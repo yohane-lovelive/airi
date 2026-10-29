@@ -5,13 +5,14 @@ Status: proposed
 ## Context
 
 AIRI speaks only after an owner message or a module event. The owner wants a character that behaves on its own, as Neuro-sama does.
-The owner has five requirements:
+The owner has four requirements:
 
 1. The character starts conversation without an owner message.
 2. The character talks while it perceives the PC screen.
 3. The character carries out tasks that the owner gives, for example game commentary and reminders.
-4. The VRM model moves its lips in time with the speech of the TTS model.
-5. The VRM model moves in natural, generated motions, not only an idle loop.
+4. The VRM model moves in natural, generated motions, not only an idle loop.
+
+The owner withdrew one earlier requirement for now: lip sync with the TTS speech. The code has `useVRMLipSync`. Nobody has verified it.
 
 ### Findings from earlier trials
 
@@ -26,12 +27,11 @@ The owner tried a first design and found three faults. The causes below are hypo
 - `notifyConversation` in `packages/stage-ui/src/stores/chat.ts` starts a turn without an owner message. The model speaks or stays silent. A silent notice leaves no history.
 - The screen pipeline is `devtools/vision.vue`, then the vision model, then text context. A chat model reads an image itself when its catalog declares image input (`use-chat-vision.ts`).
 - The character notebook holds tasks with `dueAt`, and the orchestrator sends a `spark:notify` for each due task. No tool lets the model create a task.
-- `useVRMLipSync` in `packages/stage-ui-three` already drives the VRM mouth. The input is an `AudioBufferSourceNode` only.
 - The VRM has one animation, `idle_loop.vrma`, and expression changes. The loader and the `AnimationMixer` already exist.
 
 ## Decision
 
-AIRI gets a perception layer, a speech decision layer, a mission layer, and a motion layer. The brain (requirements 1 to 3) and the body (requirements 4 and 5) can ship independently.
+AIRI gets a perception layer, a speech decision layer, a mission layer, and a motion layer. The brain (requirements 1 to 3) and the body (requirement 4) can ship independently.
 All features are off by default and apply to `apps/stage-tamagotchi` only.
 
 ### Principles
@@ -41,13 +41,29 @@ All features are off by default and apply to `apps/stage-tamagotchi` only.
 - Text carries the past. Images stay out of history, and a timeline of short notes stays in.
 - Code owns variety. State and random choice give variety. A second LLM step does not.
 - An owner instruction becomes an explicit mission. Code guarantees its time and its end.
+- Capture is free and local. Only the images that go to the model cost money, so a budget limits them.
+- The tool does not know any game. Genre-specific logic is not part of the code.
+
+### Speaking model
+
+- The speaking model is a chat model that accepts image input and returns text.
+- A realtime model that answers with audio, such as Gemini Live, is out of scope.
+- The owner chooses the model later. The design does not depend on one provider.
+- The vision module stays as a fallback for chat models without image input. In that case the quality of commentary is lower.
 
 ### Perception
 
-- A ring buffer holds screen frames at 1 frame per second for the last 60 seconds. It lives in memory only.
+- Capture runs on the PC and costs nothing. A ring buffer holds frames at up to 2 frames per second for the last 60 seconds. It lives in memory only.
 - Detectors run in code without a model call. They report a screen change, a motion amount, a loud sound, an app switch, and a long still period.
-- Each detector event has a salience value.
+- No detector knows a game. Each detector event has a salience value.
 - The buffer is not part of the prompt. A frame reaches the model only in a decision turn.
+
+### Image budget
+
+- The owner sets a budget in images per hour. The default is low.
+- The budget counts every image that goes to the model.
+- When the budget runs low, code lengthens the time between decision turns. When the budget is empty, no image goes out until the next hour.
+- Settings show the images sent in the current hour.
 
 ### Speech pressure
 
@@ -61,17 +77,26 @@ All features are off by default and apply to `apps/stage-tamagotchi` only.
 ### Decision turn
 
 - Code calls the speaking model when pressure passes the threshold.
-- The request holds 2 to 4 key frames, the timeline, the time since the last speech, and a hint of the inner state.
+- The request holds new frames, the timeline, the time since the last speech, and a hint of the inner state.
+- Frames are the ones that changed most since the last turn, not frames at equal spacing. The newest frame has full size. Older frames have a reduced size.
+- Each frame goes to the model once. The timeline carries what older frames showed. This keeps the cost of one turn near the cost of its new frames.
+- After an event, the request can include frames from before the event. A late reaction then still sees the cause.
 - Images are part of this request only. History keeps the speech text and the timeline notes.
 - The model speaks, stays silent, or writes a timeline note with the `noteTimeline` tool.
-- The speaking model must accept image input. The vision module stays as a fallback for chat models without image input.
 
 ### Timeline
 
 - The timeline is a list of short notes with times.
-- Code writes app switches, owner speech, and mission starts. The model writes events that it sees, for example "the boss fight started".
+- Code writes app switches, owner speech, and mission starts. The model writes what it sees, for example "the boss fight started".
 - Old notes are summarized so that the list stays short.
 - The timeline is the only history of what happened on screen.
+
+### Real-time games
+
+- A model call and the speech playback take several seconds. The owner accepts this delay.
+- Commentary therefore has two styles. After an event, the character reacts with frames from before the event. In between, it gives periodic commentary.
+- The stale speech rule keeps a late line from playing after a newer event.
+- The owner describes the game in the free text of the mission. The code has no game profile.
 
 ### Inner state and variety
 
@@ -95,24 +120,24 @@ An owner instruction becomes a mission. The model creates it with a tool. The ow
 - A notice gets a `mustSpeak` option. Today a notice stays silent when the model gives no visible reply, so it cannot carry a reminder.
 - Missions are stored on the device. The renderer leader checks the clock.
 
-### Body: lip sync
-
-- `useVRMLipSync` exists. This change verifies it with each TTS provider and fixes the gaps.
-- Streaming playback and `HTMLAudioElement` output can fail to reach the lip sync node. Step 0 tests this.
-- Sentence-by-sentence playback must keep the mouth in time with the audio.
-
 ### Body: motion
+
+The owner uses VRM models from outside sources. Their bones and expressions differ.
+
+- At load, code reads which humanoid bones and expressions the model has.
+- A clip or marker that needs a missing part is skipped. A missing feature turns off without an error.
+- A `.vrma` clip uses normalized humanoid bones, so one clip fits many models.
 
 Three layers stack. The team builds them in this order.
 
 1. **Library.** A set of `.vrma` clips plays when the model writes a `<|MOTION:name|>` marker. Clips cover gestures such as a wave, a nod, a shrug, and a laugh.
-2. **Speech-driven procedure.** The audio amplitude drives head nods and upper-body sway. It uses the same audio node as the lip sync.
+2. **Speech-driven procedure.** The audio amplitude drives head nods and upper-body sway.
 3. **Generated motion.** A tool turns text into a `.vrma` clip, and the library caches the result.
 
 - Motion plays on an upper-body layer of the `AnimationMixer` with a crossfade of 0.2 to 0.4 seconds. The idle loop continues.
-- Expressions and lip sync are separate layers.
+- Expressions are a separate layer.
 - Generation is not a per-utterance step. It takes seconds to minutes. A request without a library match plays the nearest clip and queues a generation for later use.
-- A community tool named Text-To-VRMA exists. This ADR did not verify its license or quality. Use it first offline, to build the library.
+- The owner allows any motion source. A community tool named Text-To-VRMA exists. This ADR did not verify its license or quality. Use it first offline, to build the library.
 
 ### Privacy
 
@@ -126,7 +151,7 @@ The speaking model is a cloud model. Frames leave the PC, so these rules are man
 
 ## Implementation boundaries
 
-- `packages/core-agent` owns the portable policy: pressure, thresholds, gates, speech types, mission rules, and the timeline. These are pure functions with a clock and a random source as inputs.
+- `packages/core-agent` owns the portable policy: pressure, thresholds, gates, budget, speech types, mission rules, and the timeline. These are pure functions with a clock and a random source as inputs.
 - `packages/stage-shared` owns frame comparison and the detectors. It has no Vue dependency.
 - `packages/stage-ui` owns the stores, the ring buffer, the decision turn, the mission store, and the tools.
 - `packages/stage-ui-three` owns the motion layers and the marker playback.
@@ -144,39 +169,41 @@ Names such as `trigger`, `condition`, and `cooldown` follow that ADR. Check upst
 
 Opinion alone cannot judge behavior. Replay evaluation compares methods on the same input.
 
-- A recorder saves timed frames and audio. A replay runs perception and decision from the recording, so the owner does not replay a game for each trial.
-- Metrics: turns per minute, the share of silence, repeated openings and structure (`distinct-n`), and the entropy of the speech types.
+- Steps 0 to 2 use synthetic event streams with a fake clock. Step 3 adds a recorder that saves timed frames and audio, and a replay that runs perception and decision from the recording.
+- Metrics: turns per minute, the share of silence, repeated openings and structure (`distinct-n`), the entropy of the speech types, and images sent per hour.
 - A judge model checks whether a speech refers to a real event in its window. Another check finds contradictions with the timeline.
 - Evaluations follow the form of `evals/asr-rewrite` and `evals/tts-speech-formula`.
-- Deterministic tests with a fake clock and a fixed random source cover pressure, gates, speech types, and missions.
+- Deterministic tests with a fake clock and a fixed random source cover pressure, gates, the budget, speech types, and missions.
 - Live checks with a real cloud model and a real screen are not part of CI. Record them in the PR.
 
 ## Non-goals
 
+- Lip sync work. The owner withdrew it for now.
 - A realtime streaming API for audio and video. The first design uses decision turns.
 - A local vision model. The first release supports cloud providers only.
 - Screen perception in `stage-web` and in `apps/stage-tamagotchi-kirie`.
 - Control of the PC from the screen content. Computer use has its own tools.
 - Storage of frames or of a long screen history.
+- Game-specific detectors or profiles.
 
 ## Steps
 
+The order follows dependencies. Each step uses the parts of the earlier steps.
+
 | Step | Content | State |
 | --- | --- | --- |
-| 0 | Verify lip sync on a real VRM with each TTS provider. Build the recorder and the replay evaluation. Measure the current behavior. | To do |
+| 0 | Policy core without the screen: pressure, gates, inner state, and speech types in `core-agent`. Evaluation harness with synthetic events. | To do |
 | 1 | Mission base and `reminder`: the `mustSpeak` notice, storage, the mission list, and the tools. | To do |
-| 2 | Speech pressure and inner state without the screen: silence and timer triggers, speech types, and repeat control. | To do |
-| 3 | Perception buffer, decision turn with images, timeline, and `commentary` and `watch` missions. | To do |
-| 4 | Motion library, markers, upper-body layer, and speech-driven procedure. | To do |
+| 2 | Autonomous talk without the screen: connect the policy core to `notifyConversation` with silence and timer triggers. Measure variety. | To do |
+| 3 | Perception: local capture, ring buffer, detectors, image budget, recorder, decision turn with images, timeline, and the `commentary` and `watch` missions. | To do |
+| 4 | Motion: model capability check, library, markers, upper-body layer, and speech-driven procedure. | To do |
 | 5 | Generated motion, topics from memory, and polish. | To do |
 
-Steps 4 and 5 do not depend on steps 1 to 3.
+Step 4 does not depend on steps 0 to 3. It comes after them so that the speech output format changes only once.
 
 ## Open work
 
-- Choose the speaking model, and set the cost limit.
+- Choose the image-capable speaking model, and set the default image budget.
 - Check upstream issues and pull requests for automation work before step 1.
-- Choose the game genres for commentary. The genre sets the needed reaction speed.
-- Choose the motion sources and check their licenses. State the VRM source of the owner.
-- Decide whether a realtime API enters a later ADR.
 - Choose the default exclusion list with the owner.
+- Decide whether a realtime API enters a later ADR.
