@@ -94,11 +94,43 @@ An `Automation` has triggers, conditions, and an optional cooldown. `checkAutoma
 Each trigger event counts once. A recipe in its cooldown, or with a run that still runs, spends the event without a run.
 Each trigger keeps its own time, so one trigger that fires never spends the event of another.
 
+## Initiative
+
+The initiative policy decides when the character starts speech without an owner message. It is the Step 0 policy core of [the autonomy ADR](../../docs/ai/adr/2026-10-28-autonomous-character-perception-and-missions.md).
+All functions are pure. The host passes the time, a random source, and the state, and it keeps the returned state.
+
+- `observeInitiative` applies an event: a detector event with a salience, an owner message, a finished turn, or a mode change.
+- `decideInitiative` runs on a host timer. It returns `wait` with a reason, or `turn` with a trigger and an optional speech type hint.
+- `isSpeechStale` tells the host to drop speech before playback, after owner input or a newer salient event.
+- `resolveInitiativeOptions` fills owner settings with defaults: intervals, quiet hours, and the daily turn budget.
+
+The drive is event pressure plus boredom. Pressure decays, and salience counts squared. Boredom grows by 1 per boredom interval of quiet.
+A turn starts when the drive passes a threshold. Low energy raises the threshold, and a random jitter changes it once per cycle.
+Gates stop a turn in this order: owner input and its grace time, speech playback, a running turn, quiet hours, the daily budget, and the refractory time.
+
+```ts
+const options = resolveInitiativeOptions(settings)
+let state = createInitiativeState(initiativeTimeFrom(new Date()))
+
+// Each second, on the renderer leader.
+const result = decideInitiative(state, host, initiativeTimeFrom(new Date()), Math.random, options)
+state = result.state
+if (result.decision.kind === 'turn') {
+  // Start one model call with result.decision.speechType as a light hint.
+  // Before playback, check isSpeechStale(state, host). Then report the outcome.
+  state = observeInitiative(state, { type: 'turn-finished', outcome: 'spoke' }, initiativeTimeFrom(new Date()), options)
+}
+```
+
+Use it to start autonomous turns and to compare policy settings. Do not use it for missions that must speak at a time, for example reminders. Those come with Step 1.
+
+`src/autonomy/simulation.ts` runs the policy against synthetic event streams with a fake clock and a seeded random source. `simulation.test.ts` checks the metrics of the ADR, for example turns per minute, silence share, and speech type entropy.
+
 ## Verify
 
 ```sh
 pnpm -F @proj-airi/core-agent typecheck
-pnpm -F @proj-airi/core-agent exec vitest run src/runtime src/messages src/agents/spark-notify
+pnpm -F @proj-airi/core-agent exec vitest run src/runtime src/messages src/agents/spark-notify src/autonomy
 ```
 
 ## Type boundaries

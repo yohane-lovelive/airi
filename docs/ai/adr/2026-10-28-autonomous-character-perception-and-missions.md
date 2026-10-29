@@ -68,7 +68,8 @@ All features are off by default and apply to `apps/stage-tamagotchi` only.
 ### Speech pressure
 
 - An event adds pressure by its salience. Pressure decays with time. A long silence adds a boredom term.
-- Each mode has a base threshold. Each check adds random jitter to it, so the gaps between turns vary.
+- Salience counts squared. Many small screen changes then add less pressure than one large change.
+- Each mode has a base threshold. Code draws a random jitter for it once in each cycle between turns, so the gaps between turns vary.
 - A refractory period follows each turn. A choice to stay silent lowers the pressure only in part.
 - A gate stops a turn when the owner types or speaks, when speech plays, or when a turn runs. Owner input always wins.
 - If a salient event happens between a decision and the playback, code drops the stale speech.
@@ -192,7 +193,7 @@ The order follows dependencies. Each step uses the parts of the earlier steps.
 
 | Step | Content | State |
 | --- | --- | --- |
-| 0 | Policy core without the screen: pressure, gates, inner state, and speech types in `core-agent`. Evaluation harness with synthetic events. | To do |
+| 0 | Policy core without the screen: pressure, gates, inner state, and speech types in `core-agent`. Evaluation harness with synthetic events. | Done |
 | 1 | Mission base and `reminder`: the `mustSpeak` notice, storage, the mission list, and the tools. | To do |
 | 2 | Autonomous talk without the screen: connect the policy core to `notifyConversation` with silence and timer triggers. Measure variety. | To do |
 | 3 | Perception: local capture, ring buffer, detectors, image budget, recorder, decision turn with images, timeline, and the `commentary` and `watch` missions. | To do |

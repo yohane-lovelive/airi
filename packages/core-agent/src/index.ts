@@ -1,3 +1,4 @@
+export * from './autonomy'
 export type { AgentContextPort } from './contracts/context-port'
 export type { ChatHookRegistry } from './contracts/hook-types'
 export type { AgentLLMPort } from './contracts/llm-port'
