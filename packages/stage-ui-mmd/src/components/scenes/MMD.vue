@@ -25,6 +25,7 @@ import {
   Color,
   DirectionalLight,
   Group,
+  NeutralToneMapping,
   NoToneMapping,
   PerspectiveCamera,
   Quaternion,
@@ -45,6 +46,7 @@ import {
   EYE_PITCH_LIMIT,
   EYE_YAW_LIMIT,
   loadMMDAnimationClip,
+  MMDPhysicalLighting,
   MMDPostProcessing,
   useMMDBlink,
   useMMDEmote,
@@ -53,13 +55,15 @@ import {
 import { DEFAULT_IDLE_MOTION } from '../../constants/actions'
 import { Emotion, EMOTION_VALUES } from '../../constants/emotions'
 import { useMMD } from '../../stores/mmd'
-import { resolveMMDGraphics } from '../../utils/mmd-graphics'
+import { resolveMMDGraphics, resolveMMDLighting } from '../../utils/mmd-graphics'
 import { loadMMDModelFromSource } from '../../utils/mmd-loader'
 import {
   applyMMDMaterialOpacity,
+  applyMMDRenderMode,
   collectMMDMaterials,
   disposeMMDObject,
   setMMDMaterialGlow,
+  setMMDRimLight,
 } from '../../utils/mmd-materials'
 import { loadVRMAnimationFile } from '../../utils/vrma-loader'
 import { mmdRigFromMesh, retargetVRMAnimationToMMD } from '../../utils/vrma-retarget'
@@ -120,6 +124,8 @@ const {
   renderScale,
   graphicsQuality,
   graphicsAdjustments,
+  renderMode,
+  materialSurfaces,
 } = storeToRefs(mmdStore)
 
 const canvasRef = ref<HTMLCanvasElement>()
@@ -133,6 +139,8 @@ let controls: OrbitControls | undefined
 let postProcessing: MMDPostProcessing | undefined
 let ambientLight: AmbientLight | undefined
 let directionalLight: DirectionalLight | undefined
+/** The environment light and shadows of hybrid and PBR modes. */
+let physicalLighting: MMDPhysicalLighting | undefined
 let modelGroup: Group | undefined
 let resolved: ResolvedMMDModel | undefined
 let mesh: SkinnedMesh | undefined
@@ -212,6 +220,13 @@ function applyTransform() {
   modelGroup.scale.setScalar(scale.value)
   modelGroup.rotation.y = rotationY.value
   modelGroup.position.set(position.value.x, position.value.y, 0)
+  placeDirectionalLight()
+}
+
+/** Aims the directional light from the owner's direction at the model, so its shadows cover the model. */
+function placeDirectionalLight() {
+  const { x, y, z } = directionalPosition.value
+  physicalLighting?.fit(modelGroup, new Vector3(x, y, z))
 }
 
 /**
@@ -226,9 +241,7 @@ function setupScene() {
   const canvas = canvasRef.value!
   renderer = new WebGLRenderer({ canvas, alpha: true, antialias: true, preserveDrawingBuffer: true })
   renderer.outputColorSpace = SRGBColorSpace
-  // MMD toon materials are not PBR/HDR; filmic tone mapping desaturates and
-  // washes them out, so render their colors directly.
-  renderer.toneMapping = NoToneMapping
+  renderer.toneMapping = directToneMapping()
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2) * renderScale.value)
 
   scene = new Scene()
@@ -244,8 +257,9 @@ function setupScene() {
   ambientLight = new AmbientLight(new Color(normalizeHex(ambientColor.value)), ambientIntensity.value)
   scene.add(ambientLight)
   directionalLight = new DirectionalLight(new Color(normalizeHex(directionalColor.value)), directionalIntensity.value)
-  directionalLight.position.set(directionalPosition.value.x, directionalPosition.value.y, directionalPosition.value.z)
   scene.add(directionalLight)
+  physicalLighting = new MMDPhysicalLighting(renderer, scene, directionalLight)
+  placeDirectionalLight()
 
   controls = new OrbitControls(camera, canvas)
   controls.enableDamping = true
@@ -401,11 +415,29 @@ function renderFrame(delta: number) {
     renderer.render(scene, camera)
 }
 
+/**
+ * The tone mapping when the scene renders without post-processing. Toon materials are not HDR, and a filmic curve
+ * washes them out, so they render directly. Physically based materials can pass 1.0, so they need a curve. The neutral
+ * curve leaves colors below about 0.8 as they are, so faces that stay toon do not change.
+ */
+function directToneMapping() {
+  return renderMode.value === 'toon' ? NoToneMapping : NeutralToneMapping
+}
+
+/** Turns the environment light, the shadows, and the rim light on or off for the render mode. */
+function applyLighting() {
+  physicalLighting?.apply(resolveMMDLighting(renderMode.value, graphicsAdjustments.value))
+  if (modelGroup)
+    setMMDRimLight(modelGroup, graphicsAdjustments.value.rimIntensity)
+}
+
 /** Builds, rebuilds, or removes the post-processing for the current graphics settings. */
 function applyGraphics() {
   if (!renderer || !scene || !camera)
     return
-  const config = resolveMMDGraphics(graphicsQuality.value, graphicsAdjustments.value)
+  const config = resolveMMDGraphics(graphicsQuality.value, graphicsAdjustments.value, renderMode.value)
+  // The post-processing has its own tone mapping pass.
+  renderer.toneMapping = config ? NoToneMapping : directToneMapping()
   if (!config) {
     postProcessing?.dispose()
     postProcessing = undefined
@@ -587,6 +619,8 @@ async function loadModel(src: string) {
     // Ensure the camera aspect matches the live canvas before fitting.
     resize()
     frameCamera()
+    applyRenderMode()
+    applyLighting()
     setMMDMaterialGlow(modelGroup, albedoGlow.value)
     mmdStore.availableMaterials = collectMMDMaterials(modelGroup)
     applyMMDMaterialOpacity(modelGroup, materialOpacity.value)
@@ -608,6 +642,15 @@ async function loadModel(src: string) {
   }
 }
 
+/** Swaps the model's materials for the render mode and the owner's material changes. */
+function applyRenderMode() {
+  if (!modelGroup)
+    return
+  applyMMDRenderMode(modelGroup, renderMode.value, materialSurfaces.value[props.modelId ?? ''])
+  // A new physical material starts at the authored opacity.
+  applyMMDMaterialOpacity(modelGroup, materialOpacity.value)
+}
+
 /** Plays the gesture motion mapped to an emotion, if the model has one. */
 function setEmotion(emotion: string, intensity = 1) {
   const value = EMOTION_VALUES.includes(emotion as Emotion) ? emotion as Emotion : Emotion.Neutral
@@ -622,6 +665,7 @@ let resizeObserver: ResizeObserver | undefined
 
 onMounted(() => {
   setupScene()
+  applyLighting()
   applyGraphics()
   resizeObserver = new ResizeObserver(() => resize())
   if (canvasRef.value)
@@ -641,6 +685,8 @@ onUnmounted(() => {
   disposeModel()
   postProcessing?.dispose()
   postProcessing = undefined
+  physicalLighting?.dispose()
+  physicalLighting = undefined
   controls?.dispose()
   backgroundTexture?.dispose()
   backgroundTexture = undefined
@@ -714,9 +760,7 @@ watch([directionalColor, directionalIntensity], () => {
   directionalLight.color.set(normalizeHex(directionalColor.value))
   directionalLight.intensity = directionalIntensity.value
 })
-watch(directionalPosition, () => {
-  directionalLight?.position.set(directionalPosition.value.x, directionalPosition.value.y, directionalPosition.value.z)
-}, { deep: true })
+watch(directionalPosition, placeDirectionalLight, { deep: true })
 
 // Scene settings — camera & rendering.
 watch(cameraFov, () => {
@@ -729,7 +773,20 @@ watch(renderScale, () => {
   renderer?.setPixelRatio(Math.min(window.devicePixelRatio, 2) * renderScale.value)
   resize()
 })
-watch([graphicsQuality, graphicsAdjustments], applyGraphics, { deep: true })
+watch([graphicsQuality, graphicsAdjustments], () => {
+  applyLighting()
+  applyGraphics()
+}, { deep: true })
+watch(renderMode, () => {
+  applyRenderMode()
+  applyLighting()
+  applyGraphics()
+})
+watch(() => materialSurfaces.value[props.modelId ?? ''], () => {
+  applyRenderMode()
+  // New physical materials start without the rim light.
+  applyLighting()
+}, { deep: true })
 watch(albedoGlow, () => {
   if (modelGroup)
     setMMDMaterialGlow(modelGroup, albedoGlow.value)

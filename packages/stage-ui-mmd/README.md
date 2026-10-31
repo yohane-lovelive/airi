@@ -16,6 +16,24 @@ reaching feature parity with the Live2D and VRM renderers:
   is `off` by default, which renders as before. Each device keeps its own
   preset, because GPUs differ. The alpha channel survives, so a transparent
   window still shows the desktop behind the model.
+- **Shading** (`utils/mmd-pbr`, `utils/mmd-materials`,
+  `composables/mmd/physical-lighting`): `toon` (the default) keeps the loaded
+  toon materials. `hybrid` swaps each material for a physically based twin,
+  but faces and eyes stay toon. `pbr` swaps every material. The twin takes
+  the slot of the toon material, so three-mmd's SDEF shadow pass still finds
+  it. A mode change needs no reload. Hybrid and PBR add a studio environment
+  light, soft self-shadows, a rim light, and, on the high preset, ambient
+  occlusion.
+  - The kind of each material (face, eyes, skin, hair, cloth, fur, leather,
+    metal, other) sets its roughness, metalness, sheen, and gloss coat. AIRI
+    guesses it from the material name, then the texture file name, in
+    Japanese, English, or romaji (`kami.bmp` is hair).
+  - A material whose vertices mostly follow the head bone `頭` is the face,
+    unless its name says hair or eyes. PMD face skin often has no name, or the
+    name of a shared texture.
+  - The owner can change the kind and the values of each material. The
+    device keeps the changes for each model, by material index. Names do not
+    work as keys, because one name can cover the face skin and the clothes.
 - **VRM motions** (`utils/vrma-retarget`, `utils/vrma-loader`): retargets a
   `.vrma` clip to the standard MMD bones, with a rest pose correction for the
   A-pose and positions for the leg IK bones, so IK stays on. The scene plays

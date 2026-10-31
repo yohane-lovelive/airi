@@ -34,4 +34,19 @@ describe('mMDPostProcessing', () => {
     expect(renderer.autoClear).toBe(true)
     expect(renderer.toneMappingExposure).toBe(1)
   })
+
+  it('renders ambient occlusion for the high preset with physical shading', () => {
+    const renderer = new WebGLRenderer({ canvas: document.createElement('canvas'), alpha: true })
+    renderers.push(renderer)
+    renderer.setSize(64, 64, false)
+
+    const config = resolveMMDGraphics('high', DEFAULT_MMD_GRAPHICS_ADJUSTMENTS, 'hybrid')!
+    const postProcessing = new MMDPostProcessing(renderer, new Scene(), new PerspectiveCamera())
+    postProcessing.apply(config)
+    postProcessing.render(0)
+
+    expect(config.ambientOcclusion).toBeDefined()
+    expect(renderer.getContext().getError()).toBe(renderer.getContext().NO_ERROR)
+    postProcessing.dispose()
+  })
 })

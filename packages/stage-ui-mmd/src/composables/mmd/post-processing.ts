@@ -8,8 +8,10 @@ import {
   EffectComposer,
   EffectPass,
   HueSaturationEffect,
+  NormalPass,
   RenderPass,
   SMAAEffect,
+  SSAOEffect,
   ToneMappingEffect,
   ToneMappingMode,
   VignetteEffect,
@@ -23,12 +25,13 @@ const TONE_MAPPING_MODE: Record<MMDToneMapping, ToneMappingMode> = {
 }
 
 /**
- * Renders the MMD scene through post-processing: bloom, tone mapping, color grading, the vignette, and anti-aliasing.
+ * Renders the MMD scene through post-processing: ambient occlusion, bloom, tone mapping, color grading, the vignette,
+ * and anti-aliasing.
  *
  * State model:
  * - The composer renders into half-float targets, so bright pixels keep their value until tone mapping.
  * - `apply` rebuilds the passes for a new configuration. The effects run in one pass, then SMAA runs in its own pass,
- *   because SMAA reads neighbor pixels.
+ *   because SMAA reads neighbor pixels. Ambient occlusion also needs a normal pass, which renders the scene again.
  * - The alpha channel survives. On a transparent window, bloom adds light where the alpha is 0, and the premultiplied
  *   canvas shows it as a glow over the desktop.
  *
@@ -59,7 +62,22 @@ export class MMDPostProcessing {
     // renderer keeps `NoToneMapping`.
     this.renderer.toneMappingExposure = config.exposure
 
+    this.addPass(new RenderPass(this.scene, this.camera))
+
     const effects = []
+    if (config.ambientOcclusion) {
+      const normalPass = new NormalPass(this.scene, this.camera)
+      this.addPass(normalPass)
+      // Ambient occlusion darkens the linear light, so it comes before bloom and tone mapping.
+      effects.push(new SSAOEffect(this.camera, normalPass.texture, {
+        intensity: config.ambientOcclusion.intensity,
+        luminanceInfluence: 0.95,
+        radius: 0.03,
+        samples: 16,
+        rings: 7,
+        resolutionScale: 0.5,
+      }))
+    }
     if (config.bloom) {
       effects.push(new BloomEffect({
         intensity: config.bloom.intensity,
@@ -77,7 +95,6 @@ export class MMDPostProcessing {
     if (config.vignette)
       effects.push(new VignetteEffect({ darkness: config.vignette.darkness, offset: 0.35 }))
 
-    this.addPass(new RenderPass(this.scene, this.camera))
     this.addPass(new EffectPass(this.camera, ...effects))
     if (config.smaa)
       this.addPass(new EffectPass(this.camera, new SMAAEffect()))
@@ -99,7 +116,7 @@ export class MMDPostProcessing {
     this.renderer.toneMappingExposure = this.rendererState.toneMappingExposure
   }
 
-  private addPass(pass: RenderPass | EffectPass) {
+  private addPass(pass: RenderPass | NormalPass | EffectPass) {
     this.composer.addPass(pass)
     this.disposables.push(pass)
   }

@@ -2841,6 +2841,40 @@ mmd:
     saturation: Saturation
     contrast: Contrast
     vignette: Vignette
+    render-mode: Shading
+    render-mode-options:
+      toon: Toon (as the model author made it)
+      hybrid: Hybrid (PBR, face and eyes stay toon)
+      pbr: PBR (everything)
+    environment-intensity: Studio light
+    rim-intensity: Rim light
+    shadows: Soft self-shadows
+    ambient-occlusion: Ambient occlusion
+  surfaces:
+    title: Surfaces (PBR)
+    description: >-
+      AIRI guesses each material's kind from its name and its bones. The kind
+      sets how rough, metallic, and soft the surface looks. Change a material
+      here if the guess is wrong. This device keeps the changes for each model.
+    material: Material
+    kind: Kind
+    kind-auto: Auto ({kind})
+    kinds:
+      face: Face
+      eye: Eyes
+      skin: Skin
+      hair: Hair
+      cloth: Cloth
+      fur: Fur
+      leather: Leather, latex
+      metal: Metal
+      other: Other
+    roughness: Roughness
+    metalness: Metalness
+    sheen: Cloth sheen
+    clearcoat: Gloss coat
+    stays-toon: Hybrid shading keeps faces and eyes toon. Choose another kind or PBR shading to change this material.
+    reset: Reset this material
   physics:
     title: Physics & Rig
     enabled: Enable physics (hair, skirt, accessories)

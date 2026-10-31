@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { DEFAULT_MMD_GRAPHICS_ADJUSTMENTS, resolveMMDGraphics } from './mmd-graphics'
+import { DEFAULT_MMD_GRAPHICS_ADJUSTMENTS, resolveMMDGraphics, resolveMMDLighting } from './mmd-graphics'
 
 describe('resolveMMDGraphics', () => {
   it('turns post-processing off for the off preset', () => {
@@ -41,5 +41,27 @@ describe('resolveMMDGraphics', () => {
     expect(config?.bloom).toBeUndefined()
     expect(config?.vignette).toBeUndefined()
     expect(config?.color).toBeUndefined()
+  })
+})
+
+describe('resolveMMDGraphics ambient occlusion', () => {
+  it('adds ambient occlusion only to the high preset with physical shading', () => {
+    expect(resolveMMDGraphics('high', DEFAULT_MMD_GRAPHICS_ADJUSTMENTS, 'hybrid')?.ambientOcclusion).toEqual({ intensity: 0.6 })
+    expect(resolveMMDGraphics('high', DEFAULT_MMD_GRAPHICS_ADJUSTMENTS, 'toon')?.ambientOcclusion).toBeUndefined()
+    expect(resolveMMDGraphics('medium', DEFAULT_MMD_GRAPHICS_ADJUSTMENTS, 'pbr')?.ambientOcclusion).toBeUndefined()
+  })
+})
+
+describe('resolveMMDLighting', () => {
+  it('adds no lights in toon mode', () => {
+    expect(resolveMMDLighting('toon', DEFAULT_MMD_GRAPHICS_ADJUSTMENTS)).toBeUndefined()
+  })
+
+  it('reads the light adjustments in hybrid and PBR modes', () => {
+    expect(resolveMMDLighting('pbr', { ...DEFAULT_MMD_GRAPHICS_ADJUSTMENTS, shadows: false })).toEqual({
+      environmentIntensity: 1,
+      rimIntensity: 0.3,
+      shadows: false,
+    })
   })
 })

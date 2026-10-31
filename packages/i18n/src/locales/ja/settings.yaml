@@ -2299,6 +2299,38 @@ mmd:
     saturation: 彩度
     contrast: コントラスト
     vignette: ビネット
+    render-mode: 陰影
+    render-mode-options:
+      toon: トゥーン（モデル作者の見た目どおり）
+      hybrid: ハイブリッド（PBR、顔と目はトゥーン）
+      pbr: PBR（すべて）
+    environment-intensity: スタジオ光
+    rim-intensity: リムライト
+    shadows: やわらかいセルフシャドウ
+    ambient-occlusion: アンビエントオクルージョン
+  surfaces:
+    title: 質感（PBR）
+    description: >-
+      材質の種類は、名前とボーンから自動で推定します。種類によって、表面の粗さ、金属らしさ、やわらかさが決まります。推定が違うときは、ここで変更してください。変更はモデルごとに、この端末に保存します。
+    material: 材質
+    kind: 種類
+    kind-auto: 自動（{kind}）
+    kinds:
+      face: 顔
+      eye: 目
+      skin: 肌
+      hair: 髪
+      cloth: 布
+      fur: ファー
+      leather: 革・ラテックス
+      metal: 金属
+      other: その他
+    roughness: 粗さ
+    metalness: 金属度
+    sheen: 布の光沢
+    clearcoat: 表面のつや
+    stays-toon: ハイブリッドでは、顔と目はトゥーンのままです。この材質を変えるには、別の種類か PBR を選んでください。
+    reset: この材質を元に戻す
   physics:
     title: 物理演算 & リグ
     enabled: 物理演算を有効化 (髪、スカート、アクセサリ)
