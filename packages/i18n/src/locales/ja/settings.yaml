@@ -108,7 +108,7 @@ model-select:
   panel-callout:
     support-status-header: 2D および 3D モデルの両方をサポートしています
     support-status: >
-      {select-button} をクリックしてモデルを選択またはインポートします。現在、{zip} (Live2D および Spine モデル用)、{vrm} (VRM モデル用)、{mmd} (MMD モデル用、テクスチャと一緒に圧縮したもの) に対応しています。
+      {select-button} をクリックしてモデルを選択またはインポートします。現在、{zip} (Live2D および Spine モデル用)、{vrm} (VRM モデル用)、{mmd} (MMD モデル用、モデルのフォルダーまたはその ZIP) に対応しています。
     model-type-example: >
       Neuro-sama は Live2D Inc. が開発したフレームワークによる 2D モデルを使用しており、Grok Ani (Grok Companion 内) はオープンフォーマットである VRM / MMD の 3D モデルを使用しています。
   select-model:
@@ -117,6 +117,15 @@ model-select:
     select: 選択
     import: インポート
     remove: 削除
+    mmd:
+      folder: MMD（フォルダー）
+      model-only: このファイルにはテクスチャが含まれていないため、モデルが表示されません。「MMD（フォルダー）」でモデルのフォルダーを選ぶか、フォルダーを ZIP にして取り込んでください。
+      no-model: .pmx または .pmd のモデルが見つかりませんでした。
+      failed: 'MMD モデルを取り込めませんでした: {error}'
+      choose-variant:
+        title: モデルを選択
+        description: このフォルダーには複数のモデルがあります。取り込むモデルを選んでください。
+        cancel: キャンセル
     confirm: 確定
   live2d-report:
     title: インポート前の確認

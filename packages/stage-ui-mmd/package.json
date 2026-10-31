@@ -24,6 +24,7 @@
     "./stores": "./src/stores/index.ts",
     "./stores/mmd": "./src/stores/mmd.ts",
     "./utils/mmd-loader": "./src/utils/mmd-loader.ts",
+    "./utils/mmd-package": "./src/utils/mmd-package.ts",
     "./utils/mmd-preview": "./src/utils/mmd-preview.ts",
     "./utils/mmd-validator": "./src/utils/mmd-validator.ts",
     "./utils/mmd-zip-loader": "./src/utils/mmd-zip-loader.ts",

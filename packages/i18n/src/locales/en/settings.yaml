@@ -120,7 +120,7 @@ model-select:
     support-status: >
       Click {select-button} to select or import models.
       Currently, {zip} (for Live2D and Spine models), {vrm} (for VRM models),
-      and {mmd} (for MMD models, zipped with their textures) are supported.
+      and {mmd} (for MMD models, as the model folder or a ZIP of it) are supported.
     model-type-example: >
       Neuro-sama uses 2D model driven by framework developed by Live2D Inc,
       while Grok Ani (in Grok Companion) uses 3D model driven by VRM / MMD open formats.
@@ -130,6 +130,15 @@ model-select:
     select: Pick
     import: Import
     remove: Remove
+    mmd:
+      folder: MMD folder
+      model-only: This file has no textures, so the model would show blank. Import the model folder with "MMD folder", or a ZIP of the folder.
+      no-model: No .pmx or .pmd model was found.
+      failed: 'Could not import the MMD model: {error}'
+      choose-variant:
+        title: Choose a model
+        description: This folder has more than one model. Choose the one to import.
+        cancel: Cancel
     sync:
       upload: Upload to cloud
       delete-cloud: Delete from cloud

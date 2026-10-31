@@ -1,18 +1,23 @@
 <script setup lang="ts">
 import type { Live2DValidationReport } from '@proj-airi/stage-ui-live2d'
+import type { MMDPackageEntry } from '@proj-airi/stage-ui-mmd/utils/mmd-package'
+import type { MMDModelVariant } from '@proj-airi/stage-ui-mmd/utils/mmd-zip-loader'
 import type { TachieValidationReport } from '@proj-airi/stage-ui-tachie'
 
 import type { DisplayModel } from '../../../../stores/display-models'
 
+import { errorMessageFrom } from '@moeru/std'
 import { validateLive2DZip } from '@proj-airi/stage-ui-live2d'
+import { entriesFromFolder, entriesFromZip, packMMDModel, variantsOf } from '@proj-airi/stage-ui-mmd/utils/mmd-package'
 import { TACHIE_ARCHIVE_SUFFIX, validateTachieZip } from '@proj-airi/stage-ui-tachie'
-import { Button } from '@proj-airi/ui'
+import { Alert, Button } from '@proj-airi/ui'
 import { useFileDialog } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
 import { DropdownMenuContent, DropdownMenuItem, DropdownMenuPortal, DropdownMenuRoot, DropdownMenuTrigger, EditableArea, EditableEditTrigger, EditableInput, EditablePreview, EditableRoot, EditableSubmitTrigger } from 'reka-ui'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
+import MmdVariantModal from './mmd-variant-modal.vue'
 import Live2DReportModal from './reports/live2d/modal.vue'
 import TachieReportModal from './tachieReportModal.vue'
 
@@ -169,35 +174,79 @@ async function handleAddSpineModel(file: FileList | null) {
   highlightDisplayModelCard.value = displayModel.id
 }
 
+/** A message about the last MMD import, shown above the model list. */
+const mmdNotice = ref<string>()
+const showMmdVariantModal = ref(false)
+const mmdVariants = ref<MMDModelVariant[]>([])
+let pendingMmdEntries: MMDPackageEntry[] = []
+
+// NOTICE:
+// Keep the await on addDisplayModel for the same import-then-pick race as the other formats.
+// Source/context: model selector import flow -> settings model pick -> settings-stage-model.getDisplayModel().
+// Removal condition: addDisplayModel becomes a synchronous transaction or pick is blocked by explicit import state.
+async function importMmdFile(file: File) {
+  const displayModel = await displayModelStore.addDisplayModel(DisplayModelFormat.PMXZip, file)
+  highlightDisplayModelCard.value = displayModel.id
+}
+
+/**
+ * Imports an MMD package. A package with one model goes in as it is, or packed when it came from a folder. A package
+ * with several models asks which one to import, and only that model goes in.
+ */
+async function importMmdPackage(entries: MMDPackageEntry[], original?: File) {
+  const variants = variantsOf(entries)
+  if (variants.length === 0) {
+    mmdNotice.value = t('settings.model-select.select-model.mmd.no-model')
+    return
+  }
+  if (variants.length === 1) {
+    await importMmdFile(original ?? await packMMDModel(entries, variants[0]))
+    return
+  }
+  pendingMmdEntries = entries
+  mmdVariants.value = variants
+  showMmdVariantModal.value = true
+}
+
+async function runMmdImport(work: () => Promise<void>) {
+  mmdNotice.value = undefined
+  try {
+    await work()
+  }
+  catch (error) {
+    // Surface the failure instead of leaving the dialog looking inert.
+    console.error('[model-selector] failed to import MMD model:', error)
+    mmdNotice.value = t('settings.model-select.select-model.mmd.failed', { error: errorMessageFrom(error) ?? '' })
+  }
+}
+
 async function handleAddMMDModel(file: FileList | null) {
   if (file === null || file.length === 0)
     return
 
   const picked = file[0]
-  const lower = picked.name.toLowerCase()
-  // MMD distributes models as a zip (model + textures) or, less commonly, as a
-  // bare .pmx/.pmd. The renderer detects zip vs raw by magic bytes at load
-  // time, so the format here is mainly a label; .pmd keeps its own enum value.
-  let format: DisplayModelFormat
-  if (lower.endsWith('.pmd'))
-    format = DisplayModelFormat.PMD
-  else if (lower.endsWith('.pmx') || lower.endsWith('.zip'))
-    format = DisplayModelFormat.PMXZip
-  else
+  // A model file alone has no textures. They sit beside it in its folder, so the model would render blank.
+  if (/\.(?:pmx|pmd)$/i.test(picked.name)) {
+    mmdNotice.value = t('settings.model-select.select-model.mmd.model-only')
+    return
+  }
+  if (!picked.name.toLowerCase().endsWith('.zip'))
     return
 
-  // NOTICE:
-  // Keep this await for the same import-then-pick race as the other formats.
-  // Source/context: model selector import flow -> settings model pick -> settings-stage-model.getDisplayModel().
-  // Removal condition: addDisplayModel becomes a synchronous transaction or pick is blocked by explicit import state.
-  try {
-    const displayModel = await displayModelStore.addDisplayModel(format, picked)
-    highlightDisplayModelCard.value = displayModel.id
-  }
-  catch (err) {
-    // Surface the failure instead of leaving the dialog looking inert.
-    console.error('[model-selector] failed to import MMD model:', err)
-  }
+  await runMmdImport(async () => importMmdPackage(await entriesFromZip(picked), picked))
+}
+
+async function handleAddMMDFolder(files: FileList | null) {
+  if (files === null || files.length === 0)
+    return
+
+  await runMmdImport(() => importMmdPackage(entriesFromFolder(files)))
+}
+
+async function handleChooseMmdVariant(variant: MMDModelVariant) {
+  const entries = pendingMmdEntries
+  pendingMmdEntries = []
+  await runMmdImport(async () => importMmdFile(await packMMDModel(entries, variant)))
 }
 
 const mapFormatRenderer: Record<DisplayModelFormat, string> = {
@@ -216,12 +265,15 @@ const vrmDialog = useFileDialog({ accept: '.vrm', multiple: false, reset: true }
 const spineDialog = useFileDialog({ accept: '.zip', multiple: false, reset: true })
 const tachieDialog = useFileDialog({ accept: TACHIE_ARCHIVE_SUFFIX, multiple: false, reset: true })
 const mmdDialog = useFileDialog({ accept: '.zip,.pmx,.pmd', multiple: false, reset: true })
+// MMD models usually come as a folder with the model and its textures.
+const mmdFolderDialog = useFileDialog({ directory: true, multiple: true, reset: true })
 
 live2dDialog.onChange(handleAddLive2DModel)
 vrmDialog.onChange(handleAddVRMModel)
 spineDialog.onChange(handleAddSpineModel)
 tachieDialog.onChange(handleAddTachieModel)
 mmdDialog.onChange(handleAddMMDModel)
+mmdFolderDialog.onChange(handleAddMMDFolder)
 </script>
 
 <template>
@@ -235,6 +287,11 @@ mmdDialog.onChange(handleAddMMDModel)
       v-model:open="showTachieReportModal"
       :report="tachieValidationReport"
       @confirm="confirmTachieImport"
+    />
+    <MmdVariantModal
+      v-model:open="showMmdVariantModal"
+      :variants="mmdVariants"
+      @choose="handleChooseMmdVariant"
     />
 
     <div flex items-center>
@@ -314,6 +371,17 @@ mmdDialog.onChange(handleAddMMDModel)
                   'data-[highlighted]:bg-primary-300/20 dark:data-[highlighted]:bg-primary-100/20',
                   'data-[highlighted]:text-primary-400 dark:data-[highlighted]:text-primary-200',
                 ]"
+                transition="colors duration-200 ease-in-out" @click="mmdFolderDialog.open()"
+              >
+                {{ t('settings.model-select.select-model.mmd.folder') }}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                :class="[
+                  'data-[disabled]:text-mauve8 relative flex cursor-pointer select-none items-center rounded-md px-3 py-2 leading-none outline-none data-[disabled]:pointer-events-none',
+                  'text-base sm:text-sm',
+                  'data-[highlighted]:bg-primary-300/20 dark:data-[highlighted]:bg-primary-100/20',
+                  'data-[highlighted]:text-primary-400 dark:data-[highlighted]:text-primary-200',
+                ]"
                 transition="colors duration-200 ease-in-out"
                 @click="tachieDialog.open()"
               >
@@ -324,6 +392,9 @@ mmdDialog.onChange(handleAddMMDModel)
         </DropdownMenuRoot>
       </div>
     </div>
+    <Alert v-if="mmdNotice" tone="warning">
+      {{ mmdNotice }}
+    </Alert>
     <div v-if="displayModelsFromIndexedDBLoading">
       Loading display models...
     </div>

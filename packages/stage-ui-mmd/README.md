@@ -8,7 +8,12 @@ Renders PMX/PMD models with VMD/VPD motion support inside AIRI's stage,
 reaching feature parity with the Live2D and VRM renderers:
 
 - **Model loading** for `.pmx`/`.pmd`, from a packaged ZIP (model + textures)
-  or a bare model URL.
+  or a bare model URL. ZIP names without the UTF-8 flag are read as Shift_JIS
+  when they are not valid UTF-8, as older Windows and Japanese tools write them.
+- **Model packages** (`utils/mmd-package`): reads a picked folder or a ZIP,
+  lists its models, and packs one model with its textures into a ZIP for the
+  loader. The model selector uses it for folder import and for folders that
+  hold several models, for example the outfits of one character.
 - **Physics** for hair, skirts, and custom rigs via Bullet (Ammo.js) — rigid
   bodies and 6-DOF spring joints, toggleable at runtime.
 - **IK** (CCD solver) and **append-bone ("grant")** propagation for standard
