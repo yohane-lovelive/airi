@@ -22,6 +22,7 @@ Add a `settings` feature to the resource API. It uses `createFieldSyncStore` lik
   - Secrets, for example API keys, tokens, and the voiceprint. The field store keeps values as plain JSON.
   - Values that belong to one device, for example audio devices, window placement, render quality, and connection addresses.
   - Features that must run on one device only, for example the Discord bot and missions.
+- The renderer leader runs a sync 1.5 seconds after a local change, on sign-in, and when the experiment turns on. It also reads the server when the page becomes visible or the window becomes the leader, at most once each 10 seconds. A hidden tab can report these events many times in a row.
 - On a conflict, the server value applies. A settings group has a fixed id, so the client keeps no conflict copy.
 - A new device that has only default values takes the server values on its first run.
 - Synchronization is a client-owned experiment, `settings-sync`, off by default.

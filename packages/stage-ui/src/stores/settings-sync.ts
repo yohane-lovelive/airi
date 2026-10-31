@@ -20,6 +20,11 @@ const SETTINGS_PATH = '/api/v1/settings'
 const SYNC_STATE_NAME = 'settings'
 /** Settings change in bursts, for example while a slider moves. One run after the burst sends them together. */
 const CHANGE_DEBOUNCE_MS = 1_500
+/**
+ * A run that only reads changes from other devices, after the page becomes visible or this window becomes the leader,
+ * starts at most this often. A hidden tab can report these events many times in a row.
+ */
+const PULL_INTERVAL_MS = 10_000
 
 /**
  * Synchronizes the allowed settings of this device with the account on the server.
@@ -40,12 +45,13 @@ export const useSettingsSyncStore = defineStore('settings-sync', () => {
   const featureFlags = useFeatureFlagsStore()
   const enabled = computed(() => featureFlags.isEnabled(SETTINGS_SYNC_FLAG.key))
 
-  let leadership: SyncedPiniaRuntime | undefined
+  let leadership: Pick<SyncedPiniaRuntime, 'isLeader' | 'onLeadershipChange'> | undefined
   let syncClient: DocumentSyncClient | undefined
   let activeRun: Promise<void> | undefined
   let hasQueuedRun = false
   /** True while a run writes received settings, so their own `storage` events do not request another run. */
   let applying = false
+  let lastRunStartedAt = Number.NEGATIVE_INFINITY
 
   function canRun() {
     return !!leadership?.isLeader() && enabled.value && userId.value !== 'local'
@@ -90,6 +96,7 @@ export const useSettingsSyncStore = defineStore('settings-sync', () => {
     activeRun = (async () => {
       do {
         hasQueuedRun = false
+        lastRunStartedAt = Date.now()
         try {
           await runOnce(userId.value)
         }
@@ -109,6 +116,12 @@ export const useSettingsSyncStore = defineStore('settings-sync', () => {
 
   const requestAfterChange = useDebounceFn(() => void synchronizeSettings(), CHANGE_DEBOUNCE_MS)
 
+  /** Reads the changes of other devices, unless a run started a short time ago. */
+  function requestPull() {
+    if (Date.now() - lastRunStartedAt >= PULL_INTERVAL_MS)
+      void synchronizeSettings()
+  }
+
   useEventListener(window, 'storage', (event: StorageEvent) => {
     if (applying || event.storageArea !== localStorage || event.key === null || !SETTINGS_SYNC_KEY_GROUPS.has(event.key))
       return
@@ -122,21 +135,24 @@ export const useSettingsSyncStore = defineStore('settings-sync', () => {
   const visibility = useDocumentVisibility()
   watch(visibility, (state) => {
     if (state === 'visible')
-      void synchronizeSettings()
+      requestPull()
   })
 
   let stopLeadershipListener: (() => void) | undefined
 
   /** Starts the synchronization in the renderer leader. Later calls do nothing. */
-  function initialize(syncedPinia: SyncedPiniaRuntime) {
+  function initialize(syncedPinia: Pick<SyncedPiniaRuntime, 'isLeader' | 'onLeadershipChange'>) {
     if (leadership)
       return
     leadership = syncedPinia
+    // The runtime calls the listener at once with the current state, so this also starts the first run. The library
+    // reports each `leadershipchange` event, so only a change from follower to leader requests a run.
+    let wasLeader = false
     stopLeadershipListener = syncedPinia.onLeadershipChange((isLeader) => {
-      if (isLeader)
-        void synchronizeSettings()
+      if (isLeader && !wasLeader)
+        requestPull()
+      wasLeader = isLeader
     })
-    void synchronizeSettings()
   }
 
   function dispose() {
