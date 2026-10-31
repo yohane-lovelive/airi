@@ -96,7 +96,8 @@ services:
       S3_FORCE_PATH_STYLE: 'true'
       S3_REGION: us-east-1
     healthcheck:
-      test: ['CMD-SHELL', 'wget -qO- http://localhost:3000/readyz >/dev/null']
+      # The server listens on IPv4 only. In the container, `localhost` can resolve to `::1` first, so the check uses 127.0.0.1.
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:3000/readyz >/dev/null']
       interval: 10s
       timeout: 5s
       retries: 10
@@ -120,7 +121,8 @@ services:
       REDIS_URL: redis://redis:6379
       RESOURCE_SERVER_URL: http://api:3000
     healthcheck:
-      test: ['CMD-SHELL', 'wget -qO- http://localhost:3000/readyz >/dev/null']
+      # Same reason as the API check above.
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:3000/readyz >/dev/null']
       interval: 10s
       timeout: 5s
       retries: 10
