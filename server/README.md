@@ -65,6 +65,13 @@ through your own server. The steps use the local stack above.
    docker compose -f server/docker-compose.yaml exec db psql -U postgres -c "UPDATE \"user\" SET email_verified = true WHERE email = 'you@example.com';"
    ```
 
+   PowerShell does not read `\"` as a quote. In PowerShell, send the SQL
+   through standard input:
+
+   ```powershell
+   'UPDATE "user" SET email_verified = true WHERE email = ''you@example.com'';' | docker compose -f server/docker-compose.yaml exec -T db psql -U postgres
+   ```
+
 6. Sign in on each device with the same account. Chats sync at once.
 7. In Settings > System > Experimental Features, turn on the sync features
    that you want: character cards, models, and settings.
