@@ -502,6 +502,22 @@ The order follows dependencies. Each step uses the parts of the earlier steps. E
 Step 4 does not depend on steps 0 to 3. It comes after them so that the speech output format changes only once.
 The memory ADR has its own steps. They can run beside steps 1 to 4.
 
+## Work outside the steps
+
+The owner asked for this work between the steps. It is not in the step table, but some of it supports later steps.
+
+| Work | Where | State |
+| --- | --- | --- |
+| VRM motions on MMD models: the `.vrma` retarget in [Body: motion](#body-motion), and the VRM idle loop as the default MMD idle. Helper IK, for example `左腕WIK` under `左ひじ`, follows its parent. | `packages/stage-ui-mmd` | Done. It is the base of the step 4 library on MMD models. |
+| MMD import from a folder: a model choice for a folder or ZIP with several models, and Shift_JIS ZIP names. | `packages/stage-ui-mmd`, `packages/stage-ui` | Done |
+| MMD graphics, phase 1: the post-processing presets `off`, `low`, `medium`, and `high`. They add bloom, tone mapping, color grading, the vignette, and anti-aliasing. | `packages/stage-ui-mmd` | Done |
+| MMD graphics, phase 2: the `toon`, `hybrid`, and `pbr` render modes. They add environment light, soft shadows, a rim light, ambient occlusion, and tuning for each material. | `packages/stage-ui-mmd`, `packages/stage-ui` | Done. Not checked in the desktop app yet. |
+| MMD graphics, phase 3: depth of field that keeps the head bone `頭` sharp, and chromatic aberration. Depth of field works only with a background image. | `packages/stage-ui-mmd`, `packages/stage-ui` | Done. Not checked in the desktop app yet. |
+| MMD graphics, phase 4: stage models (`.x` and PMX) and particles. | — | On hold |
+| Settings sync between devices through a self-hosted server. [ADR 2026-10-31](../../../server/docs/ai/adr/2026-10-31-settings-sync.md) has the design. API keys do not sync. | `server/apps/api`, `packages/stage-ui` | Done. Memories, recipes, and missions wait for the memory ADR. |
+| A proxy for the OpenCode Go API in the web dev server. | `apps/stage-web` | Done |
+| Desktop fixes: the floating chat no longer stays empty after a side switch. The overlay windows hide the Vue DevTools button. | `apps/stage-tamagotchi` | Done |
+
 ## Open work
 
 - Agree on the step 0 defaults with the owner. They are about 15 minutes for idle talk, 45 seconds for commentary, and 200 turns each day.
