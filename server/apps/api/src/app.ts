@@ -21,6 +21,7 @@ import type { ProductEventService } from './services/domain/product-events'
 import type { ProviderCatalogService } from './services/domain/provider-catalog'
 import type { ProviderService } from './services/domain/providers'
 import type { RequestLogService } from './services/domain/request-log'
+import type { SettingsSyncService } from './services/domain/settings-sync'
 import type { UserDeletionService } from './services/domain/user-deletion'
 import type { VoicePackService } from './services/domain/voice-packs'
 import type { HonoEnv } from './types/hono'
@@ -71,6 +72,7 @@ import { createLlmRequestRoutes } from './routes/llm-requests'
 import { createV1Routes } from './routes/openai/v1'
 import { createProviderRoutes } from './routes/providers'
 import { createRevenuecatRoutes } from './routes/revenuecat'
+import { createSettingsSyncRoutes } from './routes/settings-sync'
 import { createStripeRoutes } from './routes/stripe'
 import { createVoicePackRoutes } from './routes/voice-packs'
 import { accountEventsStream, createUserDeletedEventHandler } from './services/adapters/account-events'
@@ -95,6 +97,7 @@ import { createProductEventService } from './services/domain/product-events'
 import { createProviderCatalogService } from './services/domain/provider-catalog'
 import { createProviderService } from './services/domain/providers'
 import { createRequestLogService } from './services/domain/request-log'
+import { createSettingsSyncService } from './services/domain/settings-sync'
 import { createUploadSessionService } from './services/domain/upload-sessions'
 import { createUserDeletionService } from './services/domain/user-deletion'
 import { createVoicePackService } from './services/domain/voice-packs'
@@ -105,6 +108,7 @@ import { getTrustedOrigin } from './utils/origin'
 interface AppDeps {
   db: Database
   characterCardService: CharacterCardService
+  settingsSyncService: SettingsSyncService
   characterService: CharacterService
   chatService: ChatService
   providerService: ProviderService
@@ -401,6 +405,11 @@ export async function buildApp(deps: AppDeps) {
     .route('/api/v1/character-cards', createCharacterCardRoutes(deps.characterCardService))
 
     /**
+     * Settings routes synchronize the allowed settings of a user between devices.
+     */
+    .route('/api/v1/settings', createSettingsSyncRoutes(deps.settingsSyncService))
+
+    /**
      * Display model routes sync imported Live2D and VRM originals through private object storage.
      */
     .route('/api/v1/display-models', createDisplayModelRoutes(deps.displayModelService))
@@ -638,6 +647,11 @@ export async function createApp() {
     build: ({ dependsOn }) => createCharacterCardService(dependsOn.db),
   })
 
+  const settingsSyncService = injeca.provide('services:settingsSync', {
+    dependsOn: { db },
+    build: ({ dependsOn }) => createSettingsSyncService(dependsOn.db),
+  })
+
   // Envelope crypto for at-rest upstream key decryption. Shared by provider
   // config rows, the LLM router (HTTP chat / TTS), and the audio-speech-ws
   // proxy (streaming TTS) so a single master-key change rotates every surface.
@@ -766,7 +780,7 @@ export async function createApp() {
   // Domain knowledge stays inside each service instead of being copied into
   // a parallel handler file.
   const userDeletionService = injeca.provide('services:userDeletion', {
-    dependsOn: { paymentService, fluxService, providerService, characterService, characterCardService, chatService, accountEvents },
+    dependsOn: { paymentService, fluxService, providerService, characterService, characterCardService, settingsSyncService, chatService, accountEvents },
     build: ({ dependsOn }) => {
       const service = createUserDeletionService()
       // priority: 20 = financial / cache state (Flux balance + Redis),
@@ -777,6 +791,7 @@ export async function createApp() {
       service.register({ name: 'providers', priority: 30, softDelete: ({ userId }) => dependsOn.providerService.deleteAllForUser(userId) })
       service.register({ name: 'characters', priority: 30, softDelete: ({ userId }) => dependsOn.characterService.deleteAllForUser(userId) })
       service.register({ name: 'characterCards', priority: 30, softDelete: ({ userId }) => dependsOn.characterCardService.deleteAllForUser(userId) })
+      service.register({ name: 'settings', priority: 30, softDelete: ({ userId }) => dependsOn.settingsSyncService.deleteAllForUser(userId) })
       service.register({ name: 'chats', priority: 30, softDelete: ({ userId }) => dependsOn.chatService.deleteAllForUser(userId) })
       service.register(createUserDeletedEventHandler(dependsOn.accountEvents))
       return service
@@ -810,6 +825,7 @@ export async function createApp() {
     objectStore,
     db,
     characterCardService,
+    settingsSyncService,
     characterService,
     chatService,
     providerService,
@@ -846,6 +862,7 @@ export async function createApp() {
   const appDeps = {
     db: resolved.db,
     characterCardService: resolved.characterCardService,
+    settingsSyncService: resolved.settingsSyncService,
     characterService: resolved.characterService,
     chatService: resolved.chatService,
     providerService: resolved.providerService,

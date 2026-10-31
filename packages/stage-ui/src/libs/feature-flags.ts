@@ -60,6 +60,18 @@ export const DISPLAY_MODEL_SYNC_FLAG: FeatureFlag = {
 }
 
 /**
+ * Synchronizes the allowed settings with the account, for example on a self-hosted server. A device choice, off by
+ * default, so no setting leaves the device without opt-in.
+ */
+export const SETTINGS_SYNC_FLAG: FeatureFlag = {
+  key: 'settings-sync',
+  titleKey: 'settings.pages.system.experimental.features.settings_sync.title',
+  descriptionKey: 'settings.pages.system.experimental.features.settings_sync.description',
+  defaultEnabled: false,
+  availability: 'local',
+}
+
+/**
  * The fullscreen mode of the desktop app, where settings and the chat open beside the character. It is a device
  * choice, off by default, and the standalone settings window stays the default.
  *
@@ -84,7 +96,7 @@ export const FULLSCREEN_WORKSPACE_FLAG = {
 } as const satisfies FeatureFlag
 
 /** Only implemented experiments belong here. An empty catalog produces an empty settings page. */
-export const featureFlags: readonly FeatureFlag[] = [CHARACTER_CARD_SYNC_FLAG, DISPLAY_MODEL_SYNC_FLAG, FULLSCREEN_WORKSPACE_FLAG]
+export const featureFlags: readonly FeatureFlag[] = [CHARACTER_CARD_SYNC_FLAG, DISPLAY_MODEL_SYNC_FLAG, SETTINGS_SYNC_FLAG, FULLSCREEN_WORKSPACE_FLAG]
 
 /** The variant of a feature: the saved one while the feature still offers it, otherwise the first one. */
 export function resolveFeatureVariant(feature: FeatureFlag | undefined, saved: string | undefined): string | undefined {
