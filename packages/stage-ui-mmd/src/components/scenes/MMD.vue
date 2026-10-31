@@ -45,6 +45,7 @@ import {
   EYE_PITCH_LIMIT,
   EYE_YAW_LIMIT,
   loadMMDAnimationClip,
+  MMDPostProcessing,
   useMMDBlink,
   useMMDEmote,
   useMMDLipSync,
@@ -52,6 +53,7 @@ import {
 import { DEFAULT_IDLE_MOTION } from '../../constants/actions'
 import { Emotion, EMOTION_VALUES } from '../../constants/emotions'
 import { useMMD } from '../../stores/mmd'
+import { resolveMMDGraphics } from '../../utils/mmd-graphics'
 import { loadMMDModelFromSource } from '../../utils/mmd-loader'
 import {
   applyMMDMaterialOpacity,
@@ -116,6 +118,8 @@ const {
   directionalPosition,
   albedoGlow,
   renderScale,
+  graphicsQuality,
+  graphicsAdjustments,
 } = storeToRefs(mmdStore)
 
 const canvasRef = ref<HTMLCanvasElement>()
@@ -125,6 +129,8 @@ let renderer: WebGLRenderer | undefined
 let scene: Scene | undefined
 let camera: PerspectiveCamera | undefined
 let controls: OrbitControls | undefined
+/** Present while the graphics quality is not `off`. Without it, the scene renders directly. */
+let postProcessing: MMDPostProcessing | undefined
 let ambientLight: AmbientLight | undefined
 let directionalLight: DirectionalLight | undefined
 let modelGroup: Group | undefined
@@ -155,8 +161,8 @@ function canvasElement() {
 function captureFrame(): Promise<Blob | null> | undefined {
   if (!renderer || !scene || !camera)
     return undefined
-  // preserveDrawingBuffer keeps the last frame readable for the snapshot.
-  renderer.render(scene, camera)
+  // preserveDrawingBuffer keeps the last frame readable for the snapshot. The snapshot goes through the same effects.
+  renderFrame(0)
   return new Promise(resolve => canvasRef.value?.toBlob(resolve, 'image/png'))
 }
 
@@ -357,6 +363,7 @@ function resize() {
   if (w === 0 || h === 0)
     return
   renderer.setSize(w, h, false)
+  postProcessing?.setSize(w, h)
   camera.aspect = w / h
   camera.updateProjectionMatrix()
   layoutBackground()
@@ -382,7 +389,31 @@ function renderLoop() {
   }
 
   controls?.update()
-  renderer.render(scene, camera)
+  renderFrame(delta)
+}
+
+function renderFrame(delta: number) {
+  if (!renderer || !scene || !camera)
+    return
+  if (postProcessing)
+    postProcessing.render(delta)
+  else
+    renderer.render(scene, camera)
+}
+
+/** Builds, rebuilds, or removes the post-processing for the current graphics settings. */
+function applyGraphics() {
+  if (!renderer || !scene || !camera)
+    return
+  const config = resolveMMDGraphics(graphicsQuality.value, graphicsAdjustments.value)
+  if (!config) {
+    postProcessing?.dispose()
+    postProcessing = undefined
+    return
+  }
+  postProcessing ??= new MMDPostProcessing(renderer, scene, camera)
+  postProcessing.apply(config)
+  resize()
 }
 
 function disposeModel() {
@@ -591,6 +622,7 @@ let resizeObserver: ResizeObserver | undefined
 
 onMounted(() => {
   setupScene()
+  applyGraphics()
   resizeObserver = new ResizeObserver(() => resize())
   if (canvasRef.value)
     resizeObserver.observe(canvasRef.value)
@@ -607,6 +639,8 @@ onUnmounted(() => {
   resizeObserver?.disconnect()
   loadGeneration++
   disposeModel()
+  postProcessing?.dispose()
+  postProcessing = undefined
   controls?.dispose()
   backgroundTexture?.dispose()
   backgroundTexture = undefined
@@ -695,6 +729,7 @@ watch(renderScale, () => {
   renderer?.setPixelRatio(Math.min(window.devicePixelRatio, 2) * renderScale.value)
   resize()
 })
+watch([graphicsQuality, graphicsAdjustments], applyGraphics, { deep: true })
 watch(albedoGlow, () => {
   if (modelGroup)
     setMMDMaterialGlow(modelGroup, albedoGlow.value)

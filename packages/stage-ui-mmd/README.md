@@ -10,6 +10,12 @@ reaching feature parity with the Live2D and VRM renderers:
 - **Model loading** for `.pmx`/`.pmd`, from a packaged ZIP (model + textures)
   or a bare model URL. ZIP names without the UTF-8 flag are read as Shift_JIS
   when they are not valid UTF-8, as older Windows and Japanese tools write them.
+- **Graphics** (`utils/mmd-graphics`, `composables/mmd/post-processing`):
+  optional post-processing with bloom, tone mapping (Neutral, AgX, or ACES),
+  color grading, the vignette, and SMAA or multisampling. The quality preset
+  is `off` by default, which renders as before. Each device keeps its own
+  preset, because GPUs differ. The alpha channel survives, so a transparent
+  window still shows the desktop behind the model.
 - **VRM motions** (`utils/vrma-retarget`, `utils/vrma-loader`): retargets a
   `.vrma` clip to the standard MMD bones, with a rest pose correction for the
   A-pose and positions for the leg IK bones, so IK stays on. The scene plays

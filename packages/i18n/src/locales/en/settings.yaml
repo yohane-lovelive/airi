@@ -2821,6 +2821,26 @@ mmd:
     title: Extract colors from model
     button-extract:
       title: Extract
+  graphics:
+    title: Graphics
+    description: Post-processing makes the model glow and sets the color tone. Higher quality uses more GPU time. This device keeps its own setting.
+    quality: Quality
+    quality-options:
+      off: Off (as before)
+      low: Low
+      medium: Medium
+      high: High
+    tone-mapping: Tone mapping
+    tone-mapping-options:
+      neutral: Neutral (keeps the colors)
+      agx: AgX (film look)
+      aces: ACES (high contrast)
+    exposure: Exposure
+    bloom-intensity: Bloom strength
+    bloom-threshold: Bloom threshold
+    saturation: Saturation
+    contrast: Contrast
+    vignette: Vignette
   physics:
     title: Physics & Rig
     enabled: Enable physics (hair, skirt, accessories)

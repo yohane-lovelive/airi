@@ -2279,6 +2279,26 @@ mmd:
     title: モデルからテーマカラーを抽出
     button-extract:
       title: 抽出
+  graphics:
+    title: グラフィック
+    description: 後処理でモデルの光り方と色調を整えます。品質を上げるほど GPU を使います。この設定は端末ごとに保存します。
+    quality: 品質
+    quality-options:
+      off: オフ（今までどおり）
+      low: 低
+      medium: 中
+      high: 高
+    tone-mapping: トーンマッピング
+    tone-mapping-options:
+      neutral: Neutral（色を保つ）
+      agx: AgX（映画風）
+      aces: ACES（高コントラスト）
+    exposure: 露出
+    bloom-intensity: ブルームの強さ
+    bloom-threshold: ブルームのしきい値
+    saturation: 彩度
+    contrast: コントラスト
+    vignette: ビネット
   physics:
     title: 物理演算 & リグ
     enabled: 物理演算を有効化 (髪、スカート、アクセサリ)

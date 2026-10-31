@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { MMDGazeMode, MorphSlot } from '@proj-airi/stage-ui-mmd'
+import type { MMDGazeMode, MMDGraphicsAdjustments, MorphSlot } from '@proj-airi/stage-ui-mmd'
 
 import type { ModelSettingsRuntimeSnapshot } from './runtime'
 
@@ -52,7 +52,33 @@ const {
   directionalPosition,
   albedoGlow,
   renderScale,
+  graphicsQuality,
+  graphicsAdjustments,
 } = storeToRefs(mmdStore)
+
+const graphicsQualityOptions = computed(() => (['off', 'low', 'medium', 'high'] as const).map(value => ({
+  label: t(`settings.mmd.graphics.quality-options.${value}`),
+  value,
+})))
+const toneMappingOptions = computed(() => (['neutral', 'agx', 'aces'] as const).map(value => ({
+  label: t(`settings.mmd.graphics.tone-mapping-options.${value}`),
+  value,
+})))
+
+function handleGraphicsQuality(value: string | number | undefined) {
+  if (value === 'off' || value === 'low' || value === 'medium' || value === 'high')
+    graphicsQuality.value = value
+}
+
+/** Replaces one adjustment, so the stored object changes as a whole and every window reads the change. */
+function setGraphicsAdjustment<K extends keyof MMDGraphicsAdjustments>(key: K, value: MMDGraphicsAdjustments[K]) {
+  graphicsAdjustments.value = { ...graphicsAdjustments.value, [key]: value }
+}
+
+function handleToneMapping(value: string | number | undefined) {
+  if (value === 'neutral' || value === 'agx' || value === 'aces')
+    setGraphicsAdjustment('toneMapping', value)
+}
 
 const canExtractColors = computed(() => props.runtimeSnapshot.canCapturePreview)
 
@@ -235,6 +261,70 @@ function removeMotion(id: string) {
       />
     </div>
   </Container>
+
+  <Section
+    :title="t('settings.mmd.graphics.title')"
+    icon="i-solar:magic-stick-3-bold-duotone"
+    :class="['rounded-xl', 'bg-white/80 dark:bg-black/75', 'backdrop-blur-lg']"
+    size="sm"
+    :expand="false"
+  >
+    <p :class="['mb-2', 'text-xs', 'text-neutral-500', 'dark:text-neutral-400']">
+      {{ t('settings.mmd.graphics.description') }}
+    </p>
+    <FieldCombobox
+      :model-value="graphicsQuality"
+      :options="graphicsQualityOptions"
+      :label="t('settings.mmd.graphics.quality')"
+      @update:model-value="handleGraphicsQuality"
+    />
+    <template v-if="graphicsQuality !== 'off'">
+      <FieldCombobox
+        :model-value="graphicsAdjustments.toneMapping"
+        :options="toneMappingOptions"
+        :label="t('settings.mmd.graphics.tone-mapping')"
+        @update:model-value="handleToneMapping"
+      />
+      <FieldRange
+        :model-value="graphicsAdjustments.exposure"
+        as="div" :min="0.5" :max="2" :step="0.05" :default-value="1"
+        :label="t('settings.mmd.graphics.exposure')"
+        @update:model-value="value => setGraphicsAdjustment('exposure', value)"
+      />
+      <FieldRange
+        :model-value="graphicsAdjustments.bloomIntensity"
+        as="div" :min="0" :max="3" :step="0.05" :default-value="0.6"
+        :label="t('settings.mmd.graphics.bloom-intensity')"
+        @update:model-value="value => setGraphicsAdjustment('bloomIntensity', value)"
+      />
+      <FieldRange
+        :model-value="graphicsAdjustments.bloomThreshold"
+        as="div" :min="0" :max="1" :step="0.01" :default-value="0.8"
+        :label="t('settings.mmd.graphics.bloom-threshold')"
+        @update:model-value="value => setGraphicsAdjustment('bloomThreshold', value)"
+      />
+      <template v-if="graphicsQuality !== 'low'">
+        <FieldRange
+          :model-value="graphicsAdjustments.saturation"
+          as="div" :min="-1" :max="1" :step="0.01" :default-value="0"
+          :label="t('settings.mmd.graphics.saturation')"
+          @update:model-value="value => setGraphicsAdjustment('saturation', value)"
+        />
+        <FieldRange
+          :model-value="graphicsAdjustments.contrast"
+          as="div" :min="-1" :max="1" :step="0.01" :default-value="0"
+          :label="t('settings.mmd.graphics.contrast')"
+          @update:model-value="value => setGraphicsAdjustment('contrast', value)"
+        />
+        <FieldRange
+          :model-value="graphicsAdjustments.vignette"
+          as="div" :min="0" :max="1" :step="0.01" :default-value="0.3"
+          :label="t('settings.mmd.graphics.vignette')"
+          @update:model-value="value => setGraphicsAdjustment('vignette', value)"
+        />
+      </template>
+    </template>
+  </Section>
 
   <Section
     :title="t('settings.mmd.physics.title')"

@@ -1,5 +1,6 @@
 import type { Emotion } from '../constants/emotions'
 import type { MorphSlot } from '../constants/morphs'
+import type { MMDGraphicsAdjustments, MMDGraphicsQuality } from '../utils/mmd-graphics'
 
 import localforage from 'localforage'
 
@@ -10,6 +11,7 @@ import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 
 import { EMOTION_ACTION_NAME } from '../constants/actions'
+import { DEFAULT_MMD_GRAPHICS_ADJUSTMENTS } from '../utils/mmd-graphics'
 import { supportedControl, useMMDViewControl } from './view-control'
 
 type BroadcastChannelEvents
@@ -147,6 +149,14 @@ export const useMMD = defineStore('mmd', () => {
   const albedoGlow = useLocalStorageManualReset<number>('settings/mmd/albedo-glow', 0.45)
   /** Device-pixel-ratio multiplier for render resolution. */
   const renderScale = useLocalStorageManualReset<number>('settings/mmd/render-scale', 1)
+  /** Post-processing preset. Off by default, so the scene looks as before until the owner opts in. */
+  const graphicsQuality = useLocalStorageManualReset<MMDGraphicsQuality>('settings/mmd/graphics/quality', 'off')
+  /** The owner's adjustments on top of the preset. */
+  const graphicsAdjustments = useLocalStorageManualReset<MMDGraphicsAdjustments>(
+    'settings/mmd/graphics/adjustments',
+    () => ({ ...DEFAULT_MMD_GRAPHICS_ADJUSTMENTS }),
+    { mergeDefaults: true },
+  )
 
   // === Animation ===
   /** Name of the persistent idle motion; empty means none/static. */
@@ -272,6 +282,8 @@ export const useMMD = defineStore('mmd', () => {
     directionalPosition.reset()
     albedoGlow.reset()
     renderScale.reset()
+    graphicsQuality.reset()
+    graphicsAdjustments.reset()
     idleMotionName.reset()
     void clearMotions()
     oneShotAction.value = undefined
@@ -302,6 +314,8 @@ export const useMMD = defineStore('mmd', () => {
     directionalPosition,
     albedoGlow,
     renderScale,
+    graphicsQuality,
+    graphicsAdjustments,
 
     idleMotionName,
     availableMotions,

@@ -51,6 +51,7 @@
     "localforage": "catalog:",
     "nanoid": "catalog:",
     "pinia": "catalog:",
+    "postprocessing": "catalog:",
     "three": "catalog:",
     "three-stdlib": "catalog:",
     "vue": "catalog:"
