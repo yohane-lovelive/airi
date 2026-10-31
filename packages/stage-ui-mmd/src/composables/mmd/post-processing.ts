@@ -38,12 +38,16 @@ const TONE_MAPPING_MODE: Record<MMDToneMapping, ToneMappingMode> = {
 export class MMDPostProcessing {
   private readonly composer: EffectComposer
   private readonly disposables: Array<{ dispose: () => void }> = []
+  /** Renderer settings that the composer changes. `dispose` restores them for direct rendering. */
+  private readonly rendererState: { autoClear: boolean, toneMappingExposure: number }
 
   constructor(
     private readonly renderer: WebGLRenderer,
     private readonly scene: Scene,
     private readonly camera: Camera,
   ) {
+    this.rendererState = { autoClear: renderer.autoClear, toneMappingExposure: renderer.toneMappingExposure }
+    // The composer turns `autoClear` off, because its passes clear their own targets.
     this.composer = new EffectComposer(renderer, { frameBufferType: HalfFloatType })
   }
 
@@ -87,10 +91,12 @@ export class MMDPostProcessing {
     this.composer.render(delta)
   }
 
+  /** Frees the passes and restores the renderer. Without the restore, direct rendering never cleared and left trails. */
   dispose() {
     this.clearPasses()
     this.composer.dispose()
-    this.renderer.toneMappingExposure = 1
+    this.renderer.autoClear = this.rendererState.autoClear
+    this.renderer.toneMappingExposure = this.rendererState.toneMappingExposure
   }
 
   private addPass(pass: RenderPass | EffectPass) {
