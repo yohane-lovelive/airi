@@ -21,5 +21,26 @@ export type {
   InnerState,
   PendingTurn,
 } from './initiative'
+export {
+  collectDueMissions,
+  createReminder,
+  deliverReminder,
+  missedRemindersNoticeText,
+  MISSION_TEMPLATES,
+  parseLocalDateTime,
+  reminderNoticeText,
+  settleMissionRun,
+  stopMission,
+} from './missions'
+export type {
+  MissionInstance,
+  MissionScheduleOptions,
+  MissionStatus,
+  MissionTemplate,
+  MustSpeakNotify,
+  NoticeOutcome,
+  ReminderRepeat,
+  ReminderValues,
+} from './missions'
 export { SPEECH_TYPES } from './speech-types'
 export type { SpeechType } from './speech-types'

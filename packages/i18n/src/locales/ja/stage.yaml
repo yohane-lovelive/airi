@@ -260,3 +260,6 @@ status:
   sign-in-unconfirmed: セッションを確認できませんでした。もう一度ログインしてください。
   dismiss: 閉じる
   configure-hearing: 設定で聴覚のプロバイダーを選択し、設定してください。
+missions:
+  fixed-reminder: 'リマインド: {text}'
+  notification-title: AIRI からのリマインド

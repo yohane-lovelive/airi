@@ -900,6 +900,30 @@ pages:
               注意: プロバイダーが verbose_json レスポンスに対応していない場合、この設定は効果がありません。
             verbose-json-unsupported: >-
               お使いのプロバイダーは verbose_json セグメントを返しません。最新の文字起こしセグメントに対する信頼度フィルターは適用されません。
+    missions:
+      title: ミッション
+      description: リマインドなど、キャラクターがあなたのために行うタスク
+      enable: ミッションを使う
+      enable-description: 頼むと、キャラクターがリマインドを設定し、その時刻に伝えます。オフのときは、リマインドは動きません。web 版で音声出力がオフのときにリマインドを見るには、通知を許可してください。
+      missed-age-limit: 伝える見逃したリマインド
+      missed-age-limit-description: リマインドの時刻にアプリが閉じていた場合、キャラクターは次の起動の後で伝えます。これより古いリマインドは、「見逃し」と表示されるだけです。
+      hours: '{count} 時間'
+      active: 実行中
+      ended: 終了
+      clear-ended: 消去
+      empty: 実行中のミッションはありません。キャラクターにリマインドを頼んでみてください。例：「18時に薬を飲むよう教えて」
+      next: '次回: {time}'
+      stop: '{name} を止める'
+      repeat:
+        once: 1 回だけ
+        daily: 毎日
+        weekdays: 平日
+        weekly: '毎週: {days}'
+      status:
+        scheduled: 予定
+        done: 完了
+        stopped: 停止
+        missed: 見逃し
     memory-long-term:
       description: 長期記憶固有の設定と管理
       title: 長期記憶

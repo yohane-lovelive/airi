@@ -178,6 +178,17 @@ export interface ChatOrchestratorSendOptions {
   notice?: {
     /** What sent the notice, for the reply's trace. */
     source: string
+    /**
+     * The owner must hear about the notice now, for example a reminder. The request asks the model to speak instead of
+     * allowing silence. Only reply text counts as a reply, because a tool call or a sticker cannot be spoken.
+     * A reply without text still stores nothing, so the host can see it and try again.
+     */
+    mustSpeak?: boolean
+    /**
+     * A fixed reply. The run makes no model call and streams this text as the reply, so history, speech, and expressions
+     * work as for a model reply. The host uses it when the model cannot speak a `mustSpeak` notice.
+     */
+    reply?: string
   }
 }
 
@@ -497,6 +508,14 @@ async function waitForProvider(work: Promise<unknown>, signal: AbortSignal) {
   }
   finally {
     signal.removeEventListener('abort', abort)
+  }
+}
+
+/** A stream that gives a fixed reply as one text chunk, with no model call. */
+function streamFixedReply(text: string): ChatOrchestratorLLMPort['stream'] {
+  return async (_model, _chatProvider, _context, options) => {
+    await options?.onStreamEvent?.({ type: 'text-delta', text })
+    await options?.onStreamEvent?.({ type: 'finish' })
   }
 }
 
@@ -969,8 +988,11 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
       // The stored notice ends the history. Only this request tells the model that it can stay quiet about it.
       if (options.notice) {
         const lastTurn = context.turns.at(-1)
+        const instruction = options.notice.mustSpeak
+          ? '\n[Tell the owner about this notice now, in your own words. Do not stay quiet.]'
+          : '\n[Speak about this notice only if it fits now, or stay quiet.]'
         if (lastTurn?.type === 'user')
-          lastTurn.content.push({ type: 'text', text: '\n[Speak about this notice only if it fits now, or stay quiet.]' })
+          lastTurn.content.push({ type: 'text', text: instruction })
       }
       if (systemPrompt?.trim())
         context.turns.unshift({ id: 'system-identity', type: 'system', authority: 'system', content: [{ type: 'text', text: systemPrompt }] })
@@ -1039,7 +1061,9 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
       })
 
       const resolveOwnerStep = options.resolveStep
-      await waitForProvider(deps.llm.stream(options.model, options.chatProvider, context, {
+      const fixedReply = options.notice?.reply
+      const stream = fixedReply === undefined ? deps.llm.stream : streamFixedReply(fixedReply)
+      await waitForProvider(stream(options.model, options.chatProvider, context, {
         headers,
         providerId: activeProvider,
         // A resolved prompt replaces the composed system message, so it must carry the same supplement.
@@ -1215,10 +1239,9 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
       }
 
       // A notice lets the conversation stay quiet. Only rendered text, stickers, cards, and tool calls count as a reply.
-      const hasVisibleReply = buildingMessage.slices.some(slice => slice.type === 'sticker'
-        || slice.type === 'card'
-        || slice.type === 'tool-call'
-        || (slice.type === 'text' && Boolean(slice.text.trim())))
+      // A notice that must speak counts text only, because the owner must hear it.
+      const hasVisibleReply = buildingMessage.slices.some(slice => (slice.type === 'text' && Boolean(slice.text.trim()))
+        || (!options.notice?.mustSpeak && (slice.type === 'sticker' || slice.type === 'card' || slice.type === 'tool-call')))
       const silent = Boolean(options.notice) && !hasVisibleReply
       if (!silent && !shouldAbort() && (buildingMessage.slices.length > 0 || generatedTurn?.rounds.length)) {
         const finalAssistant = buildingMessage

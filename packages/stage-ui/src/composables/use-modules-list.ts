@@ -7,6 +7,7 @@ import { useI18n } from 'vue-i18n'
 import factorioIcon from '../assets/factorio-simple.png'
 
 import { useMemoryStore } from '../stores/memory'
+import { useMissionsStore } from '../stores/missions'
 import { useArtistryStore } from '../stores/modules/artistry'
 import { useConsciousnessStore } from '../stores/modules/consciousness'
 import { useDiscordStore } from '../stores/modules/discord'
@@ -50,6 +51,7 @@ export function useModulesList() {
   const homeAssistantStore = useHomeAssistantStore()
   const artistryStore = useArtistryStore()
   const memoryStore = useMemoryStore()
+  const missionsStore = useMissionsStore()
   const toolCardsStore = useToolCardsStore()
   const beatSyncState = ref<BeatSyncDetectorState>()
   const beatSyncSupported = isBeatSyncSupported()
@@ -136,6 +138,15 @@ export function useModulesList() {
       icon: 'i-solar:book-bookmark-bold-duotone',
       to: '/settings/modules/memory-long-term',
       configured: memoryStore.enabled,
+      category: 'essential',
+    },
+    {
+      id: 'missions',
+      name: t('settings.pages.modules.missions.title'),
+      description: t('settings.pages.modules.missions.description'),
+      icon: 'i-solar:alarm-bold-duotone',
+      to: '/settings/modules/missions',
+      configured: missionsStore.enabled,
       category: 'essential',
     },
     {

@@ -38,6 +38,7 @@ import { getSpeechBusContext, voiceGenerationEnded } from '../services/speech/bu
 import { composeDrawCardPrompt, createDrawCardTool, DRAW_CARD_TOOL_NAME, drawCardContent } from '../tools/draw-card'
 import { createJudgeRecipeTool, judgmentSkillText } from '../tools/judge-recipe'
 import { composeMemoryPrompt, createMemoryTools } from '../tools/memory'
+import { createMissionTools } from '../tools/missions'
 import { createProposeRecipeTool } from '../tools/propose-recipe'
 import { createSearchIconsTool } from '../tools/search-icons'
 import { createUseRecipeTool } from '../tools/use-recipe'
@@ -56,6 +57,7 @@ import { useChatSessionStore } from './chat/session-store'
 import { useChatStreamStore } from './chat/stream-store'
 import { useContextObservabilityStore } from './devtools/context-observability'
 import { useMemoryStore } from './memory'
+import { useMissionsStore } from './missions'
 import { useAiriCardStore } from './modules/airi-card'
 import { useAutonomousArtistryStore } from './modules/artistry-autonomous'
 import { useConsciousnessStore } from './modules/consciousness'
@@ -279,6 +281,7 @@ export const useChatStore = defineStore('chat', () => {
   const cardStore = useAiriCardStore()
   const recipes = useRecipesStore()
   const memory = useMemoryStore()
+  const missions = useMissionsStore()
 
   /** The persona of a session. A session without one uses the selected card. */
   function personaOf(sessionId: string) {
@@ -411,17 +414,25 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   /**
-   * Tells a conversation about finished background work. The main agent reads the notice and decides what to say, or stays quiet.
+   * Tells a conversation about work outside it, for example a finished background task or a due reminder.
+   * The main agent reads the notice and decides what to say, or stays quiet. With `mustSpeak`, it is asked to speak.
+   * With `reply`, the run speaks that fixed text and makes no model call.
    * Only the owner's own conversation gets a notice, so background results never reach a scene.
+   *
+   * Resolves to `spoke` when a reply with content was stored, `silent` when none was, `failed` when the send failed, and
+   * `skipped` for a conversation that is not the owner's.
    */
-  async function notifyConversation(sessionId: string, notice: { source: string, text: string }) {
+  async function notifyConversation(sessionId: string, notice: { source: string, text: string, mustSpeak?: boolean, reply?: string }): Promise<'spoke' | 'silent' | 'failed' | 'skipped'> {
     if (!isOwnerSession(sessionId))
-      return
+      return 'skipped'
     try {
-      await executeSend({ sessionId, text: notice.text }, { notice: { source: notice.source } })
+      const { text, ...options } = notice
+      const result = await executeSend({ sessionId, text }, { notice: options })
+      return result.messages.some(message => message.role === 'assistant') ? 'spoke' : 'silent'
     }
     catch (error) {
       console.warn('[chat] Failed to deliver a notice:', errorMessageFrom(error))
+      return 'failed'
     }
   }
 
@@ -643,6 +654,15 @@ export const useChatStore = defineStore('chat', () => {
       ...(ownerOnly ? await createUseRecipeTool({ recipes: () => recipes.recipes, start: (recipe, task) => startRecipe(recipe, { parentSessionId: sessionId, task }) }) : []),
       // The owner can turn proposals off. Every proposal waits for the owner's approval.
       ...(ownerOnly && recipes.proposalsEnabled ? await createProposeRecipeTool({ propose: recipe => recipes.propose(recipe) }) : []),
+      // A mission speaks to the owner later, so only the owner's own conversation starts one. The owner can turn missions
+      // off, and an app without a mission runner offers no tools.
+      ...(ownerOnly && missions.enabled && missions.supported
+        ? await createMissionTools({
+            missions: () => missions.missions,
+            addReminder: values => missions.addReminder(values, sessionId),
+            stop: id => missions.stop(id),
+          })
+        : []),
       // Cards show in the owner's own chat only. A scene, such as a Discord channel, gets text. A card names its icons
       // from a search, so the model never guesses an icon name.
       ...(drawsCards(sessionId) ? [...await createDrawCardTool(), ...await createSearchIconsTool()] : []),

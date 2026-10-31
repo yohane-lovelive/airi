@@ -425,3 +425,6 @@ notifications:
       title: Renewal payment failed
       body: We will retry on {retryAt}. Update your payment method to keep {plan}.
       body-no-retry: Update your payment method to keep {plan}.
+missions:
+  fixed-reminder: 'Reminder: {text}'
+  notification-title: Reminder from AIRI

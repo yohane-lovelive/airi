@@ -139,6 +139,46 @@ describe('chat orchestrator host options', () => {
     expect(harness.messages['session-1']?.map(message => message.role)).toEqual(['user'])
   })
 
+  // A reminder must reach the owner as speech. The host sees the missing reply and tries again.
+  it('asks a must-speak notice to speak, and stores no reply that has no text', async () => {
+    const harness = createHarness()
+    harness.stream.mockImplementationOnce(async (_model, _provider, _conversation, streamOptions) => {
+      await streamOptions?.onStreamEvent?.({ type: 'tool-call', toolCallId: 'look', toolCallType: 'function', toolName: 'look', args: '{}' })
+      await streamOptions?.onStreamEvent?.({ type: 'finish' })
+    })
+
+    await harness.runtime.ingest('Reminder: medicine time', {
+      model: 'test',
+      chatProvider: provider,
+      notice: { source: 'mission:reminder', mustSpeak: true },
+    })
+
+    expect(harness.prompt(0)).toContain('Tell the owner about this notice now, in your own words.')
+    expect(harness.prompt(0)).not.toContain('or stay quiet')
+    expect(harness.messages['session-1']?.map(message => message.role)).toEqual(['user'])
+  })
+
+  it('speaks a fixed reply without a model call', async () => {
+    const harness = createHarness()
+    const speaks: ChatStreamEventContext['speaks'][] = []
+    harness.runtime.hooks.onBeforeSend(async (_message, context) => {
+      speaks.push(context.speaks)
+    })
+
+    await harness.runtime.ingest('The reminder was not spoken.', {
+      model: 'test',
+      chatProvider: provider,
+      notice: { source: 'mission:reminder:fixed', mustSpeak: true, reply: 'Reminder: medicine time' },
+    })
+
+    expect(harness.stream).not.toHaveBeenCalled()
+    expect(speaks).toEqual([true])
+    expect(harness.messages['session-1']?.[1]).toMatchObject({
+      proactive: { source: 'mission:reminder:fixed' },
+      slices: [{ type: 'text', text: 'Reminder: medicine time' }],
+    })
+  })
+
   it('keeps a notice reply that only contains a valid sticker', async () => {
     const harness = createHarness()
     harness.stream.mockImplementationOnce(async (_model, _provider, _conversation, streamOptions) => {

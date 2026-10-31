@@ -13,6 +13,7 @@ import { useChatSessionStore } from '../stores/chat/session-store'
 import { useDisplayModelsStore } from '../stores/display-models'
 import { useMcpStore } from '../stores/mcp'
 import { useMemoryStore } from '../stores/memory'
+import { useMissionsStore } from '../stores/missions'
 import { useAiriCardStore } from '../stores/modules/airi-card'
 import { useConsciousnessStore } from '../stores/modules/consciousness'
 import { useConsciousnessSettingsStore } from '../stores/modules/consciousness-settings'
@@ -57,6 +58,7 @@ export function useDataMaintenance() {
   const airiCardStore = useAiriCardStore()
   const memoryStore = useMemoryStore()
   const recipesStore = useRecipesStore()
+  const missionsStore = useMissionsStore()
   const voiceprintStore = useVoiceprintStore()
 
   async function deleteAllModels() {
@@ -86,6 +88,7 @@ export function useDataMaintenance() {
       // Memories and recipes hold what the character learned about the owner.
       () => memoryStore.resetState(),
       () => recipesStore.resetState(),
+      () => missionsStore.resetState(),
     ].map(reset => Promise.resolve().then(reset)))
     const failure = results.find(result => result.status === 'rejected')
     if (failure)

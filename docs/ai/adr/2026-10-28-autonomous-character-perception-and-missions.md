@@ -27,7 +27,7 @@ The owner tried a first design and found five faults. The causes below are hypot
 
 ### Current code
 
-- `notifyConversation` in `packages/stage-ui/src/stores/chat.ts` starts a turn without an owner message. The model speaks or stays silent. A silent notice leaves no history.
+- `notifyConversation` in `packages/stage-ui/src/stores/chat.ts` starts a turn without an owner message. The model speaks or stays silent. History keeps a silent notice, but no reply.
 - The screen pipeline is `devtools/vision.vue`, then the vision model, then text context. A chat model reads an image itself when its catalog declares image input (`use-chat-vision.ts`).
 - The character notebook holds tasks with `dueAt` in memory only. The orchestrator sends a `spark:notify` for each due task. No tool lets the model create a task.
 - Recipes and long-term memory are in IndexedDB, one record for each item. They stay on the device. Chats and character cards sync to the server.
@@ -294,7 +294,35 @@ The last two templates give a daily rhythm. These rules complete it:
 - A watch uses a check turn, not a speech turn. A change in the region, or a slow timer, starts the check.
 - In a check turn, the model gets a small crop and answers with a tool. Only a "yes" starts a `mustSpeak` notice.
 - IndexedDB keeps the instances on the device, one record for each instance, in the shape of the recipe records.
-- The renderer leader checks the clock. After a closed app, the next start reports the missed reminders.
+- The renderer leader checks the clock.
+
+#### Mission tools
+
+- `builtIn_startMission` takes a template name and its values. `builtIn_listMissions` lists the instances. `builtIn_stopMission` stops one instance.
+- The tool description lists the templates and their values in short form, inside the prompt budget.
+- Each template has its own value schema. If a value is wrong, the tool returns the reason, and the model can try again.
+- A new template needs no new tool.
+
+#### Reminder rules
+
+- A time is a local ISO string, for example `2026-10-31T18:00`. Code refuses a time in the past and a time too far ahead.
+- A reminder runs once, or it repeats daily, on weekdays, or weekly on chosen days, at one time.
+- After each run, code sets the next time of a repeated reminder. The owner stops it in the mission list or in chat.
+- The owner asks for a repeated reminder in chat, so it needs no approval. This differs from the rule for repeated recipes in ADR 2026-10-10.
+- A reminder speaks also in quiet hours and in a temporary quiet period. The owner chose the time, so the time wins.
+
+If the model gives no visible reply to a `mustSpeak` notice, code makes sure that the owner still gets the reminder:
+
+1. Code sends the notice again one time.
+2. If the second reply is also empty, the character speaks a fixed text, for example "Reminder: medicine time".
+3. If the model call fails, code skips the second try and speaks the fixed text at once.
+4. If speech playback fails, code shows an operating system notification. The web app needs the notification permission for this.
+
+After a closed app, the next start reports the missed reminders:
+
+- A reminder that was missed by less than the age limit gets a notice. The default limit is 24 hours, and Settings can change it.
+- An older missed reminder only gets the state "missed" in the mission list.
+- All missed reminders of one start go into one notice, so the character does not speak many times after the start.
 
 ### Small talk
 
@@ -448,9 +476,9 @@ The order follows dependencies. Each step uses the parts of the earlier steps. E
 | Step | Content | State |
 | --- | --- | --- |
 | 0 | Policy core without the screen: pressure, gates, inner state, and speech types in `core-agent`. Evaluation harness with synthetic events. | Done |
-| 1 | Mission base: the time trigger, templates as recipes, the instance store, and the tools. Also the `mustSpeak` notice, the `reminder` template, and the mission list. | To do |
+| 1 | Mission base: the time trigger, the instance store, and the tools. Also the `mustSpeak` notice, the `reminder` template, and the mission list. | Done |
 | 2 | Autonomous talk without the screen: connect the policy core to `notifyConversation`. Add the prompt budget, intentions, owner control, usage by purpose, and the inspector. | To do |
-| 2b | Daily rhythm and small talk: the `greeting`, `welcome-back`, and `small-talk` templates, topic seeds, and the time of day. Measure variety. | To do |
+| 2b | Daily rhythm and small talk: templates as recipes, the `greeting`, `welcome-back`, and `small-talk` templates, topic seeds, and the time of day. Measure variety. | To do |
 | 3 | Perception: the adapters, ring buffer, detectors, frame policies, image budget, recorder, replay, timeline, scene state, `commentary` with interruptions, and `watch`. | To do |
 | 4 | Motion: the model capability check, the procedural layer, the library with `ACT` markers, expression sync, and the upper-body layer. | To do |
 | 5 | Generated motion, game audio, recall from memory, and polish. Recall needs the memory ADR. | To do |
@@ -460,8 +488,6 @@ The memory ADR has its own steps. They can run beside steps 1 to 4.
 
 ## Open work
 
-- Decide the step 1 details with the owner. They are repeated reminders, an empty reply to a `mustSpeak` notice, and the age limit of missed reminders.
-- Also decide whether reminders obey quiet hours, and choose the tool names.
 - Agree on the step 0 defaults with the owner. They are about 15 minutes for idle talk, 45 seconds for commentary, and 200 turns each day.
 - Set the default image budget.
 - Choose the default exclusion list with the owner.

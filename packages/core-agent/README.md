@@ -122,7 +122,22 @@ if (result.decision.kind === 'turn') {
 }
 ```
 
-Use it to start autonomous turns and to compare policy settings. Do not use it for missions that must speak at a time, for example reminders. Those come with Step 1.
+Use it to start autonomous turns and to compare policy settings. Do not use it for missions that must speak at a time, for example reminders. The mission rules below handle them.
+
+## Missions
+
+A mission is an owner instruction that code carries out later with the voice of the character. Step 1 of the autonomy ADR has one template, `reminder`.
+All functions are pure. The host passes the time and keeps the returned missions.
+
+- `MISSION_TEMPLATES` describes each template and its values for the mission tools.
+- `createReminder` checks the values from the model. It refuses a past time, a time more than one year ahead, and an empty text. A refusal has a reason for the model.
+- A reminder runs once, daily, on weekdays, or weekly on chosen days. A repeated reminder whose time today has passed starts on its next day.
+- `collectDueMissions` sorts due runs into on time, missed inside the age limit, and expired.
+- `settleMissionRun` moves a mission past its run. A repeated reminder skips the runs that the app missed while it was closed.
+- `deliverReminder` makes sure that the owner hears a reminder: the model, one more try after an empty reply, then a fixed text without a model call.
+- `reminderNoticeText` and `missedRemindersNoticeText` write the notices. All missed reminders of one start share one notice.
+
+A notice with `mustSpeak` asks the model to speak, and only reply text counts as a reply. A notice with `reply` streams that text with no model call, so history, speech, and expressions work as for a model reply.
 
 `src/autonomy/simulation.ts` runs the policy against synthetic event streams with a fake clock and a seeded random source. `simulation.test.ts` checks the metrics of the ADR, for example turns per minute, silence share, and speech type entropy.
 

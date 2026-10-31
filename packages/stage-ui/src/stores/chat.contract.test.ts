@@ -146,6 +146,7 @@ vi.mock('./chat/context-store', () => ({
 // IndexedDB is a browser boundary. Browser tests exercise the real sticker and recipe repositories.
 vi.mock('../database/repos/chat-assets.repo')
 vi.mock('../database/repos/memory.repo')
+vi.mock('../database/repos/missions.repo')
 vi.mock('../database/repos/recipes.repo')
 
 vi.mock('../database/repos/stickers.repo', () => ({
