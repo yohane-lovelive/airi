@@ -350,6 +350,15 @@ The owner uses VRM models from outside sources. Their bones and expressions diff
 - A clip or marker that needs a missing part is skipped. A missing feature turns off without an error.
 - A `.vrma` clip uses normalized humanoid bones, so one clip fits many models.
 
+MMD models use the same `.vrma` clips. The library stores only `.vrma` data, and code retargets a clip when an MMD model plays it:
+
+- Each VRM bone gets a standard MMD bone, for example `leftUpperArm` gets `左腕`. A bone that the model lacks passes its rotation to its children.
+- VRM rotations are relative to a T-pose. Code corrects them for the MMD rest pose, which is an A-pose for most models.
+- The hips translation moves `センター`, scaled by the ratio of hip heights.
+- Code also writes the positions of the IK bones, for example `左足ＩＫ`, from the retargeted pose. IK stays on, so the clip blends with VMD motions that drive the legs by IK.
+- Until the owner chooses a VMD idle, an MMD model plays the VRM idle loop.
+- `packages/stage-ui-mmd/src/utils/vrma-retarget.ts` owns the retarget. A generated clip goes through the same retarget.
+
 Three layers stack. The team builds them in this order.
 
 1. **Procedural layer.** Code moves the body without clips. It adds breath, small sway, and gaze with a delayed neck and head. The gaze moves away while the model thinks, and the speech amplitude drives nods. Blinks and eye motions exist.

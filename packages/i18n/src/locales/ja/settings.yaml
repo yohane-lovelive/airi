@@ -2295,6 +2295,7 @@ mmd:
   animation:
     title: アニメーション
     idle-motion: アイドルモーション
+    default-idle: AIRI 標準（VRM と同じ待機）
     import-motion: モーションをインポート (.vmd)
     play-once: モーションをプレビュー
     remove: モーションを削除

@@ -49,6 +49,7 @@ import {
   useMMDEmote,
   useMMDLipSync,
 } from '../../composables/mmd'
+import { DEFAULT_IDLE_MOTION } from '../../constants/actions'
 import { Emotion, EMOTION_VALUES } from '../../constants/emotions'
 import { useMMD } from '../../stores/mmd'
 import { loadMMDModelFromSource } from '../../utils/mmd-loader'
@@ -58,6 +59,8 @@ import {
   disposeMMDObject,
   setMMDMaterialGlow,
 } from '../../utils/mmd-materials'
+import { loadVRMAnimationFile } from '../../utils/vrma-loader'
+import { mmdRigFromMesh, retargetVRMAnimationToMMD } from '../../utils/vrma-retarget'
 
 const props = withDefaults(defineProps<{
   /** The context that owns `currentAudioSource`. */
@@ -73,6 +76,11 @@ const props = withDefaults(defineProps<{
   backgroundUrl?: string | null
   currentAudioSource?: AudioBufferSourceNode
   enableOrbitControls?: boolean
+  /**
+   * A `.vrma` idle loop, retargeted to the MMD bones. It plays while the owner has chosen no VMD idle, so a model does
+   * not stand in its rest pose.
+   */
+  defaultIdleAnimationUrl?: string
 }>(), {
   paused: false,
   enableOrbitControls: false,
@@ -127,6 +135,8 @@ let animation: MMDAnimationManager | undefined
 let emote: ReturnType<typeof useMMDEmote> | undefined
 // Motion names already bound to the current model runtime.
 const registeredMotions = new Set<string>()
+/** Loaded `.vrma` files by URL, so a model change does not fetch the idle again. */
+const vrmAnimations = new Map<string, ReturnType<typeof loadVRMAnimationFile>>()
 const clock = new Clock()
 let rafHandle = 0
 
@@ -441,20 +451,78 @@ async function syncMotions() {
     }
   }
 
+  applyIdleMotion()
+}
+
+/** Plays the chosen VMD idle, or the default idle while none is chosen or the chosen one is not loaded. */
+function applyIdleMotion() {
+  if (!animation)
+    return
   if (idleMotionName.value && registeredMotions.has(idleMotionName.value))
     animation.setIdleMotion(idleMotionName.value)
+  else if (registeredMotions.has(DEFAULT_IDLE_MOTION))
+    animation.setIdleMotion(DEFAULT_IDLE_MOTION)
 }
+
+/**
+ * Retargets the default `.vrma` idle to the current model and registers it. `rig` must come from the model at rest.
+ * A model that changed during the load keeps its own state, because the result belongs to the earlier model.
+ */
+async function registerDefaultIdle(rig: ReturnType<typeof mmdRigFromMesh>) {
+  const url = props.defaultIdleAnimationUrl
+  if (!url)
+    return
+  const owner = resolved
+  try {
+    let pending = vrmAnimations.get(url)
+    if (!pending) {
+      pending = loadVRMAnimationFile(url)
+      vrmAnimations.set(url, pending)
+    }
+    const vrmAnimation = await pending
+    if (!vrmAnimation || owner !== resolved || !animation)
+      return
+    animation.registerClip(DEFAULT_IDLE_MOTION, retargetVRMAnimationToMMD(vrmAnimation, rig, { name: DEFAULT_IDLE_MOTION }))
+    registeredMotions.add(DEFAULT_IDLE_MOTION)
+    applyIdleMotion()
+  }
+  catch (err) {
+    vrmAnimations.delete(url)
+    console.error('[mmd] failed to load the default idle motion:', errorMessageFrom(err))
+  }
+}
+
+/**
+ * Counts model loads. The mount and the source watcher can both start a load, and a load that finishes after a newer one
+ * started drops its result. Without it, both models entered the scene.
+ */
+let loadGeneration = 0
 
 async function loadModel(src: string) {
   if (!scene)
     return
 
+  const generation = ++loadGeneration
   componentState.value = 'loading'
   disposeModel()
 
   try {
-    resolved = await loadMMDModelFromSource(src, { cacheKey: props.modelId })
+    const loaded = await loadMMDModelFromSource(src, { cacheKey: props.modelId })
+    if (generation !== loadGeneration) {
+      loaded.mmd.dispose()
+      disposeMMDObject(loaded.mesh)
+      loaded.dispose()
+      return
+    }
+    resolved = loaded
     mesh = resolved.mesh
+    // Read the rig now, while every bone is at rest. Motions move the bones later.
+    const ikEffectors = new Map<number, number>()
+    resolved.mmd.pmx.bones.forEach((bone, index) => {
+      if (bone.ik)
+        ikEffectors.set(index, bone.ik.target)
+    })
+    const rig = mmdRigFromMesh(mesh, ikEffectors)
 
     modelGroup = new Group()
     modelGroup.add(mesh)
@@ -475,9 +543,12 @@ async function loadModel(src: string) {
     gaze = createGazeController(mesh)
 
     animation = createMMDAnimationManager(resolved.mmd, { physicsEnabled: physicsEnabled.value })
-    // No preset idle VMD ships yet; the runtime still advances solvers and
-    // physics without an animation action.
     await animation.init()
+    // A newer load already disposed this model when it started.
+    if (generation !== loadGeneration)
+      return
+    // No idle VMD ships, so the VRM idle loop plays until the owner chooses one.
+    void registerDefaultIdle(rig)
     animation.setIKEnabled(ikEnabled.value)
     animation.setGrantEnabled(grantEnabled.value)
     animation.setGravity(physicsGravity.value)
@@ -496,6 +567,9 @@ async function loadModel(src: string) {
     await syncMotions()
   }
   catch (err) {
+    // A failed load that a newer load replaced must not dispose the newer model.
+    if (generation !== loadGeneration)
+      return
     disposeModel()
     componentState.value = 'pending'
     console.error('[mmd] failed to load model:', errorMessageFrom(err))
@@ -531,6 +605,7 @@ onMounted(() => {
 onUnmounted(() => {
   cancelAnimationFrame(rafHandle)
   resizeObserver?.disconnect()
+  loadGeneration++
   disposeModel()
   controls?.dispose()
   backgroundTexture?.dispose()
@@ -548,10 +623,12 @@ onUnmounted(() => {
 })
 
 watch(() => props.modelSrc, (src) => {
-  if (src)
+  if (src) {
     loadModel(src)
-  else
-    disposeModel()
+    return
+  }
+  loadGeneration++
+  disposeModel()
 })
 
 watch(() => props.enableOrbitControls, (enabled) => {
@@ -588,10 +665,7 @@ watch(availableMotions, () => {
 }, { deep: true })
 
 // Idle-motion selection from the settings panel.
-watch(idleMotionName, (name) => {
-  if (name && registeredMotions.has(name))
-    animation?.setIdleMotion(name)
-})
+watch(idleMotionName, applyIdleMotion)
 
 // Scene settings — lighting.
 watch([ambientColor, ambientIntensity], () => {

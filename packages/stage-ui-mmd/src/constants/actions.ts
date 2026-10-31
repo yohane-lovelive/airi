@@ -1,6 +1,12 @@
 import { Emotion } from './emotions'
 
 /**
+ * The motion name of the AIRI default idle, the VRM idle loop retargeted to the MMD bones.
+ * A `:` cannot appear in a Windows file name, so no imported VMD gets this name.
+ */
+export const DEFAULT_IDLE_MOTION = 'airi:vrm-idle'
+
+/**
  * Optional emotion → motion-name mapping for gesture playback.
  *
  * Expressions (morphs) are always applied for an emotion; on top of that, if

@@ -800,6 +800,7 @@ defineExpose({
         :enable-orbit-controls="props.enableOrbitControls"
         :audio-context="audioContext"
         :current-audio-source="currentAudioSource"
+        :default-idle-animation-url="animations.idleLoop.toString()"
         @error="reportStageRenderError"
       />
       <div

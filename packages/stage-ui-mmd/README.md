@@ -10,6 +10,11 @@ reaching feature parity with the Live2D and VRM renderers:
 - **Model loading** for `.pmx`/`.pmd`, from a packaged ZIP (model + textures)
   or a bare model URL. ZIP names without the UTF-8 flag are read as Shift_JIS
   when they are not valid UTF-8, as older Windows and Japanese tools write them.
+- **VRM motions** (`utils/vrma-retarget`, `utils/vrma-loader`): retargets a
+  `.vrma` clip to the standard MMD bones, with a rest pose correction for the
+  A-pose and positions for the leg IK bones, so IK stays on. The scene plays
+  the VRM idle loop through it until the owner chooses a VMD idle. Pass the
+  loop as `defaultIdleAnimationUrl`.
 - **Model packages** (`utils/mmd-package`): reads a picked folder or a ZIP,
   lists its models, and packs one model with its textures into a ZIP for the
   loader. The model selector uses it for folder import and for folders that

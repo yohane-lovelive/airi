@@ -3,7 +3,7 @@ import type { MMDGazeMode, MorphSlot } from '@proj-airi/stage-ui-mmd'
 
 import type { ModelSettingsRuntimeSnapshot } from './runtime'
 
-import { controlConfig, useMMD } from '@proj-airi/stage-ui-mmd'
+import { controlConfig, DEFAULT_IDLE_MOTION, useMMD } from '@proj-airi/stage-ui-mmd'
 import { Button, FieldCheckbox, FieldCombobox, FieldRange, GhostButton } from '@proj-airi/ui'
 import { useFileDialog } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
@@ -63,11 +63,17 @@ const trackingOptions = computed<{ value: MMDGazeMode, label: string, class: str
   { value: 'none', label: t('settings.mmd.gaze.options.none'), class: 'col-start-5' },
 ])
 
-const motionOptions = computed(() => availableMotions.value.map(motion => ({
-  label: motion.name,
-  value: motion.name,
-  description: '',
-})))
+// The setting stores an empty name for the AIRI default idle. The option needs its own value, because the combobox
+// does not show an item with an empty value.
+const idleMotionChoice = computed(() => idleMotionName.value || DEFAULT_IDLE_MOTION)
+const motionOptions = computed(() => [
+  { label: t('settings.mmd.animation.default-idle'), value: DEFAULT_IDLE_MOTION, description: '' },
+  ...availableMotions.value.map(motion => ({
+    label: motion.name,
+    value: motion.name,
+    description: '',
+  })),
+])
 
 // '(auto)' lets the renderer pick the morph by its standard-name candidates.
 const morphOptions = computed(() => [
@@ -96,7 +102,7 @@ const MORPH_SLOTS: { slot: MorphSlot, label: string }[] = [
 function handleIdleMotionSelect(name: string | number | undefined) {
   if (typeof name !== 'string')
     return
-  idleMotionName.value = name
+  idleMotionName.value = name === DEFAULT_IDLE_MOTION ? '' : name
 }
 
 function setMorphOverride(slot: MorphSlot, value: string | number | undefined) {
@@ -113,13 +119,9 @@ const vmdDialog = useFileDialog({ accept: '.vmd', multiple: true, reset: true })
 vmdDialog.onChange(async (files) => {
   if (!files)
     return
-  for (const file of Array.from(files)) {
-    const descriptor = await mmdStore.addMotion(file)
-    // Make the first imported motion the idle if none is chosen yet, so the
-    // character immediately animates instead of standing in rest pose.
-    if (!idleMotionName.value)
-      idleMotionName.value = descriptor.name
-  }
+  // The AIRI default idle plays until the owner chooses an imported motion as the idle.
+  for (const file of Array.from(files))
+    await mmdStore.addMotion(file)
 })
 
 function playMotionOnce(name: string) {
@@ -270,8 +272,7 @@ function removeMotion(id: string) {
       {{ t('settings.mmd.animation.import-motion') }}
     </Button>
     <FieldCombobox
-      v-if="motionOptions.length > 0"
-      :model-value="idleMotionName"
+      :model-value="idleMotionChoice"
       :options="motionOptions"
       :label="t('settings.mmd.animation.idle-motion')"
       @update:model-value="handleIdleMotionSelect"

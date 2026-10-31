@@ -2837,6 +2837,7 @@ mmd:
   animation:
     title: Animation
     idle-motion: Idle Motion
+    default-idle: AIRI default (the VRM idle)
     import-motion: Import Motion (.vmd)
     play-once: Preview Animation
     remove: Remove motion
