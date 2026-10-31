@@ -1,4 +1,4 @@
-import { PerspectiveCamera, Scene, WebGLRenderer } from 'three'
+import { PerspectiveCamera, Scene, Vector3, WebGLRenderer } from 'three'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { DEFAULT_MMD_GRAPHICS_ADJUSTMENTS, resolveMMDGraphics } from '../../utils/mmd-graphics'
@@ -40,12 +40,31 @@ describe('mMDPostProcessing', () => {
     renderers.push(renderer)
     renderer.setSize(64, 64, false)
 
-    const config = resolveMMDGraphics('high', DEFAULT_MMD_GRAPHICS_ADJUSTMENTS, 'hybrid')!
+    const config = resolveMMDGraphics('high', DEFAULT_MMD_GRAPHICS_ADJUSTMENTS, { renderMode: 'hybrid' })!
     const postProcessing = new MMDPostProcessing(renderer, new Scene(), new PerspectiveCamera())
     postProcessing.apply(config)
     postProcessing.render(0)
 
     expect(config.ambientOcclusion).toBeDefined()
+    expect(renderer.getContext().getError()).toBe(renderer.getContext().NO_ERROR)
+    postProcessing.dispose()
+  })
+
+  it('renders depth of field and chromatic aberration, and keeps the focus across a rebuild', () => {
+    const renderer = new WebGLRenderer({ canvas: document.createElement('canvas'), alpha: true })
+    renderers.push(renderer)
+    renderer.setSize(64, 64, false)
+
+    const config = resolveMMDGraphics('medium', DEFAULT_MMD_GRAPHICS_ADJUSTMENTS, { hasBackground: true })!
+    const postProcessing = new MMDPostProcessing(renderer, new Scene(), new PerspectiveCamera())
+    postProcessing.setFocus(new Vector3(0, 1.5, 0), 0.8)
+    postProcessing.apply(config)
+    postProcessing.render(0)
+    postProcessing.apply(config)
+    postProcessing.render(0)
+
+    expect(config.depthOfField).toBeDefined()
+    expect(config.chromaticAberration).toBeDefined()
     expect(renderer.getContext().getError()).toBe(renderer.getContext().NO_ERROR)
     postProcessing.dispose()
   })

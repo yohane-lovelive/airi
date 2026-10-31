@@ -46,9 +46,44 @@ describe('resolveMMDGraphics', () => {
 
 describe('resolveMMDGraphics ambient occlusion', () => {
   it('adds ambient occlusion only to the high preset with physical shading', () => {
-    expect(resolveMMDGraphics('high', DEFAULT_MMD_GRAPHICS_ADJUSTMENTS, 'hybrid')?.ambientOcclusion).toEqual({ intensity: 0.6 })
-    expect(resolveMMDGraphics('high', DEFAULT_MMD_GRAPHICS_ADJUSTMENTS, 'toon')?.ambientOcclusion).toBeUndefined()
-    expect(resolveMMDGraphics('medium', DEFAULT_MMD_GRAPHICS_ADJUSTMENTS, 'pbr')?.ambientOcclusion).toBeUndefined()
+    expect(resolveMMDGraphics('high', DEFAULT_MMD_GRAPHICS_ADJUSTMENTS, { renderMode: 'hybrid' })?.ambientOcclusion).toEqual({ intensity: 0.6 })
+    expect(resolveMMDGraphics('high', DEFAULT_MMD_GRAPHICS_ADJUSTMENTS, { renderMode: 'toon' })?.ambientOcclusion).toBeUndefined()
+    expect(resolveMMDGraphics('medium', DEFAULT_MMD_GRAPHICS_ADJUSTMENTS, { renderMode: 'pbr' })?.ambientOcclusion).toBeUndefined()
+  })
+})
+
+describe('resolveMMDGraphics lens effects', () => {
+  it('adds depth of field and chromatic aberration from the medium preset', () => {
+    expect(resolveMMDGraphics('low', DEFAULT_MMD_GRAPHICS_ADJUSTMENTS)?.depthOfField).toBeUndefined()
+    expect(resolveMMDGraphics('low', DEFAULT_MMD_GRAPHICS_ADJUSTMENTS)?.chromaticAberration).toBeUndefined()
+
+    const medium = resolveMMDGraphics('medium', DEFAULT_MMD_GRAPHICS_ADJUSTMENTS, { hasBackground: true })
+    expect(medium?.depthOfField).toEqual({ strength: 0.5, resolutionScale: 0.5 })
+    expect(medium?.chromaticAberration).toEqual({ strength: 0.2 })
+  })
+
+  it('blurs at full resolution for the high preset', () => {
+    expect(resolveMMDGraphics('high', DEFAULT_MMD_GRAPHICS_ADJUSTMENTS, { hasBackground: true })?.depthOfField?.resolutionScale).toBe(1)
+  })
+
+  // ROOT CAUSE:
+  //
+  // On a transparent canvas, the background counts as far away, so depth of field blurred the model outline outward.
+  // The model got a hazy halo, and nothing behind it was there to blur.
+  //
+  // We fixed this by keeping depth of field off without a background image.
+  it('leaves depth of field out on a transparent canvas', () => {
+    const config = resolveMMDGraphics('high', DEFAULT_MMD_GRAPHICS_ADJUSTMENTS, { hasBackground: false })
+
+    expect(config?.depthOfField).toBeUndefined()
+    expect(config?.chromaticAberration).toEqual({ strength: 0.2 })
+  })
+
+  it('leaves the lens effects out at strength 0', () => {
+    const config = resolveMMDGraphics('high', { ...DEFAULT_MMD_GRAPHICS_ADJUSTMENTS, depthOfField: 0, chromaticAberration: 0 }, { hasBackground: true })
+
+    expect(config?.depthOfField).toBeUndefined()
+    expect(config?.chromaticAberration).toBeUndefined()
   })
 })
 

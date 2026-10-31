@@ -2841,6 +2841,8 @@ mmd:
     saturation: Saturation
     contrast: Contrast
     vignette: Vignette
+    depth-of-field: Background blur (depth of field)
+    chromatic-aberration: Chromatic aberration
     render-mode: Shading
     render-mode-options:
       toon: Toon (as the model author made it)

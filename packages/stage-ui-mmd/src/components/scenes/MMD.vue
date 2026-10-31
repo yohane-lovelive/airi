@@ -9,7 +9,7 @@
   * contract Stage.vue expects from every renderer.
 */
 
-import type { SkinnedMesh, Texture } from 'three'
+import type { Bone, SkinnedMesh, Texture } from 'three'
 
 import type { GazeOffset, MMDAnimationManager, MorphController } from '../../composables/mmd'
 import type { ResolvedMMDModel } from '../../utils/mmd-loader'
@@ -161,6 +161,11 @@ const lipSync = useMMDLipSync(
 )
 const blink = useMMDBlink()
 let gaze: ReturnType<typeof createGazeController> | undefined
+/** The bone that depth of field keeps sharp. Models without `頭` keep the middle of their bounds sharp. */
+let focusBone: Bone | undefined
+const focusPoint = new Vector3()
+/** The depth around the focus point that stays sharp, in world units. It follows the model size. */
+let focusRange = 1
 
 function canvasElement() {
   return canvasRef.value
@@ -221,6 +226,31 @@ function applyTransform() {
   modelGroup.rotation.y = rotationY.value
   modelGroup.position.set(position.value.x, position.value.y, 0)
   placeDirectionalLight()
+  measureFocus()
+}
+
+/**
+ * Sizes the sharp depth from the model height, so the whole body stays sharp while the background blurs. Half the
+ * height covers long hair and a stretched arm in front of or behind the face.
+ */
+function measureFocus() {
+  if (!modelGroup)
+    return
+  modelGroup.updateMatrixWorld(true)
+  const bounds = new Box3().setFromObject(modelGroup)
+  if (bounds.isEmpty())
+    return
+  focusRange = bounds.getSize(new Vector3()).y * 0.5
+  if (!focusBone)
+    bounds.getCenter(focusPoint)
+}
+
+/** Keeps depth of field on the face. The head moves with every motion, so this runs every frame. */
+function updateFocus() {
+  if (!postProcessing)
+    return
+  focusBone?.getWorldPosition(focusPoint)
+  postProcessing.setFocus(focusPoint, focusRange)
 }
 
 /** Aims the directional light from the owner's direction at the model, so its shadows cover the model. */
@@ -331,6 +361,8 @@ async function syncBackground() {
     scene.background = null
     backgroundTexture?.dispose()
     backgroundTexture = undefined
+    // Depth of field runs only behind a background image.
+    applyGraphics()
     return
   }
 
@@ -365,6 +397,7 @@ async function syncBackground() {
   backgroundTexture = texture
   scene.background = texture
   layoutBackground()
+  applyGraphics()
 }
 
 watch(() => props.backgroundUrl, () => void syncBackground())
@@ -409,10 +442,13 @@ function renderLoop() {
 function renderFrame(delta: number) {
   if (!renderer || !scene || !camera)
     return
-  if (postProcessing)
+  if (postProcessing) {
+    updateFocus()
     postProcessing.render(delta)
-  else
+  }
+  else {
     renderer.render(scene, camera)
+  }
 }
 
 /**
@@ -435,7 +471,10 @@ function applyLighting() {
 function applyGraphics() {
   if (!renderer || !scene || !camera)
     return
-  const config = resolveMMDGraphics(graphicsQuality.value, graphicsAdjustments.value, renderMode.value)
+  const config = resolveMMDGraphics(graphicsQuality.value, graphicsAdjustments.value, {
+    renderMode: renderMode.value,
+    hasBackground: scene.background !== null,
+  })
   // The post-processing has its own tone mapping pass.
   renderer.toneMapping = config ? NoToneMapping : directToneMapping()
   if (!config) {
@@ -464,6 +503,7 @@ function disposeModel() {
   resolved?.dispose()
   registeredMotions.clear()
   modelGroup = undefined
+  focusBone = undefined
   mesh = undefined
   morphs = undefined
   emote = undefined
@@ -589,6 +629,7 @@ async function loadModel(src: string) {
 
     modelGroup = new Group()
     modelGroup.add(mesh)
+    focusBone = mesh.skeleton.bones.find(bone => bone.name === '頭')
     applyTransform()
     scene.add(modelGroup)
 

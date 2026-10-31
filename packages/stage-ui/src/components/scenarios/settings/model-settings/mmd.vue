@@ -430,6 +430,18 @@ function removeMotion(id: string) {
           :label="t('settings.mmd.graphics.vignette')"
           @update:model-value="value => setGraphicsAdjustment('vignette', value)"
         />
+        <FieldRange
+          :model-value="graphicsAdjustments.depthOfField"
+          as="div" :min="0" :max="1" :step="0.01" :default-value="0.5"
+          :label="t('settings.mmd.graphics.depth-of-field')"
+          @update:model-value="value => setGraphicsAdjustment('depthOfField', value)"
+        />
+        <FieldRange
+          :model-value="graphicsAdjustments.chromaticAberration"
+          as="div" :min="0" :max="1" :step="0.01" :default-value="0.2"
+          :label="t('settings.mmd.graphics.chromatic-aberration')"
+          @update:model-value="value => setGraphicsAdjustment('chromaticAberration', value)"
+        />
       </template>
     </template>
   </Section>

@@ -12,7 +12,10 @@ reaching feature parity with the Live2D and VRM renderers:
   when they are not valid UTF-8, as older Windows and Japanese tools write them.
 - **Graphics** (`utils/mmd-graphics`, `composables/mmd/post-processing`):
   optional post-processing with bloom, tone mapping (Neutral, AgX, or ACES),
-  color grading, the vignette, and SMAA or multisampling. The quality preset
+  color grading, the vignette, and SMAA or multisampling. From the medium
+  preset, depth of field keeps the head bone `頭` sharp and blurs the
+  background, and chromatic aberration adds color fringes toward the edges of
+  the view. The sharp depth follows the model height. The quality preset
   is `off` by default, which renders as before. Each device keeps its own
   preset, because GPUs differ. The alpha channel survives, so a transparent
   window still shows the desktop behind the model.

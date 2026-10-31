@@ -32,6 +32,10 @@ export interface MMDGraphicsAdjustments {
   shadows: boolean
   /** Strength of the contact shadows in creases, 0 to 1. High quality with hybrid or PBR only. */
   ambientOcclusion: number
+  /** Blur of what lies in front of or behind the face, 0 to 1. 0 turns depth of field off. Medium and high only. */
+  depthOfField: number
+  /** Color fringes toward the edges of the view, as a lens makes them, 0 to 1. 0 turns them off. Medium and high only. */
+  chromaticAberration: number
 }
 
 export const DEFAULT_MMD_GRAPHICS_ADJUSTMENTS: MMDGraphicsAdjustments = {
@@ -46,6 +50,19 @@ export const DEFAULT_MMD_GRAPHICS_ADJUSTMENTS: MMDGraphicsAdjustments = {
   rimIntensity: 0.3,
   shadows: true,
   ambientOcclusion: 0.6,
+  depthOfField: 0.5,
+  chromaticAberration: 0.2,
+}
+
+/** What the scene shows, which decides the effects that make sense. */
+export interface MMDGraphicsScene {
+  /** The shading of the model. Ambient occlusion needs physically based shading. */
+  renderMode?: MMDRenderMode
+  /**
+   * Whether a background image fills the view. Without one, the canvas is transparent and nothing lies behind the
+   * model to blur. Depth of field would only spread the outline into a halo there, so it stays off.
+   */
+  hasBackground?: boolean
 }
 
 /** The effects that the post-processing builds. An effect that is missing stays off. */
@@ -71,22 +88,31 @@ export interface MMDGraphicsConfig {
   ambientOcclusion?: {
     intensity: number
   }
+  depthOfField?: {
+    strength: number
+    /** Resolution of the blur, relative to the canvas. */
+    resolutionScale: number
+  }
+  chromaticAberration?: {
+    strength: number
+  }
 }
 
 /**
  * Turns a quality preset and the owner's adjustments into the effects to build.
  *
  * - `low`: tone mapping, SMAA, and a light bloom at half resolution.
- * - `medium`: adds color grading, the vignette, and the full bloom strength.
- * - `high`: renders the bloom at full resolution and uses 4x multisampling instead of SMAA. With hybrid or PBR, it adds
- *   ambient occlusion. Toon shading has no place for it, so toon mode never gets it.
+ * - `medium`: adds color grading, the vignette, the full bloom strength, chromatic aberration, and, behind a background
+ *   image, depth of field at half resolution.
+ * - `high`: renders the bloom and the depth of field at full resolution and uses 4x multisampling instead of SMAA. With
+ *   hybrid or PBR, it adds ambient occlusion. Toon shading has no place for it, so toon mode never gets it.
  *
  * @returns `undefined` for `off`, so the scene renders without post-processing.
  */
 export function resolveMMDGraphics(
   quality: MMDGraphicsQuality,
   adjustments: MMDGraphicsAdjustments,
-  renderMode: MMDRenderMode = 'toon',
+  { renderMode = 'toon', hasBackground = false }: MMDGraphicsScene = {},
 ): MMDGraphicsConfig | undefined {
   if (quality === 'off')
     return undefined
@@ -110,6 +136,10 @@ export function resolveMMDGraphics(
       config.color = { saturation: adjustments.saturation, contrast: adjustments.contrast }
     if (adjustments.vignette > 0)
       config.vignette = { darkness: adjustments.vignette }
+    if (hasBackground && adjustments.depthOfField > 0)
+      config.depthOfField = { strength: adjustments.depthOfField, resolutionScale: quality === 'high' ? 1 : 0.5 }
+    if (adjustments.chromaticAberration > 0)
+      config.chromaticAberration = { strength: adjustments.chromaticAberration }
   }
   if (quality === 'high' && renderMode !== 'toon' && adjustments.ambientOcclusion > 0)
     config.ambientOcclusion = { intensity: adjustments.ambientOcclusion }

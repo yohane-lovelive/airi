@@ -2299,6 +2299,8 @@ mmd:
     saturation: 彩度
     contrast: コントラスト
     vignette: ビネット
+    depth-of-field: 背景のボケ（被写界深度）
+    chromatic-aberration: 色収差
     render-mode: 陰影
     render-mode-options:
       toon: トゥーン（モデル作者の見た目どおり）
