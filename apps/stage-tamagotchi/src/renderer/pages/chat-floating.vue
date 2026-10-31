@@ -33,7 +33,10 @@ import {
 import { chatHeaderButtonClass } from '../components/chat-window/chat-header-button'
 import { useChatDraftHandover } from '../composables/use-chat-draft-handover'
 import { dismissOverlays, useChatFloatingClickThrough } from '../composables/use-chat-floating-click-through'
+import { useHideDevToolsButton } from '../composables/use-hide-dev-tools-button'
 import { useControlsIslandStore } from '../stores/controls-island'
+
+useHideDevToolsButton()
 
 const panel = useTemplateRef<HTMLElement>('panel')
 
