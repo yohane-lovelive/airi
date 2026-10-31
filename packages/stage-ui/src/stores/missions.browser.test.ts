@@ -1,5 +1,3 @@
-import type { ReminderValues } from '@proj-airi/core-agent'
-
 import localforage from 'localforage'
 
 import { createPinia, disposePinia } from 'pinia'
@@ -17,11 +15,8 @@ function createStore() {
   return useMissionsStore(pinia)
 }
 
-function inOneHour(): ReminderValues['at'] {
-  const date = new Date(Date.now() + 60 * 60_000)
-  const pad = (value: number) => String(value).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
-}
+/** A start one hour from now, so the reminder is valid whenever the test runs. */
+const IN_ONE_HOUR = { kind: 'after', minutes: 60 } as const
 
 describe('missions store', () => {
   beforeEach(async () => {
@@ -36,7 +31,7 @@ describe('missions store', () => {
 
   it('keeps a new reminder in IndexedDB, so another window reads it', async () => {
     const first = createStore()
-    const result = await first.addReminder({ text: 'medicine time', at: inOneHour(), repeat: { kind: 'once' } }, 'session-1')
+    const result = await first.addReminder({ text: 'medicine time', start: IN_ONE_HOUR, repeat: { kind: 'once' } }, 'session-1')
 
     const second = createStore()
     await second.ready()
@@ -48,7 +43,7 @@ describe('missions store', () => {
   // A stop from Settings and a run on the leader can overlap. The run must not start the stopped reminder again.
   it('keeps a stopped reminder stopped when a run settles after the stop', async () => {
     const missions = createStore()
-    const result = await missions.addReminder({ text: 'stretch', at: inOneHour(), repeat: { kind: 'daily' } }, 'session-1')
+    const result = await missions.addReminder({ text: 'stretch', start: IN_ONE_HOUR, repeat: { kind: 'daily' } }, 'session-1')
     if (!result.ok)
       throw new Error(result.reason)
 
@@ -61,8 +56,8 @@ describe('missions store', () => {
 
   it('removes ended missions and keeps active ones', async () => {
     const missions = createStore()
-    const ended = await missions.addReminder({ text: 'old', at: inOneHour(), repeat: { kind: 'once' } }, 'session-1')
-    await missions.addReminder({ text: 'next', at: inOneHour(), repeat: { kind: 'once' } }, 'session-1')
+    const ended = await missions.addReminder({ text: 'old', start: IN_ONE_HOUR, repeat: { kind: 'once' } }, 'session-1')
+    await missions.addReminder({ text: 'next', start: IN_ONE_HOUR, repeat: { kind: 'once' } }, 'session-1')
     if (!ended.ok)
       throw new Error(ended.reason)
 

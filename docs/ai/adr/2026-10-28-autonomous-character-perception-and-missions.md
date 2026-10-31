@@ -305,8 +305,14 @@ The last two templates give a daily rhythm. These rules complete it:
 
 #### Reminder rules
 
-- A time is a local ISO string, for example `2026-10-31T18:00`. Code refuses a time in the past and a time too far ahead.
-- A reminder runs once, or it repeats daily, on weekdays, or weekly on chosen days, at one time.
+- The model gives the first run in one of two forms:
+  - `at`: a local clock time as an ISO string, for example `2026-10-31T18:00`.
+  - `after`: minutes from now, for example "in 10 minutes".
+- Code counts an `after` start from the real time and rounds it up to a whole minute. The model sees message times without seconds. So a clock time that the model counts itself can already be in the past, and the reminder then speaks at once.
+- Code refuses a time in the past and a time too far ahead. A clock time in the current minute is still valid.
+- A reminder runs once, or it repeats in one of these ways:
+  - Daily, on weekdays, or weekly on chosen days, at one time of day.
+  - At an interval from the first run, from 15 minutes to 24 hours. A shorter interval makes the character talk too often.
 - After each run, code sets the next time of a repeated reminder. The owner stops it in the mission list or in chat.
 - The owner asks for a repeated reminder in chat, so it needs no approval. This differs from the rule for repeated recipes in ADR 2026-10-10.
 - A reminder speaks also in quiet hours and in a temporary quiet period. The owner chose the time, so the time wins.

@@ -25,6 +25,7 @@ export {
   collectDueMissions,
   createReminder,
   deliverReminder,
+  formatLocalDateTime,
   missedRemindersNoticeText,
   MISSION_TEMPLATES,
   parseLocalDateTime,
@@ -40,6 +41,8 @@ export type {
   MustSpeakNotify,
   NoticeOutcome,
   ReminderRepeat,
+  ReminderRequest,
+  ReminderStart,
   ReminderValues,
 } from './missions'
 export { SPEECH_TYPES } from './speech-types'

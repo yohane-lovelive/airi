@@ -1,21 +1,21 @@
-import type { MissionInstance, ReminderValues } from '@proj-airi/core-agent'
+import type { MissionInstance, ReminderRequest } from '@proj-airi/core-agent'
 
-import { createReminder } from '@proj-airi/core-agent'
+import { createReminder, formatLocalDateTime } from '@proj-airi/core-agent'
 import { describe, expect, it, vi } from 'vitest'
 
 import { createMissionTools, LIST_MISSIONS_TOOL_NAME, START_MISSION_TOOL_NAME, STOP_MISSION_TOOL_NAME } from './missions'
 
-/** A future local time, so the reminder is valid whenever the test runs. */
+/** A clock start one hour ahead, so the reminder is valid whenever the test runs. */
 function inOneHour() {
-  const date = new Date(Date.now() + 60 * 60_000)
-  const pad = (value: number) => String(value).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+  return { kind: 'at', at: formatLocalDateTime(Date.now() + 60 * 60_000), minutes: 0 }
 }
+
+const NO_REPEAT = { kind: 'once', days: [], minutes: 0 }
 
 async function createHarness() {
   const missions: MissionInstance[] = []
-  const addReminder = vi.fn(async (values: ReminderValues) => {
-    const result = createReminder({ id: `mission-${missions.length + 1}`, sessionId: 'session-1', values, now: Date.now() })
+  const addReminder = vi.fn(async (request: ReminderRequest) => {
+    const result = createReminder({ id: `mission-${missions.length + 1}`, sessionId: 'session-1', request, now: Date.now() })
     if (result.ok)
       missions.push(result.mission)
     return result
@@ -23,7 +23,7 @@ async function createHarness() {
   const stop = vi.fn(async (id: string) => missions.some(mission => mission.id === id))
   const tools = await createMissionTools({ missions: () => missions, addReminder, stop })
   const run = (name: string, input: unknown) => tools.find(tool => tool.function.name === name)!.execute(input, { messages: [], toolCallId: 'call-1' })
-  return { addReminder, stop, run }
+  return { missions, addReminder, stop, run }
 }
 
 describe('mission tools', () => {
@@ -32,7 +32,7 @@ describe('mission tools', () => {
 
     const result = await harness.run(START_MISSION_TOOL_NAME, {
       template: 'reminder',
-      values: { text: 'trash day', at: inOneHour(), repeat: { kind: 'weekly', days: [1, 4] } },
+      values: { text: 'trash day', start: inOneHour(), repeat: { kind: 'weekly', days: [1, 4], minutes: 0 } },
     })
 
     expect(harness.addReminder).toHaveBeenCalledWith(expect.objectContaining({ repeat: { kind: 'weekly', days: [1, 4] } }))
@@ -40,15 +40,31 @@ describe('mission tools', () => {
     expect(result).toContain('weekly on days 1, 4')
   })
 
-  it('drops the days of a reminder that does not repeat weekly', async () => {
+  it('drops the unused values of the start and the repeat', async () => {
     const harness = await createHarness()
+
+    const start = inOneHour()
 
     await harness.run(START_MISSION_TOOL_NAME, {
       template: 'reminder',
-      values: { text: 'medicine time', at: inOneHour(), repeat: { kind: 'daily', days: [] } },
+      values: { text: 'medicine time', start, repeat: { kind: 'daily', days: [], minutes: 0 } },
     })
 
-    expect(harness.addReminder).toHaveBeenCalledWith(expect.objectContaining({ repeat: { kind: 'daily' } }))
+    expect(harness.addReminder).toHaveBeenCalledWith(expect.objectContaining({ start: { kind: 'at', at: start.at }, repeat: { kind: 'daily' } }))
+  })
+
+  it('starts a reminder some minutes from now that repeats each hour', async () => {
+    const harness = await createHarness()
+    const before = Date.now()
+
+    const result = await harness.run(START_MISSION_TOOL_NAME, {
+      template: 'reminder',
+      values: { text: 'drink water', start: { kind: 'after', at: '', minutes: 10 }, repeat: { kind: 'interval', days: [], minutes: 60 } },
+    })
+
+    expect(harness.addReminder).toHaveBeenCalledWith({ text: 'drink water', start: { kind: 'after', minutes: 10 }, repeat: { kind: 'interval', minutes: 60 } })
+    expect(result).toContain('every 60 minutes')
+    expect(harness.missions[0]!.nextRunAt).toBeGreaterThanOrEqual(before + 10 * 60_000)
   })
 
   it('returns the reason when the code refuses the values', async () => {
@@ -56,7 +72,7 @@ describe('mission tools', () => {
 
     const result = await harness.run(START_MISSION_TOOL_NAME, {
       template: 'reminder',
-      values: { text: 'too late', at: '2020-01-01T09:00', repeat: { kind: 'once', days: [] } },
+      values: { text: 'too late', start: { kind: 'at', at: '2020-01-01T09:00', minutes: 0 }, repeat: NO_REPEAT },
     })
 
     expect(result).toBe('Mission not started: The time is in the past. Use a future time.')
@@ -73,7 +89,7 @@ describe('mission tools', () => {
 
   it('lists the active missions and stops one by its id', async () => {
     const harness = await createHarness()
-    await harness.run(START_MISSION_TOOL_NAME, { template: 'reminder', values: { text: 'stretch', at: inOneHour(), repeat: { kind: 'once', days: [] } } })
+    await harness.run(START_MISSION_TOOL_NAME, { template: 'reminder', values: { text: 'stretch', start: inOneHour(), repeat: NO_REPEAT } })
 
     const list = await harness.run(LIST_MISSIONS_TOOL_NAME, {})
     const stopped = await harness.run(STOP_MISSION_TOOL_NAME, { id: 'mission-1' })

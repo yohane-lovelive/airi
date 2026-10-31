@@ -1053,6 +1053,8 @@ pages:
         daily: Every day
         weekdays: Weekdays
         weekly: 'Every week: {days}'
+        interval-hours: 'Every {count} h'
+        interval-minutes: 'Every {count} min'
       status:
         scheduled: Scheduled
         done: Done

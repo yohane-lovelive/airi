@@ -24,6 +24,11 @@ watch(enabled, (on) => {
 
 function repeatLabel(mission: MissionInstance) {
   const { repeat } = mission.values
+  if (repeat.kind === 'interval') {
+    return repeat.minutes % 60 === 0
+      ? t(`${KEY}.repeat.interval-hours`, { count: repeat.minutes / 60 })
+      : t(`${KEY}.repeat.interval-minutes`, { count: repeat.minutes })
+  }
   if (repeat.kind !== 'weekly')
     return t(`${KEY}.repeat.${repeat.kind}`)
   // 2026-11-01 is a Sunday, so day N of the week is that date plus N days.

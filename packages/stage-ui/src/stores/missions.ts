@@ -1,4 +1,4 @@
-import type { ReminderValues } from '@proj-airi/core-agent'
+import type { ReminderRequest } from '@proj-airi/core-agent'
 
 import type { MissionRecord } from '../database/repos/missions.repo'
 
@@ -12,7 +12,7 @@ import { computed, ref, watch } from 'vue'
 
 import { missionsRepo } from '../database/repos/missions.repo'
 
-export type { MissionInstance, ReminderValues } from '@proj-airi/core-agent'
+export type { MissionInstance, ReminderRequest } from '@proj-airi/core-agent'
 
 /**
  * Missions that the model created from the owner's words, for example reminders.
@@ -64,8 +64,8 @@ export const useMissionsStore = defineStore('missions', () => {
   }
 
   /** Creates a reminder in an owner conversation. On a refusal, `reason` tells the model what to change. */
-  async function addReminder(values: ReminderValues, sessionId: string) {
-    const result = createReminder({ id: nanoid(), sessionId, values, now: Date.now() })
+  async function addReminder(request: ReminderRequest, sessionId: string) {
+    const result = createReminder({ id: nanoid(), sessionId, request, now: Date.now() })
     if (!result.ok)
       return result
     await missionsRepo.add(result.mission)

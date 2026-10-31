@@ -659,7 +659,7 @@ export const useChatStore = defineStore('chat', () => {
       ...(ownerOnly && missions.enabled && missions.supported
         ? await createMissionTools({
             missions: () => missions.missions,
-            addReminder: values => missions.addReminder(values, sessionId),
+            addReminder: request => missions.addReminder(request, sessionId),
             stop: id => missions.stop(id),
           })
         : []),

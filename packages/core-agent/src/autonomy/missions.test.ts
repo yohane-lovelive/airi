@@ -1,8 +1,8 @@
-import type { MissionInstance, MustSpeakNotify, NoticeOutcome, ReminderValues } from './missions'
+import type { MissionInstance, MustSpeakNotify, NoticeOutcome, ReminderRequest, ReminderStart } from './missions'
 
 import { describe, expect, it, vi } from 'vitest'
 
-import { collectDueMissions, createReminder, deliverReminder, missedRemindersNoticeText, parseLocalDateTime, reminderNoticeText, settleMissionRun, stopMission } from './missions'
+import { collectDueMissions, createReminder, deliverReminder, formatLocalDateTime, missedRemindersNoticeText, parseLocalDateTime, reminderNoticeText, settleMissionRun, stopMission } from './missions'
 
 /** Friday 2026-10-30 12:00, local time. */
 const NOW = new Date(2026, 9, 30, 12, 0).getTime()
@@ -13,13 +13,16 @@ function local(year: number, month: number, day: number, hours: number, minutes 
   return new Date(year, month - 1, day, hours, minutes).getTime()
 }
 
-function reminder(values: Partial<ReminderValues> = {}, now = NOW): MissionInstance {
-  const result = createReminder({
-    id: 'mission-1',
-    sessionId: 'session-1',
-    values: { text: 'medicine time', at: '2026-10-30T18:00', repeat: { kind: 'once' }, ...values },
-    now,
-  })
+function at(text: string): ReminderStart {
+  return { kind: 'at', at: text }
+}
+
+function request(overrides: Partial<ReminderRequest> = {}): ReminderRequest {
+  return { text: 'medicine time', start: at('2026-10-30T18:00'), repeat: { kind: 'once' }, ...overrides }
+}
+
+function reminder(overrides: Partial<ReminderRequest> = {}, now = NOW): MissionInstance {
+  const result = createReminder({ id: 'mission-1', sessionId: 'session-1', request: request(overrides), now })
   if (!result.ok)
     throw new Error(result.reason)
   return result.mission
@@ -41,7 +44,17 @@ describe('parseLocalDateTime', () => {
   })
 })
 
+describe('formatLocalDateTime', () => {
+  it('writes a local date and time without seconds', () => {
+    expect(formatLocalDateTime(local(2026, 1, 5, 7, 3) + 30_000)).toBe('2026-01-05T07:03')
+  })
+})
+
 describe('createReminder', () => {
+  function create(overrides: Partial<ReminderRequest>, now = NOW) {
+    return createReminder({ id: 'm', sessionId: 's', request: request(overrides), now })
+  }
+
   it('schedules a reminder that runs once at its time', () => {
     const mission = reminder()
 
@@ -49,40 +62,66 @@ describe('createReminder', () => {
     expect(mission.nextRunAt).toBe(local(2026, 10, 30, 18))
   })
 
-  it('accepts a time in the current minute', () => {
-    const result = createReminder({ id: 'm', sessionId: 's', values: { text: 'now', at: '2026-10-30T12:00', repeat: { kind: 'once' } }, now: NOW + 30_000 })
-
-    expect(result.ok).toBe(true)
+  it('accepts a clock time in the current minute', () => {
+    expect(create({ start: at('2026-10-30T12:00') }, NOW + 30_000).ok).toBe(true)
   })
 
   it('refuses a time in the past', () => {
-    const result = createReminder({ id: 'm', sessionId: 's', values: { text: 'late', at: '2026-10-30T11:00', repeat: { kind: 'once' } }, now: NOW })
-
-    expect(result).toEqual({ ok: false, reason: 'The time is in the past. Use a future time.' })
+    expect(create({ start: at('2026-10-30T11:00') })).toEqual({ ok: false, reason: 'The time is in the past. Use a future time.' })
   })
 
   it('refuses a time more than one year ahead', () => {
-    const result = createReminder({ id: 'm', sessionId: 's', values: { text: 'far', at: '2028-01-01T09:00', repeat: { kind: 'once' } }, now: NOW })
-
-    expect(result.ok).toBe(false)
+    expect(create({ start: at('2028-01-01T09:00') }).ok).toBe(false)
+    expect(create({ start: { kind: 'after', minutes: 400 * 24 * 60 } }).ok).toBe(false)
   })
 
   it('refuses an empty text and a weekly reminder without days', () => {
-    expect(createReminder({ id: 'm', sessionId: 's', values: { text: '  ', at: '2026-10-30T18:00', repeat: { kind: 'once' } }, now: NOW }).ok).toBe(false)
-    expect(createReminder({ id: 'm', sessionId: 's', values: { text: 'x', at: '2026-10-30T18:00', repeat: { kind: 'weekly', days: [7] } }, now: NOW }).ok).toBe(false)
+    expect(create({ text: '  ' }).ok).toBe(false)
+    expect(create({ repeat: { kind: 'weekly', days: [7] } }).ok).toBe(false)
   })
 
   it('starts a weekday reminder on Monday when the first date is a Saturday', () => {
     // 2026-10-31 is a Saturday.
-    const mission = reminder({ at: '2026-10-31T08:00', repeat: { kind: 'weekdays' } })
+    const mission = reminder({ start: at('2026-10-31T08:00'), repeat: { kind: 'weekdays' } })
 
     expect(mission.nextRunAt).toBe(local(2026, 11, 2, 8))
   })
 
   it('starts a repeated reminder on the next day when its first time today has passed', () => {
-    const mission = reminder({ at: '2026-10-30T08:00', repeat: { kind: 'daily' } })
+    const mission = reminder({ start: at('2026-10-30T08:00'), repeat: { kind: 'daily' } })
 
     expect(mission.nextRunAt).toBe(local(2026, 10, 31, 8))
+  })
+
+  // ROOT CAUSE:
+  //
+  // Message times have no seconds. At 09:45:59 the model asked for "one minute later" as 09:46, which was already past.
+  //
+  // We fixed this with an `after` start that code counts from the real time.
+  it('counts an after start from the real time and never runs early', () => {
+    const now = local(2026, 10, 31, 9, 45) + 59_500
+
+    const mission = reminder({ start: { kind: 'after', minutes: 1 } }, now)
+
+    expect(mission.nextRunAt).toBe(local(2026, 10, 31, 9, 47))
+    expect(mission.values.at).toBe('2026-10-31T09:47')
+  })
+
+  it('refuses an after start without a whole number of minutes', () => {
+    expect(create({ start: { kind: 'after', minutes: 0 } }).ok).toBe(false)
+    expect(create({ start: { kind: 'after', minutes: 1.5 } }).ok).toBe(false)
+  })
+
+  it('refuses an interval outside 15 minutes to 24 hours', () => {
+    expect(create({ repeat: { kind: 'interval', minutes: 10 } })).toEqual({ ok: false, reason: 'An interval reminder needs a whole number of minutes from 15 to 1440.' })
+    expect(create({ repeat: { kind: 'interval', minutes: 1441 } }).ok).toBe(false)
+  })
+
+  it('starts an interval reminder on its next step when its first time has passed', () => {
+    // Each hour from 09:30. At 12:00, the next step is 12:30.
+    const mission = reminder({ start: at('2026-10-30T09:30'), repeat: { kind: 'interval', minutes: 60 } })
+
+    expect(mission.nextRunAt).toBe(local(2026, 10, 30, 12, 30))
   })
 })
 
@@ -146,6 +185,17 @@ describe('settleMissionRun', () => {
     const next = settleMissionRun(mission, 'delivered', local(2026, 10, 30, 18))
 
     expect(next.nextRunAt).toBe(local(2026, 11, 2, 18))
+  })
+
+  it('moves an interval reminder to its next step and skips the steps that the app missed', () => {
+    const mission = reminder({ start: at('2026-10-30T12:30'), repeat: { kind: 'interval', minutes: 90 } })
+
+    const next = settleMissionRun(mission, 'delivered', local(2026, 10, 30, 12, 30))
+    const afterClosed = settleMissionRun(mission, 'delivered', local(2026, 10, 30, 17, 10))
+
+    expect(next.nextRunAt).toBe(local(2026, 10, 30, 14))
+    // Steps are 12:30, 14:00, 15:30, 17:00, and 18:30.
+    expect(afterClosed.nextRunAt).toBe(local(2026, 10, 30, 18, 30))
   })
 })
 

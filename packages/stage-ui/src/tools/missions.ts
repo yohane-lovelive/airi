@@ -1,4 +1,4 @@
-import type { MissionInstance, ReminderRepeat, ReminderValues } from '@proj-airi/core-agent'
+import type { MissionInstance, ReminderRepeat, ReminderRequest, ReminderStart } from '@proj-airi/core-agent'
 import type { Tool } from '@xsai/shared-chat'
 
 import { formatTimePrefix, MISSION_TEMPLATES } from '@proj-airi/core-agent'
@@ -10,13 +10,19 @@ export const START_MISSION_TOOL_NAME = 'builtIn_startMission'
 export const LIST_MISSIONS_TOOL_NAME = 'builtIn_listMissions'
 export const STOP_MISSION_TOOL_NAME = 'builtIn_stopMission'
 
-// Strict function calling needs every property in `required`, in nested objects too, so `days` is always present.
+// Strict function calling needs every property in `required`, in nested objects too. So `at`, `days`, and both
+// `minutes` are always present, and the kind tells which of them count.
 const reminderValues = strictObject({
   text: pipe(string(), minLength(1), maxLength(200), description('What to tell the owner, in the owner\'s words, for example "medicine time".')),
-  at: pipe(string(), description('The local date and time of the first run, YYYY-MM-DDTHH:mm. Read the current time from the message time.')),
+  start: strictObject({
+    kind: pipe(picklist(['after', 'at']), description('"after" for a time from now, for example "in 10 minutes". "at" for a clock time, for example "at 18:00".')),
+    at: pipe(string(), description('For "at" only: the local date and time of the first run, YYYY-MM-DDTHH:mm. Otherwise an empty string.')),
+    minutes: pipe(number(), integer(), minValue(0), description('For "after" only: the minutes from now. Code counts them from the real time. Otherwise 0.')),
+  }),
   repeat: strictObject({
-    kind: picklist(['once', 'daily', 'weekdays', 'weekly']),
+    kind: picklist(['once', 'daily', 'weekdays', 'weekly', 'interval']),
     days: pipe(array(pipe(number(), integer(), minValue(0), maxValue(6))), description('For "weekly" only: the days, 0 is Sunday and 6 is Saturday. Otherwise an empty list.')),
+    minutes: pipe(number(), integer(), minValue(0), description('For "interval" only: the minutes between runs, 15 to 1440. For example 60 for "every hour". Otherwise 0.')),
   }),
 })
 const startParameters = strictObject({
@@ -29,16 +35,38 @@ const stopParameters = strictObject({ id: pipe(string(), minLength(1), descripti
 /** What the mission tools change. The caller binds them to the owner conversation of the run. */
 interface CreateMissionToolsOptions {
   missions: () => readonly MissionInstance[]
-  addReminder: (values: ReminderValues) => Promise<{ ok: true, mission: MissionInstance } | { ok: false, reason: string }>
+  addReminder: (request: ReminderRequest) => Promise<{ ok: true, mission: MissionInstance } | { ok: false, reason: string }>
   stop: (id: string) => Promise<boolean>
 }
 
-function repeatOf(input: { kind: 'once' | 'daily' | 'weekdays' | 'weekly', days: number[] }): ReminderRepeat {
-  return input.kind === 'weekly' ? { kind: 'weekly', days: input.days } : { kind: input.kind }
+function startOf(input: { kind: 'after' | 'at', at: string, minutes: number }): ReminderStart {
+  return input.kind === 'after' ? { kind: 'after', minutes: input.minutes } : { kind: 'at', at: input.at }
+}
+
+function repeatOf(input: { kind: 'once' | 'daily' | 'weekdays' | 'weekly' | 'interval', days: number[], minutes: number }): ReminderRepeat {
+  switch (input.kind) {
+    case 'weekly':
+      return { kind: 'weekly', days: input.days }
+    case 'interval':
+      return { kind: 'interval', minutes: input.minutes }
+    default:
+      return { kind: input.kind }
+  }
+}
+
+function describeRepeat(repeat: ReminderRepeat) {
+  switch (repeat.kind) {
+    case 'weekly':
+      return `weekly on days ${repeat.days.join(', ')}`
+    case 'interval':
+      return `every ${repeat.minutes} minutes`
+    default:
+      return repeat.kind
+  }
 }
 
 function describeMission(mission: MissionInstance) {
-  const repeat = mission.values.repeat.kind === 'weekly' ? `weekly on days ${mission.values.repeat.days.join(', ')}` : mission.values.repeat.kind
+  const repeat = describeRepeat(mission.values.repeat)
   const next = mission.nextRunAt === undefined ? mission.status : `next ${formatTimePrefix(mission.nextRunAt).trim()}`
   return `- ${mission.id}: ${mission.template}, "${mission.values.text}", ${repeat}, ${next}`
 }
@@ -58,8 +86,8 @@ export async function createMissionTools(options: CreateMissionToolsOptions): Pr
         const parsed = safeParse(startParameters, rawInput)
         if (!parsed.success)
           return `Mission not started: ${summarize(parsed.issues)}`
-        const { text, at, repeat } = parsed.output.values
-        const result = await options.addReminder({ text, at, repeat: repeatOf(repeat) })
+        const { text, start, repeat } = parsed.output.values
+        const result = await options.addReminder({ text, start: startOf(start), repeat: repeatOf(repeat) })
         if (!result.ok)
           return `Mission not started: ${result.reason}`
         return `Started mission:\n${describeMission(result.mission)}`

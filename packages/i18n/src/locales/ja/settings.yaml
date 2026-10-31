@@ -919,6 +919,8 @@ pages:
         daily: 毎日
         weekdays: 平日
         weekly: '毎週: {days}'
+        interval-hours: '{count} 時間ごと'
+        interval-minutes: '{count} 分ごと'
       status:
         scheduled: 予定
         done: 完了
