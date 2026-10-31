@@ -8,6 +8,7 @@ import { mmdRigFromMesh, retargetVRMAnimationToMMD } from './vrma-retarget'
 /**
  * A small MMD rig that faces +Z with the character's left at +X, as three-mmd loads it.
  * The left arm rests 45 degrees down, as in an A-pose. `上半身2` is missing on purpose.
+ * `左腕W` is a helper bone that `左腕WIK` under the elbow turns toward the elbow, as in Sour-style Teto.
  */
 const BONES: Array<[name: string, parent: string | undefined, position: [number, number, number]]> = [
   ['全ての親', undefined, [0, 0, 0]],
@@ -26,6 +27,9 @@ const BONES: Array<[name: string, parent: string | undefined, position: [number,
   ['左手首', '左ひじ', [1.5 + 4 * Math.SQRT1_2, 13 - 4 * Math.SQRT1_2, 0]],
   ['左足ＩＫ', '全ての親', [1, 1, 0]],
   ['左つま先ＩＫ', '左足ＩＫ', [1, 0, 1]],
+  ['左腕W', '左肩', [1.5, 13, 0]],
+  ['左腕W先', '左腕W', [1.5 + 2 * Math.SQRT1_2, 13 - 2 * Math.SQRT1_2, 0]],
+  ['左腕WIK', '左ひじ', [1.5 + 2 * Math.SQRT1_2, 13 - 2 * Math.SQRT1_2, 0]],
 ]
 
 function createMesh() {
@@ -44,8 +48,12 @@ function createMesh() {
   mesh.add(bones[0])
   mesh.bind(new Skeleton(bones))
   const index = (name: string) => bones.findIndex(bone => bone.name === name)
-  const ikEffectors = new Map([[index('左足ＩＫ'), index('左足首')], [index('左つま先ＩＫ'), index('左つま先')]])
-  return { mesh, byName, rig: mmdRigFromMesh(mesh, ikEffectors) }
+  const iks = [
+    { bone: index('左足ＩＫ'), effector: index('左足首'), links: [index('左ひざ'), index('左足')] },
+    { bone: index('左つま先ＩＫ'), effector: index('左つま先'), links: [index('左足首')] },
+    { bone: index('左腕WIK'), effector: index('左腕W先'), links: [index('左腕W')] },
+  ]
+  return { mesh, byName, rig: mmdRigFromMesh(mesh, iks) }
 }
 
 type Hips = [x: number, y: number, z: number]
@@ -89,7 +97,7 @@ describe('mmdRigFromMesh', () => {
     const { rig } = createMesh()
 
     expect(rig.bones.find(bone => bone.name === '左ひざ')!.restPosition.toArray()).toEqual([1, 5, 0])
-    expect(rig.iks).toHaveLength(2)
+    expect(rig.iks).toHaveLength(3)
   })
 })
 
@@ -141,6 +149,31 @@ describe('retargetVRMAnimationToMMD', () => {
     expect(at('左つま先ＩＫ').distanceTo(at('左つま先'))).toBeLessThan(1e-6)
     // The knee bend moved the ankle away from its rest position.
     expect(at('左足首').distanceTo(new Vector3(1, 1, 0))).toBeGreaterThan(0.5)
+  })
+
+  // ROOT CAUSE:
+  //
+  // Every IK bone was held at its effector in an unmoved chain. In Sour-style Teto, the helper `左腕W` stayed in the
+  // A-pose, and the arm mesh stuck out.
+  //
+  // We fixed this by moving only the IK bones whose solver rotates a retargeted bone.
+  it('leaves a helper IK under the elbow free to follow the arm', () => {
+    const { rig } = createMesh()
+
+    const clip = retargetVRMAnimationToMMD(animationOf({ leftUpperArm: aboutZ(-45) }), rig)
+
+    const names = clip.tracks.map(track => track.name)
+    expect(names).not.toContain('.bones[左腕WIK].position')
+    expect(names).toContain('.bones[左足ＩＫ].position')
+    expect(names).toContain('.bones[左つま先ＩＫ].position')
+  })
+
+  it('keeps a helper IK at the elbow while the arm moves', () => {
+    // The arm hangs 80 degrees down, past the 45 degrees of the rest A-pose, so the elbow leaves its rest position.
+    const at = pose(animationOf({ leftUpperArm: aboutZ(-80) }))
+
+    expect(at('左ひじ').distanceTo(new Vector3(1.5 + 2 * Math.SQRT1_2, 13 - 2 * Math.SQRT1_2, 0))).toBeGreaterThan(0.5)
+    expect(at('左腕WIK').distanceTo(at('左ひじ'))).toBeLessThan(1e-6)
   })
 
   it('writes tracks that only target bones of the model', () => {

@@ -39,7 +39,9 @@ reaching feature parity with the Live2D and VRM renderers:
     work as keys, because one name can cover the face skin and the clothes.
 - **VRM motions** (`utils/vrma-retarget`, `utils/vrma-loader`): retargets a
   `.vrma` clip to the standard MMD bones, with a rest pose correction for the
-  A-pose and positions for the leg IK bones, so IK stays on. The scene plays
+  A-pose and positions for the leg IK bones, so IK stays on. Helper IK that
+  rotates no retargeted bone, for example `左腕WIK` under `左ひじ`, follows
+  its parent instead. The scene plays
   the VRM idle loop through it until the owner chooses a VMD idle. Pass the
   loop as `defaultIdleAnimationUrl`.
 - **Model packages** (`utils/mmd-package`): reads a picked folder or a ZIP,

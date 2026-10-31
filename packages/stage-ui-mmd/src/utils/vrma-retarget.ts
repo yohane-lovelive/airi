@@ -20,6 +20,8 @@ export interface MMDRigBone {
 export interface MMDRigIK {
   bone: number
   effector: number
+  /** The bones that the solver rotates, for example `左ひざ` and `左足`. */
+  links: number[]
 }
 
 export interface MMDRig {
@@ -125,9 +127,9 @@ const HUMAN_BONE_ORDER: VRMHumanBoneName[] = (() => {
 /**
  * Reads the rig of a loaded MMD model. Call it before any motion plays, while the bones are at rest.
  *
- * `ikEffectors` maps each IK bone index to its effector bone index, as `MMD.pmx.bones[i].ik.target` gives it.
+ * `iks` lists the IK bones by index, as `MMD.pmx.bones[i].ik` gives them: the effector `target` and the `links`.
  */
-export function mmdRigFromMesh(mesh: SkinnedMesh, ikEffectors: ReadonlyMap<number, number>): MMDRig {
+export function mmdRigFromMesh(mesh: SkinnedMesh, iks: readonly MMDRigIK[]): MMDRig {
   const skeletonBones = mesh.skeleton.bones
   const indexOf = new Map(skeletonBones.map((bone, index) => [bone, index]))
   const bones: MMDRigBone[] = skeletonBones.map(bone => ({
@@ -141,7 +143,7 @@ export function mmdRigFromMesh(mesh: SkinnedMesh, ikEffectors: ReadonlyMap<numbe
     if (parent !== -1)
       bones[index].restPosition.add(bones[parent].restPosition)
   }
-  return { bones, iks: [...ikEffectors].map(([bone, effector]) => ({ bone, effector })) }
+  return { bones, iks: iks.map(ik => ({ ...ik, links: [...ik.links] })) }
 }
 
 /** Bone indices in parent-first order, so a parent's transform is known before its children need it. */
@@ -177,8 +179,10 @@ function sampler(track: KeyframeTrack | undefined) {
  * - Each VRM bone rotation is relative to the VRM T-pose. Code turns it into a world rotation and gives the MMD bone the
  *   same world rotation, corrected for the MMD rest pose. MMD models rest in an A-pose, so the arms differ most.
  * - The hips motion from the first frame moves `センター`, scaled by the ratio of hip heights.
- * - IK bones, for example `左足ＩＫ`, follow the position of their effector in the retargeted pose. IK can stay on, so the
- *   clip blends with VMD motions that drive the legs by IK.
+ * - IK bones that rotate retargeted bones, for example `左足ＩＫ`, follow the position of their effector in the
+ *   retargeted pose. IK can stay on, so the clip blends with VMD motions that drive the legs by IK.
+ * - Other IK bones keep their place under their parent. Helper IK such as `左腕WIK` under `左ひじ` turns a helper bone
+ *   toward the elbow, so it must follow the arm.
  *
  * @returns A clip with tracks named like VMD clips, `.bones[name].quaternion` and `.bones[name].position`.
  */
@@ -223,7 +227,10 @@ export function retargetVRMAnimationToMMD(animation: VRMAnimationSource, rig: MM
   const hipScale = animation.restHipsPosition.y > 0 ? mmdHipHeight / animation.restHipsPosition.y : 0
 
   const order = parentFirstOrder(rig.bones)
-  const ikBones = new Map(rig.iks.map(ik => [ik.bone, ik.effector]))
+  // Only IK that rotates a retargeted bone moves. Helper IK, for example `左腕WIK` under `左ひじ`, follows its parent.
+  const ikBones = new Map(rig.iks
+    .filter(ik => ik.links.some(link => humanOf.has(link)))
+    .map(ik => [ik.bone, ik.effector]))
 
   const frameCount = Math.max(1, Math.round(animation.duration * fps) + 1)
   const times = Array.from({ length: frameCount }, (_, frame) => Math.min(frame / fps, animation.duration))

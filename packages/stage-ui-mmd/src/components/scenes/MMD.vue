@@ -620,12 +620,10 @@ async function loadModel(src: string) {
     resolved = loaded
     mesh = resolved.mesh
     // Read the rig now, while every bone is at rest. Motions move the bones later.
-    const ikEffectors = new Map<number, number>()
-    resolved.mmd.pmx.bones.forEach((bone, index) => {
-      if (bone.ik)
-        ikEffectors.set(index, bone.ik.target)
-    })
-    const rig = mmdRigFromMesh(mesh, ikEffectors)
+    const iks = resolved.mmd.pmx.bones.flatMap((bone, index) => bone.ik
+      ? [{ bone: index, effector: bone.ik.target, links: bone.ik.links.map(link => link.target) }]
+      : [])
+    const rig = mmdRigFromMesh(mesh, iks)
 
     modelGroup = new Group()
     modelGroup.add(mesh)
