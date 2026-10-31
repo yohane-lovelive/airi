@@ -131,7 +131,7 @@ All functions are pure. The host passes the time and keeps the returned missions
 
 - `MISSION_TEMPLATES` describes each template and its values for the mission tools.
 - `createReminder` checks the request from the model. It refuses a past time, a time more than one year ahead, and an empty text. A refusal has a reason for the model.
-- A reminder starts at a local clock time (`at`) or some minutes from now (`after`). Code counts `after` from the real time and rounds it up to a whole minute.
+- A reminder starts at a local clock time (`at`) or some minutes from now (`after`). Code counts `after` from the real time, to the second.
 - A reminder runs once, daily, on weekdays, weekly on chosen days, or at an interval of 15 minutes to 24 hours. A repeated reminder whose first time has passed starts on its next run.
 - `collectDueMissions` sorts due runs into on time, missed inside the age limit, and expired.
 - `settleMissionRun` moves a mission past its run. A repeated reminder skips the runs that the app missed while it was closed.

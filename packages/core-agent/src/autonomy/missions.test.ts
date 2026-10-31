@@ -97,14 +97,21 @@ describe('createReminder', () => {
   //
   // Message times have no seconds. At 09:45:59 the model asked for "one minute later" as 09:46, which was already past.
   //
-  // We fixed this with an `after` start that code counts from the real time.
-  it('counts an after start from the real time and never runs early', () => {
+  // We fixed this with an `after` start that code counts from the real time, to the second.
+  it('counts an after start from the real time, to the second', () => {
     const now = local(2026, 10, 31, 9, 45) + 59_500
 
     const mission = reminder({ start: { kind: 'after', minutes: 1 } }, now)
 
-    expect(mission.nextRunAt).toBe(local(2026, 10, 31, 9, 47))
-    expect(mission.values.at).toBe('2026-10-31T09:47')
+    expect(mission.nextRunAt).toBe(now + MINUTE)
+    expect(mission.values.at).toBe('2026-10-31T09:46')
+  })
+
+  it('starts a weekday reminder with an after start on its next weekday', () => {
+    // 2026-10-31 is a Saturday. Ten minutes after 08:00:30 is 08:10:30, and the Monday run keeps 08:10 without seconds.
+    const mission = reminder({ start: { kind: 'after', minutes: 10 }, repeat: { kind: 'weekdays' } }, local(2026, 10, 31, 8) + 30_000)
+
+    expect(mission.nextRunAt).toBe(local(2026, 11, 2, 8, 10))
   })
 
   it('refuses an after start without a whole number of minutes', () => {
@@ -196,6 +203,16 @@ describe('settleMissionRun', () => {
     expect(next.nextRunAt).toBe(local(2026, 10, 30, 14))
     // Steps are 12:30, 14:00, 15:30, 17:00, and 18:30.
     expect(afterClosed.nextRunAt).toBe(local(2026, 10, 30, 18, 30))
+  })
+
+  it('keeps the seconds of an exact first run in each interval step', () => {
+    const first = NOW + 15_000 + 10 * MINUTE
+    const mission = reminder({ start: { kind: 'after', minutes: 10 }, repeat: { kind: 'interval', minutes: 60 } }, NOW + 15_000)
+
+    const next = settleMissionRun(mission, 'delivered', first + 2_000)
+
+    expect(mission.nextRunAt).toBe(first)
+    expect(next.nextRunAt).toBe(first + HOUR)
   })
 })
 

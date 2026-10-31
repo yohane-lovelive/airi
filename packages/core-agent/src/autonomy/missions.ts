@@ -43,8 +43,8 @@ export interface ReminderValues {
   /** What the character tells the owner, in the owner's words. The fallback speech reads it as it is. */
   readonly text: string
   /**
-   * The local date and time of the first run, `YYYY-MM-DDTHH:mm`. A daily, weekday, or weekly reminder runs at this time
-   * of day, and an interval reminder counts its runs from it.
+   * The local date and time of the first run, `YYYY-MM-DDTHH:mm`, without seconds. A daily, weekday, or weekly reminder
+   * runs at this time of day. An interval reminder counts its runs from its exact first run.
    */
   readonly at: string
   readonly repeat: ReminderRepeat
@@ -78,8 +78,8 @@ export interface MissionTemplate {
 export const MISSION_TEMPLATES: readonly MissionTemplate[] = [
   {
     name: 'reminder',
-    description: 'Tell the owner something at a time that the owner asked for. You always speak when it is due.',
-    values: '{ "text": what to tell, in the owner\'s words, "start": { "kind": "after", "minutes": n } for a time from now, for example "in 10 minutes", or { "kind": "at", "at": local "YYYY-MM-DDTHH:mm" } for a clock time, "repeat": { "kind": "once" | "daily" | "weekdays" } or { "kind": "weekly", "days": [0-6, 0 is Sunday] } or { "kind": "interval", "minutes": 15-1440 } }',
+    description: 'Tell the owner something at a time that the owner asked for. You always speak when it is due. Message times have no seconds, so never count a clock time from them: use an "after" start for any time from now.',
+    values: '{ "text": what to tell, in the owner\'s words, "start": { "kind": "after", "minutes": n } for a time from now, for example "in 1 minute" or "in 2 hours", or { "kind": "at", "at": local "YYYY-MM-DDTHH:mm" } only for a clock time that the owner names, for example "at 18:00", "repeat": { "kind": "once" | "daily" | "weekdays" } or { "kind": "weekly", "days": [0-6, 0 is Sunday] } or { "kind": "interval", "minutes": 15-1440 } }',
   },
 ]
 
@@ -155,7 +155,7 @@ export function formatLocalDateTime(time: number) {
 /**
  * Creates a reminder from the request that the model gave. On a refusal, `reason` tells the model what to change.
  *
- * - An `after` start takes the next whole minute after `now` plus the minutes, so the first run is never early.
+ * - An `after` start runs first at `now` plus the minutes, to the second. `at` keeps that time without seconds.
  * - The first run of a daily, weekday, or weekly reminder is the first matching day at or after the start.
  * - The first run of an interval reminder is the first step at or after the start.
  */
@@ -175,8 +175,7 @@ export function createReminder(input: { id: string, sessionId: string, request: 
     return { ok: false, reason: startAt }
 
   const values: ReminderValues = { text, at: startAt.at, repeat }
-  // A repeated reminder whose first time has passed starts on its next run. A reminder that runs once has only its own time.
-  const firstRun = runAtOrAfter(values, repeat.kind === 'once' ? startAt.time : Math.max(startAt.time, input.now - REMINDER_LIMITS.pastSlackMs))
+  const firstRun = firstRunOf(values, startAt, input.now)
   if (firstRun === undefined || firstRun < input.now - REMINDER_LIMITS.pastSlackMs)
     return { ok: false, reason: 'The time is in the past. Use a future time.' }
   if (firstRun > input.now + REMINDER_LIMITS.maxAheadMs)
@@ -230,7 +229,7 @@ export function collectDueMissions(missions: readonly MissionInstance[], now: nu
  */
 export function settleMissionRun(mission: MissionInstance, outcome: 'delivered' | 'expired', now: number): MissionInstance {
   const lastRunAt = outcome === 'delivered' ? now : mission.lastRunAt
-  const nextRunAt = nextRunAfter(mission.values, now)
+  const nextRunAt = nextRunAfter(mission, now)
   if (nextRunAt !== undefined)
     return { ...mission, nextRunAt, lastRunAt, updatedAt: now }
 
@@ -306,19 +305,37 @@ function normalizeRepeat(repeat: ReminderRepeat): ReminderRepeat | string {
   return days.length ? { kind: 'weekly', days } : 'A weekly reminder needs at least one day from 0 to 6.'
 }
 
-/** Finds the local time of the first run. Resolves to that time, or to the reason for a refusal. */
-function resolveStart(start: ReminderStart, now: number): { at: string, time: number } | string {
+/**
+ * Finds the start time. Resolves to that time, or to the reason for a refusal.
+ * `exact` marks an `after` start. Its time keeps the seconds, and `at` drops them.
+ */
+function resolveStart(start: ReminderStart, now: number): { at: string, time: number, exact: boolean } | string {
   if (start.kind === 'after') {
     if (!Number.isInteger(start.minutes) || start.minutes < 1)
       return 'The minutes from now must be a whole number of 1 or more.'
-    // Round up to the next whole minute, because a stored time has no seconds. The run comes up to one minute late, never early.
-    const time = Math.ceil((now + start.minutes * MINUTE_MS) / MINUTE_MS) * MINUTE_MS
-    return { at: formatLocalDateTime(time), time }
+    const time = now + start.minutes * MINUTE_MS
+    return { at: formatLocalDateTime(time), time, exact: true }
   }
   const time = parseLocalDateTime(start.at)
   if (time === undefined)
     return 'The time must be a real local date and time in the form YYYY-MM-DDTHH:mm.'
-  return { at: start.at.trim(), time }
+  return { at: start.at.trim(), time, exact: false }
+}
+
+function firstRunOf(values: ReminderValues, start: { time: number, exact: boolean }, now: number) {
+  // An exact start runs at its own time when the repeat allows that day. A weekday or weekly reminder that starts on
+  // another day runs first on its next allowed day, at the time of day of `at`.
+  if (start.exact)
+    return repeatsOn(values.repeat, new Date(start.time).getDay()) ? start.time : runAtOrAfter(values, start.time)
+  // A repeated reminder whose first time has passed starts on its next run. A reminder that runs once has only its own time.
+  return runAtOrAfter(values, values.repeat.kind === 'once' ? start.time : Math.max(start.time, now - REMINDER_LIMITS.pastSlackMs))
+}
+
+/** The first step of `minutes` after `anchor` that is at or after `from`. */
+function stepAtOrAfter(anchor: number, minutes: number, from: number) {
+  // An interval counts real time, so a daylight saving change moves the wall clock time of the runs.
+  const step = minutes * MINUTE_MS
+  return anchor + Math.max(0, Math.ceil((from - anchor) / step)) * step
 }
 
 function repeatsOn(repeat: ReminderRepeat, day: number) {
@@ -344,12 +361,8 @@ function runAtOrAfter(values: ReminderValues, from: number) {
     return undefined
   if (values.repeat.kind === 'once')
     return start >= from ? start : undefined
-  if (values.repeat.kind === 'interval') {
-    // Each run is a whole number of intervals after the first one. An interval counts real time, so a daylight saving
-    // change moves the wall clock time of the runs.
-    const step = values.repeat.minutes * MINUTE_MS
-    return start + Math.max(0, Math.ceil((from - start) / step)) * step
-  }
+  if (values.repeat.kind === 'interval')
+    return stepAtOrAfter(start, values.repeat.minutes, from)
 
   const startDate = new Date(start)
   const candidate = new Date(Math.max(from, start))
@@ -364,8 +377,13 @@ function runAtOrAfter(values: ReminderValues, from: number) {
   return undefined
 }
 
-function nextRunAfter(values: ReminderValues, after: number) {
+function nextRunAfter(mission: MissionInstance, after: number) {
+  const { values } = mission
   if (values.repeat.kind === 'once')
     return undefined
+  // Each run of an interval reminder is a whole number of intervals after the current one, so an exact first run keeps
+  // its seconds.
+  if (values.repeat.kind === 'interval' && mission.nextRunAt !== undefined)
+    return stepAtOrAfter(mission.nextRunAt, values.repeat.minutes, after + 1)
   return runAtOrAfter(values, after + 1)
 }

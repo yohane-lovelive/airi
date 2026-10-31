@@ -15,9 +15,9 @@ export const STOP_MISSION_TOOL_NAME = 'builtIn_stopMission'
 const reminderValues = strictObject({
   text: pipe(string(), minLength(1), maxLength(200), description('What to tell the owner, in the owner\'s words, for example "medicine time".')),
   start: strictObject({
-    kind: pipe(picklist(['after', 'at']), description('"after" for a time from now, for example "in 10 minutes". "at" for a clock time, for example "at 18:00".')),
-    at: pipe(string(), description('For "at" only: the local date and time of the first run, YYYY-MM-DDTHH:mm. Otherwise an empty string.')),
-    minutes: pipe(number(), integer(), minValue(0), description('For "after" only: the minutes from now. Code counts them from the real time. Otherwise 0.')),
+    kind: pipe(picklist(['after', 'at']), description('"after" for any time from now, for example "in 1 minute" or "in 2 hours". "at" only for a clock time that the owner names, for example "at 18:00".')),
+    at: pipe(string(), description('For "at" only: the local date and time that the owner named, YYYY-MM-DDTHH:mm. Otherwise an empty string.')),
+    minutes: pipe(number(), integer(), minValue(0), description('For "after" only: the minutes from now, for example 120 for "in 2 hours". Code counts them from the real time to the second. Otherwise 0.')),
   }),
   repeat: strictObject({
     kind: picklist(['once', 'daily', 'weekdays', 'weekly', 'interval']),
