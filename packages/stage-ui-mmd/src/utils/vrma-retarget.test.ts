@@ -48,7 +48,10 @@ function createMesh() {
   return { mesh, byName, rig: mmdRigFromMesh(mesh, ikEffectors) }
 }
 
-function animationOf(rotations: Record<string, Quaternion> = {}, hipsY?: number): VRMAnimationSource {
+type Hips = [x: number, y: number, z: number]
+
+/** A one-second clip. `hips` gives the hips position at the start and at the end. */
+function animationOf(rotations: Record<string, Quaternion> = {}, hips?: { start: Hips, end: Hips }): VRMAnimationSource {
   return {
     duration: 1,
     restHipsPosition: new Vector3(0, 1, 0),
@@ -57,16 +60,18 @@ function animationOf(rotations: Record<string, Quaternion> = {}, hipsY?: number)
         name as never,
         new QuaternionKeyframeTrack(`${name}.quaternion`, [0, 1], [...rotation.toArray(), ...rotation.toArray()]),
       ])),
-      translation: new Map(hipsY === undefined ? [] : [['hips', new VectorKeyframeTrack('hips.position', [0, 1], [0, hipsY, 0, 0, hipsY, 0])]]),
+      translation: new Map(hips === undefined ? [] : [['hips', new VectorKeyframeTrack('hips.position', [0, 1], [...hips.start, ...hips.end])]]),
     },
   }
 }
 
-/** Poses the mesh with the first frame of a retargeted clip, then returns world positions by bone name. */
-function pose(animation: VRMAnimationSource) {
+/** Poses the mesh with a retargeted clip at `time`, then returns world positions by bone name. */
+function pose(animation: VRMAnimationSource, time = 0) {
   const { mesh, byName, rig } = createMesh()
   const mixer = new AnimationMixer(mesh)
-  mixer.clipAction(retargetVRMAnimationToMMD(animation, rig as MMDRig)).play()
+  const action = mixer.clipAction(retargetVRMAnimationToMMD(animation, rig as MMDRig))
+  action.play()
+  action.time = time
   mixer.update(0)
   mesh.updateMatrixWorld(true)
   return (name: string) => byName.get(name)!.getWorldPosition(new Vector3())
@@ -110,15 +115,27 @@ describe('retargetVRMAnimationToMMD', () => {
     expect(direction(at, '首', '頭').distanceTo(expected)).toBeLessThan(1e-6)
   })
 
-  it('moves センター by the hips translation, scaled by the hip heights', () => {
+  it('moves センター by the hips motion, scaled by the hip heights', () => {
     // The VRM hips rest at 1 and the MMD hips at 9, so 0.1 down becomes 0.9 down.
-    const at = pose(animationOf({}, 0.9))
+    const at = pose(animationOf({}, { start: [0, 1, 0], end: [0, 0.9, 0] }), 0.999)
 
-    expect(at('センター').y).toBeCloseTo(7.1)
+    expect(at('センター').y).toBeCloseTo(7.1, 1)
+  })
+
+  // ROOT CAUSE:
+  //
+  // The AIRI idle starts with its hips 0.157 m to the side. Measured from the rest hips, the MMD body stood 2 units
+  // aside, and the skirt physics broke.
+  //
+  // We fixed this by measuring from the first frame, as the VRM scene does.
+  it('starts a clip at the rest hips even when the clip starts to the side', () => {
+    const at = pose(animationOf({}, { start: [-0.157, 0.9, 0.03], end: [-0.157, 0.9, 0.03] }))
+
+    expect(at('センター').distanceTo(new Vector3(0, 8, 0))).toBeLessThan(1e-6)
   })
 
   it('moves the IK bones to their effectors, so IK can stay on', () => {
-    const at = pose(animationOf({ leftUpperLeg: aboutX(-40), leftLowerLeg: aboutX(70) }, 0.9))
+    const at = pose(animationOf({ leftUpperLeg: aboutX(-40), leftLowerLeg: aboutX(70) }, { start: [0, 1, 0], end: [0, 0.9, 0] }), 0.5)
 
     expect(at('左足ＩＫ').distanceTo(at('左足首'))).toBeLessThan(1e-6)
     expect(at('左つま先ＩＫ').distanceTo(at('左つま先'))).toBeLessThan(1e-6)

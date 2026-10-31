@@ -176,7 +176,7 @@ function sampler(track: KeyframeTrack | undefined) {
  *
  * - Each VRM bone rotation is relative to the VRM T-pose. Code turns it into a world rotation and gives the MMD bone the
  *   same world rotation, corrected for the MMD rest pose. MMD models rest in an A-pose, so the arms differ most.
- * - The hips translation moves `センター`, scaled by the ratio of hip heights.
+ * - The hips motion from the first frame moves `センター`, scaled by the ratio of hip heights.
  * - IK bones, for example `左足ＩＫ`, follow the position of their effector in the retargeted pose. IK can stay on, so the
  *   clip blends with VMD motions that drive the legs by IK.
  *
@@ -212,6 +212,9 @@ export function retargetVRMAnimationToMMD(animation: VRMAnimationSource, rig: MM
 
   const rotationOf = new Map([...animation.humanoidTracks.rotation].map(([name, track]) => [name, sampler(track)]))
   const hipsTranslation = sampler(animation.humanoidTracks.translation.get('hips'))
+  // A clip can start away from its rest hips, for example to the side. The VRM scene anchors the first frame at the rest
+  // hips, so the motion is relative to the first frame here too.
+  const hipsStart = hipsTranslation ? new Vector3().fromArray(hipsTranslation(0)) : animation.restHipsPosition
   const hipsIndex = targetOf.get('hips')
   const legs = ['左足', '右足'].map(name => boneIndex.get(name)).filter(index => index !== undefined)
   const mmdHipHeight = legs.length
@@ -275,7 +278,7 @@ export function retargetVRMAnimationToMMD(animation: VRMAnimationSource, rig: MM
       if (index === hipsIndex) {
         const hips = hipsTranslation?.(time)
         if (hips)
-          localPosition.add(new Vector3(hips[0], hips[1], hips[2]).sub(animation.restHipsPosition).multiplyScalar(hipScale))
+          localPosition.add(new Vector3(hips[0], hips[1], hips[2]).sub(hipsStart).multiplyScalar(hipScale))
         positions.get(index)!.push(localPosition.x, localPosition.y, localPosition.z)
       }
       worldPosition[index].copy(localPosition).applyQuaternion(parent === -1 ? new Quaternion() : worldRotation[parent])
