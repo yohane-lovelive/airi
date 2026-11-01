@@ -65,6 +65,12 @@ const menu = computed(() => [
     to: '/devtools/polaroid',
   },
   {
+    title: t('tamagotchi.settings.devtools.pages.initiative-inspector.title'),
+    description: t('tamagotchi.settings.devtools.pages.initiative-inspector.description'),
+    icon: 'i-solar:chart-2-bold-duotone',
+    to: '/devtools/initiative',
+  },
+  {
     title: t('tamagotchi.settings.devtools.pages.context-flow.title'),
     description: 'Inspect incoming context updates and outgoing chat stream events',
     icon: 'i-solar:chat-square-call-bold-duotone',

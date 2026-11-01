@@ -77,6 +77,49 @@ devtools:
   pages:
     context-flow:
       title: コンテキストのフロー
+    initiative-inspector:
+      title: 自律発話インスペクター
+      description: キャラクターが自分から話す理由と、黙っている理由を表示します
+      intro: このページを開いている間、メインウィンドウから毎秒、自律発話のポリシーの値を受け取って表示します。
+      status:
+        off: 自律発話はオフです。
+        waiting: メインウィンドウからの値を待っています。
+      reasons:
+        owner-active: あなたの入力中または発話中なので待機中
+        speech-playing: 読み上げ中なので待機中
+        turn-running: ターンを実行中
+        quiet-hours: 静かな時間帯
+        owner-quiet: 頼まれたので静かにしている
+        daily-budget: 今日の回数を使い切った
+        refractory: ターンの後の休み
+        below-threshold: 欲求がしきい値より低い
+        ready: 話せる状態
+      mode: 'モード: {mode}'
+      turn: 'きっかけ: {trigger} · 発話タイプ: {type}'
+      graph: 欲求としきい値の推移
+      drive: 欲求
+      threshold: しきい値
+      last-minutes: 直近 {count} 分
+      jitter-note: '* しきい値のランダムな部分は、次の判断で決まります。'
+      parts:
+        pressure: イベントの圧力
+        boredom: 退屈
+        intention: 意図
+      inner:
+        energy: エネルギー
+        mood: 気分
+        curiosity: 好奇心
+      pace:
+        title: ペース
+        unanswered: 'あなたの反応がない発話: {count} 回（間隔 ×{factor}）'
+        budget: '今日の回数: {turns} / {limit}'
+        refractory: '休みの残り: {seconds} 秒'
+        recent-types: '最近の発話タイプ: {types}'
+      intentions: 開いている意図
+      missions: 実行中のミッション
+      until: '{time} まで'
+      none: なし。
+      usage-today: 今日のトークン量
     presence-bubble:
       title: プレゼンスバブル
       description: キャラクターの頭上のバブルを操作し、メインウィンドウで確認します

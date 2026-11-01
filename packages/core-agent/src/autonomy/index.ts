@@ -1,6 +1,7 @@
 export {
   createInitiativeState,
   decideInitiative,
+  initiativeReadout,
   initiativeTimeFrom,
   isSpeechStale,
   observeInitiative,
@@ -14,6 +15,7 @@ export type {
   InitiativeMode,
   InitiativeModeOptions,
   InitiativeOptions,
+  InitiativeReadout,
   InitiativeSettings,
   InitiativeState,
   InitiativeTime,

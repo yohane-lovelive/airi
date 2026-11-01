@@ -83,6 +83,49 @@ devtools:
   pages:
     context-flow:
       title: Context Flow
+    initiative-inspector:
+      title: Autonomous Speech Inspector
+      description: See why the character talks on its own or stays quiet
+      intro: The values of the autonomous speech policy, from the main window each second while this page is open.
+      status:
+        off: Autonomous speech is off.
+        waiting: Waiting for values from the main window.
+      reasons:
+        owner-active: Waiting while you type or speak
+        speech-playing: Waiting while speech plays
+        turn-running: A turn runs now
+        quiet-hours: Quiet hours
+        owner-quiet: Quiet, because you asked
+        daily-budget: The tries of today are used up
+        refractory: Resting after a turn
+        below-threshold: The drive is below the threshold
+        ready: Ready to talk
+      mode: 'Mode: {mode}'
+      turn: 'Trigger: {trigger} · speech type: {type}'
+      graph: Drive and threshold over time
+      drive: Drive
+      threshold: Threshold
+      last-minutes: Last {count} minutes
+      jitter-note: '* The next decision draws the random part of the threshold.'
+      parts:
+        pressure: Event pressure
+        boredom: Boredom
+        intention: Intentions
+      inner:
+        energy: Energy
+        mood: Mood
+        curiosity: Curiosity
+      pace:
+        title: Pace
+        unanswered: 'Lines without your reaction: {count} (interval ×{factor})'
+        budget: 'Tries today: {turns} of {limit}'
+        refractory: 'Rest left: {seconds} s'
+        recent-types: 'Recent speech types: {types}'
+      intentions: Open intentions
+      missions: Active missions
+      until: until {time}
+      none: None.
+      usage-today: Tokens today
     presence-bubble:
       title: Presence Bubble
       description: Drive the bubble above the character and watch it in the main window

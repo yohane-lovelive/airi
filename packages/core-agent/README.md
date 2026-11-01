@@ -103,6 +103,7 @@ All functions are pure. The host passes the time, a random source, and the state
 - `observeInitiative` applies an event: a detector event with a salience, an owner message, a finished turn, or a mode change.
 - `decideInitiative` runs on a host timer. It returns `wait` with a reason, or `turn` with a trigger and an optional speech type hint.
 - `isSpeechStale` tells the host to drop speech before playback, after owner input or a newer salient event.
+- `initiativeReadout` reads what the policy sees at a time, without a decision: the drive and its parts, the threshold, the inner state, the gate reason, and the pace. An inspector shows it.
 - `resolveInitiativeOptions` fills owner settings with defaults: intervals, quiet hours, and the daily turn budget.
 - `initiativeNoticeText` writes the situation block of one turn: the reason, the time of day, the time since the last messages, the hint, the open intentions, and the last three autonomous lines.
 - `createIntention` and `openIntentions` check intentions: notes of what the character wants to do later. `INTENTION_LIMITS` has their count and time limits.

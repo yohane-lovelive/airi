@@ -53,7 +53,11 @@ The character can start to talk without an owner message. It is step 2 of [the a
 - `useIntentionsStore()` in `stores/intentions.ts` keeps the intentions in IndexedDB. The intention tools in `tools/initiative.ts` add, list, and finish them.
 - The talk level tool applies the owner's words through `applyTalkRequest` of the initiative store. It refuses in a turn that does not answer an owner message.
 
+- `useInitiativeInspectorStore()` in `stores/initiative-inspector.ts` carries a readout of the policy from the leader. The runner publishes it each second, but only while a window watches.
+- `useTalkChanges()` lists the changes from the owner's words as text, for Settings and the inspector.
+
 Settings > Modules > Autonomous speech changes the settings. It also shows the changes from the owner's words, and resets them.
+Settings > Developer > Autonomous Speech Inspector shows why the character talks or stays quiet.
 
 ## Model usage
 

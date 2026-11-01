@@ -215,6 +215,14 @@ The inspector is a panel on the main stage screen. A developer setting turns it 
 - It shows the active owner changes, and it can reset them.
 - The panel reads state only. It does not change the policy.
 
+Step 2-3b built the inspector as follows. It changed the place of the inspector.
+
+- The inspector is a devtools page, not a panel on the stage. The desktop main window is small and transparent, so a panel covered the model. The settings window shows the page beside the model. Settings > Developer opens it in both apps.
+- `initiativeReadout` of `core-agent` reads the drive, its parts, the threshold, the inner state, the gate reason, the refractory time, the lines without a reaction, the interval factor, and the budget. It decides nothing.
+- Only the leader holds the policy state. While a page watches, the runner publishes a readout each second through a synced store. The page marks itself each 5 seconds, so a closed page stops the publish.
+- The page draws the drive and the threshold of the last 10 minutes. It also shows the open intentions, the active missions, the owner changes with a reset, and the tokens of today.
+- Topic heat, the timeline, the scene state, and the frames come with steps 2b and 3.
+
 ### Speech pressure
 
 - An event adds pressure by its salience. Pressure decays with time. A long silence adds a boredom term.
@@ -530,7 +538,7 @@ Step 2 has four parts. Each part is one change.
 | --- | --- | --- |
 | 2-1 | Connect the policy to the conversation: the runner on the leader, the transient notice, the situation block, the gates, typing detection, the cancel on owner input, and the settings. | Done |
 | 2-2 | Intentions, owner control with words, and implicit feedback. | Done |
-| 2-3 | Usage by purpose and the inspector. | In progress: 2-3a (usage) is done. 2-3b (inspector) is next. |
+| 2-3 | Usage by purpose and the inspector. | Done |
 | 2-4 | The prompt budget: the top memories and the history summary. It changes every request, so it comes last. | To do |
 
 Step 4 does not depend on steps 0 to 3. It comes after them so that the speech output format changes only once.

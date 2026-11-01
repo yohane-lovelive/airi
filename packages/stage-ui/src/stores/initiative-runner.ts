@@ -2,7 +2,7 @@ import type { InitiativeDecision, InitiativeEvent, InitiativeHost, InitiativeSta
 import type { SyncedPiniaRuntime } from 'pinia-plugin-synced'
 
 import { errorMessageFrom } from '@moeru/std'
-import { createInitiativeState, decideInitiative, initiativeNoticeText, initiativeTimeFrom, observeInitiative, resolveInitiativeOptions } from '@proj-airi/core-agent'
+import { createInitiativeState, decideInitiative, initiativeNoticeText, initiativeReadout, initiativeTimeFrom, observeInitiative, resolveInitiativeOptions } from '@proj-airi/core-agent'
 import { nanoid } from 'nanoid'
 import { defineStore, storeToRefs } from 'pinia'
 import { computed, onScopeDispose, readonly, shallowRef, watch } from 'vue'
@@ -14,6 +14,7 @@ import { useSpeakingStore } from './audio'
 import { useChatStore } from './chat'
 import { useChatSessionStore } from './chat/session-store'
 import { useInitiativeStore } from './initiative'
+import { useInitiativeInspectorStore } from './initiative-inspector'
 import { useIntentionsStore } from './intentions'
 import { useOwnerTypingStore } from './owner-typing'
 import { useVoiceStore } from './voice'
@@ -33,6 +34,7 @@ const TICK_INTERVAL_MS = 1_000
  * - Stored messages of that conversation feed the policy: an owner message, and a reply that no autonomous turn started.
  * - The open intentions add drive, and the situation block lists them. The owner's temporary changes, for example a
  *   quiet time, change the options at each tick.
+ * - While a window watches the inspector, each tick publishes a readout of the policy to it.
  * - Owner input wins. The owner types in a chat input of any window, speaks, or queues a message. Then no turn starts,
  *   and a turn in flight is cancelled and closes as `dropped`. A dropped turn keeps its drive, so the character speaks
  *   again with fresh context once the owner stops.
@@ -49,6 +51,7 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
   const voice = useVoiceStore()
   const voiceMessages = useVoiceMessagesStore()
   const ownerTyping = useOwnerTypingStore()
+  const inspector = useInitiativeInspectorStore()
   const { activeSessionId } = storeToRefs(chatSession)
 
   /** The policy state. Undefined while the feature is off or this renderer does not lead. */
@@ -131,8 +134,12 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
       return
 
     const time = initiativeTimeFrom(new Date())
-    const { state: next, decision } = decideInitiative(state.value ?? createInitiativeState(time), host(time.now), time, Math.random, optionsAt(time.now))
+    const currentHost = host(time.now)
+    const options = optionsAt(time.now)
+    const { state: next, decision } = decideInitiative(state.value ?? createInitiativeState(time), currentHost, time, Math.random, options)
     state.value = next
+    if (inspector.isWatched(time.now))
+      inspector.publish(initiativeReadout(next, currentHost, time, options), time.now)
     if (decision.kind === 'turn')
       void runTurn(decision, sessionId)
   }

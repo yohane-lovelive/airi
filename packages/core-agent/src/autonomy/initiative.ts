@@ -372,10 +372,8 @@ export function decideInitiative(
   const jitter = current.jitter ?? 1 + (random() * 2 - 1) * options.thresholdJitter
   current = { ...current, jitter }
 
-  const energyFactor = 1 + (1 - current.inner.energy) * INNER_DYNAMICS.energyThresholdGain
-  const threshold = energyFactor * jitter
-  const intentionDrive = Math.min(INNER_DYNAMICS.maxIntentionDrive, Math.max(0, host.intentions) * INNER_DYNAMICS.drivePerIntention)
-  const drive = current.pressure + current.inner.boredom + intentionDrive
+  const threshold = energyFactorOf(current.inner) * jitter
+  const { total: drive, intention: intentionDrive } = driveOf(current, host)
   if (drive < threshold)
     return { state: current, decision: { kind: 'wait', reason: 'below-threshold' } }
 
@@ -394,6 +392,57 @@ export function decideInitiative(
       budget: { day: current.budget.day, turns: current.budget.turns + 1 },
     },
     decision: { kind: 'turn', trigger, drive, threshold, ...(speechType ? { speechType } : {}) },
+  }
+}
+
+/** What the policy sees at one time, for an inspector. */
+export interface InitiativeReadout {
+  readonly mode: InitiativeMode
+  /** Why no turn starts now. Undefined when the drive reaches the threshold and no gate holds. */
+  readonly waitReason?: InitiativeWaitReason
+  /** The drive and its parts. The total is their sum. */
+  readonly drive: { readonly total: number, readonly pressure: number, readonly boredom: number, readonly intention: number }
+  /** The threshold of the current cycle. Before the jitter is drawn, it uses a jitter of 1. */
+  readonly threshold: number
+  /** Whether the current cycle drew its jitter. The next decision draws it. */
+  readonly jitterDrawn: boolean
+  readonly inner: InnerState
+  /** Milliseconds until the refractory time ends. 0 when it ended. */
+  readonly refractoryLeftMs: number
+  /** Autonomous lines since the last owner message. */
+  readonly unanswered: number
+  /** The multiplier of the idle interval from {@link unansweredIntervalFactor}. */
+  readonly intervalFactor: number
+  readonly budget: { readonly turns: number, readonly limit: number }
+  readonly recentTypes: readonly SpeechType[]
+  readonly turn?: PendingTurn
+}
+
+/**
+ * Reads what the policy sees at `time`, without a decision. It changes no state and draws no random value.
+ * The values match what {@link decideInitiative} would use at the same time.
+ */
+export function initiativeReadout(state: InitiativeState, host: InitiativeHost, time: InitiativeTime, options: InitiativeOptions): InitiativeReadout {
+  let current = advance(state, time.now, options)
+  if (current.budget.day !== time.localDay)
+    current = { ...current, budget: { day: time.localDay, turns: 0 } }
+
+  const drive = driveOf(current, host)
+  const threshold = energyFactorOf(current.inner) * (current.jitter ?? 1)
+  const reason = waitReason(current, host, time, options) ?? (drive.total < threshold ? 'below-threshold' : undefined)
+  return {
+    mode: current.mode,
+    ...(reason ? { waitReason: reason } : {}),
+    drive,
+    threshold,
+    jitterDrawn: current.jitter !== undefined,
+    inner: current.inner,
+    refractoryLeftMs: Math.max(0, current.refractoryUntil - time.now),
+    unanswered: current.unanswered,
+    intervalFactor: current.mode === 'idle' ? unansweredIntervalFactor(current.unanswered) : 1,
+    budget: { turns: current.budget.turns, limit: options.dailyTurnBudget },
+    recentTypes: current.recentTypes,
+    ...(current.turn ? { turn: current.turn } : {}),
   }
 }
 
@@ -509,6 +558,17 @@ function advance(state: InitiativeState, now: number, options: InitiativeOptions
  */
 export function unansweredIntervalFactor(unanswered: number): number {
   return Math.min(INNER_DYNAMICS.maxUnansweredIntervalFactor, INNER_DYNAMICS.unansweredIntervalStep ** Math.max(0, unanswered))
+}
+
+/** Low energy raises the threshold. */
+function energyFactorOf(inner: InnerState) {
+  return 1 + (1 - inner.energy) * INNER_DYNAMICS.energyThresholdGain
+}
+
+/** The drive and its parts. Intentions add a capped part. */
+function driveOf(state: InitiativeState, host: InitiativeHost) {
+  const intention = Math.min(INNER_DYNAMICS.maxIntentionDrive, Math.max(0, host.intentions) * INNER_DYNAMICS.drivePerIntention)
+  return { total: state.pressure + state.inner.boredom + intention, pressure: state.pressure, boredom: state.inner.boredom, intention }
 }
 
 /** The trigger is the largest part of the drive. A tie goes to the event, then to boredom. */

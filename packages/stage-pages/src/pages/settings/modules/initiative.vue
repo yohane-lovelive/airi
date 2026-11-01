@@ -1,35 +1,15 @@
 <script setup lang="ts">
-import { activeTalkControl } from '@proj-airi/core-agent'
+import { useTalkChanges } from '@proj-airi/stage-ui/composables/use-talk-changes'
 import { INITIATIVE_LIMITS, useInitiativeStore } from '@proj-airi/stage-ui/stores/initiative'
 import { FieldCheckbox, FieldInput, FieldRange, GhostButton } from '@proj-airi/ui'
-import { useNow } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
-import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-const { t, locale } = useI18n()
-const initiative = useInitiativeStore()
-const { enabled, idleIntervalMinutes, dailyTurnBudget, quietHoursEnabled, quietHoursStart, quietHoursEnd, talkControl } = storeToRefs(initiative)
+const { t } = useI18n()
+const { enabled, idleIntervalMinutes, dailyTurnBudget, quietHoursEnabled, quietHoursStart, quietHoursEnd } = storeToRefs(useInitiativeStore())
+const { changes: talkChanges, reset: resetTalkChanges } = useTalkChanges()
 
 const KEY = 'settings.pages.modules.initiative'
-
-// A change ends on its own, so the list reads the clock again each 30 seconds.
-const now = useNow({ interval: 30_000 })
-const talkChanges = computed(() => {
-  const active = activeTalkControl(talkControl.value, now.value.getTime())
-  const changes: string[] = []
-  if (active.quietUntil !== undefined)
-    changes.push(t(`${KEY}.quiet-until`, { time: timeLabel(active.quietUntil) }))
-  if (active.interval) {
-    const factor = active.interval.factor.toLocaleString(locale.value, { maximumFractionDigits: 2 })
-    changes.push(t(`${KEY}.interval-until`, { factor, time: timeLabel(active.interval.until) }))
-  }
-  return changes
-})
-
-function timeLabel(epochMs: number) {
-  return new Date(epochMs).toLocaleTimeString(locale.value, { hour: '2-digit', minute: '2-digit' })
-}
 </script>
 
 <template>
@@ -67,7 +47,7 @@ function timeLabel(epochMs: number) {
       <h2 :class="['flex items-center', 'gap-2', 'text-sm font-medium']">
         <span :class="['i-solar:chat-round-line-bold-duotone', 'text-lg', 'text-primary-500 dark:text-primary-400']" aria-hidden="true" />
         <span :class="['min-w-0 flex-1']">{{ t(`${KEY}.talk-changes`) }}</span>
-        <GhostButton v-if="talkChanges.length" size="sm" icon="i-solar:restart-linear" @click="initiative.resetTalkControl()">
+        <GhostButton v-if="talkChanges.length" size="sm" icon="i-solar:restart-linear" @click="resetTalkChanges()">
           {{ t(`${KEY}.reset-talk-changes`) }}
         </GhostButton>
       </h2>

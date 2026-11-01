@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import {
   createInitiativeState,
   decideInitiative,
+  initiativeReadout,
   initiativeTimeFrom,
   isSpeechStale,
   observeInitiative,
@@ -327,5 +328,41 @@ describe('stale speech', () => {
 
   it('is never stale without a pending turn', () => {
     expect(isSpeechStale(createInitiativeState(at(0)), { ownerActive: true })).toBe(false)
+  })
+})
+
+describe('readout', () => {
+  const options = resolveInitiativeOptions()
+
+  it('shows the drive parts and the threshold before the jitter is drawn', () => {
+    const readout = initiativeReadout(createInitiativeState(at(0)), { ...IDLE, intentions: 1 }, at(450), options)
+
+    expect(readout.waitReason).toBe('below-threshold')
+    expect(readout.drive.boredom).toBeCloseTo(0.5)
+    expect(readout.drive.intention).toBeCloseTo(0.2)
+    expect(readout.drive.total).toBeCloseTo(0.7)
+    expect(readout.threshold).toBe(1)
+    expect(readout.jitterDrawn).toBe(false)
+  })
+
+  // The inspector must show the same values that the next decision uses.
+  it('matches the drive and the threshold of the decision at the same time', () => {
+    const result = decideInitiative(createInitiativeState(at(0)), IDLE, at(900), sequence(0.1, 0.5), options)
+    if (result.decision.kind !== 'turn')
+      throw new Error('expected a turn')
+    const readout = initiativeReadout(createInitiativeState(at(0)), IDLE, at(900), options)
+
+    expect(readout.drive.total).toBeCloseTo(result.decision.drive)
+    expect(readout.waitReason).toBeUndefined()
+    expect(initiativeReadout(result.state, IDLE, at(900), options)).toMatchObject({ waitReason: 'turn-running', jitterDrawn: true, threshold: result.decision.threshold })
+  })
+
+  it('shows the gate, the refractory time, the budget, and the interval factor after a spoken line', () => {
+    const spoke = observeInitiative(withTurn(options), { type: 'turn-finished', outcome: 'spoke' }, at(901), options)
+    const readout = initiativeReadout(spoke, IDLE, at(911), options)
+
+    expect(readout).toMatchObject({ waitReason: 'refractory', refractoryLeftMs: 80_000, unanswered: 1, budget: { turns: 1, limit: 200 } })
+    expect(readout.intervalFactor).toBeCloseTo(1.3)
+    expect(initiativeReadout(spoke, { ...IDLE, ownerActive: true }, at(911), options).waitReason).toBe('owner-active')
   })
 })
