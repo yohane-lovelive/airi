@@ -8,6 +8,7 @@ import { useAuthStore } from '@proj-airi/stage-ui/stores/auth'
 import { useCharacterOrchestratorStore } from '@proj-airi/stage-ui/stores/character'
 import { useChatStore } from '@proj-airi/stage-ui/stores/chat'
 import { useDisplayModelsStore } from '@proj-airi/stage-ui/stores/display-models'
+import { useInitiativeRunnerStore } from '@proj-airi/stage-ui/stores/initiative-runner'
 import { useMissionRunnerStore } from '@proj-airi/stage-ui/stores/mission-runner'
 import { useModsServerChannelStore } from '@proj-airi/stage-ui/stores/mods/api/channel-server'
 import { useContextBridgeStore } from '@proj-airi/stage-ui/stores/mods/api/context-bridge'
@@ -50,6 +51,7 @@ const syncedPinia = usePiniaSynced()
 const serverChannelStore = useModsServerChannelStore()
 const characterOrchestratorStore = useCharacterOrchestratorStore()
 const missionRunnerStore = useMissionRunnerStore()
+const initiativeRunnerStore = useInitiativeRunnerStore()
 const settingsSyncStore = useSettingsSyncStore()
 const settingsAudioDeviceStore = useSettingsAudioDevice()
 const { showingSetup } = storeToRefs(onboardingStore)
@@ -155,6 +157,7 @@ async function loadStartup() {
       contextBridgeStore.initialize()
       characterOrchestratorStore.initialize(syncedPinia)
       missionRunnerStore.initialize(syncedPinia)
+      initiativeRunnerStore.initialize(syncedPinia)
       settingsSyncStore.initialize(syncedPinia)
     })
     await startup.run('modelData', () => displayModelsStore.loadDisplayModelsFromIndexedDB())

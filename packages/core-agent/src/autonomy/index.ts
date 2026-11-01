@@ -21,6 +21,8 @@ export type {
   InnerState,
   PendingTurn,
 } from './initiative'
+export { INITIATIVE_RECENT_LINE_COUNT, initiativeNoticeText } from './initiative-notice'
+export type { InitiativeNoticeContext } from './initiative-notice'
 export {
   collectDueMissions,
   createReminder,

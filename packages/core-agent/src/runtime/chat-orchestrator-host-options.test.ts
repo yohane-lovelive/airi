@@ -63,6 +63,25 @@ describe('chat orchestrator host options', () => {
     expect(harness.prompt(1)).not.toContain('Speak about this notice only if it fits now')
   })
 
+  // An autonomous turn runs often. A stored notice for each turn fills history, so only the request reads it.
+  it('keeps a transient notice out of history, but stores its reply', async () => {
+    const harness = createHarness()
+    harness.stream.mockImplementationOnce(async (_model, _provider, _conversation, streamOptions) => {
+      await streamOptions?.onStreamEvent?.({ type: 'finish' })
+    })
+
+    await harness.runtime.ingest('Quiet turn.', { model: 'test', chatProvider: provider, notice: { source: 'initiative', transient: true } })
+    await harness.runtime.ingest('Talk turn.', { model: 'test', chatProvider: provider, notice: { source: 'initiative', transient: true } })
+    await harness.runtime.ingest('hello', { model: 'test', chatProvider: provider })
+
+    expect(harness.prompt(0)).toContain('Quiet turn.')
+    expect(harness.prompt(1)).toContain('Talk turn.')
+    expect(harness.prompt(1)).not.toContain('Quiet turn.')
+    expect(harness.prompt(2)).not.toContain('Talk turn.')
+    expect(harness.messages['session-1']?.map(message => message.role)).toEqual(['assistant', 'user', 'assistant'])
+    expect(harness.messages['session-1']?.[0]).toMatchObject({ proactive: { source: 'initiative' } })
+  })
+
   it('leaves stored system messages out of the prompt, and reads identity per session', async () => {
     const harness = createHarness({ getSystemPrompt: sessionId => `identity of ${sessionId}` })
     harness.messages['session-1'] = [

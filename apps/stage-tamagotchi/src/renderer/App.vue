@@ -15,6 +15,7 @@ import { useCharacterOrchestratorStore } from '@proj-airi/stage-ui/stores/charac
 import { useChatStore } from '@proj-airi/stage-ui/stores/chat'
 import { usePluginHostInspectorStore } from '@proj-airi/stage-ui/stores/devtools/plugin-host-debug'
 import { useDisplayModelsStore } from '@proj-airi/stage-ui/stores/display-models'
+import { useInitiativeRunnerStore } from '@proj-airi/stage-ui/stores/initiative-runner'
 import { useMissionRunnerStore } from '@proj-airi/stage-ui/stores/mission-runner'
 import { useModsServerChannelStore } from '@proj-airi/stage-ui/stores/mods/api/channel-server'
 import { useContextBridgeStore } from '@proj-airi/stage-ui/stores/mods/api/context-bridge'
@@ -165,6 +166,7 @@ function createFullStageRuntime() {
   const serverChannelStore = useModsServerChannelStore()
   const characterOrchestratorStore = useCharacterOrchestratorStore()
   const missionRunnerStore = useMissionRunnerStore()
+  const initiativeRunnerStore = useInitiativeRunnerStore()
   const settingsSyncStore = useSettingsSyncStore()
   const inferencePreload = useInferencePreload()
   const pluginHostInspectorStore = usePluginHostInspectorStore()
@@ -335,6 +337,7 @@ function createFullStageRuntime() {
       if (!isWidgetsWindow) {
         characterOrchestratorStore.initialize(syncedPinia)
         missionRunnerStore.initialize(syncedPinia)
+        initiativeRunnerStore.initialize(syncedPinia)
         settingsSyncStore.initialize(syncedPinia)
       }
 

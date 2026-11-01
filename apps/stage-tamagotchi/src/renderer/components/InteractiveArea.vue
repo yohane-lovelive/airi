@@ -11,6 +11,7 @@ import { useChatInterruption } from '@proj-airi/stage-layouts/composables/use-ch
 import { ChatBackgroundTasks, ChatHistory, JournalPreviewModal } from '@proj-airi/stage-ui/components'
 import { ChatImageAttachmentPreview, ChatProviderSetupCallout, ChatReplyPreview, ChatSendButton, useChatComposer, useChatImages, VoiceInputButton } from '@proj-airi/stage-ui/components/scenarios/chat'
 import { useAnalytics } from '@proj-airi/stage-ui/composables/use-analytics'
+import { useOwnerTypingReport } from '@proj-airi/stage-ui/composables/use-owner-typing-report'
 import { useBackgroundStore } from '@proj-airi/stage-ui/stores/background'
 import { useChatStore } from '@proj-airi/stage-ui/stores/chat'
 import { useChatSessionStore } from '@proj-airi/stage-ui/stores/chat/session-store'
@@ -138,6 +139,7 @@ const {
 } = composer
 const { addFiles: handleFilePaste, selectFiles: handleFileSelect, error: imageError, pending: pendingImages } = useChatImages(composer, () => activeSessionId.value)
 useHearingInputChannel(messageInput)
+useOwnerTypingReport(messageInput, isComposing)
 const { t } = useI18n()
 const { openImagePreview } = journalPreviewStore
 const DOUBLE_ENTER_INTERVAL_MS = 300

@@ -189,6 +189,11 @@ export interface ChatOrchestratorSendOptions {
      * work as for a model reply. The host uses it when the model cannot speak a `mustSpeak` notice.
      */
     reply?: string
+    /**
+     * The notice reaches this request only, and history never stores it. A reply is still stored as a proactive message.
+     * The host uses it for frequent notices, for example autonomous turns, so silent turns leave no trace in history.
+     */
+    transient?: boolean
   }
 }
 
@@ -822,6 +827,7 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
         delete streamingMessageContext.message.replyToMessageId
 
       // A notice is stored with its source, so later requests still know it, and none read it as owner speech.
+      // A transient notice is not stored, so only this request reads it.
       const userMessage = {
         role: 'user' as const,
         content: finalContent,
@@ -833,7 +839,9 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
         ...(audioTranscripts?.some(Boolean) ? { audioTranscripts } : {}),
         ...(options.notice ? { notice: { source: options.notice.source } } : {}),
       }
-      const receipt = await deps.session.commitUserMessage(sessionId, userMessage)
+      const receipt = options.notice?.transient
+        ? { status: 'inserted' as const, messageId: roundId }
+        : await deps.session.commitUserMessage(sessionId, userMessage)
       accepted.resolve({ sessionId, messageId: receipt.messageId })
       if (receipt.status === 'existing' || shouldAbort()) {
         resetForegroundStream(sessionId)
@@ -855,7 +863,8 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
         })
       }
 
-      const sessionMessagesForSend = deps.session.getSessionMessages(sessionId)
+      const storedMessages = deps.session.getSessionMessages(sessionId)
+      const sessionMessagesForSend = options.notice?.transient ? [...storedMessages, userMessage] : storedMessages
       deps.onUserTurnReady?.({
         sessionId,
         messageText: sendingMessage,

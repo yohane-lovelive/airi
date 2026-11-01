@@ -73,6 +73,7 @@ Realtime transport is not implemented. A future session adapter can project the 
 - `scene` marks a reply to an external scene, for example a Discord channel. It never speaks.
 - `background` marks work beside the conversation, for example a recipe task. It never speaks.
 - `notice` sends text that is not owner speech, for example a finished task. History stores it with `notice`, and requests mark it with its source. The reply carries `proactive`.
+  With `transient`, only that request reads the notice, and history keeps the reply alone. Autonomous turns use it, so silent turns leave no trace.
 - `skills` stores invoked skill steps with the owner's message. Later requests project them after that message.
 
 The stream context carries `speaks`. Only a send that is neither `background` nor `scene` speaks.
@@ -103,6 +104,7 @@ All functions are pure. The host passes the time, a random source, and the state
 - `decideInitiative` runs on a host timer. It returns `wait` with a reason, or `turn` with a trigger and an optional speech type hint.
 - `isSpeechStale` tells the host to drop speech before playback, after owner input or a newer salient event.
 - `resolveInitiativeOptions` fills owner settings with defaults: intervals, quiet hours, and the daily turn budget.
+- `initiativeNoticeText` writes the situation block of one turn: the reason, the time of day, the time since the last messages, the hint, and the last three autonomous lines. It stays under about 300 tokens.
 
 The drive is event pressure plus boredom. Pressure decays, and salience counts squared. Boredom grows by 1 per boredom interval of quiet.
 A turn starts when the drive passes a threshold. Low energy raises the threshold, and a random jitter changes it once per cycle.

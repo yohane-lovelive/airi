@@ -909,6 +909,20 @@ pages:
               注意: プロバイダーが verbose_json レスポンスに対応していない場合、この設定は効果がありません。
             verbose-json-unsupported: >-
               お使いのプロバイダーは verbose_json セグメントを返しません。最新の文字起こしセグメントに対する信頼度フィルターは適用されません。
+    initiative:
+      title: 自律発話
+      description: キャラクターが、ときどき自分から話しかけます
+      enable: キャラクターから話しかける
+      enable-description: あなたのメッセージがなくても、開いているチャットでキャラクターがときどき話し始めます。キャラクターが黙ったときも、1 回の試行ごとにモデルを 1 回呼びます。あなたが話すかメッセージを送ると、その試行は止まります。
+      idle-interval: 話しかける間隔
+      idle-interval-description: ほかに何も起きていないとき、キャラクターはおよそこの間隔で話します。実際の間隔は毎回変わります。
+      minutes: '{count} 分'
+      daily-turn-budget: 1 日の試行回数
+      daily-turn-budget-description: 1 日に自律発話でモデルを呼ぶ回数の上限です。
+      quiet-hours: 静かな時間帯を使う
+      quiet-hours-description: この時間帯は、キャラクターから話し始めません。あなたへの返事はします。
+      quiet-hours-start: 開始
+      quiet-hours-end: 終了
     missions:
       title: ミッション
       description: リマインドなど、キャラクターがあなたのために行うタスク

@@ -6,6 +6,7 @@ import { useI18n } from 'vue-i18n'
 
 import factorioIcon from '../assets/factorio-simple.png'
 
+import { useInitiativeStore } from '../stores/initiative'
 import { useMemoryStore } from '../stores/memory'
 import { useMissionsStore } from '../stores/missions'
 import { useArtistryStore } from '../stores/modules/artistry'
@@ -52,6 +53,7 @@ export function useModulesList() {
   const artistryStore = useArtistryStore()
   const memoryStore = useMemoryStore()
   const missionsStore = useMissionsStore()
+  const initiativeStore = useInitiativeStore()
   const toolCardsStore = useToolCardsStore()
   const beatSyncState = ref<BeatSyncDetectorState>()
   const beatSyncSupported = isBeatSyncSupported()
@@ -147,6 +149,15 @@ export function useModulesList() {
       icon: 'i-solar:alarm-bold-duotone',
       to: '/settings/modules/missions',
       configured: missionsStore.enabled,
+      category: 'essential',
+    },
+    {
+      id: 'initiative',
+      name: t('settings.pages.modules.initiative.title'),
+      description: t('settings.pages.modules.initiative.description'),
+      icon: 'i-solar:chat-round-dots-bold-duotone',
+      to: '/settings/modules/initiative',
+      configured: initiativeStore.enabled,
       category: 'essential',
     },
     {

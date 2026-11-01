@@ -5,6 +5,7 @@ import type { ChatHistoryItem } from '@proj-airi/stage-ui/types/chat'
 import { ChatBackgroundTasks, ChatHistory } from '@proj-airi/stage-ui/components'
 import { useChatComposer, VoiceCallCapsule } from '@proj-airi/stage-ui/components/scenarios/chat'
 import { useAnalytics } from '@proj-airi/stage-ui/composables/use-analytics'
+import { useOwnerTypingReport } from '@proj-airi/stage-ui/composables/use-owner-typing-report'
 import { useChatStore } from '@proj-airi/stage-ui/stores/chat'
 import { useChatSessionStore } from '@proj-airi/stage-ui/stores/chat/session-store'
 import { useChatStreamStore } from '@proj-airi/stage-ui/stores/chat/stream-store'
@@ -38,6 +39,7 @@ const composer = useChatComposer<ChatImageAttachment>({
   }),
 })
 const { clearReplyForMessage, selectReply } = composer
+useOwnerTypingReport(composer.draft, composer.isComposing)
 const historyMessages = computed(() => messages.value)
 const isActiveSessionSending = computed(() => (
   (activeTurns.value.some(turn => turn.sessionId === activeSessionId.value))

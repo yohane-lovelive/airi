@@ -2,6 +2,7 @@
 import { errorMessageFrom } from '@moeru/std'
 import { useElectronEventaInvoke } from '@proj-airi/electron-vueuse'
 import { useAnalytics } from '@proj-airi/stage-ui/composables'
+import { useOwnerTypingReport } from '@proj-airi/stage-ui/composables/use-owner-typing-report'
 import { extractMessageText } from '@proj-airi/stage-ui/libs/chat-sync/wire-message'
 import { useChatStore } from '@proj-airi/stage-ui/stores/chat'
 import { useChatSessionStore } from '@proj-airi/stage-ui/stores/chat/session-store'
@@ -18,6 +19,7 @@ import { artistryToolReferences } from '../stores/tools'
 const messageInput = shallowRef('')
 const isComposing = shallowRef(false)
 const sending = shallowRef(false)
+useOwnerTypingReport(messageInput, isComposing)
 const inputRef = useTemplateRef<HTMLInputElement>('inputRef')
 
 const chatStore = useChatStore()

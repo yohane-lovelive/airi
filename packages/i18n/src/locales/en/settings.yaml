@@ -1043,6 +1043,20 @@ pages:
             verbose-json-unsupported: >-
               Your provider did not return verbose_json segments. Confidence
               filtering had no effect on the last transcription.
+    initiative:
+      title: Autonomous speech
+      description: The character starts to talk on its own now and then
+      enable: Let the character talk on its own
+      enable-description: Without your message, the character sometimes starts to talk in the open chat. Each try is one model call, also when the character stays quiet. When you speak or send a message, the try stops.
+      idle-interval: Talk interval
+      idle-interval-description: When nothing else happens, the character talks about this often. The real gaps vary.
+      minutes: '{count} min'
+      daily-turn-budget: Tries per day
+      daily-turn-budget-description: The most model calls for autonomous speech in one day.
+      quiet-hours: Use quiet hours
+      quiet-hours-description: In this time, the character does not start to talk. It still answers you.
+      quiet-hours-start: Start
+      quiet-hours-end: End
     missions:
       title: Missions
       description: Reminders and other tasks that the character does for you

@@ -39,6 +39,20 @@ Entry points: the web account menu opens `InboxPopover` anchored to the account 
 The mobile menu opens `InboxDrawer` as a sub-panel with a back button. The Electron island shows `InboxPanel` in place.
 Entry points show nothing while the user is signed out. Announcements are a separate public surface.
 
+## Autonomous speech
+
+The character can start to talk without an owner message. It is step 2 of [the autonomy ADR](../../docs/ai/adr/2026-10-28-autonomous-character-perception-and-missions.md). It is off by default.
+`useInitiativeStore()` in `stores/initiative.ts` keeps the device settings: the switch, the talk interval, the tries per day, and the quiet hours.
+`useInitiativeRunnerStore()` runs the policy of `@proj-airi/core-agent` on the renderer leader. Each app calls `initialize` once.
+
+- Each second, the runner asks the policy. On a turn, a transient notice goes to the open conversation. History keeps only the reply.
+- The runner waits while the owner types or speaks, while speech plays, and while a chat turn runs.
+- When the owner types, speaks, or queues a message during a turn, the runner cancels the turn.
+- Each chat input calls `useOwnerTypingReport()`. `stores/owner-typing.ts` carries typing to the leader in every window.
+- `libs/initiative/conversation.ts` reads the situation facts and the policy events from the stored messages.
+
+Settings > Modules > Autonomous speech changes the settings.
+
 ## Message times
 
 Chat history shows a centered timestamp before the first dated message and after five minutes without a message.

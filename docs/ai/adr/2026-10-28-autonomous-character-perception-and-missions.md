@@ -217,6 +217,15 @@ The inspector is a panel on the main stage screen. A developer setting turns it 
 - Images are part of this request only. History keeps the speech text and the timeline notes.
 - The model speaks or stays silent. With tools, it can also write a timeline note, update the scene state, or write an intention.
 
+Without the screen, a decision turn works as follows. Step 2-1 built it.
+
+- The renderer leader asks the policy each second. A turn sends a transient notice to the conversation that the owner has open.
+- The notice is the situation block. It gives the reason, the time of day, the time since the last messages, the speech type hint, and the last three autonomous lines.
+- Only that request reads the notice. History keeps the reply only, so a silent turn leaves no trace.
+- The gates read four states: owner typing, owner speech input, speech playback, and a running chat turn.
+- Each chat input reports typing through a small synced store, so the leader sees typing in every window. Typing lasts at least 15 seconds after the last input, and for a whole input method composition. An empty input ends it.
+- When the owner types, speaks, or queues a message during a turn, code cancels the turn. The turn closes as `dropped`. The drive stays, so the character speaks again with fresh context after the owner stops.
+
 ### Commentary
 
 The pace of commentary follows the scene, not a fixed interval.
@@ -493,11 +502,20 @@ The order follows dependencies. Each step uses the parts of the earlier steps. E
 | --- | --- | --- |
 | 0 | Policy core without the screen: pressure, gates, inner state, and speech types in `core-agent`. Evaluation harness with synthetic events. | Done |
 | 1 | Mission base: the time trigger, the instance store, and the tools. Also the `mustSpeak` notice, the `reminder` template, and the mission list. | Done |
-| 2 | Autonomous talk without the screen: connect the policy core to `notifyConversation`. Add the prompt budget, intentions, owner control, usage by purpose, and the inspector. | To do |
+| 2 | Autonomous talk without the screen: connect the policy core to `notifyConversation`. Add the prompt budget, intentions, owner control, usage by purpose, and the inspector. | In progress |
 | 2b | Daily rhythm and small talk: templates as recipes, the `greeting`, `welcome-back`, and `small-talk` templates, topic seeds, and the time of day. Measure variety. | To do |
 | 3 | Perception: the adapters, ring buffer, detectors, frame policies, image budget, recorder, replay, timeline, scene state, `commentary` with interruptions, and `watch`. | To do |
 | 4 | Motion: the model capability check, the procedural layer, the library with `ACT` markers, expression sync, and the upper-body layer. | To do |
 | 5 | Generated motion, game audio, recall from memory, and polish. Recall needs the memory ADR. | To do |
+
+Step 2 has four parts. Each part is one change.
+
+| Part | Content | State |
+| --- | --- | --- |
+| 2-1 | Connect the policy to the conversation: the runner on the leader, the transient notice, the situation block, the gates, typing detection, the cancel on owner input, and the settings. | Done |
+| 2-2 | Intentions, owner control with words, and implicit feedback. | To do |
+| 2-3 | Usage by purpose and the inspector. | To do |
+| 2-4 | The prompt budget: the top memories and the history summary. It changes every request, so it comes last. | To do |
 
 Step 4 does not depend on steps 0 to 3. It comes after them so that the speech output format changes only once.
 The memory ADR has its own steps. They can run beside steps 1 to 4.
