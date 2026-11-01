@@ -16,11 +16,23 @@ describe('initiative evaluation with synthetic events', () => {
   it('talks now and then at a desk with no events, at varied gaps', () => {
     const { metrics } = runScenario({ name: 'quiet desk', durationMs: 2 * HOUR, events: [], ownerActivity: [] }, options, 1)
 
-    // The idle boredom interval is 15 minutes, so 2 hours hold about 8 turns.
-    expect(metrics.turnsPerMinute).toBeGreaterThan(1 / 25)
+    // The idle boredom interval is 15 minutes. The owner never reacts, so the interval grows after each line, and
+    // 2 hours hold about 5 turns.
+    expect(metrics.turnsPerMinute).toBeGreaterThan(1 / 40)
     expect(metrics.turnsPerMinute).toBeLessThan(1 / 8)
     expect(metrics.gapVariation).toBeGreaterThan(0.1)
     expect(metrics.silenceShare).toBeGreaterThan(0.98)
+  })
+
+  // Implicit feedback: an owner who never reacts hears less and less.
+  it('talks less and less to an owner who does not react', () => {
+    const { turns } = runScenario({ name: 'no reaction', durationMs: 4 * HOUR, events: [], ownerActivity: [] }, options, 7)
+    const spokenAt = turns.filter(turn => turn.outcome === 'spoke').map(turn => turn.at)
+    const gaps = spokenAt.slice(1).map((at, index) => at - spokenAt[index]!)
+
+    // The interval grows to 3 times its setting, so the last gaps are about twice the first one or more.
+    expect(gaps.length).toBeGreaterThan(2)
+    expect(gaps.at(-1)).toBeGreaterThan(gaps[0]! * 1.5)
   })
 
   // The first trial talked about the screen without end. Many small changes must not do that.

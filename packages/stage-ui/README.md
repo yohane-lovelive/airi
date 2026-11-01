@@ -50,8 +50,10 @@ The character can start to talk without an owner message. It is step 2 of [the a
 - When the owner types, speaks, or queues a message during a turn, the runner cancels the turn.
 - Each chat input calls `useOwnerTypingReport()`. `stores/owner-typing.ts` carries typing to the leader in every window.
 - `libs/initiative/conversation.ts` reads the situation facts and the policy events from the stored messages.
+- `useIntentionsStore()` in `stores/intentions.ts` keeps the intentions in IndexedDB. The intention tools in `tools/initiative.ts` add, list, and finish them.
+- The talk level tool applies the owner's words through `applyTalkRequest` of the initiative store. It refuses in a turn that does not answer an owner message.
 
-Settings > Modules > Autonomous speech changes the settings.
+Settings > Modules > Autonomous speech changes the settings. It also shows the changes from the owner's words, and resets them.
 
 ## Message times
 

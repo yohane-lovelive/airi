@@ -63,6 +63,11 @@ export interface InitiativeOptions {
    */
   quietHours?: { startMinutes: number, endMinutes: number }
   /**
+   * Epoch milliseconds. The owner asked for quiet, so no turn starts until this time.
+   * @default undefined
+   */
+  quietUntil?: number
+  /**
    * The maximum count of decision turns in one local day. Each turn is one model call, also when the model stays silent.
    * @default 200
    */
@@ -138,6 +143,17 @@ const INNER_DYNAMICS = {
   curiosityPerSalience: 0.3,
   /** Low energy multiplies the threshold by up to `1 + energyThresholdGain`. */
   energyThresholdGain: 0.5,
+  /** Each open intention adds this much drive, so the character brings it up sooner. */
+  drivePerIntention: 0.2,
+  /** The drive from intentions stops here, so a list of intentions does not make the character talk all the time. */
+  maxIntentionDrive: 0.4,
+  /**
+   * Each autonomous line without an owner reaction multiplies the idle interval by this step.
+   * The owner's next message returns the interval to its setting.
+   */
+  unansweredIntervalStep: 1.3,
+  /** The idle interval grows up to this multiple of its setting. */
+  maxUnansweredIntervalFactor: 3,
 }
 
 /** The inner state of the character. Code updates it from time and events, and the speech type draw reads it. */
@@ -155,8 +171,8 @@ export interface InnerState {
   readonly curiosity: number
 }
 
-/** Why a turn started. */
-export type InitiativeTrigger = 'event' | 'boredom'
+/** Why a turn started: the larger part of the drive. */
+export type InitiativeTrigger = 'event' | 'boredom' | 'intention'
 
 /** A decided turn that waits for its result. */
 export interface PendingTurn {
@@ -186,6 +202,11 @@ export interface InitiativeState {
   readonly turn?: PendingTurn
   /** Speech types of the last spoken turns, newest last. */
   readonly recentTypes: readonly SpeechType[]
+  /**
+   * The count of autonomous lines since the last owner message. Each one makes the idle interval longer, because the
+   * owner did not react.
+   */
+  readonly unanswered: number
   readonly budget: { readonly day: string, readonly turns: number }
 }
 
@@ -213,6 +234,8 @@ export interface InitiativeHost {
   readonly speechPlaying: boolean
   /** A chat turn that this policy did not start runs now, for example a reply to the owner. */
   readonly turnRunning: boolean
+  /** The count of open intentions. They add drive. */
+  readonly intentions: number
 }
 
 /**
@@ -224,6 +247,7 @@ export type InitiativeWaitReason
     | 'speech-playing'
     | 'turn-running'
     | 'quiet-hours'
+    | 'owner-quiet'
     | 'daily-budget'
     | 'refractory'
     | 'below-threshold'
@@ -285,6 +309,7 @@ export function createInitiativeState(time: InitiativeTime, mode: InitiativeMode
     updatedAt: time.now,
     refractoryUntil: time.now,
     recentTypes: [],
+    unanswered: 0,
     budget: { day: time.localDay, turns: 0 },
   }
 }
@@ -310,6 +335,7 @@ export function observeInitiative(state: InitiativeState, event: InitiativeEvent
         pressure: 0,
         inner: { ...current.inner, boredom: 0, mood: clamp(current.inner.mood + INNER_DYNAMICS.moodPerOwnerMessage, -1, 1) },
         lastOwnerAt: time.now,
+        unanswered: 0,
       }
     case 'character-spoke':
       return { ...current, inner: { ...current.inner, boredom: 0 } }
@@ -348,11 +374,12 @@ export function decideInitiative(
 
   const energyFactor = 1 + (1 - current.inner.energy) * INNER_DYNAMICS.energyThresholdGain
   const threshold = energyFactor * jitter
-  const drive = current.pressure + current.inner.boredom
+  const intentionDrive = Math.min(INNER_DYNAMICS.maxIntentionDrive, Math.max(0, host.intentions) * INNER_DYNAMICS.drivePerIntention)
+  const drive = current.pressure + current.inner.boredom + intentionDrive
   if (drive < threshold)
     return { state: current, decision: { kind: 'wait', reason: 'below-threshold' } }
 
-  const trigger: InitiativeTrigger = current.pressure >= current.inner.boredom ? 'event' : 'boredom'
+  const trigger = triggerOf(current.pressure, current.inner.boredom, intentionDrive)
   const speechType = random() < options.hintlessShare
     ? undefined
     : drawSpeechType({ ...current.inner, eventShare: current.pressure / drive, recentTypes: current.recentTypes }, random)
@@ -393,6 +420,8 @@ function waitReason(state: InitiativeState, host: InitiativeHost, time: Initiati
     return 'turn-running'
   if (options.quietHours && inQuietHours(time.localMinutes, options.quietHours))
     return 'quiet-hours'
+  if (options.quietUntil !== undefined && time.now < options.quietUntil)
+    return 'owner-quiet'
   if (state.budget.turns >= options.dailyTurnBudget)
     return 'daily-budget'
   if (time.now < state.refractoryUntil)
@@ -428,6 +457,7 @@ function finishTurn(state: InitiativeState, outcome: 'spoke' | 'silent' | 'dropp
         inner: { ...closed.inner, boredom: 0, energy: Math.max(0, closed.inner.energy - INNER_DYNAMICS.energyPerSpokenTurn) },
         refractoryUntil,
         recentTypes: turn.speechType ? [...closed.recentTypes, turn.speechType].slice(-RECENT_SPEECH_TYPE_COUNT) : closed.recentTypes,
+        unanswered: closed.unanswered + 1,
       }
     case 'silent':
     case 'failed':
@@ -452,6 +482,8 @@ function advance(state: InitiativeState, now: number, options: InitiativeOptions
     return state
 
   const mode = options.modes[state.mode]
+  // Only idle talk slows down for lines without a reaction. The owner starts commentary, so it keeps its pace.
+  const boredomIntervalMs = state.mode === 'idle' ? mode.boredomIntervalMs * unansweredIntervalFactor(state.unanswered) : mode.boredomIntervalMs
   const { energy, mood, boredom, curiosity } = state.inner
   return {
     ...state,
@@ -460,10 +492,30 @@ function advance(state: InitiativeState, now: number, options: InitiativeOptions
     inner: {
       energy: 1 - (1 - energy) * halving(elapsed, INNER_DYNAMICS.energyRecoveryHalfLifeMs),
       mood: mood * halving(elapsed, INNER_DYNAMICS.moodHalfLifeMs),
-      boredom: boredom + elapsed / mode.boredomIntervalMs,
+      boredom: boredom + elapsed / boredomIntervalMs,
       curiosity: curiosity * halving(elapsed, INNER_DYNAMICS.curiosityHalfLifeMs),
     },
   }
+}
+
+/**
+ * The multiplier of the idle interval after `unanswered` autonomous lines without an owner reaction.
+ *
+ * @example
+ * unansweredIntervalFactor(0)
+ * // => 1
+ * unansweredIntervalFactor(2)
+ * // => 1.69
+ */
+export function unansweredIntervalFactor(unanswered: number): number {
+  return Math.min(INNER_DYNAMICS.maxUnansweredIntervalFactor, INNER_DYNAMICS.unansweredIntervalStep ** Math.max(0, unanswered))
+}
+
+/** The trigger is the largest part of the drive. A tie goes to the event, then to boredom. */
+function triggerOf(pressure: number, boredom: number, intentionDrive: number): InitiativeTrigger {
+  if (pressure >= boredom && pressure >= intentionDrive)
+    return 'event'
+  return boredom >= intentionDrive ? 'boredom' : 'intention'
 }
 
 /** The share that remains after `elapsed` milliseconds of decay with the given half-life. */

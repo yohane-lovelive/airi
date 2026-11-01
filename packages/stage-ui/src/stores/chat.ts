@@ -36,6 +36,7 @@ import {
 } from '../libs/product-signals/headers'
 import { getSpeechBusContext, voiceGenerationEnded } from '../services/speech/bus'
 import { composeDrawCardPrompt, createDrawCardTool, DRAW_CARD_TOOL_NAME, drawCardContent } from '../tools/draw-card'
+import { createIntentionTools, createTalkLevelTool } from '../tools/initiative'
 import { createJudgeRecipeTool, judgmentSkillText } from '../tools/judge-recipe'
 import { composeMemoryPrompt, createMemoryTools } from '../tools/memory'
 import { createMissionTools } from '../tools/missions'
@@ -56,6 +57,8 @@ import { staysLocal } from './chat/session-locality'
 import { useChatSessionStore } from './chat/session-store'
 import { useChatStreamStore } from './chat/stream-store'
 import { useContextObservabilityStore } from './devtools/context-observability'
+import { useInitiativeStore } from './initiative'
+import { useIntentionsStore } from './intentions'
 import { useMemoryStore } from './memory'
 import { useMissionsStore } from './missions'
 import { useAiriCardStore } from './modules/airi-card'
@@ -282,6 +285,8 @@ export const useChatStore = defineStore('chat', () => {
   const recipes = useRecipesStore()
   const memory = useMemoryStore()
   const missions = useMissionsStore()
+  const initiative = useInitiativeStore()
+  const intentions = useIntentionsStore()
 
   /** The persona of a session. A session without one uses the selected card. */
   function personaOf(sessionId: string) {
@@ -581,6 +586,15 @@ export const useChatStore = defineStore('chat', () => {
     return llmToolsStore.tools.map(tool => ({ name: tool.function.name }))
   }
 
+  /**
+   * Whether a running turn answers an owner message. The turn id is the id of its user message. A stored notice has a
+   * `notice`, and a transient notice is never stored, so neither one counts.
+   */
+  function answersOwnerMessage(sessionId: string, turnId: string) {
+    const message = chatSession.getSessionMessagesIfLoaded(sessionId)?.find(entry => entry.id === turnId)
+    return message?.role === 'user' && !message.notice
+  }
+
   /** Whether a send answers the owner's own message in the owner's conversation: not a notice, a scene, or a task. */
   function isOwnerSend(payload: ChatSendPayload, extra: HostSendOptions) {
     return !extra.notice && isOwnerSession(payload.sessionId) && !isTaskSession(payload.sessionId)
@@ -667,6 +681,20 @@ export const useChatStore = defineStore('chat', () => {
             addReminder: request => missions.addReminder(request, sessionId),
             stop: id => missions.stop(id),
           })
+        : []),
+      // Intentions and the talk level shape autonomous speech, so only an app that runs it offers them.
+      ...(ownerOnly && initiative.enabled && initiative.supported
+        ? [
+            ...await createIntentionTools({
+              open: () => intentions.openAt(Date.now()),
+              add: request => intentions.add(request),
+              finish: id => intentions.finish(id),
+            }),
+            ...await createTalkLevelTool({
+              answersOwner: () => answersOwnerMessage(sessionId, correlation.turnId),
+              apply: async request => initiative.applyTalkRequest(request),
+            }),
+          ]
         : []),
       // Cards show in the owner's own chat only. A scene, such as a Discord channel, gets text. A card names its icons
       // from a search, so the model never guesses an icon name.

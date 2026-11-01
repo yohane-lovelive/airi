@@ -104,11 +104,14 @@ All functions are pure. The host passes the time, a random source, and the state
 - `decideInitiative` runs on a host timer. It returns `wait` with a reason, or `turn` with a trigger and an optional speech type hint.
 - `isSpeechStale` tells the host to drop speech before playback, after owner input or a newer salient event.
 - `resolveInitiativeOptions` fills owner settings with defaults: intervals, quiet hours, and the daily turn budget.
-- `initiativeNoticeText` writes the situation block of one turn: the reason, the time of day, the time since the last messages, the hint, and the last three autonomous lines. It stays under about 300 tokens.
+- `initiativeNoticeText` writes the situation block of one turn: the reason, the time of day, the time since the last messages, the hint, the open intentions, and the last three autonomous lines.
+- `createIntention` and `openIntentions` check intentions: notes of what the character wants to do later. `INTENTION_LIMITS` has their count and time limits.
+- `applyTalkLevel` and `talkControlEffect` turn the owner's words, for example "be quiet for 30 minutes", into a quiet time and an interval factor.
 
-The drive is event pressure plus boredom. Pressure decays, and salience counts squared. Boredom grows by 1 per boredom interval of quiet.
+The drive is event pressure plus boredom plus a small part for each open intention. Pressure decays, and salience counts squared. Boredom grows by 1 per boredom interval of quiet.
 A turn starts when the drive passes a threshold. Low energy raises the threshold, and a random jitter changes it once per cycle.
-Gates stop a turn in this order: owner input and its grace time, speech playback, a running turn, quiet hours, the daily budget, and the refractory time.
+Each autonomous line without an owner message makes the idle interval longer, up to 3 times. `unansweredIntervalFactor` gives the factor.
+Gates stop a turn in this order: owner input and its grace time, speech playback, a running turn, quiet hours, the owner's quiet time, the daily budget, and the refractory time.
 
 ```ts
 const options = resolveInitiativeOptions(settings)

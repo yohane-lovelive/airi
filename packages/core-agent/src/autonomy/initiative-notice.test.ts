@@ -24,6 +24,17 @@ describe('initiativeNoticeText', () => {
     expect(initiativeNoticeText(context())).toContain('Since the owner\'s last message: none in this conversation.')
   })
 
+  it('lists the open intentions with their ids, and names them as the reason', () => {
+    const text = initiativeNoticeText(context({
+      trigger: 'intention',
+      intentions: [{ id: 'trip', text: 'Ask about the trip', createdAt: NOW - 2 * 60 * 60_000, expiresAt: NOW + 60_000 }],
+    }))
+
+    expect(text).toContain('Why now: you wanted to do something later.')
+    expect(text).toContain('- trip: "Ask about the trip" (noted about 2 hours ago)')
+    expect(initiativeNoticeText(context())).not.toContain('wanted to do')
+  })
+
   it('gives the speech type as a light idea, and gives none in a hintless turn', () => {
     expect(initiativeNoticeText(context({ speechType: 'ask' }))).toContain('Idea, only if it fits: ask the owner a question.')
     expect(initiativeNoticeText(context())).not.toContain('Idea')

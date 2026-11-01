@@ -122,6 +122,15 @@ The owner can change the talk level with words, for example "be quiet for 30 min
 - Implicit feedback also changes the level. When the owner does not react to autonomous speech, the interval grows in small steps. A reaction from the owner returns it.
 - The inspector and Settings show the current changes. The owner can reset them.
 
+Step 2-2 built intentions, owner control, and implicit feedback as follows.
+
+- Intentions: at most 5 open ones. Each one stays 1 to 168 hours, 24 by default. Each one adds 0.2 drive, up to 0.4. The situation block lists them with their ids, and the model finishes one after it uses it. IndexedDB keeps them, like missions.
+- Owner control: `quiet` stops autonomous speech for 1 to 720 minutes. `less` and `more` multiply the idle interval by 1.5 or 0.67 for a time. With 0 minutes, they change the interval in Settings. `normal` ends every change for a time. The device keeps the changes, so they last through a restart.
+- The talk level tool refuses in a turn that does not answer an owner message. The tool list stays the same in each turn, so the tool checks the turn itself.
+- Implicit feedback: each autonomous line without an owner message multiplies the idle interval by 1.3, up to 3 times the setting. It applies to idle talk only. The count lives in memory, so a restart returns the pace.
+- Settings show the changes for a time and reset them. The inspector of step 2-3 shows the implicit feedback, because only the leader holds its count.
+- The model does not move its mood with a tool yet. The effect is small, so it waits for a need.
+
 ### Prompt budget
 
 Code builds each request in the same shape. Each part has a limit.
@@ -513,7 +522,7 @@ Step 2 has four parts. Each part is one change.
 | Part | Content | State |
 | --- | --- | --- |
 | 2-1 | Connect the policy to the conversation: the runner on the leader, the transient notice, the situation block, the gates, typing detection, the cancel on owner input, and the settings. | Done |
-| 2-2 | Intentions, owner control with words, and implicit feedback. | To do |
+| 2-2 | Intentions, owner control with words, and implicit feedback. | Done |
 | 2-3 | Usage by purpose and the inspector. | To do |
 | 2-4 | The prompt budget: the top memories and the history summary. It changes every request, so it comes last. | To do |
 

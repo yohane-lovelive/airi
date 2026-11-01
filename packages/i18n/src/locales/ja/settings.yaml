@@ -923,6 +923,12 @@ pages:
       quiet-hours-description: この時間帯は、キャラクターから話し始めません。あなたへの返事はします。
       quiet-hours-start: 開始
       quiet-hours-end: 終了
+      talk-changes: 言葉による変更
+      talk-changes-description: 'チャットで頼めます。例: 「30 分静かにして」「もっと話していいよ」。ずっと続く変更は、上の話す間隔を変えます。'
+      talk-changes-empty: 今は、時間つきの変更はありません。
+      quiet-until: '{time} まで静か'
+      interval-until: '{time} まで話す間隔 ×{factor}'
+      reset-talk-changes: リセット
     missions:
       title: ミッション
       description: リマインドなど、キャラクターがあなたのために行うタスク

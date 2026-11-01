@@ -1057,6 +1057,12 @@ pages:
       quiet-hours-description: In this time, the character does not start to talk. It still answers you.
       quiet-hours-start: Start
       quiet-hours-end: End
+      talk-changes: Changes from your words
+      talk-changes-description: 'You can ask in chat, for example "be quiet for 30 minutes" or "you can talk more". A lasting change moves the talk interval above.'
+      talk-changes-empty: No changes for a time now.
+      quiet-until: Quiet until {time}
+      interval-until: Talk interval ×{factor} until {time}
+      reset-talk-changes: Reset
     missions:
       title: Missions
       description: Reminders and other tasks that the character does for you

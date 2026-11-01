@@ -1,4 +1,5 @@
 import type { InitiativeMode, InitiativeTrigger } from './initiative'
+import type { Intention } from './intentions'
 import type { SpeechType } from './speech-types'
 
 /** The count of recent lines in the notice. The model reads them to avoid the same opening and structure. */
@@ -25,6 +26,14 @@ export interface InitiativeNoticeContext {
   readonly lastSpokeAt?: number
   /** The last lines that the character started on its own, oldest first. Only the last few count. */
   readonly recentLines: readonly string[]
+  /** The open intentions of the character, oldest first. */
+  readonly intentions?: readonly Intention[]
+}
+
+const TRIGGER_REASONS: Record<InitiativeTrigger, string> = {
+  event: 'something happened',
+  boredom: 'it has been quiet for a while',
+  intention: 'you wanted to do something later',
 }
 
 const SPEECH_TYPE_HINTS: Record<SpeechType, string> = {
@@ -49,7 +58,7 @@ const SPEECH_TYPE_HINTS: Record<SpeechType, string> = {
 export function initiativeNoticeText(context: InitiativeNoticeContext): string {
   const lines = [
     'Autonomous turn: nobody asked you to speak. You can start talking on your own, or stay quiet.',
-    `- Why now: ${context.trigger === 'event' ? 'something happened' : 'it has been quiet for a while'}.`,
+    `- Why now: ${TRIGGER_REASONS[context.trigger]}.`,
     `- Time of day: ${partOfDay(context.localMinutes)}.`,
     `- Since the owner's last message: ${durationSince(context.lastOwnerAt, context.now)}.`,
     `- Since your last line: ${durationSince(context.lastSpokeAt, context.now)}.`,
@@ -58,6 +67,11 @@ export function initiativeNoticeText(context: InitiativeNoticeContext): string {
     lines.push('- Mode: commentary. Keep it to one short sentence.')
   if (context.speechType)
     lines.push(`- Idea, only if it fits: ${SPEECH_TYPE_HINTS[context.speechType]}.`)
+
+  if (context.intentions?.length) {
+    lines.push('- What you wanted to do later. Use one only if it fits now. After you do it, finish it with its id:')
+    lines.push(...context.intentions.map(intention => `  - ${intention.id}: "${truncate(intention.text, RECENT_LINE_MAX_LENGTH)}" (noted ${durationSince(intention.createdAt, context.now)} ago)`))
+  }
 
   const recent = context.recentLines.slice(-INITIATIVE_RECENT_LINE_COUNT).map(line => line.trim()).filter(Boolean)
   if (recent.length) {

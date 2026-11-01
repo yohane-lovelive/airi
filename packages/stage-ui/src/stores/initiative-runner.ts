@@ -14,6 +14,7 @@ import { useSpeakingStore } from './audio'
 import { useChatStore } from './chat'
 import { useChatSessionStore } from './chat/session-store'
 import { useInitiativeStore } from './initiative'
+import { useIntentionsStore } from './intentions'
 import { useOwnerTypingStore } from './owner-typing'
 import { useVoiceStore } from './voice'
 import { useVoiceMessagesStore } from './voice-messages'
@@ -30,6 +31,8 @@ const TICK_INTERVAL_MS = 1_000
  * - Each tick asks `decideInitiative`. On a turn, a transient notice goes to the conversation that the owner has open.
  *   History keeps the reply only, so silent turns leave no trace.
  * - Stored messages of that conversation feed the policy: an owner message, and a reply that no autonomous turn started.
+ * - The open intentions add drive, and the situation block lists them. The owner's temporary changes, for example a
+ *   quiet time, change the options at each tick.
  * - Owner input wins. The owner types in a chat input of any window, speaks, or queues a message. Then no turn starts,
  *   and a turn in flight is cancelled and closes as `dropped`. A dropped turn keeps its drive, so the character speaks
  *   again with fresh context once the owner stops.
@@ -39,6 +42,7 @@ const TICK_INTERVAL_MS = 1_000
  */
 export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
   const initiative = useInitiativeStore()
+  const intentions = useIntentionsStore()
   const chat = useChatStore()
   const chatSession = useChatSessionStore()
   const speaking = useSpeakingStore()
@@ -55,21 +59,28 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
   let leadership: SyncedPiniaRuntime | undefined
   let stopLeadershipListener: (() => void) | undefined
 
-  const options = computed(() => resolveInitiativeOptions(initiative.settings))
   const ownerSpeaking = computed(() => voiceMessages.isRecording || voice.state?.phase === 'capturing')
   const activeMessages = computed(() => chatSession.getSessionMessagesIfLoaded(activeSessionId.value))
+
+  /** The options at `now`. The owner's temporary changes end on their own, so each call reads them again. */
+  function optionsAt(now: number) {
+    return resolveInitiativeOptions(initiative.settingsAt(now))
+  }
 
   function host(now: number): InitiativeHost {
     return {
       ownerActive: ownerSpeaking.value || isOwnerTyping(ownerTyping.typingUntil, now),
       speechPlaying: speaking.nowSpeaking,
       turnRunning: chat.sending || chat.activeTurns.length > 0,
+      intentions: intentions.openAt(now).length,
     }
   }
 
   function observe(event: InitiativeEvent) {
-    if (state.value)
-      state.value = observeInitiative(state.value, event, initiativeTimeFrom(new Date()), options.value)
+    if (!state.value)
+      return
+    const time = initiativeTimeFrom(new Date())
+    state.value = observeInitiative(state.value, event, time, optionsAt(time.now))
   }
 
   /** Cancels the turn in flight. Its speech is stale, because the owner comes first. */
@@ -91,6 +102,7 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
       now: time.now,
       localMinutes: time.localMinutes,
       ...facts,
+      intentions: intentions.openAt(time.now),
     })
     const turn = { sessionId, turnId: nanoid(), dropped: false }
     running = turn
@@ -119,7 +131,7 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
       return
 
     const time = initiativeTimeFrom(new Date())
-    const { state: next, decision } = decideInitiative(state.value ?? createInitiativeState(time), host(time.now), time, Math.random, options.value)
+    const { state: next, decision } = decideInitiative(state.value ?? createInitiativeState(time), host(time.now), time, Math.random, optionsAt(time.now))
     state.value = next
     if (decision.kind === 'turn')
       void runTurn(decision, sessionId)

@@ -12,6 +12,7 @@ import { useChatStore } from '../stores/chat'
 import { useChatSessionStore } from '../stores/chat/session-store'
 import { useDisplayModelsStore } from '../stores/display-models'
 import { useInitiativeStore } from '../stores/initiative'
+import { useIntentionsStore } from '../stores/intentions'
 import { useMcpStore } from '../stores/mcp'
 import { useMemoryStore } from '../stores/memory'
 import { useMissionsStore } from '../stores/missions'
@@ -61,6 +62,7 @@ export function useDataMaintenance() {
   const recipesStore = useRecipesStore()
   const missionsStore = useMissionsStore()
   const initiativeStore = useInitiativeStore()
+  const intentionsStore = useIntentionsStore()
   const voiceprintStore = useVoiceprintStore()
 
   async function deleteAllModels() {
@@ -92,6 +94,7 @@ export function useDataMaintenance() {
       () => recipesStore.resetState(),
       () => missionsStore.resetState(),
       () => initiativeStore.resetState(),
+      () => intentionsStore.resetState(),
     ].map(reset => Promise.resolve().then(reset)))
     const failure = results.find(result => result.status === 'rejected')
     if (failure)

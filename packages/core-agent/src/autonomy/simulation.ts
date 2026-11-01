@@ -1,4 +1,4 @@
-import type { InitiativeMode, InitiativeOptions, InitiativeTime } from './initiative'
+import type { InitiativeMode, InitiativeOptions, InitiativeTime, InitiativeTrigger } from './initiative'
 import type { SpeechType } from './speech-types'
 
 import { createInitiativeState, decideInitiative, isSpeechStale, observeInitiative } from './initiative'
@@ -36,7 +36,7 @@ export interface SimulatedModel {
 /** One decision turn of a simulation run. */
 export interface SimulatedTurn {
   readonly at: number
-  readonly trigger: 'event' | 'boredom'
+  readonly trigger: InitiativeTrigger
   readonly speechType?: SpeechType
   readonly outcome: 'spoke' | 'silent' | 'dropped'
   /** The owner was active or speech played at the decision. A correct policy never starts a turn then. */
@@ -126,6 +126,7 @@ export function runScenario(scenario: Scenario, options: InitiativeOptions, seed
       ownerActive: scenario.ownerActivity.some(activity => activity.from <= offset && offset < activity.to),
       speechPlaying: offset < speechEndsAt,
       turnRunning: false,
+      intentions: 0,
     }
 
     if (pending && playbackAt !== undefined && offset >= playbackAt) {

@@ -9,10 +9,11 @@ import {
   isSpeechStale,
   observeInitiative,
   resolveInitiativeOptions,
+  unansweredIntervalFactor,
 } from './initiative'
 
 const START = Date.UTC(2026, 9, 29, 1, 0)
-const IDLE: InitiativeHost = { ownerActive: false, speechPlaying: false, turnRunning: false }
+const IDLE: InitiativeHost = { ownerActive: false, speechPlaying: false, turnRunning: false, intentions: 0 }
 
 /** The time `seconds` after the start, at 10:00 local time on one day. */
 function at(seconds: number, localDay = '2026-10-29', localMinutes = 600): InitiativeTime {
@@ -80,6 +81,25 @@ describe('speech pressure', () => {
   })
 
   // The lowest jitter draw multiplies the threshold by 0.7.
+  // Two intentions add 0.4 drive, so boredom alone needs 0.6 of the interval.
+  it('starts a turn sooner with open intentions, and names them as the trigger', () => {
+    let state = createInitiativeState(at(0))
+    let turn: { second: number, trigger: string } | undefined
+    for (let second = 0; second <= 1_000 && !turn; second++) {
+      const result = decideInitiative(state, { ...IDLE, intentions: 5 }, at(second), middle, options)
+      state = result.state
+      if (result.decision.kind === 'turn')
+        turn = { second, trigger: result.decision.trigger }
+    }
+
+    expect(turn?.second).toBeGreaterThanOrEqual(540)
+    expect(turn?.second).toBeLessThanOrEqual(541)
+    expect(turn?.trigger).toBe('boredom')
+
+    const fresh = decideInitiative(createInitiativeState(at(0)), { ...IDLE, intentions: 2 }, at(400), middle, resolveInitiativeOptions({ modes: { idle: { boredomIntervalMs: 2_000_000 } } }))
+    expect(fresh.decision.kind).toBe('wait')
+  })
+
   it('moves the turn time with the threshold jitter', () => {
     const turn = firstTurn(createInitiativeState(at(0)), options, 0, 1_000, () => 0)
 
@@ -146,7 +166,7 @@ describe('gates', () => {
 
   // Owner input always wins, so it hides every other reason.
   it('checks owner input first', () => {
-    const result = decideInitiative(bored, { ownerActive: true, speechPlaying: true, turnRunning: true }, at(2_000), middle, options)
+    const result = decideInitiative(bored, { ownerActive: true, speechPlaying: true, turnRunning: true, intentions: 0 }, at(2_000), middle, options)
 
     expect(result.decision).toEqual({ kind: 'wait', reason: 'owner-active' })
   })
@@ -173,6 +193,13 @@ describe('gates', () => {
     expect(decideInitiative(bored, IDLE, at(2_000, '2026-10-29', 23 * 60 + 30), middle, options).decision).toEqual({ kind: 'wait', reason: 'quiet-hours' })
     expect(decideInitiative(bored, IDLE, at(2_000, '2026-10-29', 6 * 60 + 59), middle, options).decision).toEqual({ kind: 'wait', reason: 'quiet-hours' })
     expect(decideInitiative(bored, IDLE, at(2_000, '2026-10-29', 7 * 60), middle, options).decision.kind).toBe('turn')
+  })
+
+  it('waits while the owner asked for quiet, and starts after the quiet time', () => {
+    const quiet = resolveInitiativeOptions({ quietUntil: at(3_000).now })
+
+    expect(decideInitiative(bored, IDLE, at(2_999), middle, quiet).decision).toEqual({ kind: 'wait', reason: 'owner-quiet' })
+    expect(decideInitiative(bored, IDLE, at(3_000), middle, quiet).decision.kind).toBe('turn')
   })
 
   // Each decision turn is one model call, also when the model stays silent.
@@ -217,6 +244,31 @@ describe('turn results', () => {
 
     expect(state.inner.boredom).toBeCloseTo(pending.inner.boredom)
     expect(state.refractoryUntil).toBe(pending.refractoryUntil)
+  })
+
+  // The owner did not react to autonomous lines, so idle talk slows down. A reply returns the pace.
+  it('makes the idle interval longer after each line without an owner reaction', () => {
+    const spoke = observeInitiative(withTurn(options), { type: 'turn-finished', outcome: 'spoke' }, at(905), options)
+    expect(spoke.unanswered).toBe(1)
+
+    const afterQuiet = observeInitiative(spoke, { type: 'perceived', salience: 0 }, at(905 + 900), options)
+    expect(afterQuiet.inner.boredom).toBeCloseTo(1 / unansweredIntervalFactor(1))
+
+    const answered = observeInitiative(spoke, { type: 'owner-message' }, at(906), options)
+    expect(answered.unanswered).toBe(0)
+  })
+
+  it('caps the interval factor of lines without a reaction', () => {
+    expect(unansweredIntervalFactor(0)).toBe(1)
+    expect(unansweredIntervalFactor(2)).toBeCloseTo(1.69)
+    expect(unansweredIntervalFactor(20)).toBe(3)
+  })
+
+  it('keeps the pace of commentary after lines without a reaction', () => {
+    const commentary = { ...createInitiativeState(at(0), 'commentary'), unanswered: 4 }
+    const later = observeInitiative(commentary, { type: 'perceived', salience: 0 }, at(45), options)
+
+    expect(later.inner.boredom).toBeCloseTo(1)
   })
 
   it('draws a new jitter for the next cycle', () => {
