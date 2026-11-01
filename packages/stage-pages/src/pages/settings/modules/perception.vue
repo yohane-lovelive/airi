@@ -1,9 +1,10 @@
 <script setup lang="ts">
+import { FRAME_POLICY_NAMES } from '@proj-airi/stage-shared/perception'
 import { IMAGE_BUDGET_LIMITS } from '@proj-airi/stage-ui/libs/perception/image-budget'
 import { usePerceptionStore } from '@proj-airi/stage-ui/stores/perception'
 import { usePerceptionRunnerStore } from '@proj-airi/stage-ui/stores/perception-runner'
 import { usePerceptionStatusStore } from '@proj-airi/stage-ui/stores/perception-status'
-import { Alert, Button, FieldCheckbox, FieldRange, FieldTextArea } from '@proj-airi/ui'
+import { Alert, Button, FieldCheckbox, FieldRange, FieldSelect, FieldTextArea } from '@proj-airi/ui'
 import { useNow } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
 import { computed } from 'vue'
@@ -11,7 +12,7 @@ import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
 const perception = usePerceptionStore()
-const { enabled, paused, exclusions, imagesPerHour, commentaryImagesPerHour, supported } = storeToRefs(perception)
+const { enabled, paused, exclusions, imagesPerHour, commentaryImagesPerHour, framePolicy, supported } = storeToRefs(perception)
 const { status } = storeToRefs(usePerceptionStatusStore())
 const runner = usePerceptionRunnerStore()
 
@@ -24,6 +25,8 @@ const exclusionText = computed({
     exclusions.value = text.split('\n').map(line => line.trim()).filter(Boolean)
   },
 })
+
+const framePolicyOptions = computed(() => FRAME_POLICY_NAMES.map(value => ({ value, label: t(`${KEY}.frame-policies.${value}`) })))
 
 const canStart = computed(() => ['needs-share', 'ended', 'failed'].includes(status.value.state))
 const megabytes = computed(() => (status.value.bytes / 1_000_000).toFixed(1))
@@ -90,6 +93,15 @@ const budget = computed(() => perception.budgetAt(now.value.getTime()))
         :rows="8"
       />
       <Alert v-if="enabled && supported && !status.knowsForeground" tone="info" :title="t(`${KEY}.web-share`)" />
+    </div>
+
+    <div :class="['flex flex-col', 'gap-4', 'rounded-xl', 'bg-neutral-100 dark:bg-neutral-900', 'p-4']">
+      <FieldSelect
+        v-model="framePolicy"
+        :label="t(`${KEY}.frame-policy`)"
+        :description="t(`${KEY}.frame-policy-description`)"
+        :options="framePolicyOptions"
+      />
     </div>
   </div>
 </template>

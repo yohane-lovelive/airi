@@ -1,3 +1,5 @@
+import type { FramePolicyName } from '@proj-airi/stage-shared/perception'
+
 import { useLocalStorageManualReset } from '@proj-airi/stage-shared/composables'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
@@ -28,6 +30,11 @@ export const usePerceptionStore = defineStore('perception', () => {
   const imagesPerHour = useLocalStorageManualReset<number>('perception/images-per-hour', IMAGE_BUDGET_LIMITS.defaultImagesPerHour)
   /** The budget while a commentary runs. It replaces the normal budget then, because commentary turns come often. */
   const commentaryImagesPerHour = useLocalStorageManualReset<number>('perception/commentary-images-per-hour', IMAGE_BUDGET_LIMITS.defaultCommentaryImagesPerHour)
+  /**
+   * The frame policy of decision turns, a developer setting. The default stays `fresh-keyframes` until replay
+   * evaluation chooses one.
+   */
+  const framePolicy = useLocalStorageManualReset<FramePolicyName>('perception/frame-policy', 'fresh-keyframes')
   /** When frames went to the model, in the last hour. The device keeps them, so a restart does not reset the budget. */
   const sentImageTimes = useLocalStorageManualReset<number[]>('perception/sent-image-times', [])
   /**
@@ -58,6 +65,7 @@ export const usePerceptionStore = defineStore('perception', () => {
     exclusions.reset()
     imagesPerHour.reset()
     commentaryImagesPerHour.reset()
+    framePolicy.reset()
     sentImageTimes.reset()
   }
 
@@ -67,6 +75,7 @@ export const usePerceptionStore = defineStore('perception', () => {
     exclusions,
     imagesPerHour,
     commentaryImagesPerHour,
+    framePolicy,
     sentImageTimes,
     supported,
     togglePaused,

@@ -281,4 +281,16 @@ describe('chat orchestrator host options', () => {
     expect(reply).toMatchObject({ role: 'assistant', content: 'Nice play! ' })
     expect(reply?.role === 'assistant' && reply.categorization?.speech).toBe('Nice play! ')
   })
+
+  // A scene anchor stays the same across autonomous turns, so it sits at a fixed place near the start of the request.
+  it('puts the anchor of a notice right after the system prompt, and keeps it out of history', async () => {
+    const harness = createHarness({ getSystemPrompt: () => 'identity' })
+
+    await harness.runtime.ingest('Autonomous turn', { model: 'test', chatProvider: provider, notice: { source: 'initiative', transient: true, anchor: { text: 'The anchor of the current scene', image: 'data:image/jpeg;base64,AAAA' } } })
+
+    const conversation = harness.stream.mock.calls[0]?.[2]
+    expect(conversation?.turns[0]).toMatchObject({ type: 'system', authority: 'system' })
+    expect(conversation?.turns[1]).toMatchObject({ id: 'notice-anchor', type: 'user', content: [{ type: 'tagged-text', text: 'The anchor of the current scene' }, { type: 'image', url: 'data:image/jpeg;base64,AAAA' }] })
+    expect(JSON.stringify(harness.messages['session-1'] ?? [])).not.toContain('AAAA')
+  })
 })

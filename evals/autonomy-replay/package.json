@@ -20,6 +20,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@napi-rs/image": "catalog:",
     "@proj-airi/core-agent": "workspace:^",
     "@proj-airi/stage-shared": "workspace:^",
     "valibot": "catalog:"

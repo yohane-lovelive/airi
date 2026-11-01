@@ -1,14 +1,16 @@
 import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { FRAME_POLICY_NAMES } from '@proj-airi/stage-shared/perception'
+import { parse, picklist } from 'valibot'
 import { defineConfig, loadEnv } from 'vieval'
 import { chatModelFrom, ChatModels, chatProviderFrom, ChatProviders } from 'vieval/plugins/chat-models'
-
-import { FRAME_POLICIES } from './src/replay'
 
 const rootDirectory = dirname(fileURLToPath(import.meta.url))
 const env = loadEnv('', rootDirectory, '')
 const models = (env.AUTONOMY_REPLAY_MODELS ?? 'deepseek-v4.1-flash').split(',').map(model => model.trim()).filter(Boolean)
+// Each recording runs once for each model and each policy, so a shorter list makes a cheaper run.
+const policies = (env.AUTONOMY_REPLAY_POLICIES || FRAME_POLICY_NAMES.join(',')).split(',').map(policy => parse(picklist(FRAME_POLICY_NAMES), policy.trim()))
 
 export default defineConfig({
   env,
@@ -37,7 +39,7 @@ export default defineConfig({
       runMatrix: {
         override: {
           model: models,
-          policy: [...FRAME_POLICIES],
+          policy: policies,
         },
       },
     },

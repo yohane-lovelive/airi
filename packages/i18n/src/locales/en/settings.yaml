@@ -1159,6 +1159,13 @@ pages:
       images-per-hour: Images each hour
       images-per-hour-description: The most frames that go to the model in one hour. When half is used, each turn sends one frame, and screen events push less. When all is used, the character talks without seeing the screen.
       images-sent: 'Images sent in the last hour: {used} of {limit}'
+      frame-policy: Frame policy (developer)
+      frame-policy-description: How a turn picks the frames that it sends. The replay evaluation in evals/autonomy-replay compares them on your recordings. Keep the default unless you test.
+      frame-policies:
+        fresh-keyframes: Newest frame and key frames (default)
+        contact-sheet: Contact sheet, one image of up to six tiles
+        scene-anchor: Scene anchor near the start, then the newest frames
+        scene-anchor+contact-sheet: Scene anchor and a contact sheet
       commentary-images-per-hour: Images each hour during commentary
       commentary-images-per-hour-description: Commentary talks often, so it has its own budget. While a commentary runs, this limit replaces the one above. Each commentary turn sends two frames at most.
       states:

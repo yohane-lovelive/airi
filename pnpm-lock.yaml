@@ -3553,6 +3553,9 @@ importers:
 
   evals/autonomy-replay:
     dependencies:
+      '@napi-rs/image':
+        specifier: 'catalog:'
+        version: 1.15.0
       '@proj-airi/core-agent':
         specifier: workspace:^
         version: link:../../packages/core-agent

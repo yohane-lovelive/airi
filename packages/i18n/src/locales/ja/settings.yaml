@@ -1025,6 +1025,13 @@ pages:
       images-per-hour: 1 時間あたりの画像
       images-per-hour-description: 1 時間にモデルへ送るフレームの上限です。半分を使うと、1 ターンに 1 枚だけを送り、画面の出来事の押す力も弱まります。すべて使うと、キャラクターは画面を見ずに話します。
       images-sent: '直近 1 時間に送った画像: {used} / {limit} 枚'
+      frame-policy: フレームポリシー（開発者向け）
+      frame-policy-description: ターンが送るフレームの選び方です。evals/autonomy-replay のリプレイ評価が、あなたの録画で比べます。試すとき以外は、既定のままにしてください。
+      frame-policies:
+        fresh-keyframes: 最新のフレームとキーフレーム（既定）
+        contact-sheet: コンタクトシート（最大 6 枚のタイルを 1 枚の画像に）
+        scene-anchor: 先頭近くのシーンのアンカーと、最新のフレーム
+        scene-anchor+contact-sheet: シーンのアンカーとコンタクトシート
       commentary-images-per-hour: 実況中の 1 時間あたりの画像
       commentary-images-per-hour-description: 実況はよく話すので、別の予算を持ちます。実況の間は、上の上限の代わりにこの上限を使います。実況の 1 ターンで送るフレームは最大 2 枚です。
       states:

@@ -11,6 +11,9 @@ import { TOPIC_LIMITS } from './topics'
 /** The count of recent lines in the notice. The model reads them to avoid the same opening and structure. */
 export const INITIATIVE_RECENT_LINE_COUNT = 3
 
+/** The text beside the scene anchor frame, which the request holds near its start. */
+export const SCENE_ANCHOR_TEXT = 'The anchor frame of the current scene on the owner\'s screen. It changes only when the scene changes.'
+
 /** Each recent line is cut to this length, so the situation block stays near its budget of about 300 tokens. */
 const RECENT_LINE_MAX_LENGTH = 120
 
@@ -22,6 +25,10 @@ export interface InitiativeScreenContext {
   readonly app?: string
   /** The age of each attached frame in milliseconds, oldest first. The newest frame is the screen now. */
   readonly frameAgesMs: readonly number[]
+  /** The age of each tile of an attached contact sheet, oldest first. The sheet comes before the single frames. */
+  readonly contactSheetAgesMs?: readonly number[]
+  /** The age of the anchor frame of the current scene, which the request holds near its start. */
+  readonly anchorAgeMs?: number
   /** Why no frame is attached: the image budget of the hour is used up. */
   readonly blind?: 'budget'
   /** What the screen detectors saw since the last line, oldest first. */
@@ -149,9 +156,18 @@ export function initiativeNoticeText(context: InitiativeNoticeContext): string {
 
 function screenLines(screen: InitiativeScreenContext) {
   const lines: string[] = []
+  const age = (ageMs: number) => ageMs < 1_000 ? 'now' : `${ageLabel(ageMs)} ago`
+  if (screen.anchorAgeMs !== undefined)
+    lines.push(`- The image near the start of this request is the anchor of the current scene, taken ${age(screen.anchorAgeMs)}.`)
+  if (screen.contactSheetAgesMs?.length) {
+    lines.push(`- A contact sheet is attached: one image with ${screen.contactSheetAgesMs.length} frames as tiles, left to right and top to bottom, oldest first (${screen.contactSheetAgesMs.map(age).join(', ')}).`)
+  }
   if (screen.frameAgesMs.length) {
-    const ages = screen.frameAgesMs.map(ageMs => ageMs < 1_000 ? 'now' : `${ageLabel(ageMs)} ago`).join(', ')
+    const ages = screen.frameAgesMs.map(age).join(', ')
     lines.push(`- The owner's screen: ${screen.frameAgesMs.length === 1 ? '1 image is' : `${screen.frameAgesMs.length} images are`} attached, oldest first (${ages}). The last one is the screen now.`)
+  }
+  else if (screen.contactSheetAgesMs?.length) {
+    lines.push('- The last tile of the contact sheet is the screen now.')
   }
   else if (screen.blind === 'budget') {
     lines.push('- You cannot see the owner\'s screen now: the image budget of this hour is used up.')

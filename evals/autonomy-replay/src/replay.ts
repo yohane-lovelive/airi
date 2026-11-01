@@ -1,5 +1,5 @@
 import type { InitiativeMode, InitiativeOptions, InitiativeScreenContext, InitiativeTrigger, SpeechType, Timeline } from '@proj-airi/core-agent'
-import type { ScreenEvent } from '@proj-airi/stage-shared/perception'
+import type { FramePolicyName, ScreenEvent } from '@proj-airi/stage-shared/perception'
 
 import type { RecordedFrame, Recording } from './recording'
 
@@ -16,11 +16,7 @@ import {
   setTimelineScene,
   timelineMarkerFrom,
 } from '@proj-airi/core-agent'
-import { pickFreshKeyframes, ScreenDetector } from '@proj-airi/stage-shared/perception'
-
-/** The frame policies that the replay compares. Step 3-6c adds `contact-sheet` and `scene-anchor`. */
-export const FRAME_POLICIES = ['fresh-keyframes'] as const
-export type FramePolicyName = typeof FRAME_POLICIES[number]
+import { pickContactSheet, pickFreshKeyframes, sceneAnchorAt, ScreenDetector } from '@proj-airi/stage-shared/perception'
 
 /** Settings of one replay. */
 export interface ReplayOptions {
@@ -46,8 +42,12 @@ export interface ReplayTurn {
   readonly trigger: InitiativeTrigger
   readonly speechType?: SpeechType
   readonly notice: string
-  /** The picked frames, oldest first. The last one goes at full size. */
+  /** The frames that go one by one, oldest first. The last one goes at full size. */
   readonly frames: readonly RecordedFrame[]
+  /** The frames that go as the tiles of one contact sheet, oldest first. */
+  readonly sheet?: readonly RecordedFrame[]
+  /** The anchor frame of the current scene, which goes near the start of the request. */
+  readonly anchor?: RecordedFrame
 }
 
 /** What the speaking model answered for one turn. */
@@ -62,6 +62,7 @@ export interface ReplayLine {
   readonly text: string
   readonly trigger: InitiativeTrigger
   readonly speechType?: SpeechType
+  /** The frames that the turn showed, oldest first: the single frames or the tiles of the contact sheet. */
   readonly frames: readonly RecordedFrame[]
 }
 
@@ -116,6 +117,7 @@ function optionsFor(mode: InitiativeMode, activity: number): InitiativeOptions {
  * recording. Each decision turn goes to `speak`, which calls the model in an evaluation and a fake in a test.
  *
  * - The detectors read the recorded thumbnails, so the events come again as the app made them.
+ * - The frame policy picks the frames as the app does. A contact sheet and the scene anchor each count as one image.
  * - The owner messages of the recording reach the policy at their times. Their text was never recorded.
  * - A spoken line holds further turns for its estimated playback time.
  * - The timeline takes the NOTE and SCENE markers of the replies, and each later notice gives it to the model.
@@ -137,6 +139,9 @@ export async function replayRecording(recording: Recording, options: ReplayOptio
   let lastTurnAt: number | undefined
   let lastOwnerAt: number | undefined
   let ownerIndex = 0
+  let anchorFrame: RecordedFrame | undefined
+  const withSheet = options.policy === 'contact-sheet' || options.policy === 'scene-anchor+contact-sheet'
+  const withAnchor = (options.policy === 'scene-anchor' || options.policy === 'scene-anchor+contact-sheet') && maxImages >= 2
 
   for (const [index, frame] of recording.frames.entries()) {
     const time = initiativeTimeFrom(new Date(frame.at))
@@ -163,11 +168,24 @@ export async function replayRecording(recording: Recording, options: ReplayOptio
     const since = lastTurnAt ?? frame.at - RING_MS
     const ring = recording.frames.slice(0, index + 1).filter(candidate => candidate.at > frame.at - RING_MS)
     const fresh = events.filter(event => event.at > since)
-    const picks = pickFreshKeyframes({ frames: ring, eventTimes: fresh.map(event => event.at), since, maxImages })
-    const picked = picks.map(pick => ring[pick.index])
+    const eventTimes = fresh.map(event => event.at)
+    if (withAnchor) {
+      // A scene change or an app switch starts a new scene, and its first frame becomes the anchor.
+      const anchorAt = sceneAnchorAt({
+        frames: ring,
+        boundaries: events.filter(event => event.type === 'scene-change' || event.type === 'app-switch').map(event => event.at),
+        ...(anchorFrame ? { previous: anchorFrame.at } : {}),
+      })
+      anchorFrame = ring.find(candidate => candidate.at === anchorAt) ?? anchorFrame
+    }
+    const anchor = withAnchor ? anchorFrame : undefined
+    const sheet = withSheet ? pickContactSheet({ frames: ring, eventTimes, since }).map(pick => ring[pick.index]) : undefined
+    const picked = sheet ? [] : pickFreshKeyframes({ frames: ring, eventTimes, since, maxImages: anchor ? maxImages - 1 : maxImages }).map(pick => ring[pick.index])
     const screen: InitiativeScreenContext = {
       ...(frame.app ? { app: frame.app } : {}),
       frameAgesMs: picked.map(candidate => frame.at - candidate.at),
+      ...(sheet?.length ? { contactSheetAgesMs: sheet.map(candidate => frame.at - candidate.at) } : {}),
+      ...(anchor ? { anchorAgeMs: frame.at - anchor.at } : {}),
       events: fresh.map(event => ({ type: event.type, ageMs: frame.at - event.at, ...(event.app ? { app: event.app } : {}) })),
     }
     const notice = initiativeNoticeText({
@@ -184,9 +202,17 @@ export async function replayRecording(recording: Recording, options: ReplayOptio
     })
 
     turns += 1
-    images += picked.length
+    images += picked.length + (sheet?.length ? 1 : 0) + (anchor ? 1 : 0)
     lastTurnAt = frame.at
-    const reply = await speak({ at: frame.at, trigger: decision.trigger, ...(decision.speechType ? { speechType: decision.speechType } : {}), notice, frames: picked })
+    const reply = await speak({
+      at: frame.at,
+      trigger: decision.trigger,
+      ...(decision.speechType ? { speechType: decision.speechType } : {}),
+      notice,
+      frames: picked,
+      ...(sheet?.length ? { sheet } : {}),
+      ...(anchor ? { anchor } : {}),
+    })
     usage.input += reply.usage?.input ?? 0
     usage.output += reply.usage?.output ?? 0
     usage.cached += reply.usage?.cached ?? 0
@@ -198,7 +224,7 @@ export async function replayRecording(recording: Recording, options: ReplayOptio
         : setTimelineScene(timeline, marker.text, frame.at)
     }
     if (spoken) {
-      lines.push({ at: frame.at, text: spoken, trigger: decision.trigger, ...(decision.speechType ? { speechType: decision.speechType } : {}), frames: picked })
+      lines.push({ at: frame.at, text: spoken, trigger: decision.trigger, ...(decision.speechType ? { speechType: decision.speechType } : {}), frames: sheet?.length ? sheet : picked })
       speakingUntil = frame.at + spoken.length * SPEECH_MS_PER_CHARACTER
     }
     else {

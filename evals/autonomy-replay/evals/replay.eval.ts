@@ -1,17 +1,22 @@
+import type { FramePolicyName } from '@proj-airi/stage-shared/perception'
+
 import type { LineJudgment } from '../src/metrics'
-import type { FramePolicyName, ReplayTurn } from '../src/replay'
+import type { ReplayTurn } from '../src/replay'
 
 import process from 'node:process'
 
+import { SCENE_ANCHOR_TEXT } from '@proj-airi/core-agent'
+import { FRAME_POLICY_NAMES } from '@proj-airi/stage-shared/perception'
 import { parse, picklist } from 'valibot'
 import { describeTask, expect } from 'vieval'
 import { modelFromRun, openaiFromRunContext } from 'vieval/plugins/chat-models'
 
 import { complete } from '../src/chat'
+import { renderContactSheet } from '../src/contact-sheet'
 import { judgeMessages, parseJudgment } from '../src/judge'
 import { replayMetrics } from '../src/metrics'
 import { defaultRecordingsDirectory, frameImage, loadRecordings } from '../src/recording'
-import { FRAME_POLICIES, replayRecording } from '../src/replay'
+import { replayRecording } from '../src/replay'
 
 const recordings = loadRecordings(process.env.AUTONOMY_REPLAY_RECORDINGS || defaultRecordingsDirectory())
 const mode = parse(picklist(['idle', 'commentary']), process.env.AUTONOMY_REPLAY_MODE || 'idle')
@@ -23,13 +28,19 @@ describeTask('autonomy-replay', ({ casesFromInputs }) => {
     const { recording } = context.matrix.inputs
     const connection = openaiFromRunContext(modelFromRun(context, { axis: 'model' }))
     const baseURL = connection.baseURL ?? ''
-    const policy: FramePolicyName = parse(picklist(FRAME_POLICIES), context.task.matrix.run.policy)
+    const policy: FramePolicyName = parse(picklist(FRAME_POLICY_NAMES), context.task.matrix.run.policy)
     const judgeModel = process.env.AUTONOMY_REPLAY_JUDGE_MODEL || connection.model
 
+    // The request has the shape that the app sends: the anchor right after the system prompt, then the notice with
+    // its single frames or its contact sheet.
     const speak = async (turn: ReplayTurn) => {
       const images = await Promise.all(turn.frames.map(frame => frameImage(recording, frame)))
+      if (turn.sheet)
+        images.push(await renderContactSheet(await Promise.all(turn.sheet.map(frame => frameImage(recording, frame)))))
+      const anchor = turn.anchor ? await frameImage(recording, turn.anchor) : undefined
       return complete({ baseURL, apiKey: connection.apiKey, model: connection.model }, [
         { role: 'system', content: persona },
+        ...(anchor ? [{ role: 'user' as const, content: [{ type: 'text' as const, text: SCENE_ANCHOR_TEXT }, { type: 'image' as const, base64: anchor }] }] : []),
         { role: 'user', content: [{ type: 'text', text: turn.notice }, ...images.map(base64 => ({ type: 'image' as const, base64 }))] },
       ], context.signal)
     }

@@ -634,6 +634,19 @@ Step 3-6b built the replay evaluation as follows.
 - The report holds the metrics above, the tokens with the cache share, and no prices. The interruptions per minute wait: a recording has no playback times. Each case writes its lines to `replay.json`.
 - The unit tests replay a synthetic recording with a fake model, without network.
 
+Step 3-6c added the other frame policies as follows.
+
+- `packages/stage-shared` holds the four policy names and their pure parts, so the app and the replay pick the same frames.
+- `contact-sheet` takes the picks of `fresh-keyframes` and fills the rest with frames spread evenly since the last turn. Up to six tiles of 426 by 240 pixels go in three columns, oldest first.
+- The app draws the sheet with an `OffscreenCanvas`. The replay draws it with `@napi-rs/image` in the same layout.
+- `scene-anchor` keeps one anchor frame for each scene. A scene change or an app switch starts a scene, and the first frame after it becomes the anchor. The anchor stays until the next boundary.
+- The anchor is a user turn right after the system prompt, before the history summary. The ADR said a fixed part of the prompt. A user turn keeps the system prompt text the same, and the provider cache can still read the start of the request.
+- The anchor and a contact sheet each count as one image. With one image left in the budget, the newest frame or the sheet wins over the anchor.
+- The notice says how old the anchor is, and that the tiles go left to right and top to bottom, oldest first.
+- A developer setting on the perception page chooses the policy. The default stays `fresh-keyframes` until the owner runs the replay and chooses one.
+- The replay runs all four policies for each recording and model. `AUTONOMY_REPLAY_POLICIES` limits the list, so a run costs less. The judge sees the tiles of a sheet as single frames.
+- Nobody has measured yet whether the provider cache covers the anchor image. The replay records the cache share for each policy, so the owner can check it.
+
 ## Non-goals
 
 - Lip sync work. The owner withdrew it for now.
@@ -657,7 +670,7 @@ The order follows dependencies. Each step uses the parts of the earlier steps. E
 | 1 | Mission base: the time trigger, the instance store, and the tools. Also the `mustSpeak` notice, the `reminder` template, and the mission list. | Done |
 | 2 | Autonomous talk without the screen: connect the policy core to `notifyConversation`. Add the prompt budget, intentions, owner control, usage by purpose, and the inspector. | Done |
 | 2b | Daily rhythm and small talk: templates as recipes, the `greeting`, `welcome-back`, and `small-talk` templates, topic seeds, and the time of day. Measure variety. | Done. Templates as recipes still wait. |
-| 3 | Perception: the adapters, ring buffer, detectors, frame policies, image budget, recorder, replay, timeline, scene state, `commentary` with interruptions, and `watch`. | In progress: 3-1 to 3-6b are done. |
+| 3 | Perception: the adapters, ring buffer, detectors, frame policies, image budget, recorder, replay, timeline, scene state, `commentary` with interruptions, and `watch`. | Done. |
 | 4 | Motion: the model capability check, the procedural layer, the library with `ACT` markers, expression sync, and the upper-body layer. | To do |
 | 5 | Generated motion, game audio, recall from memory, and polish. Recall needs the memory ADR. | To do |
 
@@ -682,7 +695,7 @@ Step 3 has nine parts. Each part is one change. Detector events reach the pressu
 | 3-5b | The `watch` template with check turns and named regions. | Done |
 | 3-6a | The screen recorder of the desktop app. | Done |
 | 3-6b | The replay evaluation suite. | Done |
-| 3-6c | The `contact-sheet` and `scene-anchor` frame policies, and a developer setting to choose the policy. | To do |
+| 3-6c | The `contact-sheet` and `scene-anchor` frame policies, and a developer setting to choose the policy. | Done |
 
 Step 4 does not depend on steps 0 to 3. It comes after them so that the speech output format changes only once.
 The memory ADR has its own steps. They can run beside steps 1 to 4.

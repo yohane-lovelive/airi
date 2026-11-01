@@ -93,3 +93,83 @@ export function pickFreshKeyframes(input: FramePolicyInput): PickedFrame[] {
 
   return picked.sort((left, right) => left.index - right.index)
 }
+
+/**
+ * The frame policies of the ADR. Replay evaluation compares them, and a developer setting chooses one.
+ *
+ * - `fresh-keyframes`: the newest frame at full size, and a few smaller key frames.
+ * - `contact-sheet`: several reduced frames as tiles of one image. The budget counts one image.
+ * - `scene-anchor`: one anchor frame for each scene at a fixed place of the request, then the newest frames.
+ * - `scene-anchor+contact-sheet`: the anchor, then one contact sheet.
+ */
+export const FRAME_POLICY_NAMES = ['fresh-keyframes', 'contact-sheet', 'scene-anchor', 'scene-anchor+contact-sheet'] as const
+
+export type FramePolicyName = typeof FRAME_POLICY_NAMES[number]
+
+/** Limits of the contact sheet and the scene anchor. */
+export const CONTACT_SHEET_LIMITS = {
+  maxTiles: 6,
+  /** Each tile keeps the 16 by 9 shape of a screen. Three tiles fit the width of a full frame. */
+  tileWidth: 426,
+  tileHeight: 240,
+  columns: 3,
+} as const
+
+/** Where each tile of a contact sheet goes, and the size of the sheet. */
+export interface ContactSheetLayout {
+  readonly width: number
+  readonly height: number
+  readonly tiles: readonly { readonly x: number, readonly y: number, readonly width: number, readonly height: number }[]
+}
+
+/**
+ * The layout of a contact sheet of `count` tiles: up to three in a row, oldest at the top left.
+ *
+ * @example
+ * contactSheetLayout(6)
+ * // => { width: 1278, height: 480, tiles: [{ x: 0, y: 0, width: 426, height: 240 }, ...] }
+ */
+export function contactSheetLayout(count: number): ContactSheetLayout {
+  const { tileWidth, tileHeight, columns: maxColumns } = CONTACT_SHEET_LIMITS
+  const tiles = Math.max(0, Math.min(CONTACT_SHEET_LIMITS.maxTiles, Math.floor(count)))
+  const columns = Math.max(1, Math.min(maxColumns, tiles))
+  const rows = Math.max(1, Math.ceil(tiles / columns))
+  return {
+    width: columns * tileWidth,
+    height: rows * tileHeight,
+    tiles: Array.from({ length: tiles }, (_, index) => ({ x: (index % columns) * tileWidth, y: Math.floor(index / columns) * tileHeight, width: tileWidth, height: tileHeight })),
+  }
+}
+
+/**
+ * The frames of a contact sheet: the picks of `fresh-keyframes`, then frames spread over the time since the last turn,
+ * so the sheet shows how the screen went. Returns them oldest first.
+ */
+export function pickContactSheet(input: Omit<FramePolicyInput, 'maxImages'> & { maxTiles?: number }): PickedFrame[] {
+  const maxTiles = Math.min(CONTACT_SHEET_LIMITS.maxTiles, input.maxTiles ?? CONTACT_SHEET_LIMITS.maxTiles)
+  const picked = pickFreshKeyframes({ ...input, maxImages: maxTiles })
+  const recent = input.frames.map((frame, index) => ({ frame, index })).filter(entry => entry.frame.at > input.since && !picked.some(pick => pick.index === entry.index))
+  const free = maxTiles - picked.length
+  for (let step = 0; step < free && recent.length; step++) {
+    // Spread the extra tiles evenly over the frames that are left.
+    const entry = recent[Math.floor((step + 0.5) * recent.length / free)]
+    if (entry && !picked.some(pick => pick.index === entry.index))
+      picked.push({ index: entry.index, role: 'change' })
+  }
+  return picked.sort((left, right) => left.index - right.index)
+}
+
+/**
+ * The time of the anchor frame of the current scene: the first frame at or after the newest scene change or app switch.
+ * Before any such event, the anchor stays `previous`, or it starts at the newest frame. Returns `undefined` without
+ * frames.
+ */
+export function sceneAnchorAt(input: { frames: readonly PolicyFrame[], boundaries: readonly number[], previous?: number }): number | undefined {
+  const newestFrame = input.frames.at(-1)
+  if (!newestFrame)
+    return input.previous
+  const boundary = Math.max(-Infinity, ...input.boundaries)
+  if (!Number.isFinite(boundary) || (input.previous !== undefined && input.previous >= boundary))
+    return input.previous ?? newestFrame.at
+  return input.frames.find(frame => frame.at >= boundary)?.at ?? newestFrame.at
+}

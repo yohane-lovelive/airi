@@ -2,6 +2,7 @@ import type { ChatAttachment, InitiativeDecision, InitiativeEvent, InitiativeHos
 import type { SyncedPiniaRuntime } from 'pinia-plugin-synced'
 
 import type { OwnerPresence, OwnerPresenceSource } from '../libs/initiative/presence'
+import type { CapturedFrame } from '../libs/perception/frame-ring'
 
 import { errorMessageFrom } from '@moeru/std'
 import {
@@ -21,6 +22,7 @@ import {
   topicOf,
   topicVariety,
 } from '@proj-airi/core-agent'
+import { sceneAnchorAt } from '@proj-airi/stage-shared/perception'
 import { nanoid } from 'nanoid'
 import { defineStore, storeToRefs } from 'pinia'
 import { computed, onScopeDispose, readonly, shallowRef, watch } from 'vue'
@@ -165,6 +167,8 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
   const seedOfferedAt = new Map<string, number>()
   /** When the last turn with the screen started. Later frames and events are news to the model. */
   let lastScreenTurnAt: number | undefined
+  /** The anchor frame of the current scene. The runner keeps it, because the ring drops frames after a minute. */
+  let sceneAnchor: CapturedFrame | undefined
 
   const ownerSpeaking = computed(() => voiceMessages.isRecording || voice.state?.phase === 'capturing')
   const activeMessages = computed(() => chatSession.getSessionMessagesIfLoaded(activeSessionId.value))
@@ -240,12 +244,26 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
    * The screen part of a drive turn while perception runs and no excluded window is in front. Records the frames that
    * go to the model in the image budget.
    */
-  async function screenOf(now: number): Promise<{ context: InitiativeScreenContext, attachments: ChatAttachment[] } | undefined> {
-    if (!perception.enabled || !perceptionRunner.running() || perceptionRunner.excludedNow())
+  async function screenOf(now: number): Promise<{ context: InitiativeScreenContext, attachments: ChatAttachment[], anchor?: { text: string, image: string } } | undefined> {
+    if (!perception.enabled || !perceptionRunner.running() || perceptionRunner.excludedNow()) {
+      // Without a capture, the scene of the anchor is gone.
+      if (!perceptionRunner.running())
+        sceneAnchor = undefined
       return undefined
+    }
     try {
       const commentary = Boolean(commentaryAt(now))
+      const frames = perceptionRunner.frames()
+      // A scene change or an app switch starts a new scene, and its first frame becomes the anchor.
+      const anchorAt = sceneAnchorAt({
+        frames,
+        boundaries: perceptionRunner.events().filter(event => event.type === 'scene-change' || event.type === 'app-switch').map(event => event.at),
+        ...(sceneAnchor ? { previous: sceneAnchor.at } : {}),
+      })
+      sceneAnchor = frames.find(frame => frame.at === anchorAt) ?? sceneAnchor
       const turn = await buildScreenTurn({
+        policy: perception.framePolicy,
+        ...(sceneAnchor ? { anchor: sceneAnchor } : {}),
         frames: perceptionRunner.frames(),
         events: perceptionRunner.events(),
         ...(perceptionRunner.foregroundApp() ? { app: perceptionRunner.foregroundApp() } : {}),
@@ -255,8 +273,8 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
         now,
       })
       lastScreenTurnAt = now
-      if (turn.attachments.length)
-        perception.recordImages(turn.attachments.length, now)
+      if (turn.images)
+        perception.recordImages(turn.images, now)
       return turn
     }
     catch (error) {
@@ -299,7 +317,7 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
     salienceSinceTurn = 0
     let outcome: 'spoke' | 'silent' | 'dropped' | 'failed' = 'failed'
     try {
-      const result = await chat.notifyConversation(sessionId, { source: INITIATIVE_SOURCE, text, transient: true, ...(screen?.attachments.length ? { attachments: screen.attachments } : {}) }, turn.turnId)
+      const result = await chat.notifyConversation(sessionId, { source: INITIATIVE_SOURCE, text, transient: true, ...(screen?.attachments.length ? { attachments: screen.attachments } : {}), ...(screen?.anchor ? { anchor: screen.anchor } : {}) }, turn.turnId)
       outcome = turn.dropped ? 'dropped' : result === 'spoke' ? 'spoke' : result === 'failed' ? 'failed' : 'silent'
     }
     catch (error) {

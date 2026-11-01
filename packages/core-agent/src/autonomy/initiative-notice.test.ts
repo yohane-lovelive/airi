@@ -79,6 +79,14 @@ describe('initiativeNoticeText', () => {
     expect(initiativeNoticeText(context({ timeline: { notes: [], scene: { text: 'x', at: NOW } } }))).not.toContain('Current scene')
   })
 
+  it('describes a contact sheet and the scene anchor', () => {
+    const text = initiativeNoticeText(context({ screen: { frameAgesMs: [], contactSheetAgesMs: [30_000, 0], anchorAgeMs: 120_000, events: [] } }))
+
+    expect(text).toContain('anchor of the current scene, taken 2 minutes ago')
+    expect(text).toContain('one image with 2 frames as tiles, left to right and top to bottom, oldest first (30 s ago, now)')
+    expect(text).toContain('The last tile of the contact sheet is the screen now.')
+  })
+
   it('says when the image budget leaves the character blind', () => {
     const text = initiativeNoticeText(context({ screen: { frameAgesMs: [], blind: 'budget', events: [] } }))
 

@@ -1,5 +1,7 @@
 import type { CapturedFrame } from './frame-ring'
 
+import { contactSheetLayout } from '@proj-airi/stage-shared/perception'
+
 import { FRAME_LIMITS } from './frame-ring'
 
 /**
@@ -75,4 +77,26 @@ export async function cropImage(image: Blob, box: { x: number, y: number, width:
   finally {
     bitmap.close()
   }
+}
+
+/**
+ * Draws up to six frames as tiles of one JPEG, left to right and top to bottom, oldest first. The `contact-sheet` frame
+ * policy sends it as one image.
+ */
+export async function renderContactSheet(images: readonly Blob[]): Promise<Blob> {
+  const layout = contactSheetLayout(images.length)
+  const canvas = new OffscreenCanvas(layout.width, layout.height)
+  const context = canvas.getContext('2d')!
+  context.fillStyle = '#000000'
+  context.fillRect(0, 0, layout.width, layout.height)
+  for (const [index, tile] of layout.tiles.entries()) {
+    const bitmap = await createImageBitmap(images[index])
+    try {
+      context.drawImage(bitmap, tile.x, tile.y, tile.width, tile.height)
+    }
+    finally {
+      bitmap.close()
+    }
+  }
+  return canvas.convertToBlob({ type: 'image/jpeg', quality: FRAME_LIMITS.jpegQuality })
 }

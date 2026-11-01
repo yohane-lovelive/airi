@@ -196,6 +196,13 @@ export interface ChatOrchestratorSendOptions {
      * The host uses it for frequent notices, for example autonomous turns, so silent turns leave no trace in history.
      */
     transient?: boolean
+    /**
+     * An image that stays the same for many requests, for example the anchor frame of a screen scene. It goes after
+     * the system prompt and the history summary, so the start of each request stays the same and the provider can
+     * cache it.
+     * Only this request gets it, and history never stores it.
+     */
+    anchor?: { text: string, image: string }
   }
 }
 
@@ -1055,6 +1062,17 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
           systemMessage.content.push({ type: 'text', text: `\n\n${systemPromptSupplement}` })
         else
           context.turns.unshift({ id: 'system-supplement', type: 'system', authority: 'system', content: [{ type: 'text', text: systemPromptSupplement }] })
+      }
+      // The anchor goes right after the system prompt. The summary below lands before it, because the summary changes
+      // less often. Both stay the same across requests, so the cached prefix of the provider can hold them.
+      const anchor = options.notice?.anchor
+      if (anchor) {
+        const firstHistoryIndex = context.turns.findIndex(turn => turn.type !== 'system' || turn.authority !== 'system')
+        context.turns.splice(firstHistoryIndex < 0 ? context.turns.length : firstHistoryIndex, 0, {
+          id: 'notice-anchor',
+          type: 'user',
+          content: [{ type: 'tagged-text', tag: 'app-context', text: anchor.text }, { type: 'image', url: anchor.image }],
+        })
       }
       // The summary stands for the left-out messages, so it comes after the system prompt and before the recent history.
       if (projectedHistory.summary?.trim()) {

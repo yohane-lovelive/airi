@@ -19,6 +19,8 @@ pnpm -F @proj-airi/evals-autonomy-replay eval:run
 
 `AUTONOMY_REPLAY_RECORDINGS` names the folder of the recordings. Without it, the suite reads the recordings folder of the desktop app. `AUTONOMY_REPLAY_MODE` is `idle` or `commentary`.
 
+Each recording runs once for each model and each frame policy. Without `AUTONOMY_REPLAY_POLICIES`, the suite runs all four policies of `@proj-airi/stage-shared/perception`. Name fewer policies, separated by commas, for a cheaper run.
+
 ## Metrics
 
 | Metric | Meaning |
@@ -35,6 +37,7 @@ pnpm -F @proj-airi/evals-autonomy-replay eval:run
 | --- | --- |
 | `src/recording.ts` | Reads the recordings that the screen recorder wrote. |
 | `src/replay.ts` | Replays one recording. It needs no network, and the tests give it a fake model. |
+| `src/contact-sheet.ts` | Draws a contact sheet with `@napi-rs/image`, in the layout of the app. |
 | `src/chat.ts` | Calls an OpenAI-compatible endpoint, and reads the cached input tokens. |
 | `src/judge.ts` | The judge messages, and the reading of its JSON answer. |
 | `src/metrics.ts` | The metrics of one replay. |
@@ -43,7 +46,7 @@ pnpm -F @proj-airi/evals-autonomy-replay eval:run
 ## When to use it
 
 - Use it before you change a frame policy, the detector thresholds, the commentary pace, or the default speaking model.
-- Use it to compare frame policies on the same recording.
+- Use it to compare frame policies on the same recording. The request has the shape of the app: the scene anchor right after the system prompt, and the contact sheet as one image.
 
 ## When not to use it
 

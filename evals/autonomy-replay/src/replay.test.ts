@@ -5,9 +5,11 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+import { Transformer } from '@napi-rs/image'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { complete } from './chat'
+import { renderContactSheet } from './contact-sheet'
 import { parseJudgment } from './judge'
 import { replayMetrics } from './metrics'
 import { frameImage, loadRecording, loadRecordings } from './recording'
@@ -91,6 +93,51 @@ describe('replayRecording', () => {
 
     expect(second.turns).toBe(first.turns)
     expect(first.silent).toBe(first.turns)
+  })
+
+  it('sends one contact sheet for each turn and counts it as one image', async () => {
+    const recording = loadRecording(await writeRecording(root, 4))
+    const turns: ReplayTurn[] = []
+    const result = await replayRecording(recording, { mode: 'commentary', policy: 'contact-sheet', seed: 1 }, async (turn) => {
+      turns.push(turn)
+      return { text: 'Nice!' }
+    })
+
+    expect(turns.length).toBeGreaterThan(0)
+    expect(turns.every(turn => turn.frames.length === 0 && turn.sheet!.length >= 1 && turn.sheet!.length <= 6)).toBe(true)
+    expect(turns[0].notice).toContain('frames as tiles')
+    expect(result.images).toBe(turns.length)
+    expect(result.lines[0].frames).toEqual(turns[0].sheet)
+  })
+
+  it('keeps the anchor of the scene until the cut, and then takes the first frame after it', async () => {
+    const recording = loadRecording(await writeRecording(root, 4))
+    const turns: ReplayTurn[] = []
+    const result = await replayRecording(recording, { mode: 'commentary', policy: 'scene-anchor', seed: 1 }, async (turn) => {
+      turns.push(turn)
+      return { text: '' }
+    })
+
+    const cut = result.events.find(event => event.type === 'scene-change')!.at
+    const after = turns.filter(turn => turn.at > cut + 60_000)
+    expect(after.length).toBeGreaterThan(0)
+    expect(after.every(turn => turn.anchor!.at >= cut && turn.anchor!.at === after[0].anchor!.at)).toBe(true)
+    // In commentary two images go: the anchor and the newest frame.
+    expect(turns.every(turn => turn.anchor !== undefined && turn.frames.length === 1)).toBe(true)
+    expect(after[0].notice).toContain('anchor of the current scene')
+  })
+})
+
+describe('renderContactSheet', () => {
+  it('tiles the frames into one JPEG of the layout of the app', async () => {
+    const pixels = new Uint8Array(640 * 360 * 4).fill(200)
+    const jpeg = (await Transformer.fromRgbaPixels(pixels, 640, 360).jpeg(80)).toString('base64')
+
+    const sheet = await renderContactSheet([jpeg, jpeg, jpeg, jpeg])
+    const metadata = await new Transformer(Buffer.from(sheet, 'base64')).metadata()
+
+    expect(metadata.format).toBe('jpeg')
+    expect([metadata.width, metadata.height]).toEqual([3 * 426, 2 * 240])
   })
 })
 

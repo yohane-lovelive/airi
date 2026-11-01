@@ -66,4 +66,31 @@ describe('buildScreenTurn', () => {
     expect(turn.context.events).toEqual([])
     expect(turn.attachments).toHaveLength(1)
   })
+
+  it('sends one contact sheet of the frames since the last turn, which the budget counts as one image', async () => {
+    const frames = [await frame(NOW - 3_000, '#000000'), await frame(NOW - 2_000, '#404040'), await frame(NOW - 1_000, '#808080'), await frame(NOW - 500, '#ffffff')]
+
+    const turn = await buildScreenTurn({ frames, events: [], budget: imageBudgetState([], 20, NOW), since: NOW - 10_000, now: NOW, policy: 'contact-sheet' })
+
+    expect(turn.images).toBe(1)
+    expect(turn.attachments).toHaveLength(1)
+    expect(turn.context.contactSheetAgesMs).toEqual([3_000, 2_000, 1_000, 500])
+    expect(turn.context.frameAgesMs).toEqual([])
+    expect(await decodedWidth(turn.attachments[0].data!)).toBe(3 * 426)
+  })
+
+  it('puts the scene anchor near the start with the newest frame, and drops it when one image is left', async () => {
+    const anchor = await frame(NOW - 90_000, '#202020')
+    const frames = [await frame(NOW - 500, '#ffffff')]
+
+    const turn = await buildScreenTurn({ frames, events: [], budget: imageBudgetState([], 20, NOW), since: NOW - 10_000, now: NOW, policy: 'scene-anchor', anchor })
+    expect(turn.anchor?.image).toMatch(/^data:image\/jpeg;base64,/)
+    expect(turn.context.anchorAgeMs).toBe(90_000)
+    expect(turn.attachments).toHaveLength(1)
+    expect(turn.images).toBe(2)
+
+    const low = await buildScreenTurn({ frames, events: [], budget: imageBudgetState(Array.from<number>({ length: 15 }).fill(NOW - 1_000), 20, NOW), since: NOW - 10_000, now: NOW, policy: 'scene-anchor', anchor })
+    expect(low.anchor).toBeUndefined()
+    expect(low.images).toBe(1)
+  })
 })

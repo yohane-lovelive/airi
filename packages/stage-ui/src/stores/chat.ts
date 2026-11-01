@@ -444,7 +444,7 @@ export const useChatStore = defineStore('chat', () => {
    */
   async function notifyConversation(
     sessionId: string,
-    notice: { source: string, text: string, mustSpeak?: boolean, reply?: string, transient?: boolean, attachments?: ChatAttachment[] },
+    notice: { source: string, text: string, mustSpeak?: boolean, reply?: string, transient?: boolean, attachments?: ChatAttachment[], anchor?: { text: string, image: string } },
     messageId?: string,
   ): Promise<'spoke' | 'silent' | 'failed' | 'skipped'> {
     if (!isOwnerSession(sessionId))
