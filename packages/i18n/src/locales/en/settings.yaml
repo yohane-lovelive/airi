@@ -603,6 +603,28 @@ pages:
     import_invalid_file: Card package file is invalid
     upload: Upload
     upload_desc: Click or drag an AIRI card package to import
+  usage:
+    title: Usage
+    description: How many tokens each kind of model call used on this device
+    intro: Tokens that the provider reported for each model call on this device, sorted by why the call ran. The provider site shows the exact cost.
+    periods:
+      today: Today
+      last-30-days: Last 30 days
+    tokens: '{count} tokens'
+    details: 'In {input} · Out {output} · {calls} calls · {images} images'
+    unreported: '{count} without a report'
+    empty: No model calls yet.
+    purposes:
+      owner-reply: Replies to you
+      initiative: Autonomous speech
+      mission: Missions
+      task: Background tasks
+      scene: Replies to other people
+      vision: Image descriptions
+      voice-assist: Voice input help
+      tool-card: Tool cards
+      artistry: Artistry
+      other: Other
   memory:
     description: Where memories got stored, and organized
     title: Memory

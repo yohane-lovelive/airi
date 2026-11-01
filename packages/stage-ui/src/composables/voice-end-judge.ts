@@ -31,7 +31,7 @@ export function useVoiceEndJudge() {
       [IOAttributes.EndJudgeTranscriptLength]: transcript.length,
     })
     return runInSpan(span, signal, async () => {
-      const agent = createVoiceEndJudgeAgent({ generateText: textModel.generateText(selection) })
+      const agent = createVoiceEndJudgeAgent({ generateText: textModel.generateText(selection, 'voice-assist') })
       const judgement = await agent.judge(transcript, context, signal)
       span.setAttribute(IOAttributes.EndJudgement, judgement)
       return judgement

@@ -6,6 +6,8 @@ import type { ExecutableTool } from './tools'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { usageRepo } from '../../../database/repos/usage.repo'
+import { useUsageStore } from '../../usage'
 import { isToolRelatedError, useLLM } from './llm'
 import { useLlmToolsStore } from './tools'
 
@@ -25,6 +27,8 @@ const {
     execute: vi.fn(),
   }]),
 }))
+
+vi.mock('../../../database/repos/usage.repo')
 
 vi.mock('@xsai/model', () => ({
   listModels: vi.fn(),
@@ -386,5 +390,36 @@ describe('isToolRelatedError', () => {
         description: 'Runtime version.',
       },
     })
+  })
+})
+
+describe('usage records', () => {
+  beforeEach(async () => {
+    streamTextMock.mockReset()
+    setActivePinia(createPinia())
+    await usageRepo.clear()
+  })
+
+  const imageTurn = { id: 'user', type: 'user' as const, content: [{ type: 'text' as const, text: 'look' }, { type: 'image' as const, url: 'data:image/png;base64,AA' }] }
+
+  it('records the tokens and images of a stream under its purpose', async () => {
+    streamTextMock.mockImplementation(() => ({ ...createMockStreamResult(), totalUsage: Promise.resolve({ inputTokens: 120, outputTokens: 30, totalTokens: 150 }) }))
+
+    await useLLM().stream('model-a', provider, { turns: [imageTurn] }, { purpose: 'initiative' })
+
+    await vi.waitFor(() => expect(useUsageStore().records).toMatchObject([
+      { purpose: 'initiative', model: 'model-a', calls: 1, unreportedCalls: 0, inputTokens: 120, outputTokens: 30, totalTokens: 150, images: 1 },
+    ]))
+  })
+
+  // A cancelled or failed call still reached the provider. It counts as a call, and its unknown tokens stay out of the sums.
+  it('counts a failed stream as a call without tokens', async () => {
+    streamTextMock.mockImplementation(() => ({ ...createMockStreamResult(), steps: Promise.reject(new Error('network error')) }))
+
+    await expect(useLLM().stream('model-a', provider, { turns: [] })).rejects.toThrow('network error')
+
+    await vi.waitFor(() => expect(useUsageStore().records).toMatchObject([
+      { purpose: 'other', calls: 1, unreportedCalls: 1, totalTokens: 0 },
+    ]))
   })
 })

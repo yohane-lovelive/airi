@@ -194,9 +194,16 @@ The frame policy chooses which frames go to the model in each turn. It is a repl
 Each model call records its purpose. Settings and the inspector show the usage of each purpose.
 
 - The purposes are owner replies, autonomous turns, commentary, watch checks, topic seeds, memory work, and motion generation.
-- For each purpose, the record holds the calls, the input tokens, the cached tokens, the output tokens, the images, and the cost.
-- The cost uses the model price at the time of the call. The peak hours of a provider then show as a higher cost.
+- For each purpose, the record holds the calls, the input tokens, the output tokens, the images, and the calls without a token report.
+- The record holds no cost and no cached tokens. The owner checks the exact cost on the provider site. The owner decided this on 2026-11-01.
 - The view shows the current day and the last 30 days.
+
+Step 2-3a built the usage records as follows.
+
+- The LLM store records each finished stream. A stream with tool rounds counts one call for each round. A failed or cancelled stream counts as one call without tokens.
+- The purposes are `owner-reply`, `initiative`, `mission`, `task`, `scene`, `vision`, `voice-assist`, `tool-card`, `artistry`, and `other`. The chat store reads the purpose of a turn from its notice source. Commentary, watch checks, topic seeds, memory work, and motion generation get a purpose in their own steps.
+- IndexedDB keeps one record for each day, purpose, and model, for 30 days. The records stay on the device and never sync.
+- Settings > Usage shows the tokens of each purpose for today and for the last 30 days.
 
 ### Inspector
 
@@ -523,7 +530,7 @@ Step 2 has four parts. Each part is one change.
 | --- | --- | --- |
 | 2-1 | Connect the policy to the conversation: the runner on the leader, the transient notice, the situation block, the gates, typing detection, the cancel on owner input, and the settings. | Done |
 | 2-2 | Intentions, owner control with words, and implicit feedback. | Done |
-| 2-3 | Usage by purpose and the inspector. | To do |
+| 2-3 | Usage by purpose and the inspector. | In progress: 2-3a (usage) is done. 2-3b (inspector) is next. |
 | 2-4 | The prompt budget: the top memories and the history summary. It changes every request, so it comes last. | To do |
 
 Step 4 does not depend on steps 0 to 3. It comes after them so that the speech output format changes only once.

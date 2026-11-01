@@ -2,6 +2,7 @@ import type { Conversation, StreamOptions } from '@proj-airi/core-agent'
 import type { GenerationProvider } from '@proj-airi/provider-inference'
 import type { Tool } from '@xsai/shared-chat'
 
+import type { UsagePurpose } from '../../../libs/usage'
 import type { DescribeToolImage } from './tool-images'
 
 import { streamFrom as coreStreamFrom, isContentArrayRelatedError, isToolRelatedError, modelKey } from '@proj-airi/core-agent'
@@ -9,6 +10,8 @@ import { listModels } from '@xsai/model'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
+import { countRequestImages } from '../../../libs/usage'
+import { useUsageStore } from '../../usage'
 import { resolveLlmTools } from './tool-resolver'
 
 export type { StreamEvent, StreamOptions } from '@proj-airi/core-agent'
@@ -23,47 +26,74 @@ export interface LlmStreamOptions extends StreamOptions {
    * place of the tools of the chat, and without the tools of the provider, so a task runs nothing else.
    */
   taskTools?: Tool[]
+  /** Why the call runs. The usage records sum the tokens of each purpose. */
+  purpose?: UsagePurpose
 }
 
 export const useLLM = defineStore('llm', () => {
   const toolsCompatibility = ref<Map<string, boolean>>(new Map())
   const contentArrayCompatibility = ref<Map<string, boolean>>(new Map())
+  const usage = useUsageStore()
 
   async function stream(model: string, chatProvider: GenerationProvider, context: Conversation, options?: LlmStreamOptions) {
     // Compatibility belongs to the model that received the failing request.
     // `prepareConversation` runs for every resolved request, so the key follows a step that changes the model.
     let key = modelKey(model, chatProvider.generation(model))
     let toolExecutionStarted = false
-    const { tools: customTools, describeToolImage, taskTools, ...streamOptions } = options ?? {}
+    const { tools: customTools, describeToolImage, taskTools, purpose = 'other', ...streamOptions } = options ?? {}
     const resolveTools = async () => taskTools ?? await resolveLlmTools({ customTools, describeImage: describeToolImage })
     const builtinToolsResolver = resolveTools
     const resolveStep = streamOptions.resolveStep
 
-    const runStream = () => coreStreamFrom({
-      model,
-      chatProvider,
-      conversation: context,
-      options: {
-        ...streamOptions,
-        ...(taskTools ? { providerTools: false } : {}),
-        // Core uses only the tools of a resolved step, so each step carries the complete tool list.
-        resolveStep: resolveStep
-          ? async () => ({ ...await resolveStep(), tools: await resolveTools() })
-          : undefined,
-        prepareConversation: async (conversation, target) => {
-          key = modelKey(target.model, target.request)
-          return await streamOptions.prepareConversation?.(conversation, target) ?? conversation
-        },
-        onStreamEvent: async (event) => {
-          if (event.type === 'tool-call')
-            toolExecutionStarted = true
-          await streamOptions.onStreamEvent?.(event)
-        },
-        toolsCompatibility: toolsCompatibility.value,
-        contentArrayCompatibility: contentArrayCompatibility.value,
-      },
-      builtinToolsResolver,
-    })
+    // Each attempt is recorded on its own, so a failed attempt counts as a call without tokens.
+    const runStream = async () => {
+      let requestModel = model
+      let images = 0
+      let rounds = 0
+      let tokens: { input: number, output: number, total: number } | undefined
+      try {
+        await coreStreamFrom({
+          model,
+          chatProvider,
+          conversation: context,
+          options: {
+            ...streamOptions,
+            ...(taskTools ? { providerTools: false } : {}),
+            // Core uses only the tools of a resolved step, so each step carries the complete tool list.
+            resolveStep: resolveStep
+              ? async () => ({ ...await resolveStep(), tools: await resolveTools() })
+              : undefined,
+            prepareConversation: async (conversation, target) => {
+              key = modelKey(target.model, target.request)
+              requestModel = target.model
+              const prepared = await streamOptions.prepareConversation?.(conversation, target) ?? conversation
+              images += countRequestImages(prepared)
+              return prepared
+            },
+            onStreamEvent: async (event) => {
+              if (event.type === 'tool-call')
+                toolExecutionStarted = true
+              await streamOptions.onStreamEvent?.(event)
+            },
+            onGeneratedTurn: async (turn) => {
+              rounds = turn.rounds.filter(round => round.modelCall).length
+              await streamOptions.onGeneratedTurn?.(turn)
+            },
+            onUsage: async (reported) => {
+              if (reported.source === 'reported')
+                tokens = { input: reported.inputTokens ?? 0, output: reported.outputTokens ?? 0, total: reported.totalTokens ?? 0 }
+              await streamOptions.onUsage?.(reported)
+            },
+            toolsCompatibility: toolsCompatibility.value,
+            contentArrayCompatibility: contentArrayCompatibility.value,
+          },
+          builtinToolsResolver,
+        })
+      }
+      finally {
+        void usage.record({ purpose, model: requestModel, at: Date.now(), calls: Math.max(1, rounds), tokens, images })
+      }
+    }
 
     try {
       await runStream()

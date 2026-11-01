@@ -20,6 +20,8 @@ vi.mock('vue-i18n', () => ({
   useI18n: () => ({ locale: { value: 'en' }, t: (key: string) => key }),
 }))
 
+// The LLM store records usage in IndexedDB, which this mocked localforage lacks.
+vi.mock('../../database/repos/usage.repo')
 vi.mock('localforage', () => ({
   default: {
     getItem: vi.fn(async () => undefined),

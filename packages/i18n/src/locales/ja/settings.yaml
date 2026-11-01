@@ -540,6 +540,28 @@ pages:
     import_invalid_file: 無効なカードパックファイルです
     upload: アップロード
     upload_desc: ここをクリックするか AIRI カードパックをドラッグ＆ドロップしてインポートします
+  usage:
+    title: 使用量
+    description: この端末で、モデル呼び出しの種類ごとに使ったトークン量
+    intro: この端末のモデル呼び出しについて、プロバイダーが報告したトークン量を、呼び出しの目的ごとに表示します。正確な料金はプロバイダーのサイトで確認してください。
+    periods:
+      today: 今日
+      last-30-days: 過去 30 日
+    tokens: '{count} トークン'
+    details: '入力 {input} · 出力 {output} · {calls} 回 · 画像 {images} 枚'
+    unreported: '報告なし {count} 回'
+    empty: まだモデル呼び出しはありません。
+    purposes:
+      owner-reply: あなたへの返答
+      initiative: 自律発話
+      mission: ミッション
+      task: バックグラウンドタスク
+      scene: ほかの人への返答
+      vision: 画像の説明
+      voice-assist: 音声入力の補助
+      tool-card: ツールカード
+      artistry: 画像生成
+      other: その他
   memory:
     description: 記憶が保存され、整理される場所
     title: 記憶

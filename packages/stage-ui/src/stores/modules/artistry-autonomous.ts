@@ -2,7 +2,7 @@ import type { Message } from '@xsai/shared-chat'
 
 import { defineInvoke, defineInvokeEventa } from '@moeru/eventa'
 import { createContext } from '@moeru/eventa/adapters/electron/renderer'
-import { chatMessagesToTurns, streamFrom } from '@proj-airi/core-agent'
+import { chatMessagesToTurns } from '@proj-airi/core-agent'
 import { artistryGenerateHeadless } from '@proj-airi/stage-shared'
 import { cloneDeep } from 'es-toolkit'
 import { defineStore } from 'pinia'
@@ -10,6 +10,7 @@ import { ref, toRaw } from 'vue'
 import { toast } from 'vue-sonner'
 
 import { useAnalytics } from '../../composables/use-analytics'
+import { useLLM } from '../ai/chat-llm/llm'
 import { useBackgroundStore } from '../background'
 import { useChatSessionStore } from '../chat/session-store'
 import { useProviderStore } from '../providers/provider'
@@ -24,6 +25,7 @@ export const useAutonomousArtistryStore = defineStore('artistry-autonomous', () 
   const artistryStore = useArtistryStore()
   const providersStore = useProviderStore()
   const chatSessionStore = useChatSessionStore()
+  const llm = useLLM()
 
   const isProcessing = ref(false)
 
@@ -180,14 +182,14 @@ LATEST ${target === 'assistant' ? 'COMPANION RESPONSE' : 'USER INPUT'}:
         reason: target,
       })
       let responseText = ''
-      await streamFrom({
-        model: modelId,
-        chatProvider,
-        conversation: { turns: chatMessagesToTurns(messages) },
-        options: { onStreamEvent: (event) => {
+      await llm.stream(modelId, chatProvider, { turns: chatMessagesToTurns(messages) }, {
+        // The director answers with JSON and calls no tools.
+        supportsTools: false,
+        purpose: 'artistry',
+        onStreamEvent: (event) => {
           if (event.type === 'text-delta')
             responseText += event.text
-        } },
+        },
       })
 
       const rawContent = responseText.trim()

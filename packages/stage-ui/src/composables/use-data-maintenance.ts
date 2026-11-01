@@ -31,6 +31,7 @@ import { useOnboardingStore } from '../stores/onboarding'
 import { useProviderStore } from '../stores/providers/provider'
 import { useRecipesStore } from '../stores/recipes'
 import { useSettings, useSettingsAudioDevice } from '../stores/settings'
+import { useUsageStore } from '../stores/usage'
 import { useVoiceprintStore } from '../stores/voiceprint'
 
 export function useDataMaintenance() {
@@ -63,6 +64,7 @@ export function useDataMaintenance() {
   const missionsStore = useMissionsStore()
   const initiativeStore = useInitiativeStore()
   const intentionsStore = useIntentionsStore()
+  const usageStore = useUsageStore()
   const voiceprintStore = useVoiceprintStore()
 
   async function deleteAllModels() {
@@ -95,6 +97,7 @@ export function useDataMaintenance() {
       () => missionsStore.resetState(),
       () => initiativeStore.resetState(),
       () => intentionsStore.resetState(),
+      () => usageStore.resetState(),
     ].map(reset => Promise.resolve().then(reset)))
     const failure = results.find(result => result.status === 'rejected')
     if (failure)

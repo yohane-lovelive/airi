@@ -35,6 +35,7 @@ export const settingsSearchModules: Readonly<Record<string, SettingsSearchModule
   'modules:missions': { routes: ['/settings/modules/missions'] },
   'modules:initiative': { routes: ['/settings/modules/initiative'] },
   'settings:providers': () => import('./pages/settings/providers/index.search'),
+  'settings:usage': { routes: ['/settings/usage'] },
   'providers:comfyui': () => import('./pages/settings/providers/artistry/comfyui.search'),
   'settings:scene': () => import('./pages/settings/scene/index.search'),
   'settings:system': { routes: ['/settings/system'] },

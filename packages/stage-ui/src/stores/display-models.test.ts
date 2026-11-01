@@ -14,6 +14,8 @@ import { useAuthStore } from './auth'
 import { DisplayModelFormat, useDisplayModelsStore } from './display-models'
 import { useFeatureFlagsStore } from './feature-flags'
 
+// The LLM store records usage in IndexedDB, which this mocked localforage lacks.
+vi.mock('../database/repos/usage.repo')
 vi.mock('localforage', () => ({
   default: {
     getItem: vi.fn(async () => undefined),

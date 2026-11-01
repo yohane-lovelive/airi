@@ -4,6 +4,7 @@ import type { WebSocketEventInputs } from '@proj-airi/server-sdk'
 import type { Message } from '@xsai/shared-chat'
 import type { SyncedPiniaRuntime } from 'pinia-plugin-synced'
 
+import type { UsagePurpose } from '../libs/usage'
 import type { ChatHistoryItem, ChatToolReference } from '../types/chat'
 import type { ChatSessionTaskStatus, StoredVoiceInterruption } from '../types/chat-session'
 import type { ToolCallRerunPayload } from './tool-call-rerun'
@@ -27,6 +28,7 @@ import { useChatVision } from '../composables/vision/use-chat-vision'
 import { useVisionInference } from '../composables/vision/use-vision-inference'
 import { chatAssetIdFrom, inlineConversationAssets, storeChatAttachments } from '../libs/chat-assets'
 import { extractMessageText, isCloudSyncableMessage } from '../libs/chat-sync'
+import { INITIATIVE_SOURCE } from '../libs/initiative/conversation'
 import { syncedRoles } from '../libs/pinia/synced-context'
 import { createChatAnalyticsHooks, getProviderMode } from '../libs/product-signals/events/chat'
 import {
@@ -449,6 +451,23 @@ export const useChatStore = defineStore('chat', () => {
   /** Whether a session is a background task's own space. */
   function isTaskSession(sessionId: string) {
     return Boolean(chatSession.sessionMetas[sessionId]?.recipeId)
+  }
+
+  /** Why a send runs, for the usage records. A notice tells its purpose by its source. */
+  function usagePurposeOf(sessionId: string, notice?: { source: string }): UsagePurpose {
+    if (isTaskSession(sessionId))
+      return 'task'
+    if (!isOwnerSession(sessionId))
+      return 'scene'
+    if (!notice)
+      return 'owner-reply'
+    if (notice.source === INITIATIVE_SOURCE)
+      return 'initiative'
+    if (notice.source.startsWith('mission:'))
+      return 'mission'
+    if (notice.source.startsWith('recipe:'))
+      return 'task'
+    return 'other'
   }
 
   /**
@@ -894,6 +913,7 @@ export const useChatStore = defineStore('chat', () => {
     try {
       await llmStore.stream(model, chatProvider, providerContext, {
         ...options,
+        purpose: correlation ? usagePurposeOfTurn(correlation.conversationId, correlation.turnId) : undefined,
         tools: withRunTools(options?.tools, options?.requestCorrelation),
         prepareStringContent: prepareTextOnlyAudioContext,
         headers: requestHeaders(options?.providerId),
@@ -1133,9 +1153,16 @@ export const useChatStore = defineStore('chat', () => {
   // One request owns preparation and generation. Cancellation cannot miss asynchronous startup.
   const requests = new Map<string, {
     sessionId: string
+    /** Why the send runs. The model calls of its turn record their usage under it. */
+    purpose: UsagePurpose
     abort: AbortController
     request: ReturnType<typeof runtime.submit>
   }>()
+
+  /** The purpose of a turn that this window runs. */
+  function usagePurposeOfTurn(sessionId: string, turnId: string) {
+    return requests.get(JSON.stringify([sessionId, turnId]))?.purpose
+  }
 
   /** Whether this window runs a request of the session. */
   function hasLocalRequest(sessionId: string) {
@@ -1183,7 +1210,7 @@ export const useChatStore = defineStore('chat', () => {
       accepted: prepared.then(value => value.accepted),
       done: prepared.then(value => value.done),
     }
-    requests.set(key, { sessionId, abort, request })
+    requests.set(key, { sessionId, purpose: usagePurposeOf(sessionId, options.notice), abort, request })
     void request.accepted.catch(() => {})
     void request.done.finally(() => requests.delete(key)).catch(() => {})
     return request.done
@@ -1389,7 +1416,7 @@ export const useChatStore = defineStore('chat', () => {
         void startRecipe(recipe, { parentSessionId: payload.sessionId, task: `The owner said: ${payload.text}` })
     }).catch(() => {})
 
-    requests.set(key, { sessionId: payload.sessionId, abort, request })
+    requests.set(key, { sessionId: payload.sessionId, purpose: usagePurposeOf(payload.sessionId, extra.notice), abort, request })
     void request.accepted.catch(() => {})
     void request.done.finally(() => requests.delete(key)).catch(() => {})
 

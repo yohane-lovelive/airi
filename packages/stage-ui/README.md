@@ -55,6 +55,15 @@ The character can start to talk without an owner message. It is step 2 of [the a
 
 Settings > Modules > Autonomous speech changes the settings. It also shows the changes from the owner's words, and resets them.
 
+## Model usage
+
+`useUsageStore()` in `stores/usage.ts` keeps the tokens and images of model calls for each day, purpose, and model. IndexedDB keeps 30 days on the device, and the records never sync.
+
+- `useLLM().stream` records each finished stream under its `purpose` option. A call without a purpose counts as `other`.
+- The chat store reads the purpose of a turn from its notice source, for example `initiative` for autonomous speech.
+- `libs/usage.ts` holds the purposes and the pure sums.
+- Settings > Usage shows the tokens of each purpose. The records hold no cost. The provider site shows the exact cost.
+
 ## Message times
 
 Chat history shows a centered timestamp before the first dated message and after five minutes without a message.
