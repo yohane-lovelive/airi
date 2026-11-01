@@ -37,7 +37,7 @@ describe('missions store', () => {
     await second.ready()
 
     expect(result.ok).toBe(true)
-    expect(second.active.map(mission => mission.values.text)).toEqual(['medicine time'])
+    expect(second.active.map(mission => mission.template === 'reminder' && mission.values.text)).toEqual(['medicine time'])
   })
 
   // A stop from Settings and a run on the leader can overlap. The run must not start the stopped reminder again.
@@ -64,6 +64,22 @@ describe('missions store', () => {
     await missions.stop(ended.mission.id)
     await missions.removeEnded()
 
-    expect(missions.missions.map(mission => mission.values.text)).toEqual(['next'])
+    expect(missions.missions.map(mission => mission.template === 'reminder' && mission.values.text)).toEqual(['next'])
+  })
+
+  it('runs one small talk at a time, and ends it with its reason', async () => {
+    const missions = createStore()
+    const started = await missions.addSmallTalk({ minutes: 30 }, 'session-1')
+    const second = await missions.addSmallTalk({ minutes: 10 }, 'session-1')
+
+    expect(started.ok).toBe(true)
+    expect(second.ok).toBe(false)
+    expect(missions.smallTalkAt(Date.now())?.values.minutes).toBe(30)
+    expect(missions.active).toHaveLength(1)
+
+    expect(await missions.endSmallTalk('away')).toBe(true)
+    expect(missions.smallTalkAt(Date.now())).toBeUndefined()
+    expect(missions.missions[0]).toMatchObject({ status: 'stopped', endReason: 'away' })
+    expect(await missions.endSmallTalk('away')).toBe(false)
   })
 })

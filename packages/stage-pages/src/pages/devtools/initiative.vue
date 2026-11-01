@@ -212,8 +212,9 @@ function timeLabel(epochMs: number) {
       </h2>
       <ul v-if="activeMissions.length" :class="['flex flex-col', 'gap-1', 'text-sm']">
         <li v-for="mission in activeMissions" :key="mission.id">
-          {{ mission.values.text }}
-          <span v-if="mission.nextRunAt" :class="['text-xs', 'text-neutral-500 dark:text-neutral-400']">· {{ timeLabel(mission.nextRunAt) }}</span>
+          {{ mission.template === 'reminder' ? mission.values.text : t('settings.pages.modules.missions.small-talk.name') }}
+          <span v-if="mission.template === 'small-talk'" :class="['text-xs', 'text-neutral-500 dark:text-neutral-400']">· {{ t(`${KEY}.until`, { time: timeLabel(mission.values.endsAt) }) }}</span>
+          <span v-else-if="mission.nextRunAt" :class="['text-xs', 'text-neutral-500 dark:text-neutral-400']">· {{ timeLabel(mission.nextRunAt) }}</span>
         </li>
       </ul>
       <p v-else :class="['text-xs', 'text-neutral-500 dark:text-neutral-400']">

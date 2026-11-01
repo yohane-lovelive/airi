@@ -15,6 +15,12 @@ The "Known risks" table of the ADR keeps three more items: self-hearing, screen 
 - **Why it waits:** The owner plans to use AIRI in Discord calls. A fixed mute rule then blocks the wanted use.
 - **Look again when:** Discord voice participation has a design. The rule must know whether AIRI takes part in the call.
 
+### Small talk with a quiet owner nearby
+
+- **What:** The character starts small talk on its own when the owner is at the device but quiet for a while.
+- **Why it waits:** It is close to the normal idle talk. A faster pace without a request can annoy the owner, so step 2b-2b starts small talk only on an owner request.
+- **Look again when:** Step 3 perception tells what the owner does, for example a break or a game lobby. Then a rule can tell a good moment from normal work.
+
 ### Discord voice call participation
 
 - **What:** AIRI joins a Discord voice call and talks with the owner and friends. The bot receives one audio stream for each speaker, so it knows who spoke.

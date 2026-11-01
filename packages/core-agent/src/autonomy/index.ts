@@ -33,28 +33,38 @@ export type { InitiativeNoticeContext } from './initiative-notice'
 export { createIntention, INTENTION_LIMITS, openIntentions } from './intentions'
 export type { Intention, IntentionRequest } from './intentions'
 export {
+  activeSmallTalk,
   collectDueMissions,
   createReminder,
+  createSmallTalk,
   deliverReminder,
   formatLocalDateTime,
+  isMissionActive,
   missedRemindersNoticeText,
   MISSION_TEMPLATES,
   parseLocalDateTime,
   reminderNoticeText,
   settleMissionRun,
+  SMALL_TALK_LIMITS,
+  smallTalkPastLimit,
   stopMission,
 } from './missions'
 export type {
+  MissionEndReason,
   MissionInstance,
   MissionScheduleOptions,
   MissionStatus,
   MissionTemplate,
   MustSpeakNotify,
   NoticeOutcome,
+  ReminderMission,
   ReminderRepeat,
   ReminderRequest,
   ReminderStart,
   ReminderValues,
+  SmallTalkMission,
+  SmallTalkRequest,
+  SmallTalkValues,
 } from './missions'
 export { SPEECH_TYPES } from './speech-types'
 export type { SpeechType } from './speech-types'

@@ -45,6 +45,11 @@ describe('initiativeNoticeText', () => {
     expect(cold).not.toContain('Topic ideas')
   })
 
+  it('names small talk and the time left', () => {
+    expect(initiativeNoticeText(context({ smallTalkEndsAt: NOW + 25 * 60_000 }))).toContain('Mode: small talk. The owner asked you to keep them company for 25 minutes more.')
+    expect(initiativeNoticeText(context())).not.toContain('small talk')
+  })
+
   it('asks for a topic label at the end of the line', () => {
     expect(initiativeNoticeText(context())).toContain('end with <|TOPIC a few words|>')
   })

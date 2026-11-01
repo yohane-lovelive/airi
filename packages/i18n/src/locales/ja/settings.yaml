@@ -960,14 +960,14 @@ pages:
       title: ミッション
       description: リマインドなど、キャラクターがあなたのために行うタスク
       enable: ミッションを使う
-      enable-description: 頼むと、キャラクターがリマインドを設定し、その時刻に伝えます。オフのときは、リマインドは動きません。web 版で音声出力がオフのときにリマインドを見るには、通知を許可してください。
+      enable-description: 頼むと、キャラクターがリマインドを設定してその時刻に伝えたり、しばらく雑談の相手をしたりします。雑談には、自律発話をオンにする必要があります。オフのときは、ミッションは動きません。web 版で音声出力がオフのときにリマインドを見るには、通知を許可してください。
       missed-age-limit: 伝える見逃したリマインド
       missed-age-limit-description: リマインドの時刻にアプリが閉じていた場合、キャラクターは次の起動の後で伝えます。これより古いリマインドは、「見逃し」と表示されるだけです。
       hours: '{count} 時間'
       active: 実行中
       ended: 終了
       clear-ended: 消去
-      empty: 実行中のミッションはありません。キャラクターにリマインドを頼んでみてください。例：「18時に薬を飲むよう教えて」
+      empty: 実行中のミッションはありません。キャラクターにリマインドや雑談を頼んでみてください。例：「18時に薬を飲むよう教えて」「しばらく話し相手になって」
       next: '次回: {time}'
       stop: '{name} を止める'
       repeat:
@@ -979,9 +979,19 @@ pages:
         interval-minutes: '{count} 分ごと'
       status:
         scheduled: 予定
+        running: 実行中
         done: 完了
         stopped: 停止
         missed: 見逃し
+      small-talk:
+        name: 雑談
+        minutes: '{count} 分'
+        until: '{time} まで'
+      end-reason:
+        time: 時間切れ
+        owner: あなたが止めました
+        away: あなたが離席しました
+        quiet: あなたが静かにと頼みました
     memory-long-term:
       description: 長期記憶固有の設定と管理
       title: 長期記憶

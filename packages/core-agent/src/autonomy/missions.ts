@@ -4,11 +4,22 @@ import { formatTimePrefix } from '../messages/datetime-prefix'
  * The life of a mission instance.
  *
  * - `scheduled`: it waits for `nextRunAt`. A repeated reminder stays here after each run.
- * - `done`: a reminder that runs once reached the owner.
- * - `stopped`: the owner or the model stopped it.
+ * - `running`: a foreground mission, for example small talk, runs now.
+ * - `done`: a reminder that runs once reached the owner, or small talk reached its time limit.
+ * - `stopped`: the owner or the model stopped it, or small talk ended early.
  * - `missed`: a reminder that runs once came due while the app was closed, longer ago than the age limit.
  */
-export type MissionStatus = 'scheduled' | 'done' | 'stopped' | 'missed'
+export type MissionStatus = 'scheduled' | 'running' | 'done' | 'stopped' | 'missed'
+
+/**
+ * Why a mission ended.
+ *
+ * - `time`: small talk reached its time limit.
+ * - `owner`: the owner or the model stopped it.
+ * - `away`: the owner left the device during small talk.
+ * - `quiet`: the owner asked for quiet during small talk.
+ */
+export type MissionEndReason = 'time' | 'owner' | 'away' | 'quiet'
 
 /**
  * How a reminder repeats. Weekly days use `Date.getDay()` numbers: 0 is Sunday and 6 is Saturday.
@@ -50,20 +61,48 @@ export interface ReminderValues {
   readonly repeat: ReminderRepeat
 }
 
-/** One mission that the model created from the owner's words. Step 1 has the `reminder` template only. */
-export interface MissionInstance {
+/** A small-talk request, as the model asks for it. */
+export interface SmallTalkRequest {
+  /** How long the small talk runs. */
+  readonly minutes: number
+}
+
+/** The stored values of a `small-talk` instance. */
+export interface SmallTalkValues {
+  readonly minutes: number
+  /** Epoch milliseconds. The small talk ends at this time. */
+  readonly endsAt: number
+}
+
+/** What every mission instance has, whatever its template. */
+interface MissionBase {
   readonly id: string
-  readonly template: 'reminder'
-  readonly values: ReminderValues
   /** The owner conversation that gets the notice. */
   readonly sessionId: string
   readonly status: MissionStatus
-  /** Epoch milliseconds of the next run. Undefined after the mission ends. */
+  /** Epoch milliseconds of the next run. Undefined after the mission ends, and for a foreground mission. */
   readonly nextRunAt?: number
   readonly lastRunAt?: number
+  /** Why the mission ended. Undefined while it is active, and for a reminder that ran or expired. */
+  readonly endReason?: MissionEndReason
   readonly createdAt: number
   readonly updatedAt: number
 }
+
+/** A mission that tells the owner something at a time. */
+export interface ReminderMission extends MissionBase {
+  readonly template: 'reminder'
+  readonly values: ReminderValues
+}
+
+/** A foreground mission: the character keeps the owner company and talks more often until a time limit. */
+export interface SmallTalkMission extends MissionBase {
+  readonly template: 'small-talk'
+  readonly values: SmallTalkValues
+}
+
+/** One mission that the model created from the owner's words. The template tells the shape of its values. */
+export type MissionInstance = ReminderMission | SmallTalkMission
 
 /** A template as the mission tools describe it to the model. */
 export interface MissionTemplate {
@@ -81,9 +120,25 @@ export const MISSION_TEMPLATES: readonly MissionTemplate[] = [
     description: 'Tell the owner something at a time that the owner asked for. You always speak when it is due. Message times have no seconds, so never count a clock time from them: use an "after" start for any time from now.',
     values: '{ "text": what to tell, in the owner\'s words, "start": { "kind": "after", "minutes": n } for a time from now, for example "in 1 minute" or "in 2 hours", or { "kind": "at", "at": local "YYYY-MM-DDTHH:mm" } only for a clock time that the owner names, for example "at 18:00", "repeat": { "kind": "once" | "daily" | "weekdays" } or { "kind": "weekly", "days": [0-6, 0 is Sunday] } or { "kind": "interval", "minutes": 15-1440 } }',
   },
+  {
+    name: 'small-talk',
+    description: 'Keep the owner company and talk more often, when the owner asks for it, for example "talk with me for a while". It ends at its time limit, when the owner leaves, or when the owner asks to stop or for quiet.',
+    values: '{ "minutes": how long, 5-120, 30 when the owner names no time }',
+  },
 ]
 
 const MINUTE_MS = 60_000
+
+/** Limits and pace of small talk. The initiative settings read the pace while small talk runs. */
+export const SMALL_TALK_LIMITS = {
+  minMinutes: 5,
+  maxMinutes: 120,
+  defaultMinutes: 30,
+  /** While small talk runs, quiet time takes boredom to the threshold in this time. */
+  boredomIntervalMs: 2 * MINUTE_MS,
+  /** While small talk runs, no turn starts for this time after a turn ends. */
+  refractoryMs: 45_000,
+} as const
 
 /** Limits of a new reminder. */
 const REMINDER_LIMITS = {
@@ -159,7 +214,7 @@ export function formatLocalDateTime(time: number) {
  * - The first run of a daily, weekday, or weekly reminder is the first matching day at or after the start.
  * - The first run of an interval reminder is the first step at or after the start.
  */
-export function createReminder(input: { id: string, sessionId: string, request: ReminderRequest, now: number }): { ok: true, mission: MissionInstance } | { ok: false, reason: string } {
+export function createReminder(input: { id: string, sessionId: string, request: ReminderRequest, now: number }): { ok: true, mission: ReminderMission } | { ok: false, reason: string } {
   const text = input.request.text.trim()
   if (!text)
     return { ok: false, reason: 'The reminder needs a text.' }
@@ -205,11 +260,11 @@ export function createReminder(input: { id: string, sessionId: string, request: 
  */
 export function collectDueMissions(missions: readonly MissionInstance[], now: number, options: Partial<MissionScheduleOptions> = {}) {
   const { lateAfterMs, missedAgeLimitMs } = { ...DEFAULT_SCHEDULE_OPTIONS, ...options }
-  const due: MissionInstance[] = []
-  const missed: MissionInstance[] = []
-  const expired: MissionInstance[] = []
+  const due: ReminderMission[] = []
+  const missed: ReminderMission[] = []
+  const expired: ReminderMission[] = []
   for (const mission of missions) {
-    if (mission.status !== 'scheduled' || mission.nextRunAt === undefined || mission.nextRunAt > now)
+    if (mission.template !== 'reminder' || mission.status !== 'scheduled' || mission.nextRunAt === undefined || mission.nextRunAt > now)
       continue
     const lateness = now - mission.nextRunAt
     if (lateness <= lateAfterMs)
@@ -227,7 +282,7 @@ export function collectDueMissions(missions: readonly MissionInstance[], now: nu
  * A repeated reminder takes its next run after `now`, so runs that the app missed while closed do not come one by one.
  * A reminder that runs once ends: `done` after delivery, `missed` when it expired without a notice.
  */
-export function settleMissionRun(mission: MissionInstance, outcome: 'delivered' | 'expired', now: number): MissionInstance {
+export function settleMissionRun(mission: ReminderMission, outcome: 'delivered' | 'expired', now: number): ReminderMission {
   const lastRunAt = outcome === 'delivered' ? now : mission.lastRunAt
   const nextRunAt = nextRunAfter(mission, now)
   if (nextRunAt !== undefined)
@@ -237,10 +292,57 @@ export function settleMissionRun(mission: MissionInstance, outcome: 'delivered' 
   return { ...rest, status: outcome === 'delivered' ? 'done' : 'missed', lastRunAt, updatedAt: now }
 }
 
-/** Stops a mission. A stopped mission never runs again. */
-export function stopMission(mission: MissionInstance, now: number): MissionInstance {
+/**
+ * Ends a mission. A mission that ended never runs again.
+ * Small talk at its time limit is `done`. Every other end is `stopped`.
+ */
+export function stopMission(mission: MissionInstance, now: number, reason: MissionEndReason = 'owner'): MissionInstance {
   const { nextRunAt: _ended, ...rest } = mission
-  return { ...rest, status: 'stopped', updatedAt: now }
+  return { ...rest, status: reason === 'time' ? 'done' : 'stopped', endReason: reason, updatedAt: now }
+}
+
+/** Whether a mission is active: a reminder that waits, or a foreground mission that runs. */
+export function isMissionActive(mission: MissionInstance): boolean {
+  return mission.status === 'scheduled' || mission.status === 'running'
+}
+
+/**
+ * Creates small talk from the request that the model gave. On a refusal, `reason` tells the model what to change.
+ * One foreground mission runs at a time, so a second small talk is refused.
+ *
+ * @example
+ * createSmallTalk({ id: 'a', sessionId: 's', request: { minutes: 30 }, now: 0, missions: [] })
+ * // => { ok: true, mission: { template: 'small-talk', values: { minutes: 30, endsAt: 1800000 }, status: 'running', ... } }
+ */
+export function createSmallTalk(input: { id: string, sessionId: string, request: SmallTalkRequest, now: number, missions: readonly MissionInstance[] }): { ok: true, mission: SmallTalkMission } | { ok: false, reason: string } {
+  const { minutes } = input.request
+  const { minMinutes, maxMinutes } = SMALL_TALK_LIMITS
+  if (!Number.isInteger(minutes) || minutes < minMinutes || minutes > maxMinutes)
+    return { ok: false, reason: `Small talk needs a whole number of minutes from ${minMinutes} to ${maxMinutes}.` }
+  if (activeSmallTalk(input.missions, input.now))
+    return { ok: false, reason: 'Small talk already runs. Keep it, or stop it first.' }
+  return {
+    ok: true,
+    mission: {
+      id: input.id,
+      template: 'small-talk',
+      values: { minutes, endsAt: input.now + minutes * MINUTE_MS },
+      sessionId: input.sessionId,
+      status: 'running',
+      createdAt: input.now,
+      updatedAt: input.now,
+    },
+  }
+}
+
+/** The small talk that runs at `now`. Small talk past its time limit does not count, also before the runner ends it. */
+export function activeSmallTalk(missions: readonly MissionInstance[], now: number): SmallTalkMission | undefined {
+  return missions.find((mission): mission is SmallTalkMission => mission.template === 'small-talk' && mission.status === 'running' && mission.values.endsAt > now)
+}
+
+/** The running small talk whose time limit passed at `now`. The runner ends each one with the reason `time`. */
+export function smallTalkPastLimit(missions: readonly MissionInstance[], now: number): SmallTalkMission[] {
+  return missions.filter((mission): mission is SmallTalkMission => mission.template === 'small-talk' && mission.status === 'running' && mission.values.endsAt <= now)
 }
 
 /** What happened to one notice: a reply with text was stored, no reply was stored, or the send failed. */
@@ -274,19 +376,19 @@ export async function deliverReminder(notify: MustSpeakNotify, text: string, fix
 }
 
 /** The notice for one reminder that is due now. The `mustSpeak` notice option tells the model to speak. */
-export function reminderNoticeText(mission: MissionInstance) {
+export function reminderNoticeText(mission: ReminderMission) {
   return `Reminder that the owner asked for, ${formatRun(mission)}: ${mission.values.text}`
 }
 
 /** One notice for all reminders that came due while the app was closed, oldest first. */
-export function missedRemindersNoticeText(missions: readonly MissionInstance[]) {
+export function missedRemindersNoticeText(missions: readonly ReminderMission[]) {
   const lines = [...missions]
     .sort((left, right) => (left.nextRunAt ?? 0) - (right.nextRunAt ?? 0))
     .map(mission => `- ${formatRun(mission)}: ${mission.values.text}`)
   return [`The app was closed, so ${missions.length === 1 ? 'this reminder comes' : 'these reminders come'} late:`, ...lines].join('\n')
 }
 
-function formatRun(mission: MissionInstance) {
+function formatRun(mission: ReminderMission) {
   // A due mission always has a run time. The creation time only labels a run that a caller passes after it ended.
   return `due ${formatTimePrefix(mission.nextRunAt ?? mission.createdAt).trim()}`
 }
@@ -377,7 +479,7 @@ function runAtOrAfter(values: ReminderValues, from: number) {
   return undefined
 }
 
-function nextRunAfter(mission: MissionInstance, after: number) {
+function nextRunAfter(mission: ReminderMission, after: number) {
   const { values } = mission
   if (values.repeat.kind === 'once')
     return undefined

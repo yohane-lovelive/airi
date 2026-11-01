@@ -36,6 +36,8 @@ export interface InitiativeNoticeContext {
   readonly awayMs?: number
   /** The thread that the last autonomous lines follow. */
   readonly thread?: TopicThread
+  /** Epoch milliseconds when small talk ends, while the owner asked for small talk. */
+  readonly smallTalkEndsAt?: number
   /** Topics that the character can take up. The host draws them with `pickTopicSeeds`. */
   readonly seeds?: readonly TopicSeed[]
 }
@@ -80,6 +82,8 @@ export function initiativeNoticeText(context: InitiativeNoticeContext): string {
     lines.push(`- The owner was away for: ${durationSince(context.now - context.awayMs, context.now)}.`)
   if (context.mode === 'commentary')
     lines.push('- Mode: commentary. Keep it to one short sentence.')
+  if (context.smallTalkEndsAt !== undefined)
+    lines.push(`- Mode: small talk. The owner asked you to keep them company for ${durationSince(context.now, context.smallTalkEndsAt)} more. Talk freely, and keep the talk going.`)
   if (context.speechType)
     lines.push(`- Idea, only if it fits: ${SPEECH_TYPE_HINTS[context.speechType]}.`)
 

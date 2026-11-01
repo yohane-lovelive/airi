@@ -405,6 +405,16 @@ Step 2b-2a built topics for every autonomous turn as follows. The `small-talk` t
 - **Similarity.** Code compares topics with the share of shared character pairs. This is a temporary step: the client has no text embeddings yet. The similarity is a function that the host can replace. When the memory ADR adds embeddings, the stored labels get embeddings, and the similarity of embeddings replaces character pairs.
 - **Variety.** `core-agent` measures `distinct-2`, the entropy of the speech types, and the similarity of consecutive topics. The inspector shows the thread, the seeds of the last turn, and the variety of today's lines. The speech types of today live in memory only, so a restart begins again.
 
+Step 2b-2b built the `small-talk` template as follows.
+
+- **Template.** `small-talk` is a built-in template in code, like `reminder`. Templates as recipes still wait, as step 2b-1 decided.
+- **Trigger.** Only an owner request starts it. The model starts it with `builtIn_startMission` for 5 to 120 minutes, 30 when the owner names no time. "A quiet owner nearby" waits, because it is close to the normal idle talk, and a faster pace without a request can annoy the owner. [The idea notes](../context/autonomy-ideas.md) keep it.
+- **Gates.** Code refuses small talk while autonomous speech is off, and while another small talk runs. It is the only foreground mission so far.
+- **Speech style.** While it runs, the idle interval is 2 minutes and the rest after a turn is 45 seconds. The owner's temporary factor, for example "talk less", still applies. Lines without an owner answer still make the interval longer. The daily budget and quiet hours still hold. The notice names small talk and the time left. Topics work as in step 2b-2a.
+- **End rule.** The mission runner ends it at its time limit. `builtIn_stopMission` ends it when the owner says stop. The initiative runner ends it when the owner leaves, from the away detection of step 2b-1. A request for quiet also ends it. The instance keeps the reason: `time`, `owner`, `away`, or `quiet`.
+- **Instances.** `MissionInstance` is a union of the templates. Small talk has the state `running`, and it ends as `done` at its time limit or `stopped` otherwise. After a restart, small talk before its time limit goes on.
+- **Tool values.** The values of `builtIn_startMission` are the reminder values or the small-talk values (`anyOf`). The reminder values did not change. A new template still needs no new tool.
+
 ### Body: motion
 
 The owner uses VRM models from outside sources. Their bones and expressions differ.
@@ -557,7 +567,7 @@ The order follows dependencies. Each step uses the parts of the earlier steps. E
 | 0 | Policy core without the screen: pressure, gates, inner state, and speech types in `core-agent`. Evaluation harness with synthetic events. | Done |
 | 1 | Mission base: the time trigger, the instance store, and the tools. Also the `mustSpeak` notice, the `reminder` template, and the mission list. | Done |
 | 2 | Autonomous talk without the screen: connect the policy core to `notifyConversation`. Add the prompt budget, intentions, owner control, usage by purpose, and the inspector. | Done |
-| 2b | Daily rhythm and small talk: templates as recipes, the `greeting`, `welcome-back`, and `small-talk` templates, topic seeds, and the time of day. Measure variety. | In progress: 2b-1 (greeting, welcome back, time of day) and 2b-2a (topic labels, heat, seeds, variety) are done. 2b-2b (the `small-talk` template) is next. |
+| 2b | Daily rhythm and small talk: templates as recipes, the `greeting`, `welcome-back`, and `small-talk` templates, topic seeds, and the time of day. Measure variety. | In progress: 2b-1 (greeting, welcome back, time of day) and 2b-2a (topic labels, heat, seeds, variety), and 2b-2b (the `small-talk` template) are done. |
 | 3 | Perception: the adapters, ring buffer, detectors, frame policies, image budget, recorder, replay, timeline, scene state, `commentary` with interruptions, and `watch`. | To do |
 | 4 | Motion: the model capability check, the procedural layer, the library with `ACT` markers, expression sync, and the upper-body layer. | To do |
 | 5 | Generated motion, game audio, recall from memory, and polish. Recall needs the memory ADR. | To do |

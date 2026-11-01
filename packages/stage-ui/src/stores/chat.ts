@@ -703,6 +703,10 @@ export const useChatStore = defineStore('chat', () => {
         ? await createMissionTools({
             missions: () => missions.missions,
             addReminder: request => missions.addReminder(request, sessionId),
+            // Small talk speaks through autonomous turns, so it needs them on.
+            addSmallTalk: async request => initiative.enabled && initiative.supported
+              ? missions.addSmallTalk(request, sessionId)
+              : { ok: false, reason: 'Autonomous speech is off. The owner can turn it on in Settings > Modules > Autonomous speech.' },
             stop: id => missions.stop(id),
           })
         : []),
@@ -716,7 +720,13 @@ export const useChatStore = defineStore('chat', () => {
             }),
             ...await createTalkLevelTool({
               answersOwner: () => answersOwnerMessage(sessionId, correlation.turnId),
-              apply: async request => initiative.applyTalkRequest(request),
+              apply: async (request) => {
+                const result = initiative.applyTalkRequest(request)
+                // A request for quiet also ends small talk. Small talk that waits out a quiet time would surprise the owner.
+                if (result.ok && request.kind === 'quiet')
+                  await missions.endSmallTalk('quiet')
+                return result
+              },
             }),
           ]
         : []),

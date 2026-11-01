@@ -1,9 +1,9 @@
-import type { ReminderRequest } from '@proj-airi/core-agent'
+import type { MissionEndReason, ReminderRequest, SmallTalkRequest } from '@proj-airi/core-agent'
 
 import type { MissionRecord } from '../database/repos/missions.repo'
 
 import { errorMessageFrom } from '@moeru/std'
-import { createReminder, settleMissionRun, stopMission } from '@proj-airi/core-agent'
+import { activeSmallTalk, createReminder, createSmallTalk, isMissionActive, settleMissionRun, stopMission } from '@proj-airi/core-agent'
 import { useLocalStorageManualReset } from '@proj-airi/stage-shared/composables'
 import { useBroadcastChannel } from '@vueuse/core'
 import { nanoid } from 'nanoid'
@@ -12,10 +12,10 @@ import { computed, ref, watch } from 'vue'
 
 import { missionsRepo } from '../database/repos/missions.repo'
 
-export type { MissionInstance, ReminderRequest } from '@proj-airi/core-agent'
+export type { MissionInstance, ReminderRequest, SmallTalkRequest } from '@proj-airi/core-agent'
 
 /**
- * Missions that the model created from the owner's words, for example reminders.
+ * Missions that the model created from the owner's words, for example reminders and small talk.
  * IndexedDB keeps the instances. After each change, the other windows read them again.
  *
  * Use when:
@@ -43,7 +43,7 @@ export const useMissionsStore = defineStore('missions', () => {
   let pendingLoad: Promise<void> = Promise.resolve()
 
   const missions = computed(() => records.value.map(record => record.mission))
-  const active = computed(() => missions.value.filter(mission => mission.status === 'scheduled'))
+  const active = computed(() => missions.value.filter(isMissionActive))
 
   /** Reads the missions again, after the reads that started before. */
   function load() {
@@ -73,18 +73,43 @@ export const useMissionsStore = defineStore('missions', () => {
     return result
   }
 
-  /** Stops a mission. Resolves to whether an active mission stopped. */
-  async function stop(id: string) {
+  /**
+   * Starts small talk in an owner conversation. On a refusal, `reason` tells the model what to change.
+   * It reads the stored missions first, so small talk that another window started counts.
+   */
+  async function addSmallTalk(request: SmallTalkRequest, sessionId: string) {
+    const stored = (await missionsRepo.list()).map(record => record.mission)
+    const result = createSmallTalk({ id: nanoid(), sessionId, request, now: Date.now(), missions: stored })
+    if (!result.ok)
+      return result
+    await missionsRepo.add(result.mission)
+    await publish([result.mission.id])
+    return result
+  }
+
+  /** Ends a mission. Resolves to whether an active mission ended. `owner` is the owner's or the model's stop. */
+  async function stop(id: string, reason: MissionEndReason = 'owner') {
     let stopped = false
     await missionsRepo.change(id, (stored) => {
-      if (stored.status !== 'scheduled')
+      if (!isMissionActive(stored))
         return undefined
       stopped = true
-      return stopMission(stored, Date.now())
+      return stopMission(stored, Date.now(), reason)
     })
     if (stopped)
       await publish([id])
     return stopped
+  }
+
+  /** The small talk that runs now, if any. */
+  function smallTalkAt(now: number) {
+    return activeSmallTalk(missions.value, now)
+  }
+
+  /** Ends the small talk that runs now, for example when the owner leaves. Resolves to whether one ended. */
+  async function endSmallTalk(reason: MissionEndReason) {
+    const running = smallTalkAt(Date.now())
+    return running ? stop(running.id, reason) : false
   }
 
   /**
@@ -92,13 +117,13 @@ export const useMissionsStore = defineStore('missions', () => {
    * stays stopped.
    */
   async function settle(id: string, outcome: 'delivered' | 'expired', now: number) {
-    await missionsRepo.change(id, stored => stored.status === 'scheduled' ? settleMissionRun(stored, outcome, now) : undefined)
+    await missionsRepo.change(id, stored => stored.template === 'reminder' && stored.status === 'scheduled' ? settleMissionRun(stored, outcome, now) : undefined)
     await publish([id])
   }
 
   /** Removes ended missions from the list. */
   async function removeEnded() {
-    const ids = missions.value.filter(mission => mission.status !== 'scheduled').map(mission => mission.id)
+    const ids = missions.value.filter(mission => !isMissionActive(mission)).map(mission => mission.id)
     if (!ids.length)
       return
     await missionsRepo.remove(ids, Date.now())
@@ -127,7 +152,10 @@ export const useMissionsStore = defineStore('missions', () => {
     missedAgeLimitHours,
     ready,
     addReminder,
+    addSmallTalk,
     stop,
+    smallTalkAt,
+    endSmallTalk,
     settle,
     removeEnded,
     resetState,

@@ -1094,14 +1094,14 @@ pages:
       title: Missions
       description: Reminders and other tasks that the character does for you
       enable: Use missions
-      enable-description: When you ask, the character sets a reminder and tells you at that time. When this is off, no reminder runs. In the web app, allow notifications to see reminders while speech is off.
+      enable-description: When you ask, the character sets a reminder and tells you at that time, or keeps you company with small talk for a while. Small talk needs Autonomous speech on. When this is off, no mission runs. In the web app, allow notifications to see reminders while speech is off.
       missed-age-limit: Missed reminders to tell
       missed-age-limit-description: If the app was closed when a reminder came due, the character tells you after the next start. An older reminder only shows as missed.
       hours: '{count} h'
       active: Active
       ended: Ended
       clear-ended: Clear
-      empty: No active missions. Ask the character for a reminder, for example "Remind me to take my medicine at 6 PM".
+      empty: No active missions. Ask the character for a reminder, for example "Remind me to take my medicine at 6 PM", or for small talk, for example "Talk with me for a while".
       next: 'Next: {time}'
       stop: 'Stop {name}'
       repeat:
@@ -1113,9 +1113,19 @@ pages:
         interval-minutes: 'Every {count} min'
       status:
         scheduled: Scheduled
+        running: Running
         done: Done
         stopped: Stopped
         missed: Missed
+      small-talk:
+        name: Small talk
+        minutes: '{count} min'
+        until: 'Until {time}'
+      end-reason:
+        time: time is up
+        owner: you stopped it
+        away: you left
+        quiet: you asked for quiet
     memory-long-term:
       description: Long-term memory specific settings and management
       enable: Use long-term memory

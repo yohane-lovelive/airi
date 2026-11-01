@@ -36,6 +36,7 @@ import { useInitiativeStore } from './initiative'
 import { useInitiativeInspectorStore } from './initiative-inspector'
 import { useIntentionsStore } from './intentions'
 import { useMemoryStore } from './memory'
+import { useMissionsStore } from './missions'
 import { useOwnerTypingStore } from './owner-typing'
 import { useVoiceStore } from './voice'
 import { useVoiceMessagesStore } from './voice-messages'
@@ -61,6 +62,8 @@ const LASTING_WAIT_REASONS: readonly InitiativeWaitReason[] = ['quiet-hours', 'o
  *   of recent days: the current thread and its heat, and a few seeds from the memory index and the calendar that are
  *   far from the recent topics. A seed that a spoken turn offered rests for six hours. A cold thread asks the model
  *   for a new topic.
+ * - Small talk that the owner asked for makes the idle pace faster, and the situation block names it. When the owner
+ *   leaves, the runner ends the small talk.
  * - The open intentions add drive, and the situation block lists them. The owner's temporary changes, for example a
  *   quiet time, change the options at each tick.
  * - While a window watches the inspector, each tick publishes a readout of the policy to it.
@@ -85,6 +88,7 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
   const ownerTyping = useOwnerTypingStore()
   const inspector = useInitiativeInspectorStore()
   const memory = useMemoryStore()
+  const missions = useMissionsStore()
   const { activeSessionId } = storeToRefs(chatSession)
 
   /** The policy state. Undefined while the feature is off or this renderer does not lead. */
@@ -115,9 +119,14 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
   const ownerSpeaking = computed(() => voiceMessages.isRecording || voice.state?.phase === 'capturing')
   const activeMessages = computed(() => chatSession.getSessionMessagesIfLoaded(activeSessionId.value))
 
-  /** The options at `now`. The owner's temporary changes end on their own, so each call reads them again. */
+  /** The small talk that runs at `now`. Missions that are off run no small talk. */
+  function smallTalkAt(now: number) {
+    return missions.enabled ? missions.smallTalkAt(now) : undefined
+  }
+
+  /** The options at `now`. The owner's temporary changes and small talk end on their own, so each call reads them again. */
   function optionsAt(now: number) {
-    return resolveInitiativeOptions(initiative.settingsAt(now))
+    return resolveInitiativeOptions(initiative.settingsAt(now, Boolean(smallTalkAt(now))))
   }
 
   function host(now: number): InitiativeHost {
@@ -172,6 +181,7 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
     // A greeting and a welcome back have their own reason. Topic ideas would pull them away from it.
     const rhythm = decision.trigger === 'greeting' || decision.trigger === 'welcome-back'
     const topics = rhythm ? undefined : topicsOf(sessionId, time)
+    const smallTalk = rhythm ? undefined : smallTalkAt(time.now)
     lastSeeds = topics?.seeds ?? []
     const text = initiativeNoticeText({
       mode: state.value?.mode ?? 'idle',
@@ -182,6 +192,7 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
       ...facts,
       intentions: intentions.openAt(time.now),
       ...(awayMs !== undefined ? { awayMs } : {}),
+      ...(smallTalk ? { smallTalkEndsAt: smallTalk.values.endsAt } : {}),
       ...(topics?.thread ? { thread: topics.thread } : {}),
       ...(topics?.seeds.length ? { seeds: topics.seeds } : {}),
     })
@@ -294,6 +305,12 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
     if (event.type === 'owner-message')
       dropRunningTurn()
     observe(event)
+  })
+
+  // Small talk ends when the owner leaves the device. Only the leader writes the end.
+  watch(() => presence.value.awaySince, (awaySince) => {
+    if (awaySince !== undefined && leadership?.isLeader() && smallTalkAt(Date.now()))
+      void missions.endSmallTalk('away').catch(error => console.warn('[initiative] Failed to end small talk:', errorMessageFrom(error)))
   })
 
   // The owner starts to speak, or queues a message behind the turn. Either one makes the turn stale.

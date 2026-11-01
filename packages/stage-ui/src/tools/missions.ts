@@ -1,9 +1,9 @@
-import type { MissionInstance, ReminderRepeat, ReminderRequest, ReminderStart } from '@proj-airi/core-agent'
+import type { MissionInstance, ReminderRepeat, ReminderRequest, ReminderStart, SmallTalkRequest } from '@proj-airi/core-agent'
 import type { Tool } from '@xsai/shared-chat'
 
-import { formatTimePrefix, MISSION_TEMPLATES } from '@proj-airi/core-agent'
+import { formatTimePrefix, isMissionActive, MISSION_TEMPLATES, SMALL_TALK_LIMITS } from '@proj-airi/core-agent'
 import { rawTool } from '@xsai/tool'
-import { array, description, integer, maxLength, maxValue, minLength, minValue, number, picklist, pipe, safeParse, strictObject, string, summarize } from 'valibot'
+import { array, description, integer, maxLength, maxValue, minLength, minValue, number, picklist, pipe, safeParse, strictObject, string, summarize, union } from 'valibot'
 import { toJsonSchema } from 'xsschema'
 
 export const START_MISSION_TOOL_NAME = 'builtIn_startMission'
@@ -25,9 +25,12 @@ const reminderValues = strictObject({
     minutes: pipe(number(), integer(), minValue(0), description('For "interval" only: the minutes between runs, 15 to 1440. For example 60 for "every hour". Otherwise 0.')),
   }),
 })
+const smallTalkValues = strictObject({
+  minutes: pipe(number(), integer(), description(`How long the small talk runs, ${SMALL_TALK_LIMITS.minMinutes} to ${SMALL_TALK_LIMITS.maxMinutes} minutes. ${SMALL_TALK_LIMITS.defaultMinutes} when the owner names no time.`)),
+})
 const startParameters = strictObject({
   template: pipe(picklist(MISSION_TEMPLATES.map(template => template.name)), description('The mission template.')),
-  values: reminderValues,
+  values: pipe(union([reminderValues, smallTalkValues]), description('The values of the template: the reminder values, or the small-talk values.')),
 })
 const listParameters = strictObject({})
 const stopParameters = strictObject({ id: pipe(string(), minLength(1), description('The mission id, as the mission list shows it.')) })
@@ -36,6 +39,7 @@ const stopParameters = strictObject({ id: pipe(string(), minLength(1), descripti
 interface CreateMissionToolsOptions {
   missions: () => readonly MissionInstance[]
   addReminder: (request: ReminderRequest) => Promise<{ ok: true, mission: MissionInstance } | { ok: false, reason: string }>
+  addSmallTalk: (request: SmallTalkRequest) => Promise<{ ok: true, mission: MissionInstance } | { ok: false, reason: string }>
   stop: (id: string) => Promise<boolean>
 }
 
@@ -66,6 +70,8 @@ function describeRepeat(repeat: ReminderRepeat) {
 }
 
 function describeMission(mission: MissionInstance) {
+  if (mission.template === 'small-talk')
+    return `- ${mission.id}: small-talk, until ${formatTimePrefix(mission.values.endsAt).trim()}`
   const repeat = describeRepeat(mission.values.repeat)
   const next = mission.nextRunAt === undefined ? mission.status : `next ${formatTimePrefix(mission.nextRunAt).trim()}`
   return `- ${mission.id}: ${mission.template}, "${mission.values.text}", ${repeat}, ${next}`
@@ -80,14 +86,18 @@ export async function createMissionTools(options: CreateMissionToolsOptions): Pr
   return [
     rawTool({
       name: START_MISSION_TOOL_NAME,
-      description: `Start a mission when the owner asks for one, for example a reminder. Use it only for the owner's own request. Templates:\n${templates}`,
+      description: `Start a mission when the owner asks for one, for example a reminder or small talk. Use it only for the owner's own request. Templates:\n${templates}`,
       parameters: await toJsonSchema(startParameters),
       execute: async (rawInput) => {
         const parsed = safeParse(startParameters, rawInput)
         if (!parsed.success)
           return `Mission not started: ${summarize(parsed.issues)}`
-        const { text, start, repeat } = parsed.output.values
-        const result = await options.addReminder({ text, start: startOf(start), repeat: repeatOf(repeat) })
+        const { template, values } = parsed.output
+        if (('text' in values) !== (template === 'reminder'))
+          return `Mission not started: the values do not match the template "${template}".`
+        const result = 'text' in values
+          ? await options.addReminder({ text: values.text, start: startOf(values.start), repeat: repeatOf(values.repeat) })
+          : await options.addSmallTalk({ minutes: values.minutes })
         if (!result.ok)
           return `Mission not started: ${result.reason}`
         return `Started mission:\n${describeMission(result.mission)}`
@@ -98,13 +108,13 @@ export async function createMissionTools(options: CreateMissionToolsOptions): Pr
       description: 'List the active missions with their ids.',
       parameters: await toJsonSchema(listParameters),
       execute: async () => {
-        const active = options.missions().filter(mission => mission.status === 'scheduled')
+        const active = options.missions().filter(isMissionActive)
         return active.length ? active.map(describeMission).join('\n') : 'No active missions.'
       },
     }),
     rawTool({
       name: STOP_MISSION_TOOL_NAME,
-      description: 'Stop one active mission when the owner asks.',
+      description: 'Stop one active mission when the owner asks, for example when the owner wants small talk to end.',
       parameters: await toJsonSchema(stopParameters),
       execute: async (rawInput) => {
         const parsed = safeParse(stopParameters, rawInput)

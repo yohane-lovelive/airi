@@ -1,8 +1,22 @@
-import type { MissionInstance, MustSpeakNotify, NoticeOutcome, ReminderRequest, ReminderStart } from './missions'
+import type { MissionInstance, MustSpeakNotify, NoticeOutcome, ReminderMission, ReminderRequest, ReminderStart } from './missions'
 
 import { describe, expect, it, vi } from 'vitest'
 
-import { collectDueMissions, createReminder, deliverReminder, formatLocalDateTime, missedRemindersNoticeText, parseLocalDateTime, reminderNoticeText, settleMissionRun, stopMission } from './missions'
+import {
+  activeSmallTalk,
+  collectDueMissions,
+  createReminder,
+  createSmallTalk,
+  deliverReminder,
+  formatLocalDateTime,
+  isMissionActive,
+  missedRemindersNoticeText,
+  parseLocalDateTime,
+  reminderNoticeText,
+  settleMissionRun,
+  smallTalkPastLimit,
+  stopMission,
+} from './missions'
 
 /** Friday 2026-10-30 12:00, local time. */
 const NOW = new Date(2026, 9, 30, 12, 0).getTime()
@@ -21,7 +35,7 @@ function request(overrides: Partial<ReminderRequest> = {}): ReminderRequest {
   return { text: 'medicine time', start: at('2026-10-30T18:00'), repeat: { kind: 'once' }, ...overrides }
 }
 
-function reminder(overrides: Partial<ReminderRequest> = {}, now = NOW): MissionInstance {
+function reminder(overrides: Partial<ReminderRequest> = {}, now = NOW): ReminderMission {
   const result = createReminder({ id: 'mission-1', sessionId: 'session-1', request: request(overrides), now })
   if (!result.ok)
     throw new Error(result.reason)
@@ -272,5 +286,53 @@ describe('notice text', () => {
       '- due [2026-10-30 08:00]: first',
       '- due [2026-10-30 09:00]: second',
     ].join('\n'))
+  })
+})
+
+describe('small talk', () => {
+  function smallTalk(minutes = 30, missions: MissionInstance[] = []) {
+    const result = createSmallTalk({ id: 'talk', sessionId: 'session-1', request: { minutes }, now: NOW, missions })
+    if (!result.ok)
+      throw new Error(result.reason)
+    return result.mission
+  }
+
+  it('runs from now until its time limit', () => {
+    const mission = smallTalk(30)
+
+    expect(mission).toMatchObject({ template: 'small-talk', status: 'running', values: { minutes: 30, endsAt: NOW + 30 * MINUTE } })
+    expect(mission.nextRunAt).toBeUndefined()
+    expect(isMissionActive(mission)).toBe(true)
+  })
+
+  it('refuses a time outside 5 to 120 minutes, and a second small talk', () => {
+    for (const minutes of [4, 121, 2.5]) {
+      const result = createSmallTalk({ id: 'talk', sessionId: 's', request: { minutes }, now: NOW, missions: [] })
+      expect(result.ok).toBe(false)
+    }
+    const second = createSmallTalk({ id: 'other', sessionId: 's', request: { minutes: 10 }, now: NOW, missions: [smallTalk()] })
+    expect(second).toEqual({ ok: false, reason: expect.stringContaining('already runs') })
+  })
+
+  it('stops counting as active at its time limit, before the runner ends it', () => {
+    const mission = smallTalk(10)
+
+    expect(activeSmallTalk([mission], NOW + 9 * MINUTE)?.id).toBe('talk')
+    expect(activeSmallTalk([mission], NOW + 10 * MINUTE)).toBeUndefined()
+    expect(smallTalkPastLimit([mission], NOW + 10 * MINUTE).map(entry => entry.id)).toEqual(['talk'])
+    expect(smallTalkPastLimit([mission, reminder()], NOW + 9 * MINUTE)).toEqual([])
+  })
+
+  it('ends as done at the time limit and as stopped otherwise, with the reason', () => {
+    const mission = smallTalk()
+
+    expect(stopMission(mission, NOW + HOUR, 'time')).toMatchObject({ status: 'done', endReason: 'time' })
+    for (const reason of ['owner', 'away', 'quiet'] as const)
+      expect(stopMission(mission, NOW, reason)).toMatchObject({ status: 'stopped', endReason: reason })
+    expect(activeSmallTalk([stopMission(mission, NOW, 'away')], NOW)).toBeUndefined()
+  })
+
+  it('is never due as a reminder', () => {
+    expect(collectDueMissions([smallTalk()], NOW + 2 * HOUR)).toEqual({ due: [], missed: [], expired: [] })
   })
 })

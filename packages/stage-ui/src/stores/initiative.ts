@@ -2,7 +2,7 @@ import type { InitiativeSettings, TalkControl, TalkLevelRequest } from '@proj-ai
 
 import type { TalkLevelApplyResult } from '../tools/initiative'
 
-import { activeTalkControl, applyTalkLevel, talkControlEffect } from '@proj-airi/core-agent'
+import { activeTalkControl, applyTalkLevel, SMALL_TALK_LIMITS, talkControlEffect } from '@proj-airi/core-agent'
 import { useLocalStorageManualReset } from '@proj-airi/stage-shared/composables'
 import { clamp } from 'es-toolkit'
 import { defineStore } from 'pinia'
@@ -70,15 +70,22 @@ export const useInitiativeStore = defineStore('initiative', () => {
     return clamp(idleIntervalMinutes.value, INITIATIVE_LIMITS.minIdleIntervalMinutes, INITIATIVE_LIMITS.maxIdleIntervalMinutes)
   }
 
-  /** The settings for the policy at `now`, with the owner's temporary changes. Each value stays inside its limits. */
-  function settingsAt(now: number): InitiativeSettings {
+  /**
+   * The settings for the policy at `now`, with the owner's temporary changes. Each value stays inside its limits.
+   * While small talk runs, the idle pace is the pace of small talk. The owner's temporary factor still applies to it.
+   */
+  function settingsAt(now: number, smallTalk = false): InitiativeSettings {
     const { minDailyTurnBudget, maxDailyTurnBudget } = INITIATIVE_LIMITS
     const startMinutes = minutesOf(quietHoursStart.value)
     const endMinutes = minutesOf(quietHoursEnd.value)
     const { quietUntil, idleIntervalFactor } = talkControlEffect(talkControl.value, now)
     return {
       dailyTurnBudget: Math.round(clamp(dailyTurnBudget.value, minDailyTurnBudget, maxDailyTurnBudget)),
-      modes: { idle: { boredomIntervalMs: clampedIdleIntervalMinutes() * idleIntervalFactor * 60_000 } },
+      modes: {
+        idle: smallTalk
+          ? { boredomIntervalMs: SMALL_TALK_LIMITS.boredomIntervalMs * idleIntervalFactor, refractoryMs: SMALL_TALK_LIMITS.refractoryMs }
+          : { boredomIntervalMs: clampedIdleIntervalMinutes() * idleIntervalFactor * 60_000 },
+      },
       ...(quietHoursEnabled.value && startMinutes !== undefined && endMinutes !== undefined ? { quietHours: { startMinutes, endMinutes } } : {}),
       ...(quietUntil !== undefined ? { quietUntil } : {}),
     }

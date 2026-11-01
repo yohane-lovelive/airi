@@ -136,7 +136,7 @@ Use it to start autonomous turns and to compare policy settings. Do not use it f
 
 ## Missions
 
-A mission is an owner instruction that code carries out later with the voice of the character. Step 1 of the autonomy ADR has one template, `reminder`.
+A mission is an owner instruction that code carries out later with the voice of the character. The templates are `reminder` (step 1 of the autonomy ADR) and `small-talk` (step 2b-2b).
 All functions are pure. The host passes the time and keeps the returned missions.
 
 - `MISSION_TEMPLATES` describes each template and its values for the mission tools.
@@ -147,6 +147,8 @@ All functions are pure. The host passes the time and keeps the returned missions
 - `settleMissionRun` moves a mission past its run. A repeated reminder skips the runs that the app missed while it was closed.
 - `deliverReminder` makes sure that the owner hears a reminder: the model, one more try after an empty reply, then a fixed text without a model call.
 - `reminderNoticeText` and `missedRemindersNoticeText` write the notices. All missed reminders of one start share one notice.
+- `createSmallTalk` starts small talk for 5 to 120 minutes. One small talk runs at a time. `activeSmallTalk` finds it, and `smallTalkPastLimit` finds small talk past its time limit. `SMALL_TALK_LIMITS` has the pace: a 2-minute idle interval and a 45-second rest.
+- `stopMission` ends any mission with a reason: `time`, `owner`, `away`, or `quiet`. Small talk at its time limit is `done`, and every other end is `stopped`.
 
 A notice with `mustSpeak` asks the model to speak, and only reply text counts as a reply. A notice with `reply` streams that text with no model call, so history, speech, and expressions work as for a model reply.
 
