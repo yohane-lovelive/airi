@@ -562,6 +562,7 @@ pages:
       tool-card: ツールカード
       artistry: 画像生成
       history-summary: 履歴の要約
+      timeline: 画面のタイムラインの要約
       other: その他
   memory:
     description: 記憶が保存され、整理される場所

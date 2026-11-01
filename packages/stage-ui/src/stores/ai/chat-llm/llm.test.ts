@@ -29,6 +29,7 @@ const {
 }))
 
 vi.mock('../../../database/repos/usage.repo')
+vi.mock('../../../database/repos/timeline.repo')
 
 vi.mock('@xsai/model', () => ({
   listModels: vi.fn(),

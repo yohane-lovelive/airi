@@ -15,7 +15,7 @@ const provider: GenerationProvider = {
 
 type Stream = (model: string, chatProvider: GenerationProvider, conversation: Conversation, options?: StreamOptions) => Promise<void>
 
-function createHarness(options: Partial<Pick<ChatOrchestratorRuntimeDeps, 'getSystemPrompt' | 'projectHistory'>> = {}) {
+function createHarness(options: Partial<Pick<ChatOrchestratorRuntimeDeps, 'getSystemPrompt' | 'projectHistory' | 'onTimelineMarker'>> = {}) {
   const messages: Record<string, ChatHistoryItem[]> = {}
   const stream = vi.fn<Stream>(async (_model, _provider, _conversation, streamOptions) => {
     await streamOptions?.onStreamEvent?.({ type: 'text-delta', text: 'reply' })
@@ -250,5 +250,35 @@ describe('chat orchestrator host options', () => {
     await harness.runtime.ingest('task', { model: 'test', chatProvider: provider, background: true }, 'recipe-session')
 
     expect(speaks).toEqual([true, false, false])
+  })
+
+  // The character notes the screen with markers. A reply with markers only stays silent, and its markers still count.
+  it('reports timeline markers, also from a silent reply, and keeps them out of the stored text', async () => {
+    const markers: Array<{ kind: string, text: string }> = []
+    const harness = createHarness({ onTimelineMarker: event => markers.push({ kind: event.kind, text: event.text }) })
+    harness.stream.mockImplementationOnce(async (_model, _provider, _conversation, streamOptions) => {
+      for (const text of ['<|SCENE ranked match, mid lane|>', '<|NOTE first blood|>', '<|NOTE dragon taken|>', '<|NOTE third note|>'])
+        await streamOptions?.onStreamEvent?.({ type: 'text-delta', text })
+      await streamOptions?.onStreamEvent?.({ type: 'finish' })
+    })
+    harness.stream.mockImplementationOnce(async (_model, _provider, _conversation, streamOptions) => {
+      for (const text of ['Nice play! ', '<|NOTE won the fight|>'])
+        await streamOptions?.onStreamEvent?.({ type: 'text-delta', text })
+      await streamOptions?.onStreamEvent?.({ type: 'finish' })
+    })
+
+    await harness.runtime.ingest('Autonomous turn', { model: 'test', chatProvider: provider, notice: { source: 'initiative', transient: true } })
+    expect(harness.messages['session-1'] ?? []).toEqual([])
+    await harness.runtime.ingest('Autonomous turn', { model: 'test', chatProvider: provider, notice: { source: 'initiative', transient: true } })
+
+    expect(markers).toEqual([
+      { kind: 'scene', text: 'ranked match, mid lane' },
+      { kind: 'note', text: 'first blood' },
+      { kind: 'note', text: 'dragon taken' },
+      { kind: 'note', text: 'won the fight' },
+    ])
+    const reply = harness.messages['session-1']?.at(-1)
+    expect(reply).toMatchObject({ role: 'assistant', content: 'Nice play! ' })
+    expect(reply?.role === 'assistant' && reply.categorization?.speech).toBe('Nice play! ')
   })
 })

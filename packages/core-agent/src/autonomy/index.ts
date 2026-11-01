@@ -71,6 +71,17 @@ export type { SpeechType } from './speech-types'
 export { activeTalkControl, applyTalkLevel, TALK_CONTROL_LIMITS, talkControlEffect } from './talk-control'
 export type { TalkControl, TalkLevelRequest, TalkLevelResult } from './talk-control'
 export {
+  addTimelineNotes,
+  applyTimelineSummary,
+  EMPTY_TIMELINE,
+  setTimelineScene,
+  TIMELINE_LIMITS,
+  timelineMarkerFrom,
+  timelineNotesToSummarize,
+  timelineSummaryRequest,
+} from './timeline'
+export type { Timeline, TimelineNote } from './timeline'
+export {
   bigramSimilarity,
   calendarTopicSeeds,
   characterBigrams,

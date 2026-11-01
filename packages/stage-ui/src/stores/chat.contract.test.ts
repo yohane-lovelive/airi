@@ -148,6 +148,7 @@ vi.mock('../database/repos/chat-assets.repo')
 vi.mock('../database/repos/intentions.repo')
 vi.mock('../database/repos/memory.repo')
 vi.mock('../database/repos/missions.repo')
+vi.mock('../database/repos/timeline.repo')
 vi.mock('../database/repos/recipes.repo')
 
 vi.mock('../database/repos/stickers.repo', () => ({

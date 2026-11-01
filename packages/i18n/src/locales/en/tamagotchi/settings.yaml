@@ -131,6 +131,14 @@ devtools:
         away: 'The owner is away since {time}.'
         greeting: 'Last greeting: {time}'
         welcome-back: 'Last welcome back: {time}'
+      timeline:
+        title: Screen timeline of this chat
+        clear: Clear
+        scene: 'Current scene: {text}'
+        summary: 'Earlier: {text}'
+        sources:
+          code: by the app
+          model: by the character
       screen:
         title: Screen
         activity: 'Screen activity: {value}'

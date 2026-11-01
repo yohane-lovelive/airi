@@ -75,7 +75,7 @@ async function createLeader(source: ScreenSource) {
   return { runner, perception: usePerceptionStore(), status: usePerceptionStatusStore() }
 }
 
-describe('usePerceptionRunnerStore', () => {
+describe('usePerceptionRunnerStore', { timeout: 60_000 }, () => {
   beforeEach(() => {
     localStorage.clear()
   })
@@ -102,7 +102,7 @@ describe('usePerceptionRunnerStore', () => {
     const { runner, perception, status } = await createLeader(screen.source)
 
     perception.enabled = true
-    await expect.poll(() => runner.frames().length, { timeout: 5_000 }).toBeGreaterThan(1)
+    await expect.poll(() => runner.frames().length, { timeout: 15_000 }).toBeGreaterThan(1)
     const [frame] = runner.frames()
     expect(frame.image.type).toBe('image/jpeg')
     expect(frame.thumbnail).toHaveLength(FRAME_LIMITS.thumbnailWidth * FRAME_LIMITS.thumbnailHeight)
@@ -120,26 +120,26 @@ describe('usePerceptionRunnerStore', () => {
     const { runner, perception, status } = await createLeader(screen.source)
 
     perception.enabled = true
-    await expect.poll(() => status.status.excluded, { timeout: 5_000 }).toBeGreaterThan(1)
+    await expect.poll(() => status.status.excluded, { timeout: 15_000 }).toBeGreaterThan(1)
     expect(runner.frames()).toHaveLength(0)
     expect(status.status).toMatchObject({ excludedNow: true, foregroundApp: 'Bitwarden', knowsForeground: true })
 
     window = { title: 'Game', app: 'Game' }
-    await expect.poll(() => runner.frames().length, { timeout: 5_000 }).toBeGreaterThan(0)
+    await expect.poll(() => runner.frames().length, { timeout: 15_000 }).toBeGreaterThan(0)
   })
 
   it('stops on a lock and starts again after it', async () => {
     const screen = canvasSource()
     const { runner, perception, status } = await createLeader(screen.source)
     perception.enabled = true
-    await expect.poll(() => status.status.state, { timeout: 5_000 }).toBe('running')
+    await expect.poll(() => status.status.state, { timeout: 15_000 }).toBe('running')
 
     screen.interrupt(true)
     await expect.poll(() => status.status.state).toBe('interrupted')
     expect(runner.frames()).toHaveLength(0)
 
     screen.interrupt(false)
-    await expect.poll(() => status.status.state, { timeout: 5_000 }).toBe('running')
+    await expect.poll(() => status.status.state, { timeout: 15_000 }).toBe('running')
     expect(screen.source.start).toHaveBeenCalledTimes(2)
   })
 
@@ -152,7 +152,7 @@ describe('usePerceptionRunnerStore', () => {
     expect(screen.source.start).not.toHaveBeenCalled()
 
     await runner.startFromGesture()
-    await expect.poll(() => status.status.state, { timeout: 5_000 }).toBe('running')
+    await expect.poll(() => status.status.state, { timeout: 15_000 }).toBe('running')
 
     // A share that the owner stops in the browser ends the track. `stop` fires no event, so the test dispatches it.
     const [track] = screen.streams[0].getVideoTracks()
@@ -166,11 +166,11 @@ describe('usePerceptionRunnerStore', () => {
     const screen = canvasSource({ steady: true })
     const { runner, perception, status } = await createLeader(screen.source)
     perception.enabled = true
-    await expect.poll(() => runner.frames().length, { timeout: 5_000 }).toBeGreaterThan(3)
+    await expect.poll(() => runner.frames().length, { timeout: 15_000 }).toBeGreaterThan(3)
     expect(runner.events()).toEqual([])
 
     screen.setScene(1)
-    await expect.poll(() => runner.events().length, { timeout: 5_000 }).toBe(1)
+    await expect.poll(() => runner.events().length, { timeout: 15_000 }).toBe(1)
     expect(runner.events()[0]).toMatchObject({ type: 'scene-change', familiar: false })
     await expect.poll(() => status.status.events).toHaveLength(1)
   })

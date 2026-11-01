@@ -125,6 +125,14 @@ devtools:
         away: 'オーナーは {time} から離席中です。'
         greeting: '最後のあいさつ: {time}'
         welcome-back: '最後のおかえり: {time}'
+      timeline:
+        title: この会話の画面のタイムライン
+        clear: 消去
+        scene: '今のシーン: {text}'
+        summary: 'それまで: {text}'
+        sources:
+          code: アプリが記録
+          model: キャラクターが記録
       screen:
         title: 画面
         activity: '画面の動き: {value}'

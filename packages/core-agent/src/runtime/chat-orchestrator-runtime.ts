@@ -10,6 +10,7 @@ import type { LlmUsage, StreamEvent, StreamOptions } from '../types/llm'
 
 import { createQueue } from '@proj-airi/stream-kit'
 
+import { TIMELINE_LIMITS, timelineMarkerFrom } from '../autonomy/timeline'
 import { topicFromMarker } from '../autonomy/topics'
 import { chatMessagesToTurns } from '../messages/chat-completions'
 import { formatTimePrefix } from '../messages/datetime-prefix'
@@ -462,6 +463,11 @@ export interface ChatOrchestratorRuntimeDeps {
     message: StreamingAssistantMessage
     messageText: string
   }) => void
+  /**
+   * Called with each `<|NOTE ...|>` or `<|SCENE ...|>` marker of visible speech, at most two notes for each reply.
+   * A reply that stays silent still reports its markers, so the character can note the screen without a word.
+   */
+  onTimelineMarker?: (event: { sessionId: string, turnId: string, kind: 'note' | 'scene', text: string }) => void
   /** Called after user turn persistence, before provider prompt composition. */
   onUserTurnReady?: (event: {
     sessionId: string
@@ -883,6 +889,7 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
       let speechStarted = false
       const stickers = options.stickers
       let stickerEmitted = false
+      let timelineNotes = 0
 
       const parser = useLlmmarkerParser({
         onLiteral: async (literal) => {
@@ -945,6 +952,17 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
             return
           }
 
+          if (/^<\|(?:NOTE|SCENE)\b/.test(special)) {
+            // Timeline markers are data for code, like a topic label. They never reach speech or plugins.
+            const marker = categorizer.filterToSpeech(special, streamPosition) ? timelineMarkerFrom(special) : undefined
+            if (marker && (marker.kind === 'scene' || timelineNotes < TIMELINE_LIMITS.maxModelNotesPerTurn)) {
+              if (marker.kind === 'note')
+                timelineNotes += 1
+              deps.onTimelineMarker?.({ sessionId, turnId: streamingMessageContext.turnId, ...marker })
+            }
+            return
+          }
+
           if (/^<\|TOPIC\b/.test(special)) {
             // A topic label is data for code, like a sticker. Only the first label of visible speech counts.
             const topic = categorizer.filterToSpeech(special, streamPosition) ? topicFromMarker(special) : undefined
@@ -959,8 +977,8 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
           if (shouldAbort())
             return
 
-          // Strip only sticker and topic markers, including the escaped form accepted by the parser.
-          const speechText = fullText.replace(/<(?:\||\{'\|'\})(?:STICKER|TOPIC)\b[\s\S]*?(?:(?:\||\{'\|'\})>|$)/g, '')
+          // Strip only sticker, topic, and timeline markers, including the escaped form accepted by the parser.
+          const speechText = fullText.replace(/<(?:\||\{'\|'\})(?:STICKER|TOPIC|NOTE|SCENE)\b[\s\S]*?(?:(?:\||\{'\|'\})>|$)/g, '')
           const finalCategorization = categorizeResponse(speechText, activeProvider)
 
           const reasoningContentField = buildingMessage.categorization?.reasoning?.trim()

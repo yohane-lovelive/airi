@@ -291,7 +291,7 @@ Step 2-3b built the inspector as follows. It changed the place of the inspector.
 - The request follows the prompt budget. It holds the frames of the frame policy, the timeline, the scene state, and a hint of the inner state.
 - After an event, the request can include frames from before the event. A late reaction then still sees the cause.
 - Images are part of this request only. History keeps the speech text and the timeline notes.
-- The model speaks or stays silent. With tools, it can also write a timeline note, update the scene state, or write an intention.
+- The model speaks or stays silent. With markers, it can also write a timeline note or update the scene state. With a tool, it can write an intention.
 
 Without the screen, a decision turn works as follows. Step 2-1 built it.
 
@@ -325,6 +325,15 @@ A new event can interrupt the current speech. These rules keep the speech cohere
 - Old notes are summarized so that the list stays short.
 - The timeline is the only history of what happened on screen.
 - The scene state is one short text that the model updates. It describes the current scene, not its history.
+
+Step 3-4 built the timeline and the scene state as follows.
+
+- **Markers, not tools.** The model writes `<|NOTE a short fact|>` and `<|SCENE the current scene|>` in its reply, like the topic label of step 2b-2a. A tool would need a second model call in each turn, because the model answers again after the tool result. The orchestrator reports the markers through `onTimelineMarker`, also from a reply that stays silent, and keeps them out of speech and plugins. One reply writes two notes at most.
+- **Code notes.** While perception runs, code notes app switches, owner messages without their text, and mission starts and ends. Interruptions come with step 3-5.
+- **Storage.** Each conversation has its own timeline in IndexedDB on the device. It never syncs, because it describes the screen. A deleted conversation deletes its timeline, and the module reset deletes all timelines.
+- **Limits.** A note has 120 characters, the scene 300. Past 30 notes, or for notes older than 12 hours, the chat model summarizes the oldest notes with the earlier summary in a background call with the usage purpose `timeline`.
+- **Prompt.** A drive turn with the screen gives the scene, the summary, and the newest 12 notes, and it asks for the markers. A reply to the owner does not get the timeline yet.
+- The inspector shows the scene, the summary, and the newest notes of the open conversation, and it clears them.
 
 ### Inner state and variety
 
@@ -610,7 +619,7 @@ The order follows dependencies. Each step uses the parts of the earlier steps. E
 | 1 | Mission base: the time trigger, the instance store, and the tools. Also the `mustSpeak` notice, the `reminder` template, and the mission list. | Done |
 | 2 | Autonomous talk without the screen: connect the policy core to `notifyConversation`. Add the prompt budget, intentions, owner control, usage by purpose, and the inspector. | Done |
 | 2b | Daily rhythm and small talk: templates as recipes, the `greeting`, `welcome-back`, and `small-talk` templates, topic seeds, and the time of day. Measure variety. | Done. Templates as recipes still wait. |
-| 3 | Perception: the adapters, ring buffer, detectors, frame policies, image budget, recorder, replay, timeline, scene state, `commentary` with interruptions, and `watch`. | In progress: 3-1 to 3-3 are done. |
+| 3 | Perception: the adapters, ring buffer, detectors, frame policies, image budget, recorder, replay, timeline, scene state, `commentary` with interruptions, and `watch`. | In progress: 3-1 to 3-4 are done. |
 | 4 | Motion: the model capability check, the procedural layer, the library with `ACT` markers, expression sync, and the upper-body layer. | To do |
 | 5 | Generated motion, game audio, recall from memory, and polish. Recall needs the memory ADR. | To do |
 
@@ -630,7 +639,7 @@ Step 3 has six parts. Each part is one change. Detector events reach the pressur
 | 3-1 | The screen sources of the desktop and web apps, the ring buffer, and the privacy rules: opt-in, the indicator and pause, the exclusion list, and the stop on lock. | Done |
 | 3-2 | The detectors: settle then compare, familiar screens, the baseline for each app, the app switch dwell, and long still periods. The inspector lists the events. The loud sound detector waits for step 5. | Done |
 | 3-3 | The decision turn with frames: `fresh-keyframes` as the first default frame policy until replay chooses one, images in the transient notice, the image budget, events as pressure, and screen text as untrusted data. | Done |
-| 3-4 | The timeline and the scene state. | To do |
+| 3-4 | The timeline and the scene state, written with markers. | Done |
 | 3-5 | The `commentary` and `watch` templates. | To do |
 | 3-6 | The recorder, the replay evaluation, and the `contact-sheet` and `scene-anchor` frame policies. | To do |
 

@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { useTalkChanges } from '@proj-airi/stage-ui/composables/use-talk-changes'
+import { useChatSessionStore } from '@proj-airi/stage-ui/stores/chat/session-store'
 import { useInitiativeStore } from '@proj-airi/stage-ui/stores/initiative'
 import { INSPECTOR_WATCH_REFRESH_MS, useInitiativeInspectorStore } from '@proj-airi/stage-ui/stores/initiative-inspector'
 import { useIntentionsStore } from '@proj-airi/stage-ui/stores/intentions'
 import { useMissionsStore } from '@proj-airi/stage-ui/stores/missions'
 import { usePerceptionStore } from '@proj-airi/stage-ui/stores/perception'
 import { usePerceptionStatusStore } from '@proj-airi/stage-ui/stores/perception-status'
+import { useTimelineStore } from '@proj-airi/stage-ui/stores/timeline'
 import { usageByPurpose, usageDayOf, useUsageStore } from '@proj-airi/stage-ui/stores/usage'
 import { GhostButton } from '@proj-airi/ui'
 import { useIntervalFn, useNow } from '@vueuse/core'
@@ -23,6 +25,12 @@ const { records: usageRecords } = storeToRefs(useUsageStore())
 const { changes: talkChanges, reset: resetTalkChanges } = useTalkChanges()
 const { status: perception } = storeToRefs(usePerceptionStatusStore())
 const perceptionSettings = usePerceptionStore()
+const timelineStore = useTimelineStore()
+const { activeSessionId } = storeToRefs(useChatSessionStore())
+// The timeline of the open conversation. Each window reads it from the device, and reads it again after a change.
+watch(activeSessionId, sessionId => void timelineStore.load(sessionId), { immediate: true })
+const screenTimeline = computed(() => timelineStore.timelineOf(activeSessionId.value))
+const recentNotes = computed(() => [...screenTimeline.value.notes].reverse().slice(0, 12))
 
 const KEY = 'tamagotchi.settings.devtools.pages.initiative-inspector'
 /** The graph shows this much time. */
@@ -233,6 +241,31 @@ function timeLabel(epochMs: number) {
         </li>
       </ul>
       <p v-else :class="['text-xs', 'text-neutral-500 dark:text-neutral-400']">
+        {{ t(`${KEY}.none`) }}
+      </p>
+    </section>
+
+    <section :class="['flex flex-col', 'gap-2', 'rounded-xl', 'bg-neutral-100 dark:bg-neutral-900', 'p-4']">
+      <h2 :class="['flex items-center', 'gap-2', 'text-sm font-medium']">
+        <span :class="['min-w-0 flex-1']">{{ t(`${KEY}.timeline.title`) }}</span>
+        <GhostButton v-if="screenTimeline.notes.length || screenTimeline.scene || screenTimeline.summary" size="sm" icon="i-solar:trash-bin-minimalistic-linear" @click="timelineStore.clear(activeSessionId)">
+          {{ t(`${KEY}.timeline.clear`) }}
+        </GhostButton>
+      </h2>
+      <p v-if="screenTimeline.scene" :class="['text-sm']">
+        {{ t(`${KEY}.timeline.scene`, { text: screenTimeline.scene.text }) }}
+      </p>
+      <p v-if="screenTimeline.summary" :class="['text-xs', 'text-neutral-500 dark:text-neutral-400']">
+        {{ t(`${KEY}.timeline.summary`, { text: screenTimeline.summary.text }) }}
+      </p>
+      <ul v-if="recentNotes.length" :class="['flex flex-col', 'gap-1', 'text-sm']">
+        <li v-for="note in recentNotes" :key="`${note.at}-${note.text}`">
+          <span :class="['text-xs', 'text-neutral-500 dark:text-neutral-400', 'tabular-nums']">{{ secondsLabel(note.at) }}</span>
+          {{ note.text }}
+          <span :class="['text-xs', 'text-neutral-500 dark:text-neutral-400']">· {{ t(`${KEY}.timeline.sources.${note.source}`) }}</span>
+        </li>
+      </ul>
+      <p v-else-if="!screenTimeline.scene" :class="['text-xs', 'text-neutral-500 dark:text-neutral-400']">
         {{ t(`${KEY}.none`) }}
       </p>
     </section>

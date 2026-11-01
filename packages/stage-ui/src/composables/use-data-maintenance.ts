@@ -33,6 +33,7 @@ import { usePerceptionStore } from '../stores/perception'
 import { useProviderStore } from '../stores/providers/provider'
 import { useRecipesStore } from '../stores/recipes'
 import { useSettings, useSettingsAudioDevice } from '../stores/settings'
+import { useTimelineStore } from '../stores/timeline'
 import { useUsageStore } from '../stores/usage'
 import { useVoiceprintStore } from '../stores/voiceprint'
 
@@ -66,6 +67,7 @@ export function useDataMaintenance() {
   const missionsStore = useMissionsStore()
   const initiativeStore = useInitiativeStore()
   const perceptionStore = usePerceptionStore()
+  const timelineStore = useTimelineStore()
   const intentionsStore = useIntentionsStore()
   const historySummaryStore = useHistorySummaryStore()
   const usageStore = useUsageStore()
@@ -101,6 +103,7 @@ export function useDataMaintenance() {
       () => missionsStore.resetState(),
       () => initiativeStore.resetState(),
       () => perceptionStore.resetState(),
+      () => timelineStore.resetState(),
       () => intentionsStore.resetState(),
       () => historySummaryStore.resetState(),
       () => usageStore.resetState(),

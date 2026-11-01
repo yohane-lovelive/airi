@@ -625,6 +625,7 @@ pages:
       tool-card: Tool cards
       artistry: Artistry
       history-summary: History summaries
+      timeline: Screen timeline summaries
       other: Other
   memory:
     description: Where memories got stored, and organized

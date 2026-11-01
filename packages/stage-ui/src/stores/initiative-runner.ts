@@ -1,4 +1,4 @@
-import type { ChatAttachment, InitiativeDecision, InitiativeEvent, InitiativeHost, InitiativeRhythm, InitiativeScreenContext, InitiativeState, InitiativeTime, InitiativeWaitReason, SpeechType, TopicSeed } from '@proj-airi/core-agent'
+import type { ChatAttachment, InitiativeDecision, InitiativeEvent, InitiativeHost, InitiativeRhythm, InitiativeScreenContext, InitiativeState, InitiativeTime, InitiativeWaitReason, MissionInstance, SpeechType, TimelineNote, TopicSeed } from '@proj-airi/core-agent'
 import type { SyncedPiniaRuntime } from 'pinia-plugin-synced'
 
 import type { OwnerPresence, OwnerPresenceSource } from '../libs/initiative/presence'
@@ -42,6 +42,7 @@ import { useMissionsStore } from './missions'
 import { useOwnerTypingStore } from './owner-typing'
 import { usePerceptionStore } from './perception'
 import { usePerceptionRunnerStore } from './perception-runner'
+import { useTimelineStore } from './timeline'
 import { useVoiceStore } from './voice'
 import { useVoiceMessagesStore } from './voice-messages'
 
@@ -49,8 +50,16 @@ import { useVoiceMessagesStore } from './voice-messages'
 const TICK_INTERVAL_MS = 1_000
 
 const DAY_MS = 24 * 60 * 60_000
+/** A mission change counts as a timeline note only when it happened this recently. */
+const MISSION_NOTE_WINDOW_MS = 60_000
 /** The first turn with the screen treats the frames of this time as news. */
 const FIRST_SCREEN_TURN_LOOKBACK_MS = 60_000
+
+/** The note that the timeline gets when a mission starts or ends. */
+function missionNote(mission: MissionInstance, change: 'started' | 'ended') {
+  const what = mission.template === 'small-talk' ? `small talk (${mission.values.minutes} min)` : `reminder "${mission.values.text}"`
+  return `Mission ${change}: ${what}`
+}
 
 /** Gates that hold for longer than a pending rhythm turn waits. A greeting or a welcome back then never starts. */
 const LASTING_WAIT_REASONS: readonly InitiativeWaitReason[] = ['quiet-hours', 'owner-quiet', 'daily-budget']
@@ -73,6 +82,8 @@ const LASTING_WAIT_REASONS: readonly InitiativeWaitReason[] = ['quiet-hours', 'o
  * - Screen perception feeds the drive: each screen event adds pressure by its salience, less when the image budget
  *   runs low. A drive turn while perception runs attaches the frames that `fresh-keyframes` picks, inside the image
  *   budget. The notice keeps them out of history, so they never reach the disk.
+ * - While perception runs, code writes timeline notes: app switches, owner messages, and mission starts and ends. A
+ *   drive turn with the screen gives the timeline of the conversation to the model, which adds notes with markers.
  * - The open intentions add drive, and the situation block lists them. The owner's temporary changes, for example a
  *   quiet time, change the options at each tick.
  * - While a window watches the inspector, each tick publishes a readout of the policy to it.
@@ -100,6 +111,7 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
   const missions = useMissionsStore()
   const perception = usePerceptionStore()
   const perceptionRunner = usePerceptionRunnerStore()
+  const timeline = useTimelineStore()
   const { activeSessionId } = storeToRefs(chatSession)
 
   /** The policy state. Undefined while the feature is off or this renderer does not lead. */
@@ -224,6 +236,7 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
     const smallTalk = rhythm ? undefined : smallTalkAt(time.now)
     lastSeeds = topics?.seeds ?? []
     const screen = rhythm ? undefined : await screenOf(time.now)
+    const screenTimeline = screen ? await timeline.load(sessionId).catch(() => timeline.timelineOf(sessionId)) : undefined
     const text = initiativeNoticeText({
       mode: state.value?.mode ?? 'idle',
       trigger: decision.trigger,
@@ -235,6 +248,7 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
       ...(awayMs !== undefined ? { awayMs } : {}),
       ...(smallTalk ? { smallTalkEndsAt: smallTalk.values.endsAt } : {}),
       ...(screen ? { screen: screen.context } : {}),
+      ...(screenTimeline ? { timeline: screenTimeline } : {}),
       ...(topics?.thread ? { thread: topics.thread } : {}),
       ...(topics?.seeds.length ? { seeds: topics.seeds } : {}),
     })
@@ -344,8 +358,10 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
     const event = initiativeEventOf(message)
     if (!event)
       return
-    if (event.type === 'owner-message')
+    if (event.type === 'owner-message') {
       dropRunningTurn()
+      noteScreenHistory([{ at: message.createdAt ?? Date.now(), text: 'The owner sent a message', source: 'code' }])
+    }
     observe(event)
   })
 
@@ -355,14 +371,38 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
       void missions.endSmallTalk('away').catch(error => console.warn('[initiative] Failed to end small talk:', errorMessageFrom(error)))
   })
 
+  /** Adds code notes to the timeline of the open conversation, while this renderer leads and perception runs. */
+  function noteScreenHistory(notes: readonly TimelineNote[]) {
+    if (!leadership?.isLeader() || !perceptionRunner.running() || !notes.length)
+      return
+    void timeline.addNotes(activeSessionId.value, notes).catch(error => console.warn('[initiative] Failed to write the timeline:', errorMessageFrom(error)))
+  }
+
   // Each screen event pushes the drive. A low image budget weakens it, so turns with frames come less often.
   const stopScreenEvents = perceptionRunner.onEvents((events) => {
+    noteScreenHistory(events.flatMap(event => event.type === 'app-switch' ? [{ at: event.at, text: `The owner switched to ${event.app}`, source: 'code' as const }] : []))
     if (!state.value)
       return
     // The policy counts salience squared, so the square root of the factor scales the pressure by the factor.
     const scale = Math.sqrt(eventPressureFactor(perception.budgetAt(Date.now())))
     for (const event of events)
       observe({ type: 'perceived', salience: event.salience * scale })
+  })
+
+  // A mission that starts or ends is part of what happened while the character watched the screen. The first read of
+  // the stored missions also changes the list, so only a change of the last minute counts.
+  let knownMissions = new Map<string, MissionInstance>()
+  watch(() => missions.active, (active) => {
+    const now = Date.now()
+    const recent = (at: number) => now - at < MISSION_NOTE_WINDOW_MS
+    const next = new Map(active.map(mission => [mission.id, mission]))
+    const started = active.filter(mission => !knownMissions.has(mission.id) && recent(mission.createdAt))
+    const ended = missions.missions.filter(mission => knownMissions.has(mission.id) && !next.has(mission.id) && recent(mission.updatedAt))
+    noteScreenHistory([
+      ...started.map(mission => ({ at: mission.createdAt, text: missionNote(mission, 'started'), source: 'code' as const })),
+      ...ended.map(mission => ({ at: mission.updatedAt, text: missionNote(mission, 'ended'), source: 'code' as const })),
+    ])
+    knownMissions = next
   })
 
   // The owner starts to speak, or queues a message behind the turn. Either one makes the turn stale.

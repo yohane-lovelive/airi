@@ -73,6 +73,7 @@ import { useStickersStore } from './modules/stickers'
 import { useVisionStore } from './modules/vision'
 import { useWebSearchStore } from './modules/web-search'
 import { useRecipesStore } from './recipes'
+import { useTimelineStore } from './timeline'
 import { executeToolCallRerun } from './tool-call-rerun'
 import { useToolCardsStore } from './tool-cards'
 import { useWakeWordsStore } from './wake-words'
@@ -294,6 +295,7 @@ export const useChatStore = defineStore('chat', () => {
   const missions = useMissionsStore()
   const initiative = useInitiativeStore()
   const intentions = useIntentionsStore()
+  const timeline = useTimelineStore()
 
   /** The persona of a session. A session without one uses the selected card. */
   function personaOf(sessionId: string) {
@@ -1144,6 +1146,12 @@ export const useChatStore = defineStore('chat', () => {
         })
       }
     },
+    // The character notes the screen with markers. They go to the timeline of the conversation on this device.
+    onTimelineMarker: ({ sessionId, kind, text }) => {
+      const at = Date.now()
+      void (kind === 'note' ? timeline.addNotes(sessionId, [{ at, text, source: 'model' }]) : timeline.setScene(sessionId, text, at))
+        .catch(error => console.warn('[chat] Failed to keep a timeline marker:', errorMessageFrom(error)))
+    },
     onAssistantMessageAppended: ({ sessionId, message, roundId }) => {
       const source = chatSession.getSessionMessages(sessionId).find(message => message.role === 'user' && message.id === roundId)
       if (source && isCloudSyncableMessage(source) && isCloudSyncableMessage(message) && message.id && syncsToCloud(sessionId)) {
@@ -1601,6 +1609,7 @@ export const useChatStore = defineStore('chat', () => {
   async function deleteSession(sessionId: string): Promise<void> {
     failedImageReads.delete(sessionId)
     await cancelPendingSends(sessionId)
+    await timeline.clear(sessionId)
     return chatSession.deleteSession(sessionId)
   }
 
