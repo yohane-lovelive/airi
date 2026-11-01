@@ -624,6 +624,16 @@ Opinion alone cannot judge behavior. Replay evaluation compares methods on the s
 - Deterministic tests with a fake clock and a fixed random source cover pressure, gates, budgets, speech types, intentions, owner control, topic heat, and missions.
 - Live checks with a real cloud model and a real screen are not part of CI. Record them in the PR.
 
+Step 3-6b built the replay evaluation as follows.
+
+- `evals/autonomy-replay` is a vieval suite in the form of `evals/asr-rewrite`. The owner runs it by hand, because it calls paid models and sends recorded frames to the provider.
+- It calls OpenCode Go through its OpenAI-compatible endpoint, the same provider as the app, so the results hold for the app. The judge uses the speaking model unless a judge model is set.
+- For each recording, the detectors read the recorded thumbnails, the initiative policy decides on the clock of the recording with a seeded random source, and the frame policy picks the frames of each turn. The owner messages of the recording reach the policy at their times. A spoken line holds further turns for its estimated playback time.
+- The speaking model gets the notice of the app with the frames, and the NOTE and SCENE markers of its replies build the timeline of later turns.
+- The judge gets the frames before each line and the screen after it, and answers whether the line is grounded and whether it contradicts the timeline.
+- The report holds the metrics above, the tokens with the cache share, and no prices. The interruptions per minute wait: a recording has no playback times. Each case writes its lines to `replay.json`.
+- The unit tests replay a synthetic recording with a fake model, without network.
+
 ## Non-goals
 
 - Lip sync work. The owner withdrew it for now.
@@ -647,7 +657,7 @@ The order follows dependencies. Each step uses the parts of the earlier steps. E
 | 1 | Mission base: the time trigger, the instance store, and the tools. Also the `mustSpeak` notice, the `reminder` template, and the mission list. | Done |
 | 2 | Autonomous talk without the screen: connect the policy core to `notifyConversation`. Add the prompt budget, intentions, owner control, usage by purpose, and the inspector. | Done |
 | 2b | Daily rhythm and small talk: templates as recipes, the `greeting`, `welcome-back`, and `small-talk` templates, topic seeds, and the time of day. Measure variety. | Done. Templates as recipes still wait. |
-| 3 | Perception: the adapters, ring buffer, detectors, frame policies, image budget, recorder, replay, timeline, scene state, `commentary` with interruptions, and `watch`. | In progress: 3-1 to 3-6a are done. |
+| 3 | Perception: the adapters, ring buffer, detectors, frame policies, image budget, recorder, replay, timeline, scene state, `commentary` with interruptions, and `watch`. | In progress: 3-1 to 3-6b are done. |
 | 4 | Motion: the model capability check, the procedural layer, the library with `ACT` markers, expression sync, and the upper-body layer. | To do |
 | 5 | Generated motion, game audio, recall from memory, and polish. Recall needs the memory ADR. | To do |
 
@@ -671,7 +681,7 @@ Step 3 has nine parts. Each part is one change. Detector events reach the pressu
 | 3-5a | The `commentary` template with the target window, its pace, its budget, and interruptions. | Done |
 | 3-5b | The `watch` template with check turns and named regions. | Done |
 | 3-6a | The screen recorder of the desktop app. | Done |
-| 3-6b | The replay evaluation suite. | To do |
+| 3-6b | The replay evaluation suite. | Done |
 | 3-6c | The `contact-sheet` and `scene-anchor` frame policies, and a developer setting to choose the policy. | To do |
 
 Step 4 does not depend on steps 0 to 3. It comes after them so that the speech output format changes only once.
