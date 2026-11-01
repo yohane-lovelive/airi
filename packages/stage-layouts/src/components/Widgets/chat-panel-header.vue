@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ChatSessionsDrawer } from '@proj-airi/stage-ui/components/scenarios/chat'
+import { usePerceptionIndicator } from '@proj-airi/stage-ui/composables/use-perception-indicator'
 import { useChatSessionStore } from '@proj-airi/stage-ui/stores/chat/session-store'
 import { BasicButton } from '@proj-airi/ui'
 import { storeToRefs } from 'pinia'
@@ -11,6 +12,7 @@ import { useStopSpeakingButton } from '../../composables/useStopSpeakingButton'
 const { t } = useI18n()
 const { activeSessionId, sessionMetas } = storeToRefs(useChatSessionStore())
 const { speechMuted, toggleSpeechMuted } = useStopSpeakingButton()
+const perception = usePerceptionIndicator()
 
 const sessionsDrawerOpen = ref(false)
 const activeSessionTitle = computed(() => {
@@ -48,22 +50,41 @@ const activeSessionTitle = computed(() => {
       </template>
     </ChatSessionsDrawer>
 
-    <BasicButton
-      size="unset"
-      data-testid="speech-mute-button"
-      :class="[
-        'size-8 shrink-0 rounded-lg outline-none',
-        'text-neutral-500 hover:bg-primary-100/60 hover:text-primary-700 dark:text-neutral-400 dark:hover:bg-primary-900/40 dark:hover:text-primary-200',
-        'focus-visible:outline-2 focus-visible:outline-primary-500 focus-visible:outline-offset-1',
-        speechMuted ? 'bg-primary-100/80 text-primary-700 dark:bg-primary-900/50 dark:text-primary-200' : '',
-      ]"
-      :title="speechMuted ? t('stage.speech-output.unmute') : t('stage.speech-output.mute')"
-      :aria-label="speechMuted ? t('stage.speech-output.unmute') : t('stage.speech-output.mute')"
-      :aria-pressed="speechMuted"
-      @click="toggleSpeechMuted"
-    >
-      <span v-if="speechMuted" aria-hidden="true" :class="['i-solar:volume-cross-outline size-5']" />
-      <span v-else aria-hidden="true" :class="['i-solar:volume-loud-outline size-5']" />
-    </BasicButton>
+    <div :class="['flex items-center gap-1']">
+      <BasicButton
+        v-if="perception.visible.value"
+        size="unset"
+        data-testid="perception-button"
+        :class="[
+          'size-8 shrink-0 rounded-lg outline-none',
+          'text-neutral-500 hover:bg-primary-100/60 hover:text-primary-700 dark:text-neutral-400 dark:hover:bg-primary-900/40 dark:hover:text-primary-200',
+          'focus-visible:outline-2 focus-visible:outline-primary-500 focus-visible:outline-offset-1',
+          perception.active.value ? 'text-primary-600 dark:text-primary-300' : '',
+        ]"
+        :title="perception.label.value"
+        :aria-label="perception.label.value"
+        :aria-pressed="perception.active.value"
+        @click="perception.press"
+      >
+        <span aria-hidden="true" :class="[perception.icon.value, 'size-5']" />
+      </BasicButton>
+      <BasicButton
+        size="unset"
+        data-testid="speech-mute-button"
+        :class="[
+          'size-8 shrink-0 rounded-lg outline-none',
+          'text-neutral-500 hover:bg-primary-100/60 hover:text-primary-700 dark:text-neutral-400 dark:hover:bg-primary-900/40 dark:hover:text-primary-200',
+          'focus-visible:outline-2 focus-visible:outline-primary-500 focus-visible:outline-offset-1',
+          speechMuted ? 'bg-primary-100/80 text-primary-700 dark:bg-primary-900/50 dark:text-primary-200' : '',
+        ]"
+        :title="speechMuted ? t('stage.speech-output.unmute') : t('stage.speech-output.mute')"
+        :aria-label="speechMuted ? t('stage.speech-output.unmute') : t('stage.speech-output.mute')"
+        :aria-pressed="speechMuted"
+        @click="toggleSpeechMuted"
+      >
+        <span v-if="speechMuted" aria-hidden="true" :class="['i-solar:volume-cross-outline size-5']" />
+        <span v-else aria-hidden="true" :class="['i-solar:volume-loud-outline size-5']" />
+      </BasicButton>
+    </div>
   </div>
 </template>

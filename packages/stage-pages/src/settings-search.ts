@@ -35,6 +35,7 @@ export const settingsSearchModules: Readonly<Record<string, SettingsSearchModule
   'modules:missions': { routes: ['/settings/modules/missions'] },
   'modules:memory-short-term': { routes: ['/settings/modules/memory-short-term'] },
   'modules:initiative': { routes: ['/settings/modules/initiative'] },
+  'modules:perception': { routes: ['/settings/modules/perception'] },
   'settings:providers': () => import('./pages/settings/providers/index.search'),
   'settings:usage': { routes: ['/settings/usage'] },
   'providers:comfyui': () => import('./pages/settings/providers/artistry/comfyui.search'),

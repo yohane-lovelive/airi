@@ -792,6 +792,9 @@ catalogs:
     get-port-please:
       specifier: ^3.2.0
       version: 3.2.0
+    get-windows:
+      specifier: ^9.3.0
+      version: 9.3.0
     gpuu:
       specifier: ^1.0.7
       version: 1.0.7
@@ -1674,7 +1677,7 @@ importers:
         version: 6.0.1
       node-vibrant:
         specifier: 'catalog:'
-        version: 4.0.4
+        version: 4.0.4(encoding@0.1.14)
       nprogress:
         specifier: 'catalog:'
         version: 0.2.0
@@ -1910,6 +1913,9 @@ importers:
       electron-updater:
         specifier: ^6.8.9
         version: 6.8.9(supports-color@10.2.2)
+      get-windows:
+        specifier: 'catalog:'
+        version: 9.3.0(encoding@0.1.14)(supports-color@10.2.2)
       uiohook-napi:
         specifier: 'catalog:'
         version: 1.5.5(patch_hash=012c5e5ad881d5ae40fc0af58832e31a0772ab0a74c038c8f4dfe51efaf398dd)
@@ -2315,7 +2321,7 @@ importers:
         version: 6.0.1
       node-vibrant:
         specifier: 'catalog:'
-        version: 4.0.4
+        version: 4.0.4(encoding@0.1.14)
       nprogress:
         specifier: 'catalog:'
         version: 0.2.0
@@ -2706,7 +2712,7 @@ importers:
         version: 6.0.1
       node-vibrant:
         specifier: 'catalog:'
-        version: 4.0.4
+        version: 4.0.4(encoding@0.1.14)
       nprogress:
         specifier: 'catalog:'
         version: 0.2.0
@@ -3136,7 +3142,7 @@ importers:
         version: 1.55.2
       node-vibrant:
         specifier: 'catalog:'
-        version: 4.0.4
+        version: 4.0.4(encoding@0.1.14)
       nprogress:
         specifier: 'catalog:'
         version: 0.2.0
@@ -3722,25 +3728,25 @@ importers:
         version: 3.102.3
       mineflayer:
         specifier: 'catalog:'
-        version: 4.37.1(supports-color@10.2.2)
+        version: 4.37.1(encoding@0.1.14)(supports-color@10.2.2)
       mineflayer-armor-manager:
         specifier: 'catalog:'
-        version: 2.0.1(mineflayer@4.37.1(supports-color@10.2.2))
+        version: 2.0.1(mineflayer@4.37.1(encoding@0.1.14)(supports-color@10.2.2))
       mineflayer-auto-eat:
         specifier: 'catalog:'
-        version: 5.0.3(supports-color@10.2.2)(vec3@0.2.0)
+        version: 5.0.3(encoding@0.1.14)(supports-color@10.2.2)(vec3@0.2.0)
       mineflayer-collectblock:
         specifier: 'catalog:'
-        version: 1.6.0(supports-color@10.2.2)
+        version: 1.6.0(encoding@0.1.14)(supports-color@10.2.2)
       mineflayer-pathfinder:
         specifier: 'catalog:'
         version: 2.4.5(patch_hash=4bbfdca823ab48b74086e6e7d4b2f9baf5ee7c0ba9aee0c279b3c91c50bfd797)(supports-color@10.2.2)
       mineflayer-pvp:
         specifier: 'catalog:'
-        version: 1.3.2(prismarine-registry@1.12.0(supports-color@10.2.2))(supports-color@10.2.2)
+        version: 1.3.2(encoding@0.1.14)(prismarine-registry@1.12.0(supports-color@10.2.2))(supports-color@10.2.2)
       mineflayer-tool:
         specifier: 'catalog:'
-        version: 1.2.0(supports-color@10.2.2)
+        version: 1.2.0(encoding@0.1.14)(supports-color@10.2.2)
       nanoid:
         specifier: 'catalog:'
         version: 6.0.1
@@ -3844,7 +3850,7 @@ importers:
         version: 1.1.0
       '@grammyjs/files':
         specifier: 'catalog:'
-        version: 1.2.0(grammy@1.45.1(supports-color@10.2.2))
+        version: 1.2.0(grammy@1.45.1(encoding@0.1.14)(supports-color@10.2.2))
       '@guiiai/logg':
         specifier: 'catalog:'
         version: 1.2.12
@@ -3916,7 +3922,7 @@ importers:
         version: 2.1.3
       grammy:
         specifier: 'catalog:'
-        version: 1.45.1(supports-color@10.2.2)
+        version: 1.45.1(encoding@0.1.14)(supports-color@10.2.2)
       nanoid:
         specifier: 'catalog:'
         version: 6.0.1
@@ -4797,7 +4803,7 @@ importers:
         version: 6.0.1
       node-vibrant:
         specifier: 'catalog:'
-        version: 4.0.4
+        version: 4.0.4(encoding@0.1.14)
       pinia:
         specifier: 'catalog:'
         version: 4.0.3(@vue/devtools-api@8.2.1)(typescript@6.0.3)(vue@3.5.41(typescript@6.0.3))
@@ -4927,7 +4933,7 @@ importers:
         version: 6.0.1
       node-vibrant:
         specifier: 'catalog:'
-        version: 4.0.4
+        version: 4.0.4(encoding@0.1.14)
       pinia:
         specifier: 'catalog:'
         version: 4.0.3(@vue/devtools-api@8.2.1)(typescript@6.0.3)(vue@3.5.41(typescript@6.0.3))
@@ -5316,7 +5322,7 @@ importers:
         version: 6.0.1
       node-vibrant:
         specifier: 'catalog:'
-        version: 4.0.4
+        version: 4.0.4(encoding@0.1.14)
       ofetch:
         specifier: 'catalog:'
         version: 1.5.1
@@ -6430,7 +6436,7 @@ importers:
     dependencies:
       '@apple/app-store-server-library':
         specifier: 'catalog:'
-        version: 3.1.0
+        version: 3.1.0(encoding@0.1.14)
       '@aws-sdk/client-s3':
         specifier: 'catalog:'
         version: 3.1139.0
@@ -9501,6 +9507,10 @@ packages:
     resolution: {integrity: sha512-9QOtNffcOF/c1seMCDnjckb3R9WHcG34tky+FHpNKKCW0wc/scYLwMtO+ptyGUfMW0/b/n4qRiALlaFHc9Oj7Q==}
     engines: {node: '>= 10.0.0'}
 
+  '@mapbox/node-pre-gyp@1.0.11':
+    resolution: {integrity: sha512-Yhlar6v9WQgUp/He7BdgzOz8lqMQ8sU+jkCq7Wx8Myc5YFJLbEe7lgui/V7G1qB1DJykHSGwreceSaD60Y0PUQ==}
+    hasBin: true
+
   '@marijn/find-cluster-break@1.0.4':
     resolution: {integrity: sha512-Wy0V7+SGUjnF9/TkiM1hKVDPj7jKXduPNboMVtHTA8dySMURWqfg/JZ9E2Sq8JgSJmkl7k7Qe9FLeMSrSraWmQ==}
 
@@ -9788,6 +9798,14 @@ packages:
   '@nolyfill/string.prototype.matchall@1.0.44':
     resolution: {integrity: sha512-/lwVUaDPCeopUL6XPz2B2ZwaQeIbctP8YxNIyCxunxVKWhCAhii+w0ourNK7JedyGIcM+DaXZTeRlcbgEWaZig==}
     engines: {node: '>=12.4.0'}
+
+  '@npmcli/agent@2.2.2':
+    resolution: {integrity: sha512-OrcNPXdpSl9UX7qPVRWbmWMCSXrcDa2M9DvrbOTj7ao1S4PlqVFYv9/yLKMkrJKZ/V5A/kDBC690or307i26Og==}
+    engines: {node: ^16.14.0 || >=18.0.0}
+
+  '@npmcli/fs@3.1.1':
+    resolution: {integrity: sha512-q9CRWjpHCMIh5sVyefoD1cA7PkvILqCZsnSOEUUivORLjxCO/Irmue2DprETiNgEqktDBZaM1Bi+jrarx1XdCg==}
+    engines: {node: ^14.17.0 || ^16.13.0 || >=18.0.0}
 
   '@nuxt/kit@3.21.11':
     resolution: {integrity: sha512-0Xi3tgwN77w43Q8GCPIrvWmF1J7Peehkts44E0uKNIml9lB8WoUn8YxyUjxBv47XtVR86NWoWALAT+/IEMHJEA==}
@@ -13739,6 +13757,9 @@ packages:
   '@yuku-toolchain/types@0.8.7':
     resolution: {integrity: sha512-2Z53dNxAJL6UvFoIrDZvYf3zlO8s4VJK4O2hhaB4mXVwwpX/7ajtss3cmfqKvamlNLWyt9FSWs4eoYdlbxpnHA==}
 
+  abbrev@1.1.1:
+    resolution: {integrity: sha512-nne9/IiQ/hzIhY6pdDnbBtz7DjPTKrY00P/zvPSm5pOFkl6xuGrGnXn/VtTNNfNtAfZ9/1RtehkszU9qcTii0Q==}
+
   abbrev@2.0.0:
     resolution: {integrity: sha512-6/mh1E2u2YgEsCHdY0Yx5oW+61gZU+1vXaoiHHrpKeuRNNgFvS+/jrwHiQhB5apAf5oB7UB7E19ol2R2LKH8hQ==}
     engines: {node: ^14.17.0 || ^16.13.0 || >=18.0.0}
@@ -13772,9 +13793,17 @@ packages:
   aes-js@3.1.2:
     resolution: {integrity: sha512-e5pEa2kBnBOgR4Y/p20pskXI74UEz7de8ZGVo58asOtvSVG5YAbJeELPZxOmt+Bnz3rX753YKhfIn4X4l1PPRQ==}
 
+  agent-base@6.0.2:
+    resolution: {integrity: sha512-RZNwNclF7+MS/8bDg70amg32dyeZGZxiDuQmZxKLAlQjr3jGyLx+4Kkk58UO7D2QdgFIQCovuSuZESne6RG6XQ==}
+    engines: {node: '>= 6.0.0'}
+
   agent-base@7.1.4:
     resolution: {integrity: sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ==}
     engines: {node: '>= 14'}
+
+  aggregate-error@3.1.0:
+    resolution: {integrity: sha512-4I7Td01quW/RpocfNayFdFVk1qSuoh0E7JrbRJ16nH01HhKFQ88INq9Sd+nd72zqRySlr9BmDA8xlEJ6vJMrYA==}
+    engines: {node: '>=8'}
 
   ajv-formats@3.0.1:
     resolution: {integrity: sha512-8iUql50EUR+uUcdRQ3HDqa6EVyo3docL8g5WJ3FNcWmu62IbkGUue/pEyLBW8VGKKucTPgqeks4fIU1DA4yowQ==}
@@ -13870,9 +13899,17 @@ packages:
       dmg-builder: 26.16.1
       electron-builder-squirrel-windows: 26.16.1
 
+  aproba@2.1.0:
+    resolution: {integrity: sha512-tLIEcj5GuR2RSTnxNKdkK0dJ/GrC7P38sUkiDmDuHfsHmbagTFAxDVIBltoklXEVIQ/f14IL8IMJ5pn9Hez1Ew==}
+
   are-docs-informative@0.0.2:
     resolution: {integrity: sha512-ixiS0nLNNG5jNQzgZJNoUpBKdo9yTYZMGJ+QgT2jmjR7G7+QHRCc4v6LQ3NgE7EBJq+o0ams3waJwkrlBom8Ig==}
     engines: {node: '>=14'}
+
+  are-we-there-yet@2.0.0:
+    resolution: {integrity: sha512-Ci/qENmwHnsYo9xKIcUJN5LeDKdJ6R1Z1j9V/J5wyq8nh/mYPEpIKJbBZXtZjG04HiK7zV/p6Vs9952MrMeUIw==}
+    engines: {node: '>=10'}
+    deprecated: This package is no longer supported.
 
   argparse@1.0.10:
     resolution: {integrity: sha512-o5Roy6tNG4SL/FOkCAN6RzjiakZS25RLYFrcMttJqbdd8BWrnA+fGz57iN5Pb06pvBGvl5gQ0B48dJlslXvoTg==}
@@ -14404,6 +14441,10 @@ packages:
     resolution: {integrity: sha512-tixWYgm5ZoOD+3g6UTea91eow5z6AAHaho3g0V9CNSNb45gM8SmflpAc+GRd1InC4AqN/07Unrgp56Y94N9hJQ==}
     engines: {node: '>=20.19.0'}
 
+  cacache@18.0.4:
+    resolution: {integrity: sha512-B+L5iIa9mgcjLbliir2th36yEwPftrzteHYujzsx3dFP/31GCHcIeS8f5MGd80odLOjaOvSpU3EEAmRQptkxLQ==}
+    engines: {node: ^16.14.0 || >=18.0.0}
+
   cacheable-lookup@5.0.4:
     resolution: {integrity: sha512-2/kNscPhpcxrOigMZzbiWF7dz8ilhb/nIHU3EyZiXWXpeq/au8qJ8VhdftMkty3n7Gj6HIGalQG8oiBNB3AJgA==}
     engines: {node: '>=10.6.0'}
@@ -14498,6 +14539,10 @@ packages:
   chownr@1.1.4:
     resolution: {integrity: sha512-jJ0bqzaylmJtVnNgzTeSOs8DPavpbYgEr/b0YL8/2GO3xJEhInFmhKMUnEJQjZumK7KXGFhUy89PrsJWlakBVg==}
 
+  chownr@2.0.0:
+    resolution: {integrity: sha512-bIomtDF5KGpdogkLd9VspvFzk9KfpyyGlS8YFVZl7TGPBHL5snIOnxeshwVgPteQ9b4Eydl+pVbIyE1DcvCWgQ==}
+    engines: {node: '>=10'}
+
   chownr@3.0.0:
     resolution: {integrity: sha512-+IxzY9BZOQd/XuYPRmrvEVjF/nqj5kgT4kEq7VofrDoM1MxoRjEWkrCC3EtLi59TVawxTAn+orJwFQcrqEN1+g==}
     engines: {node: '>=18'}
@@ -14528,6 +14573,10 @@ packages:
   clean-regexp@1.0.0:
     resolution: {integrity: sha512-GfisEZEJvzKrmGWkvfhgzcz/BllN1USeqD2V6tg14OAOgaCD2Z/PUEuxnAZ/nPvmaHRG7a8y77p1T/IRQ4D1Hw==}
     engines: {node: '>=4'}
+
+  clean-stack@2.2.0:
+    resolution: {integrity: sha512-4diC9HaTE+KRAMWhDhrGOECgWZxoevMc5TlkObMqNSsVU62PYzXZ/SMTjzyGAFF1YusgxGcSWTEXBhp0CPwQ1A==}
+    engines: {node: '>=6'}
 
   cli-spinners@3.4.0:
     resolution: {integrity: sha512-bXfOC4QcT1tKXGorxL3wbJm6XJPDqEnij2gQ2m7ESQuE+/z9YFIWnl/5RpTiKWbMq3EVKR4fRLJGn6DVfu0mpw==}
@@ -14686,6 +14735,9 @@ packages:
   consola@3.4.2:
     resolution: {integrity: sha512-5IKcdX0nnYavi6G7TtOhwkYzyjfJlatbjMjuLSfE2kYT5pMDOilZ4OvMhi637CcDICTmz3wARPoyhqyX1Y+XvA==}
     engines: {node: ^14.18.0 || >=16.10.0}
+
+  console-control-strings@1.1.0:
+    resolution: {integrity: sha512-ty/fTekppD2fIwRvnZAVdeOiGd1c7YXEixbgJTNzqcxJWKQnjJ/V1bNEEE6hygpM3WjwHFUVK6HTjWSzV4a8sQ==}
 
   content-disposition@0.5.4:
     resolution: {integrity: sha512-FveZTNuGw04cxlAiWbzi6zTAL/lhehaWbTtgluJh4/E95DqMwTmha3KZN1aAWA8cFIhHzMZUvLevkw5Rqk+tSQ==}
@@ -15044,6 +15096,9 @@ packages:
   delayed-stream@1.0.0:
     resolution: {integrity: sha512-ZySD7Nf91aLB0RxL4KGrKHBXl7Eds1DAmEdcoVawXnLD7SDhpNgtuII2aAkg7a7QS41jxPSZ17p4VdGnMHk3MQ==}
     engines: {node: '>=0.4.0'}
+
+  delegates@1.0.0:
+    resolution: {integrity: sha512-bd2L678uiWATM6m5Z1VzNCErI3jiGzt6HGY8OVICs40JQq/HALfbyNJmp0UDakEY4pMMaN0Ly5om/B1VI/+xfQ==}
 
   denque@2.1.0:
     resolution: {integrity: sha512-HVQE3AAb/pxF8fQAoiqpvg9i3evqug3hoiwakOyZAwJm+6vZehbkYXZ0l4JxS+I3QxM97v5aaRNhj8v5oBhekw==}
@@ -15513,6 +15568,10 @@ packages:
   encodeurl@2.0.0:
     resolution: {integrity: sha512-Q0n9HRi4m6JuGIV1eFlmvJB7ZEVxu93IrMyiMsGC0lrMJMWzRgx6WGquyfQgZVb31vhGgXnfmPNNXmxnOkRBrg==}
     engines: {node: '>= 0.8'}
+
+  encoding@0.1.14:
+    resolution: {integrity: sha512-pqH+jIxIhwX5U4w+Tnu3jjowTo5QTACbqef2C5Cw2RhApr7COQqgnai53u8VbtqjWRcSoAcTf7uZ62dO5kC8Iw==}
+    engines: {node: '>=20.0.0'}
 
   end-of-stream@1.4.5:
     resolution: {integrity: sha512-ooEGc6HP26xXq/N+GCGOT0JKCLDGrq2bQUZrQ7gyrJiZANJ/8YDTxTpQBXGMn+WbIQXNVpyWymm7KYVICQnyOg==}
@@ -16256,6 +16315,14 @@ packages:
     resolution: {integrity: sha512-hcg3ZmepS30/7BSFqRvoo3DOMQu7IjqxO5nCDt+zM9XWjb33Wg7ziNT+Qvqbuc3+gWpzO02JubVyk2G4Zvo1OQ==}
     engines: {node: '>=10'}
 
+  fs-minipass@2.1.0:
+    resolution: {integrity: sha512-V/JgOLFCS+R6Vcq0slCuaeWEdNC3ouDlJMNIsacH2VtALiu9mV4LPrHc5cDl8k5aw6J8jwgWWpiTo5RYhmIzvg==}
+    engines: {node: '>= 8'}
+
+  fs-minipass@3.0.3:
+    resolution: {integrity: sha512-XUBA9XClHbnJWSfBzjkm6RvPsyg3sryZt06BEQoXcF7EK/xpGaQYJgQKDJSUH5SGZ76Y7pFx1QBnXz09rU5Fbw==}
+    engines: {node: ^14.17.0 || ^16.13.0 || >=18.0.0}
+
   fs.realpath@1.0.0:
     resolution: {integrity: sha512-OO0pH2lK6a0hZnAdau5ItzHPI6pUlvI7jMVnxUQRtw4owF2wk8lOSabtGDCTP4Ggrg2MbGnWO9X8K1t4+fGMDw==}
 
@@ -16281,6 +16348,11 @@ packages:
 
   fzf@0.5.2:
     resolution: {integrity: sha512-Tt4kuxLXFKHy8KT40zwsUPUkg1CrsgY25FxA2U/j/0WgEDCk3ddc/zLTCCcbSHX9FcKtLuVaDGtGE/STWC+j3Q==}
+
+  gauge@3.0.2:
+    resolution: {integrity: sha512-+5J6MS/5XksCuXq++uFRsnUd7Ovu1XenbeuIuNRJxYWjgQbPuFhT14lAvsWfqfAmnwluf1OwMjz39HjfLPci0Q==}
+    engines: {node: '>=10'}
+    deprecated: This package is no longer supported.
 
   gaxios@7.1.3:
     resolution: {integrity: sha512-YGGyuEdVIjqxkxVH1pUTMY/XtmmsApXrCVv5EU25iX6inEPbV+VakJfLealkBtJN69AQmh1eGOdCl9Sm1UP6XQ==}
@@ -16348,6 +16420,10 @@ packages:
   get-tsconfig@5.0.0-beta.5:
     resolution: {integrity: sha512-/6gFNr0N04nob252sTQxyFLi3eKFRqIg1I87YcqAMT1i6SQrSF6KujUEQrtrjMV0H/eejTCltLdDSTEMzHbnsQ==}
     engines: {node: '>=20.20.0'}
+
+  get-windows@9.3.0:
+    resolution: {integrity: sha512-DrOfQSmIcsFax28FfSUjbLTfeOkAG7yeh6NCb/9zzRkDuClXaqYqHuQBPUqcqd1uYS70ygYERSooacMAwvbyVw==}
+    engines: {node: '>=18.18'}
 
   getpass@0.1.7:
     resolution: {integrity: sha512-0fzj9JxOLfJ+XGLhR8ze3unN0KZCgZwiSSDz168VERjK8Wl8kVSdcu2kspd4s4wtAa1y/qrVRiAA0WclVsu0ng==}
@@ -16552,6 +16628,9 @@ packages:
     resolution: {integrity: sha512-NqADB8VjPFLM2V0VvHUewwwsw0ZWBaIdgo+ieHtK3hasLz4qeCRjYcqfB6AQrBggRKppKF8L52/VqdVsO47Dlw==}
     engines: {node: '>= 0.4'}
 
+  has-unicode@2.0.1:
+    resolution: {integrity: sha512-8Rf9Y83NBReMnx0gFzA8JImQACstCYWUplepDa9xprwwtmgEZUF0h/i5xSA625zB/I37EtrswSST6OXxwaaIJQ==}
+
   hasown@2.0.4:
     resolution: {integrity: sha512-T2UbfbBEF32wiepXIsMlTW9+dDYC6wMh/t/vYA4tuOMKqWz/n3vr1NFSxQiyP+zk2mXsoMA/i/7qV6LKut1t1A==}
     engines: {node: '>= 0.4'}
@@ -16705,6 +16784,10 @@ packages:
     resolution: {integrity: sha512-V+23sDMr12Wnz7iTcDeJr3O6AIxlnvT/bmaAAAP/Xda35C90p9599p0F1eHR/N1KILWSoWVAiOMFjBBXaXSMxg==}
     engines: {node: '>=10.19.0'}
 
+  https-proxy-agent@5.0.1:
+    resolution: {integrity: sha512-dFcAjpTQFgoLMzC2VwU+C/CbS7uRL0lWmxDITmqm7C+7F0Odmj6s9l6alZc6AELXhrnggM2CeWSXHGOdX2YtwA==}
+    engines: {node: '>= 6'}
+
   https-proxy-agent@7.0.6:
     resolution: {integrity: sha512-vK9P5/iUfdl95AI+JVyUuIcVtd4ofvtrOr3HNtM2yxC9bnMbEdp3x01OhQNnjb8IJYi38VlTE3mBXwcfvywuSw==}
     engines: {node: '>= 14'}
@@ -16770,6 +16853,10 @@ packages:
   imurmurhash@0.1.4:
     resolution: {integrity: sha512-JmXMZ6wuvDmLiHEml9ykzqO6lwFbof0GG4IkcGaENdCRDDmMVnny7s5HsIgHCbaq0w2MyPhDqkhTUgS2LU2PHA==}
     engines: {node: '>=0.8.19'}
+
+  indent-string@4.0.0:
+    resolution: {integrity: sha512-EdDDZu4A2OyIK7Lr/2zG+w5jmbuk1DVBnEwREQvBzspBJkCEbRa8GxU1lghYcaGJCnRWibjDXlq779X1/y5xwg==}
+    engines: {node: '>=8'}
 
   indent-string@5.0.0:
     resolution: {integrity: sha512-m6FAo/spmsW2Ab2fU35JTYwtOKa2yAwXSwgjSv1TJzh4Mh7mC3lzAOVLBprb72XsTrgkEIsl7YrFNAiDiRhIGg==}
@@ -16892,6 +16979,9 @@ packages:
     resolution: {integrity: sha512-KIYLCCJghfHZxqjYBE7rEy0OBuTd5xCHS7tHVgvCLkx7StIoaxwNW3hCALgEUjFfeRk+MG/Qxmp/vtETEF3tRA==}
     engines: {node: '>=14.16'}
     hasBin: true
+
+  is-lambda@1.0.1:
+    resolution: {integrity: sha512-z7CMFGNrENq5iFB9Bqo64Xk6Y9sg+epq1myIcdHaGnbMTYOxvzsEtdYqQUylB7LxfkvgrrjP32T6Ywciio9UIQ==}
 
   is-module@1.0.0:
     resolution: {integrity: sha512-51ypPSPCoTEIN9dy5Oy+h4pShgJmPCygKfyRCISBI+JoWT/2oJvK8QPxmwv7b/p239jXrm9M1mlQbyKJ5A152g==}
@@ -17490,6 +17580,10 @@ packages:
     resolution: {integrity: sha512-IfpFq6UM39dUNiphpA6uDezNx/AvWyhwfICWPR3t1VspkgkMZrL+Rk1RbN1bx+aeNYwOrqGJgEgV3yotk+ZUVw==}
     engines: {node: '>=18'}
 
+  make-fetch-happen@13.0.1:
+    resolution: {integrity: sha512-cKTUFc/rbKUd/9meOvgrpJ2WrNzymt6jfRDdwg5UCnVzv9dTpEj9JS5m3wtziXVCjluIXyL8pcaukYqezIzZQA==}
+    engines: {node: ^16.14.0 || >=18.0.0}
+
   many-keys-map@3.0.3:
     resolution: {integrity: sha512-1DiZmDHPXMBgMRjeUtHy1q1VYmeJscHxhIAexX9z/zjRMP80+0ETuPfssi8z+kMY4DwUgsKuHqpjxgmeA9gBNA==}
     engines: {node: '>=18'}
@@ -17818,9 +17912,41 @@ packages:
   minimist@1.2.8:
     resolution: {integrity: sha512-2yyAR8qBkN3YuheJanUpWC5U3bb5osDywNB8RzDVlDwDHbocAJveqqj1u8+SVD7jkWT4yvsHCpWqqWqAxb0zCA==}
 
+  minipass-collect@2.0.1:
+    resolution: {integrity: sha512-D7V8PO9oaz7PWGLbCACuI1qEOsq7UKfLotx/C0Aet43fCUB/wfQ7DYeq2oR/svFJGYDHPr38SHATeaj/ZoKHKw==}
+    engines: {node: '>=16 || 14 >=14.17'}
+
+  minipass-fetch@3.0.5:
+    resolution: {integrity: sha512-2N8elDQAtSnFV0Dk7gt15KHsS0Fyz6CbYZ360h0WTYV1Ty46li3rAXVOQj1THMNLdmrD9Vt5pBPtWtVkpwGBqg==}
+    engines: {node: ^14.17.0 || ^16.13.0 || >=18.0.0}
+
+  minipass-flush@1.0.7:
+    resolution: {integrity: sha512-TbqTz9cUwWyHS2Dy89P3ocAGUGxKjjLuR9z8w4WUTGAVgEj17/4nhgo2Du56i0Fm3Pm30g4iA8Lcqctc76jCzA==}
+    engines: {node: '>= 8'}
+
+  minipass-pipeline@1.2.4:
+    resolution: {integrity: sha512-xuIq7cIOt09RPRJ19gdi4b+RiNvDFYe5JH+ggNvBqGqpQXcru3PcRmOZuHBKWK1Txf9+cQ+HMVN4d6z46LZP7A==}
+    engines: {node: '>=8'}
+
+  minipass-sized@1.0.3:
+    resolution: {integrity: sha512-MbkQQ2CTiBMlA2Dm/5cY+9SWFEN8pzzOXi6rlM5Xxq0Yqbda5ZQy9sU75a673FE9ZK0Zsbr6Y5iP6u9nktfg2g==}
+    engines: {node: '>=8'}
+
+  minipass@3.3.6:
+    resolution: {integrity: sha512-DxiNidxSEK+tHG6zOIklvNOwm3hvCrbUrdtzY74U6HKTJxvIDfOUL5W5P2Ghd3DTkhhKPYGqeNUIh5qcM4YBfw==}
+    engines: {node: '>=8'}
+
+  minipass@5.0.0:
+    resolution: {integrity: sha512-3FnjYuehv9k6ovOEbyOswadCDPX1piCfhV8ncmYtHOjuPwylVWsghTLo7rabjC3Rx5xD4HDx8Wm1xnMF7S5qFQ==}
+    engines: {node: '>=8'}
+
   minipass@7.1.3:
     resolution: {integrity: sha512-tEBHqDnIoM/1rXME1zgka9g6Q2lcoCkxHLuc7ODJ5BxbP5d4c2Z5cGgtXAku59200Cx7diuHTOYfSBD8n6mm8A==}
     engines: {node: '>=16 || 14 >=14.17'}
+
+  minizlib@2.1.2:
+    resolution: {integrity: sha512-bAxsR8BVfj60DWXHE3u30oHzfl4G7khkSuPW+qvpd7jFRHm7dLxOjUk1EHACJ/hxLY8phGJ0YhYHZo7jil7Qdg==}
+    engines: {node: '>= 8'}
 
   minizlib@3.1.0:
     resolution: {integrity: sha512-KZxYo1BUkWD2TVFLr0MQoM8vUUigWD3LlD83a/75BqC+4qE0Hb1Vo5v1FgcfaNXvfXzr+5EhQ6ing/CaBijTlw==}
@@ -17839,6 +17965,11 @@ packages:
 
   mkdirp@0.5.6:
     resolution: {integrity: sha512-FP+p8RB8OWpF3YZBCrP5gtADmtXApB5AMLn+vdyA+PyxCjrCs00mjyUozssO33cwDeT3wNGdLxJ5M//YqtHAJw==}
+    hasBin: true
+
+  mkdirp@1.0.4:
+    resolution: {integrity: sha512-vVqVZQyf3WLx2Shd0qJ9xuvqgAyKPLAiqITEtqW0oIUjzo3PePDd6fW9iFz30ef7Ysp/oiWqbhszeGWW2T6Gzw==}
+    engines: {node: '>=10'}
     hasBin: true
 
   mlly@1.8.2:
@@ -17972,6 +18103,10 @@ packages:
   node-addon-api@7.1.1:
     resolution: {integrity: sha512-5m3bsyrjFWE1xf7nz7YXdN4udnVtXK6/Yfgn5qnahL6bCkf2yKt4k3nuTKAtT4r3IG8JNR2ncsIMdZuAzJjHQQ==}
 
+  node-addon-api@8.9.2:
+    resolution: {integrity: sha512-VijLXbi3UACN69I0JVXJsX4tjACjNoQDgv2gTF6sx2wWEi8tkSg2eX8p5gSIFi8z2+DL3oHmY6OyKce38SDolg==}
+    engines: {node: ^18 || ^20 || >= 21}
+
   node-api-version@0.2.1:
     resolution: {integrity: sha512-2xP/IGGMmmSQpI1+O/k72jF/ykvZ89JeuKX3TLJAYPDVLUalrshrLHkeVcCCZqG/eEa635cr8IBYzgnDvM2O8Q==}
 
@@ -18004,6 +18139,11 @@ packages:
     resolution: {integrity: sha512-LA4ZjwlnUblHVgq0oBF3Jl/6h/Nvs5fzBLwdEF4nuxnFdsfajde4WfxtJr3CaiH+F6ewcIB/q4jQ4UzPyid+CQ==}
     hasBin: true
 
+  node-gyp@10.3.1:
+    resolution: {integrity: sha512-Pp3nFHBThHzVtNY7U6JfPjvT/DTE8+o/4xKsLQtBoU+j2HLsGlhcfzflAoUreaJbNmYnX+LlLi0qjV8kpyO6xQ==}
+    engines: {node: ^16.14.0 || >=18.0.0}
+    hasBin: true
+
   node-gyp@12.4.0:
     resolution: {integrity: sha512-OMcPNvqTCFUnNaBlmdgq+lfNqY7gTiSmNRDjY3uAXRyudeKZEZxu3CLtjMQrx4zZxCX2b/mpNqTtwuCJgXhHkw==}
     engines: {node: ^20.17.0 || >=22.9.0}
@@ -18029,6 +18169,11 @@ packages:
   node-vibrant@4.0.4:
     resolution: {integrity: sha512-hA/pUXBE9TJ41G9FlTkzeqD5JdxgvvPGYZb/HNpdkaxxXUEnP36imSolZ644JuPun+lTd+FpWWtBpTYdp2noQA==}
 
+  nopt@5.0.0:
+    resolution: {integrity: sha512-Tbj67rffqceeLpcRXrT7vKAN8CwfPeIBgM7E6iBkmKLV7bEMwpGgYLGv0jACUsECaa/vuxP0IjEont6umdMgtQ==}
+    engines: {node: '>=6'}
+    hasBin: true
+
   nopt@7.2.1:
     resolution: {integrity: sha512-taM24ViiimT/XntxbPyJQzCG+p4EKOpgD3mxFwW38mGjVUrfERQOeY4EDHjdnptttfHuHQXFx+lTP08Q+mLa/w==}
     engines: {node: ^14.17.0 || ^16.13.0 || >=18.0.0}
@@ -18053,6 +18198,10 @@ packages:
   npm-run-path@6.0.0:
     resolution: {integrity: sha512-9qny7Z9DsQU8Ou39ERsPU4OZQlSTP47ShQzuKZ6PRXpYLtIFgl/DEBYEXKlvcEa+9tHVcK8CF81Y2V72qaZhWA==}
     engines: {node: '>=18'}
+
+  npmlog@5.0.1:
+    resolution: {integrity: sha512-AqZtDUWOMKs1G/8lwylVjrdYgqA4d9nu8hc+0gzRxlDb1I10+FHBGMXs6aiQHFdCUUlqH99MUMuLfzWDNDtfxw==}
+    deprecated: This package is no longer supported.
 
   nprogress@0.2.0:
     resolution: {integrity: sha512-I19aIingLgR1fmhftnbWWO3dXc0hSxqHQHQb3H8m+K3TnEn/iSeTZZOyvKXWqQESMwuUVnatlCnZdLBZZt2VSA==}
@@ -18237,6 +18386,10 @@ packages:
 
   p-locate@5.0.0:
     resolution: {integrity: sha512-LaNjtRWUBY++zB5nE/NwcaoMylSPk+S+ZHNB1TzdbMJMny6dynpAGt7X/tl/QYq3TIeE6nxHppbo2LGymrG5Pw==}
+    engines: {node: '>=10'}
+
+  p-map@4.0.0:
+    resolution: {integrity: sha512-/bjOqmgETBYB5BoEeGVea8dmvHb2m9GLy1E9W43yeyfP6QQCZGFNa+XRceJEuDB6zqr+gKpIAmlLebMpykw/MQ==}
     engines: {node: '>=10'}
 
   p-retry@4.6.2:
@@ -18694,6 +18847,10 @@ packages:
   probe-image-size@7.4.0:
     resolution: {integrity: sha512-cdEprVtZxV+awMde9X+4jILBFYh4CARxVrQaMl4wY4YcPWbul9jntXrIW95NInBDyJwcVUP3U0T6yukN8rMBaQ==}
 
+  proc-log@4.2.0:
+    resolution: {integrity: sha512-g8+OnU/L2v+wyiVK+D5fA34J7EH8jZ8DDlvwhRCMxmMj7UCBvxiO1mGeN+36JXIKF4zevU4kRBd8lVgG9vLelA==}
+    engines: {node: ^14.17.0 || ^16.13.0 || >=18.0.0}
+
   proc-log@6.1.0:
     resolution: {integrity: sha512-iG+GYldRf2BQ0UDUAd6JQ/RwzaQy6mXmsk/IzlYyal4A4SNFw54MeH4/tLkF4I5WoWG9SQwuqWzS99jaFQHBuQ==}
     engines: {node: ^20.17.0 || >=22.9.0}
@@ -19056,6 +19213,11 @@ packages:
     deprecated: Rimraf versions prior to v4 are no longer supported
     hasBin: true
 
+  rimraf@3.0.2:
+    resolution: {integrity: sha512-JZkJMZkAGFFPP2YqXZXPbMlMBgsxzE8ILs4lMIX/2o0L9UBw9O/Y3o6wFw/i9YLapcUJWwqbi3kdxIPdC62TIA==}
+    deprecated: Rimraf versions prior to v4 are no longer supported
+    hasBin: true
+
   rimraf@5.0.10:
     resolution: {integrity: sha512-l0OE8wL34P4nJH/H2ffoaniAokM2qSmrtXHmlpvYr5AVVX8msAyW0l8NVJFDxlSK4u3Uh/f41cQheDVdnYijwQ==}
     hasBin: true
@@ -19240,6 +19402,9 @@ packages:
     resolution: {integrity: sha512-xRXBn0pPqQTVQiC8wyQrKs2MOlX24zQ0POGaj0kultvoOCstBQM5yvOhAVSUwOMjQtTvsPWoNCHfPGwaaQJhTw==}
     engines: {node: '>= 18'}
 
+  set-blocking@2.0.0:
+    resolution: {integrity: sha512-KiKBS8AnWGEyLzofFfmvKwpdPzqiy16LvQfK3yv/fVH7Bj13/wl3JSR1J+rfgRE9q7xUJK4qvgS8raSOeLUehw==}
+
   set-cookie-parser@2.7.2:
     resolution: {integrity: sha512-oeM1lpU/UvhTxw+g3cIfxXHyJRc/uidd3yK1P242gzHds0udQBYzs3y8j4gCCW+ZJ7ad0yctld8RYO+bdurlvw==}
 
@@ -19357,6 +19522,10 @@ packages:
     resolution: {integrity: sha512-2Dd78bqzzjE6KPkD5fHZmDAKRNe3J15q+YHDrIsy9WEkqttc7GY+kT9OBLSMaPbQaEd0x1BjcmtMtXkfpc+T5A==}
     engines: {node: '>=10.2.0'}
 
+  socks-proxy-agent@8.0.5:
+    resolution: {integrity: sha512-HehCEsotFqbPW9sJ8WVYB6UbmIMv7kUUORIF2Nncq4VQvBfNBLibW9YZR5dlYCSUhwcD628pRllm7n+E+YTzJw==}
+    engines: {node: '>= 14'}
+
   socks@2.8.9:
     resolution: {integrity: sha512-LJhUYUvItdQ0LkJTmPeaEObWXAqFyfmP85x0tch/ez9cahmhlBBLbIqDFnvBnUJGagb0JbIQrkBs1wJ+yRYpEw==}
     engines: {node: '>= 10.0.0', npm: '>= 3.0.0'}
@@ -19444,6 +19613,10 @@ packages:
     resolution: {integrity: sha512-2p2KJZTSqQ/I3+HX42EpYOa2l3f8Erv8MWKsy2I9uf4wA7yFIkXRffYdsx86y6z4vHtV8u7g+pPlr8/4ouAxsQ==}
     engines: {node: '>=0.10.0'}
     hasBin: true
+
+  ssri@10.0.6:
+    resolution: {integrity: sha512-MGrFH9Z4NP9Iyhqn16sDtBpRRNJ0Y2hNa6D65h736fVSaPCHr4DM4sWUNvVaSuC+0OBGhwsrydQwmgfg5LncqQ==}
+    engines: {node: ^14.17.0 || ^16.13.0 || >=18.0.0}
 
   stackback@0.0.2:
     resolution: {integrity: sha512-1XMJE5fQo1jGH6Y/7ebnwPOBEkIEnT4QF32d5R1+VXdXveM0IBMJt8zfaxX1P3QhVwrYe+576+jkANtSS2mBbw==}
@@ -19669,6 +19842,11 @@ packages:
 
   tar-stream@3.2.0:
     resolution: {integrity: sha512-ojzvCvVaNp6aOTFmG7jaRD0meowIAuPc3cMMhSgKiVWws1GyHbGd/xvnyuRKcKlMpt3qvxx6r0hreCNITP9hIg==}
+
+  tar@6.2.1:
+    resolution: {integrity: sha512-DZ4yORTwrbTj/7MZYq2w+/ZFdI6OZ/f9SFHR+71gIVUZhOQPHzVCLpvRnPgyaMpfWxxk/4ONva3GQSyNIKRv6A==}
+    engines: {node: '>=10'}
+    deprecated: Old versions of tar are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
 
   tar@7.5.22:
     resolution: {integrity: sha512-MFO/QzvtAOmJbkhOaCTvbGcFN9L9b+JunIsDwaKljSOdcLMea3NJ1k9Usz/rjdfSXTq4dfzfeS7W4p4YOAAHeA==}
@@ -20120,6 +20298,14 @@ packages:
         optional: true
       rolldown:
         optional: true
+
+  unique-filename@3.0.0:
+    resolution: {integrity: sha512-afXhuC55wkAmZ0P18QsVE6kp8JaxrEokN2HGIoIVv2ijHQd419H0+6EigAFcIzXeMIkcIkNBpB3L/DXB3cTS/g==}
+    engines: {node: ^14.17.0 || ^16.13.0 || >=18.0.0}
+
+  unique-slug@4.0.0:
+    resolution: {integrity: sha512-WrcA6AyEfqDX5bWige/4NQfPZMtASNVxdmWR76WESYQVAACSgWcR6e9i0mofqqBxYFtL4oAxPIptY73/0YE1DQ==}
+    engines: {node: ^14.17.0 || ^16.13.0 || >=18.0.0}
 
   unique-string@2.0.0:
     resolution: {integrity: sha512-uNaeirEPvpZWSgzwsPGtU2zVSTrn/8L5q/IexZmH0eH6SA73CmAA5U4GwORTxQAZs95TAXLNqeLoPPNO5gZfWg==}
@@ -20993,6 +21179,11 @@ packages:
     engines: {node: '>= 8'}
     hasBin: true
 
+  which@4.0.0:
+    resolution: {integrity: sha512-GlaYyEb07DPxYCKhKzplCWBJtvxZcZMrL+4UkrTSJHHPyZU4mYYTv3qaOe77H7EODLSSopAUFAc6W8U4yqvscg==}
+    engines: {node: ^16.13.0 || >=18.0.0}
+    hasBin: true
+
   which@5.0.0:
     resolution: {integrity: sha512-JEdGzHwwkrbWoGOlIHqQ5gtprKGOenpDHpxE9zVR1bWbOtYRyPPHMe9FaP6x61CmNaTThSkb0DAJte5jD+DmzQ==}
     engines: {node: ^18.17.0 || >=20.5.0}
@@ -21010,6 +21201,9 @@ packages:
 
   wicked-good-xpath@1.3.0:
     resolution: {integrity: sha512-Gd9+TUn5nXdwj/hFsPVx5cuHHiF5Bwuc30jZ4+ronF1qHK5O7HD0sgmXWSEgwKquT3ClLoKPVbO6qGwVwLzvAw==}
+
+  wide-align@1.1.5:
+    resolution: {integrity: sha512-eDMORYaPNZ4sQIuuYPDHdQvf4gyCF9rEEV/yPxGfwPkRodwEgiMUUXTx/dex+Me0wxx53S+NgUHaP7y3MGlDmg==}
 
   wlipsync@1.3.1:
     resolution: {integrity: sha512-R7m2b7UkfpXxvQYxypIkJqtmgmgMXNZ/z3558u9S0rI0HoMhKusXz4tFdDSsct3eRoZg1WBan6YfcawGxJqP1g==}
@@ -21576,7 +21770,7 @@ snapshots:
       jsonpointer: 5.0.1
       leven: 3.1.0
 
-  '@apple/app-store-server-library@3.1.0':
+  '@apple/app-store-server-library@3.1.0(encoding@0.1.14)':
     dependencies:
       '@types/jsonwebtoken': 9.0.10
       '@types/jsrsasign': 10.5.15
@@ -21585,7 +21779,7 @@ snapshots:
       base64url: 3.0.1
       jsonwebtoken: 9.0.3
       jsrsasign: 11.1.5
-      node-fetch: 2.7.0
+      node-fetch: 2.7.0(encoding@0.1.14)
     transitivePeerDependencies:
       - encoding
 
@@ -23877,9 +24071,9 @@ snapshots:
       - supports-color
       - utf-8-validate
 
-  '@grammyjs/files@1.2.0(grammy@1.45.1(supports-color@10.2.2))':
+  '@grammyjs/files@1.2.0(grammy@1.45.1(encoding@0.1.14)(supports-color@10.2.2))':
     dependencies:
-      grammy: 1.45.1(supports-color@10.2.2)
+      grammy: 1.45.1(encoding@0.1.14)(supports-color@10.2.2)
 
   '@grammyjs/types@4.0.0': {}
 
@@ -24384,68 +24578,68 @@ snapshots:
     dependencies:
       minipass: 7.1.3
 
-  '@jimp/bmp@0.22.12(@jimp/custom@0.22.12)':
+  '@jimp/bmp@0.22.12(@jimp/custom@0.22.12(encoding@0.1.14))':
     dependencies:
-      '@jimp/custom': 0.22.12
+      '@jimp/custom': 0.22.12(encoding@0.1.14)
       '@jimp/utils': 0.22.12
       bmp-js: 0.1.0
 
-  '@jimp/core@0.22.12':
+  '@jimp/core@0.22.12(encoding@0.1.14)':
     dependencies:
       '@jimp/utils': 0.22.12
       any-base: 1.1.0
       buffer: 5.7.1
       exif-parser: 0.1.12
       file-type: 16.5.4
-      isomorphic-fetch: 3.0.0
+      isomorphic-fetch: 3.0.0(encoding@0.1.14)
       pixelmatch: 4.0.2
       tinycolor2: 1.6.0
     transitivePeerDependencies:
       - encoding
 
-  '@jimp/custom@0.22.12':
+  '@jimp/custom@0.22.12(encoding@0.1.14)':
     dependencies:
-      '@jimp/core': 0.22.12
+      '@jimp/core': 0.22.12(encoding@0.1.14)
     transitivePeerDependencies:
       - encoding
 
-  '@jimp/gif@0.22.12(@jimp/custom@0.22.12)':
+  '@jimp/gif@0.22.12(@jimp/custom@0.22.12(encoding@0.1.14))':
     dependencies:
-      '@jimp/custom': 0.22.12
+      '@jimp/custom': 0.22.12(encoding@0.1.14)
       '@jimp/utils': 0.22.12
       gifwrap: 0.10.1
       omggif: 1.0.10
 
-  '@jimp/jpeg@0.22.12(@jimp/custom@0.22.12)':
+  '@jimp/jpeg@0.22.12(@jimp/custom@0.22.12(encoding@0.1.14))':
     dependencies:
-      '@jimp/custom': 0.22.12
+      '@jimp/custom': 0.22.12(encoding@0.1.14)
       '@jimp/utils': 0.22.12
       jpeg-js: 0.4.4
 
-  '@jimp/plugin-resize@0.22.12(@jimp/custom@0.22.12)':
+  '@jimp/plugin-resize@0.22.12(@jimp/custom@0.22.12(encoding@0.1.14))':
     dependencies:
-      '@jimp/custom': 0.22.12
+      '@jimp/custom': 0.22.12(encoding@0.1.14)
       '@jimp/utils': 0.22.12
 
-  '@jimp/png@0.22.12(@jimp/custom@0.22.12)':
+  '@jimp/png@0.22.12(@jimp/custom@0.22.12(encoding@0.1.14))':
     dependencies:
-      '@jimp/custom': 0.22.12
+      '@jimp/custom': 0.22.12(encoding@0.1.14)
       '@jimp/utils': 0.22.12
       pngjs: 6.0.0
 
-  '@jimp/tiff@0.22.12(@jimp/custom@0.22.12)':
+  '@jimp/tiff@0.22.12(@jimp/custom@0.22.12(encoding@0.1.14))':
     dependencies:
-      '@jimp/custom': 0.22.12
+      '@jimp/custom': 0.22.12(encoding@0.1.14)
       utif2: 4.1.0
 
-  '@jimp/types@0.22.12(@jimp/custom@0.22.12)':
+  '@jimp/types@0.22.12(@jimp/custom@0.22.12(encoding@0.1.14))':
     dependencies:
-      '@jimp/bmp': 0.22.12(@jimp/custom@0.22.12)
-      '@jimp/custom': 0.22.12
-      '@jimp/gif': 0.22.12(@jimp/custom@0.22.12)
-      '@jimp/jpeg': 0.22.12(@jimp/custom@0.22.12)
-      '@jimp/png': 0.22.12(@jimp/custom@0.22.12)
-      '@jimp/tiff': 0.22.12(@jimp/custom@0.22.12)
+      '@jimp/bmp': 0.22.12(@jimp/custom@0.22.12(encoding@0.1.14))
+      '@jimp/custom': 0.22.12(encoding@0.1.14)
+      '@jimp/gif': 0.22.12(@jimp/custom@0.22.12(encoding@0.1.14))
+      '@jimp/jpeg': 0.22.12(@jimp/custom@0.22.12(encoding@0.1.14))
+      '@jimp/png': 0.22.12(@jimp/custom@0.22.12(encoding@0.1.14))
+      '@jimp/tiff': 0.22.12(@jimp/custom@0.22.12(encoding@0.1.14))
       timm: 1.7.1
 
   '@jimp/utils@0.22.12':
@@ -24567,6 +24761,22 @@ snapshots:
       tmp-promise: 3.0.3
     transitivePeerDependencies:
       - supports-color
+
+  '@mapbox/node-pre-gyp@1.0.11(encoding@0.1.14)(supports-color@10.2.2)':
+    dependencies:
+      detect-libc: 2.1.2
+      https-proxy-agent: 5.0.1(supports-color@10.2.2)
+      make-dir: 3.1.0
+      node-fetch: 2.7.0(encoding@0.1.14)
+      nopt: 5.0.0
+      npmlog: 5.0.1
+      rimraf: 3.0.2
+      semver: 7.8.5
+      tar: 6.2.1
+    transitivePeerDependencies:
+      - encoding
+      - supports-color
+    optional: true
 
   '@marijn/find-cluster-break@1.0.4': {}
 
@@ -24820,6 +25030,22 @@ snapshots:
   '@nolyfill/string.prototype.matchall@1.0.44':
     dependencies:
       '@nolyfill/shared': 1.0.44
+
+  '@npmcli/agent@2.2.2(supports-color@10.2.2)':
+    dependencies:
+      agent-base: 7.1.4
+      http-proxy-agent: 7.0.2(supports-color@10.2.2)
+      https-proxy-agent: 7.0.6(supports-color@10.2.2)
+      lru-cache: 10.4.3
+      socks-proxy-agent: 8.0.5(supports-color@10.2.2)
+    transitivePeerDependencies:
+      - supports-color
+    optional: true
+
+  '@npmcli/fs@3.1.1':
+    dependencies:
+      semver: 7.8.5
+    optional: true
 
   '@nuxt/kit@3.21.11(magicast@0.5.4)':
     dependencies:
@@ -27823,11 +28049,11 @@ snapshots:
     dependencies:
       '@vibrant/image': 4.0.4
 
-  '@vibrant/image-node@4.0.4':
+  '@vibrant/image-node@4.0.4(encoding@0.1.14)':
     dependencies:
-      '@jimp/custom': 0.22.12
-      '@jimp/plugin-resize': 0.22.12(@jimp/custom@0.22.12)
-      '@jimp/types': 0.22.12(@jimp/custom@0.22.12)
+      '@jimp/custom': 0.22.12(encoding@0.1.14)
+      '@jimp/plugin-resize': 0.22.12(@jimp/custom@0.22.12(encoding@0.1.14))
+      '@jimp/types': 0.22.12(@jimp/custom@0.22.12(encoding@0.1.14))
       '@vibrant/image': 4.0.4
     transitivePeerDependencies:
       - encoding
@@ -28881,6 +29107,9 @@ snapshots:
 
   '@yuku-toolchain/types@0.8.7': {}
 
+  abbrev@1.1.1:
+    optional: true
+
   abbrev@2.0.0: {}
 
   abbrev@4.0.0: {}
@@ -28907,7 +29136,20 @@ snapshots:
 
   aes-js@3.1.2: {}
 
+  agent-base@6.0.2(supports-color@10.2.2):
+    dependencies:
+      debug: 4.4.3(supports-color@10.2.2)
+    transitivePeerDependencies:
+      - supports-color
+    optional: true
+
   agent-base@7.1.4: {}
+
+  aggregate-error@3.1.0:
+    dependencies:
+      clean-stack: 2.2.0
+      indent-string: 4.0.0
+    optional: true
 
   ajv-formats@3.0.1(ajv@8.20.0):
     optionalDependencies:
@@ -29047,7 +29289,16 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  aproba@2.1.0:
+    optional: true
+
   are-docs-informative@0.0.2: {}
+
+  are-we-there-yet@2.0.0:
+    dependencies:
+      delegates: 1.0.0
+      readable-stream: 3.6.2
+    optional: true
 
   argparse@1.0.10:
     dependencies:
@@ -29517,6 +29768,22 @@ snapshots:
 
   cac@7.0.0: {}
 
+  cacache@18.0.4:
+    dependencies:
+      '@npmcli/fs': 3.1.1
+      fs-minipass: 3.0.3
+      glob: 10.5.0
+      lru-cache: 10.4.3
+      minipass: 7.1.3
+      minipass-collect: 2.0.1
+      minipass-flush: 1.0.7
+      minipass-pipeline: 1.2.4
+      p-map: 4.0.0
+      ssri: 10.0.6
+      tar: 6.2.1
+      unique-filename: 3.0.0
+    optional: true
+
   cacheable-lookup@5.0.4: {}
 
   cacheable-request@7.0.4:
@@ -29601,6 +29868,9 @@ snapshots:
 
   chownr@1.1.4: {}
 
+  chownr@2.0.0:
+    optional: true
+
   chownr@3.0.0: {}
 
   chromium-pickle-js@0.2.0: {}
@@ -29623,6 +29893,9 @@ snapshots:
   clean-regexp@1.0.0:
     dependencies:
       escape-string-regexp: 1.0.5
+
+  clean-stack@2.2.0:
+    optional: true
 
   cli-spinners@3.4.0: {}
 
@@ -29772,6 +30045,9 @@ snapshots:
       - supports-color
 
   consola@3.4.2: {}
+
+  console-control-strings@1.1.0:
+    optional: true
 
   content-disposition@0.5.4:
     dependencies:
@@ -30121,6 +30397,9 @@ snapshots:
       robust-predicates: 3.0.3
 
   delayed-stream@1.0.0: {}
+
+  delegates@1.0.0:
+    optional: true
 
   denque@2.1.0: {}
 
@@ -30496,6 +30775,11 @@ snapshots:
   encodeurl@1.0.2: {}
 
   encodeurl@2.0.0: {}
+
+  encoding@0.1.14:
+    dependencies:
+      iconv-lite: 0.7.3
+    optional: true
 
   end-of-stream@1.4.5:
     dependencies:
@@ -31514,6 +31798,16 @@ snapshots:
       jsonfile: 6.2.1
       universalify: 2.0.1
 
+  fs-minipass@2.1.0:
+    dependencies:
+      minipass: 3.3.6
+    optional: true
+
+  fs-minipass@3.0.3:
+    dependencies:
+      minipass: 7.1.3
+    optional: true
+
   fs.realpath@1.0.0: {}
 
   fsevents@2.3.2:
@@ -31529,6 +31823,19 @@ snapshots:
   fuse.js@7.5.0: {}
 
   fzf@0.5.2: {}
+
+  gauge@3.0.2:
+    dependencies:
+      aproba: 2.1.0
+      color-support: 1.1.3
+      console-control-strings: 1.1.0
+      has-unicode: 2.0.1
+      object-assign: 4.1.1
+      signal-exit: 3.0.7
+      string-width: 4.2.3
+      strip-ansi: 6.0.1
+      wide-align: 1.1.5
+    optional: true
 
   gaxios@7.1.3(supports-color@10.2.2):
     dependencies:
@@ -31617,6 +31924,15 @@ snapshots:
   get-tsconfig@5.0.0-beta.5:
     dependencies:
       resolve-pkg-maps: 1.0.0
+
+  get-windows@9.3.0(encoding@0.1.14)(supports-color@10.2.2):
+    optionalDependencies:
+      '@mapbox/node-pre-gyp': 1.0.11(encoding@0.1.14)(supports-color@10.2.2)
+      node-addon-api: 8.9.2
+      node-gyp: 10.3.1(supports-color@10.2.2)
+    transitivePeerDependencies:
+      - encoding
+      - supports-color
 
   getpass@0.1.7:
     dependencies:
@@ -31774,12 +32090,12 @@ snapshots:
 
   graceful-fs@4.2.11: {}
 
-  grammy@1.45.1(supports-color@10.2.2):
+  grammy@1.45.1(encoding@0.1.14)(supports-color@10.2.2):
     dependencies:
       '@grammyjs/types': 4.0.0
       abort-controller: 3.0.0
       debug: 4.4.3(supports-color@10.2.2)
-      node-fetch: 2.7.0
+      node-fetch: 2.7.0(encoding@0.1.14)
     transitivePeerDependencies:
       - encoding
       - supports-color
@@ -31862,6 +32178,9 @@ snapshots:
   has-tostringtag@1.0.2:
     dependencies:
       has-symbols: 1.1.0
+
+  has-unicode@2.0.1:
+    optional: true
 
   hasown@2.0.4:
     dependencies:
@@ -32163,6 +32482,14 @@ snapshots:
       quick-lru: 5.1.1
       resolve-alpn: 1.2.1
 
+  https-proxy-agent@5.0.1(supports-color@10.2.2):
+    dependencies:
+      agent-base: 6.0.2(supports-color@10.2.2)
+      debug: 4.4.3(supports-color@10.2.2)
+    transitivePeerDependencies:
+      - supports-color
+    optional: true
+
   https-proxy-agent@7.0.6(supports-color@10.2.2):
     dependencies:
       agent-base: 7.1.4
@@ -32225,6 +32552,9 @@ snapshots:
   import-without-cache@0.4.0: {}
 
   imurmurhash@0.1.4: {}
+
+  indent-string@4.0.0:
+    optional: true
 
   indent-string@5.0.0: {}
 
@@ -32343,6 +32673,9 @@ snapshots:
     dependencies:
       is-docker: 3.0.0
 
+  is-lambda@1.0.1:
+    optional: true
+
   is-module@1.0.0: {}
 
   is-network-error@1.3.2: {}
@@ -32397,9 +32730,9 @@ snapshots:
     dependencies:
       node-gyp-build: 4.8.4
 
-  isomorphic-fetch@3.0.0:
+  isomorphic-fetch@3.0.0(encoding@0.1.14):
     dependencies:
-      node-fetch: 2.7.0
+      node-fetch: 2.7.0(encoding@0.1.14)
       whatwg-fetch: 3.6.20
     transitivePeerDependencies:
       - encoding
@@ -32979,6 +33312,24 @@ snapshots:
   make-dir@5.1.0:
     optional: true
 
+  make-fetch-happen@13.0.1(supports-color@10.2.2):
+    dependencies:
+      '@npmcli/agent': 2.2.2(supports-color@10.2.2)
+      cacache: 18.0.4
+      http-cache-semantics: 4.2.0
+      is-lambda: 1.0.1
+      minipass: 7.1.3
+      minipass-fetch: 3.0.5
+      minipass-flush: 1.0.7
+      minipass-pipeline: 1.2.4
+      negotiator: 0.6.4
+      proc-log: 4.2.0
+      promise-retry: 2.0.1
+      ssri: 10.0.6
+    transitivePeerDependencies:
+      - supports-color
+    optional: true
+
   many-keys-map@3.0.3: {}
 
   markdown-it-anchor@9.2.1(@types/markdown-it@14.2.0)(markdown-it@14.3.0):
@@ -33429,7 +33780,7 @@ snapshots:
 
   minecraft-folder-path@1.2.0: {}
 
-  minecraft-protocol@1.67.0(supports-color@10.2.2):
+  minecraft-protocol@1.67.0(encoding@0.1.14)(supports-color@10.2.2):
     dependencies:
       '@types/node-rsa': 1.1.4
       '@types/readable-stream': 4.0.24
@@ -33440,39 +33791,39 @@ snapshots:
       lodash.merge: 4.6.2
       minecraft-data: 3.113.2
       minecraft-folder-path: 1.2.0
-      node-fetch: 2.7.0
+      node-fetch: 2.7.0(encoding@0.1.14)
       node-rsa: 0.4.2
       prismarine-auth: 3.1.1(supports-color@10.2.2)
       prismarine-chat: 1.13.0(supports-color@10.2.2)
       prismarine-nbt: 2.8.0
-      prismarine-realms: 1.6.0(supports-color@10.2.2)
+      prismarine-realms: 1.6.0(encoding@0.1.14)(supports-color@10.2.2)
       protodef: 1.19.0
       readable-stream: 4.7.0
       uuid-1345: 1.0.2
-      yggdrasil: 1.8.0
+      yggdrasil: 1.8.0(encoding@0.1.14)
     transitivePeerDependencies:
       - encoding
       - supports-color
 
-  mineflayer-armor-manager@2.0.1(mineflayer@4.37.1(supports-color@10.2.2)):
+  mineflayer-armor-manager@2.0.1(mineflayer@4.37.1(encoding@0.1.14)(supports-color@10.2.2)):
     dependencies:
       minecraft-data: 3.113.2
-      mineflayer: 4.37.1(supports-color@10.2.2)
+      mineflayer: 4.37.1(encoding@0.1.14)(supports-color@10.2.2)
 
-  mineflayer-auto-eat@5.0.3(supports-color@10.2.2)(vec3@0.2.0):
+  mineflayer-auto-eat@5.0.3(encoding@0.1.14)(supports-color@10.2.2)(vec3@0.2.0):
     dependencies:
       '@nxg-org/mineflayer-util-plugin': 1.9.4(vec3@0.2.0)
-      mineflayer: 4.37.1(supports-color@10.2.2)
+      mineflayer: 4.37.1(encoding@0.1.14)(supports-color@10.2.2)
     transitivePeerDependencies:
       - encoding
       - supports-color
       - vec3
 
-  mineflayer-collectblock@1.6.0(supports-color@10.2.2):
+  mineflayer-collectblock@1.6.0(encoding@0.1.14)(supports-color@10.2.2):
     dependencies:
-      mineflayer: 4.37.1(supports-color@10.2.2)
+      mineflayer: 4.37.1(encoding@0.1.14)(supports-color@10.2.2)
       mineflayer-pathfinder: 2.4.5(patch_hash=4bbfdca823ab48b74086e6e7d4b2f9baf5ee7c0ba9aee0c279b3c91c50bfd797)(supports-color@10.2.2)
-      mineflayer-tool: 1.2.0(supports-color@10.2.2)
+      mineflayer-tool: 1.2.0(encoding@0.1.14)(supports-color@10.2.2)
     transitivePeerDependencies:
       - encoding
       - supports-color
@@ -33489,29 +33840,29 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  mineflayer-pvp@1.3.2(prismarine-registry@1.12.0(supports-color@10.2.2))(supports-color@10.2.2):
+  mineflayer-pvp@1.3.2(encoding@0.1.14)(prismarine-registry@1.12.0(supports-color@10.2.2))(supports-color@10.2.2):
     dependencies:
-      mineflayer: 4.37.1(supports-color@10.2.2)
+      mineflayer: 4.37.1(encoding@0.1.14)(supports-color@10.2.2)
       mineflayer-pathfinder: 2.4.5(patch_hash=4bbfdca823ab48b74086e6e7d4b2f9baf5ee7c0ba9aee0c279b3c91c50bfd797)(supports-color@10.2.2)
-      mineflayer-utils: 0.1.4(prismarine-registry@1.12.0(supports-color@10.2.2))(supports-color@10.2.2)
+      mineflayer-utils: 0.1.4(encoding@0.1.14)(prismarine-registry@1.12.0(supports-color@10.2.2))(supports-color@10.2.2)
     transitivePeerDependencies:
       - encoding
       - prismarine-registry
       - supports-color
 
-  mineflayer-tool@1.2.0(supports-color@10.2.2):
+  mineflayer-tool@1.2.0(encoding@0.1.14)(supports-color@10.2.2):
     dependencies:
-      mineflayer: 4.37.1(supports-color@10.2.2)
+      mineflayer: 4.37.1(encoding@0.1.14)(supports-color@10.2.2)
       mineflayer-pathfinder: 2.4.5(patch_hash=4bbfdca823ab48b74086e6e7d4b2f9baf5ee7c0ba9aee0c279b3c91c50bfd797)(supports-color@10.2.2)
       prismarine-nbt: 2.8.0
     transitivePeerDependencies:
       - encoding
       - supports-color
 
-  mineflayer-utils@0.1.4(prismarine-registry@1.12.0(supports-color@10.2.2))(supports-color@10.2.2):
+  mineflayer-utils@0.1.4(encoding@0.1.14)(prismarine-registry@1.12.0(supports-color@10.2.2))(supports-color@10.2.2):
     dependencies:
       '@types/node': 14.18.63
-      mineflayer: 2.41.0(prismarine-registry@1.12.0(supports-color@10.2.2))(supports-color@10.2.2)
+      mineflayer: 2.41.0(encoding@0.1.14)(prismarine-registry@1.12.0(supports-color@10.2.2))(supports-color@10.2.2)
       prismarine-entity: 1.2.0
       require-self: 0.2.3
       typescript: 3.9.10
@@ -33520,10 +33871,10 @@ snapshots:
       - prismarine-registry
       - supports-color
 
-  mineflayer@2.41.0(prismarine-registry@1.12.0(supports-color@10.2.2))(supports-color@10.2.2):
+  mineflayer@2.41.0(encoding@0.1.14)(prismarine-registry@1.12.0(supports-color@10.2.2))(supports-color@10.2.2):
     dependencies:
       minecraft-data: 2.221.0
-      minecraft-protocol: 1.67.0(supports-color@10.2.2)
+      minecraft-protocol: 1.67.0(encoding@0.1.14)(supports-color@10.2.2)
       prismarine-biome: 1.4.0(prismarine-registry@1.12.0(supports-color@10.2.2))
       prismarine-block: 1.23.0(supports-color@10.2.2)
       prismarine-chat: 1.13.0(supports-color@10.2.2)
@@ -33542,10 +33893,10 @@ snapshots:
       - prismarine-registry
       - supports-color
 
-  mineflayer@4.37.1(supports-color@10.2.2):
+  mineflayer@4.37.1(encoding@0.1.14)(supports-color@10.2.2):
     dependencies:
       minecraft-data: 3.113.2
-      minecraft-protocol: 1.67.0(supports-color@10.2.2)
+      minecraft-protocol: 1.67.0(encoding@0.1.14)(supports-color@10.2.2)
       mojangson: 2.0.4
       prismarine-biome: 1.4.0(prismarine-registry@1.12.0(supports-color@10.2.2))
       prismarine-block: 1.23.0(supports-color@10.2.2)
@@ -33585,7 +33936,50 @@ snapshots:
 
   minimist@1.2.8: {}
 
+  minipass-collect@2.0.1:
+    dependencies:
+      minipass: 7.1.3
+    optional: true
+
+  minipass-fetch@3.0.5:
+    dependencies:
+      minipass: 7.1.3
+      minipass-sized: 1.0.3
+      minizlib: 2.1.2
+    optionalDependencies:
+      encoding: 0.1.14
+    optional: true
+
+  minipass-flush@1.0.7:
+    dependencies:
+      minipass: 3.3.6
+    optional: true
+
+  minipass-pipeline@1.2.4:
+    dependencies:
+      minipass: 3.3.6
+    optional: true
+
+  minipass-sized@1.0.3:
+    dependencies:
+      minipass: 3.3.6
+    optional: true
+
+  minipass@3.3.6:
+    dependencies:
+      yallist: 4.0.0
+    optional: true
+
+  minipass@5.0.0:
+    optional: true
+
   minipass@7.1.3: {}
+
+  minizlib@2.1.2:
+    dependencies:
+      minipass: 3.3.6
+      yallist: 4.0.0
+    optional: true
 
   minizlib@3.1.0:
     dependencies:
@@ -33603,6 +33997,9 @@ snapshots:
   mkdirp@0.5.6:
     dependencies:
       minimist: 1.2.8
+
+  mkdirp@1.0.4:
+    optional: true
 
   mlly@1.8.2:
     dependencies:
@@ -33726,6 +34123,9 @@ snapshots:
 
   node-addon-api@7.1.1: {}
 
+  node-addon-api@8.9.2:
+    optional: true
+
   node-api-version@0.2.1:
     dependencies:
       semver: 7.8.5
@@ -33734,9 +34134,11 @@ snapshots:
 
   node-fetch-native@1.6.7: {}
 
-  node-fetch@2.7.0:
+  node-fetch@2.7.0(encoding@0.1.14):
     dependencies:
       whatwg-url: 5.0.0
+    optionalDependencies:
+      encoding: 0.1.14
 
   node-fetch@3.3.2:
     dependencies:
@@ -33747,6 +34149,22 @@ snapshots:
   node-forge@1.4.0: {}
 
   node-gyp-build@4.8.4: {}
+
+  node-gyp@10.3.1(supports-color@10.2.2):
+    dependencies:
+      env-paths: 2.2.1
+      exponential-backoff: 3.1.3
+      glob: 10.5.0
+      graceful-fs: 4.2.11
+      make-fetch-happen: 13.0.1(supports-color@10.2.2)
+      nopt: 7.2.1
+      proc-log: 4.2.0
+      semver: 7.8.5
+      tar: 6.2.1
+      which: 4.0.0
+    transitivePeerDependencies:
+      - supports-color
+    optional: true
 
   node-gyp@12.4.0:
     dependencies:
@@ -33775,16 +34193,21 @@ snapshots:
     dependencies:
       asn1: 0.2.3
 
-  node-vibrant@4.0.4:
+  node-vibrant@4.0.4(encoding@0.1.14):
     dependencies:
       '@types/node': 18.19.130
       '@vibrant/core': 4.0.4
       '@vibrant/generator-default': 4.0.4
       '@vibrant/image-browser': 4.0.4
-      '@vibrant/image-node': 4.0.4
+      '@vibrant/image-node': 4.0.4(encoding@0.1.14)
       '@vibrant/quantizer-mmcq': 4.0.4
     transitivePeerDependencies:
       - encoding
+
+  nopt@5.0.0:
+    dependencies:
+      abbrev: 1.1.1
+    optional: true
 
   nopt@7.2.1:
     dependencies:
@@ -33804,6 +34227,14 @@ snapshots:
     dependencies:
       path-key: 4.0.0
       unicorn-magic: 0.3.0
+
+  npmlog@5.0.1:
+    dependencies:
+      are-we-there-yet: 2.0.0
+      console-control-strings: 1.1.0
+      gauge: 3.0.2
+      set-blocking: 2.0.0
+    optional: true
 
   nprogress@0.2.0: {}
 
@@ -34159,6 +34590,11 @@ snapshots:
   p-locate@5.0.0:
     dependencies:
       p-limit: 3.1.0
+
+  p-map@4.0.0:
+    dependencies:
+      aggregate-error: 3.1.0
+    optional: true
 
   p-retry@4.6.2:
     dependencies:
@@ -34605,10 +35041,10 @@ snapshots:
       prismarine-nbt: 2.8.0
       vec3: 0.2.0
 
-  prismarine-realms@1.6.0(supports-color@10.2.2):
+  prismarine-realms@1.6.0(encoding@0.1.14)(supports-color@10.2.2):
     dependencies:
       debug: 4.4.3(supports-color@10.2.2)
-      node-fetch: 2.7.0
+      node-fetch: 2.7.0(encoding@0.1.14)
     transitivePeerDependencies:
       - encoding
       - supports-color
@@ -34667,6 +35103,9 @@ snapshots:
       stream-parser: 0.3.1(supports-color@10.2.2)
     transitivePeerDependencies:
       - supports-color
+    optional: true
+
+  proc-log@4.2.0:
     optional: true
 
   proc-log@6.1.0: {}
@@ -35093,6 +35532,11 @@ snapshots:
     dependencies:
       glob: 7.2.3
 
+  rimraf@3.0.2:
+    dependencies:
+      glob: 7.2.3
+    optional: true
+
   rimraf@5.0.10:
     dependencies:
       glob: 10.5.0
@@ -35345,6 +35789,9 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  set-blocking@2.0.0:
+    optional: true
+
   set-cookie-parser@2.7.2: {}
 
   set-cookie-parser@3.1.2: {}
@@ -35530,6 +35977,15 @@ snapshots:
       - supports-color
       - utf-8-validate
 
+  socks-proxy-agent@8.0.5(supports-color@10.2.2):
+    dependencies:
+      agent-base: 7.1.4
+      debug: 4.4.3(supports-color@10.2.2)
+      socks: 2.8.9
+    transitivePeerDependencies:
+      - supports-color
+    optional: true
+
   socks@2.8.9:
     dependencies:
       ip-address: 10.5.0
@@ -35614,6 +36070,11 @@ snapshots:
       jsbn: 0.1.1
       safer-buffer: '@nolyfill/safer-buffer@1.0.44'
       tweetnacl: 0.14.5
+
+  ssri@10.0.6:
+    dependencies:
+      minipass: 7.1.3
+    optional: true
 
   stackback@0.0.2: {}
 
@@ -35842,6 +36303,16 @@ snapshots:
       - bare-abort-controller
       - bare-buffer
       - react-native-b4a
+
+  tar@6.2.1:
+    dependencies:
+      chownr: 2.0.0
+      fs-minipass: 2.1.0
+      minipass: 5.0.0
+      minizlib: 2.1.2
+      mkdirp: 1.0.4
+      yallist: 4.0.0
+    optional: true
 
   tar@7.5.22:
     dependencies:
@@ -36311,6 +36782,16 @@ snapshots:
       - unloader
       - vite
       - webpack
+
+  unique-filename@3.0.0:
+    dependencies:
+      unique-slug: 4.0.0
+    optional: true
+
+  unique-slug@4.0.0:
+    dependencies:
+      imurmurhash: 0.1.4
+    optional: true
 
   unique-string@2.0.0:
     dependencies:
@@ -37210,6 +37691,11 @@ snapshots:
     dependencies:
       isexe: 2.0.0
 
+  which@4.0.0:
+    dependencies:
+      isexe: 3.1.5
+    optional: true
+
   which@5.0.0:
     dependencies:
       isexe: 3.1.5
@@ -37224,6 +37710,11 @@ snapshots:
       stackback: 0.0.2
 
   wicked-good-xpath@1.3.0: {}
+
+  wide-align@1.1.5:
+    dependencies:
+      string-width: 4.2.3
+    optional: true
 
   wlipsync@1.3.1: {}
 
@@ -37540,9 +38031,9 @@ snapshots:
     dependencies:
       pend: 1.2.0
 
-  yggdrasil@1.8.0:
+  yggdrasil@1.8.0(encoding@0.1.14):
     dependencies:
-      node-fetch: 2.7.0
+      node-fetch: 2.7.0(encoding@0.1.14)
       uuid: 10.0.0
     transitivePeerDependencies:
       - encoding

@@ -22,6 +22,7 @@ import { useStickersStore } from '../stores/modules/stickers'
 import { useTwitterStore } from '../stores/modules/twitter'
 import { useVisionStore } from '../stores/modules/vision'
 import { useWebSearchStore } from '../stores/modules/web-search'
+import { usePerceptionStore } from '../stores/perception'
 import { useToolCardsStore } from '../stores/tool-cards'
 
 export interface Module {
@@ -55,6 +56,7 @@ export function useModulesList() {
   const memoryStore = useMemoryStore()
   const missionsStore = useMissionsStore()
   const initiativeStore = useInitiativeStore()
+  const perceptionStore = usePerceptionStore()
   const historySummaryStore = useHistorySummaryStore()
   const toolCardsStore = useToolCardsStore()
   const beatSyncState = ref<BeatSyncDetectorState>()
@@ -160,6 +162,15 @@ export function useModulesList() {
       icon: 'i-solar:chat-round-dots-bold-duotone',
       to: '/settings/modules/initiative',
       configured: initiativeStore.enabled,
+      category: 'essential',
+    },
+    {
+      id: 'perception',
+      name: t('settings.pages.modules.perception.title'),
+      description: t('settings.pages.modules.perception.description'),
+      icon: 'i-solar:eye-bold-duotone',
+      to: '/settings/modules/perception',
+      configured: perceptionStore.enabled,
       category: 'essential',
     },
     {

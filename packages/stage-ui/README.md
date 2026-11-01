@@ -62,6 +62,18 @@ The character can start to talk without an owner message. It is step 2 of [the a
 Settings > Modules > Autonomous speech changes the settings. It also shows the changes from the owner's words, and resets them.
 Settings > Developer > Autonomous Speech Inspector shows why the character talks or stays quiet.
 
+## Screen perception
+
+The character can see the screen of the device. It is step 3 of [the autonomy ADR](../../docs/ai/adr/2026-10-28-autonomous-character-perception-and-missions.md). It is off by default.
+
+- Each app passes a `ScreenSource` (`libs/perception/screen-source.ts`) to `usePerceptionRunnerStore().initialize`. The desktop app captures the primary display and knows the window in front. The web app captures a share that the owner chooses with a click.
+- The runner on the leader takes 2 frames each second into a `FrameRing` (`libs/perception/frame-ring.ts`). It keeps the last minute in memory only. `FrameEncoder` (`workers/frame-encoder`) makes a JPEG and a grayscale thumbnail of each frame.
+- `exclusionMatch` (`libs/perception/exclusion.ts`) skips the frames of excluded windows in front. `usePerceptionStore()` keeps the switch, the pause, and the exclusion list.
+- `usePerceptionStatusStore()` carries the state to every window. `usePerceptionIndicator()` gives the stage button that shows perception and pauses it.
+- Use it to read the recent screen in later steps, for example the detectors and the decision turn. Do not use it to store frames: nothing reaches the disk.
+
+Settings > Modules > Screen perception changes the settings and shows the state.
+
 ## Prompt budget
 
 Each chat request has parts with limits. It is step 2-4 of [the autonomy ADR](../../docs/ai/adr/2026-10-28-autonomous-character-perception-and-missions.md).

@@ -12,7 +12,7 @@ import { isMacOS, isWindows } from 'std-env'
 import { focusWindow } from '../../libs/electron/focus'
 import { createServerChannelService } from '../../services/airi/channel-server'
 import { createI18nService } from '../../services/airi/i18n'
-import { createAppService, createAppVersionService, createPowerMonitorService, createScreenService, createSystemPreferencesService, createWindowService } from '../../services/electron'
+import { createAppService, createAppVersionService, createForegroundWindowService, createPowerMonitorService, createScreenService, createSystemPreferencesService, createWindowService } from '../../services/electron'
 import { WindowBackdropService } from '../../services/electron/window-backdrop'
 
 export function toggleWindowShow(window?: BrowserWindow | null): void {
@@ -182,6 +182,7 @@ export async function setupBaseWindowElectronInvokes(params: {
   createAppService({ context: params.context, window: params.window })
   createAppVersionService({ window: params.window })
   createPowerMonitorService({ context: params.context, window: params.window })
+  createForegroundWindowService({ context: params.context })
   createSystemPreferencesService({ context: params.context, window: params.window })
   WindowBackdropService.install(params.window)
 

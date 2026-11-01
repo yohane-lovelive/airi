@@ -19,6 +19,7 @@ import { useHearingStore } from '@proj-airi/stage-ui/stores/modules/hearing'
 import { useSpeechStore } from '@proj-airi/stage-ui/stores/modules/speech'
 import { useVisionStore } from '@proj-airi/stage-ui/stores/modules/vision'
 import { useOnboardingStore } from '@proj-airi/stage-ui/stores/onboarding'
+import { usePerceptionRunnerStore } from '@proj-airi/stage-ui/stores/perception-runner'
 import { useSettings, useSettingsAudioDevice } from '@proj-airi/stage-ui/stores/settings'
 import { useSettingsSyncStore } from '@proj-airi/stage-ui/stores/settings-sync'
 import { useSettingsStageModel } from '@proj-airi/stage-ui/stores/settings/stage-model'
@@ -34,6 +35,7 @@ import { toast, Toaster } from 'vue-sonner'
 import PerformanceOverlay from './components/Devtools/PerformanceOverlay.vue'
 
 import { usePageOwnerPresence } from './composables/owner-presence'
+import { createPageScreenSource } from './composables/screen-source'
 import { usePWAStore } from './stores/pwa'
 
 usePWAStore()
@@ -54,6 +56,7 @@ const characterOrchestratorStore = useCharacterOrchestratorStore()
 const missionRunnerStore = useMissionRunnerStore()
 const initiativeRunnerStore = useInitiativeRunnerStore()
 const ownerPresence = usePageOwnerPresence()
+const perceptionRunnerStore = usePerceptionRunnerStore()
 const settingsSyncStore = useSettingsSyncStore()
 const settingsAudioDeviceStore = useSettingsAudioDevice()
 const { showingSetup } = storeToRefs(onboardingStore)
@@ -160,6 +163,7 @@ async function loadStartup() {
       characterOrchestratorStore.initialize(syncedPinia)
       missionRunnerStore.initialize(syncedPinia)
       initiativeRunnerStore.initialize(syncedPinia, ownerPresence)
+      perceptionRunnerStore.initialize(syncedPinia, createPageScreenSource())
       settingsSyncStore.initialize(syncedPinia)
     })
     await startup.run('modelData', () => displayModelsStore.loadDisplayModelsFromIndexedDB())

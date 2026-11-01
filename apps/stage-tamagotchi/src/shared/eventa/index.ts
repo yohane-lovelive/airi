@@ -43,6 +43,14 @@ export const electronOpenEditor = defineInvokeEventa<void>('eventa:invoke:electr
 export const electronOpenSettings = defineInvokeEventa<void, { route?: string }>('eventa:invoke:electron:windows:settings:open')
 /** Seconds since the last keyboard or mouse input on the whole system, from `powerMonitor.getSystemIdleTime()`. */
 export const electronSystemIdleSeconds = defineInvokeEventa<number>('eventa:invoke:electron:power-monitor:system-idle-seconds')
+/** The window in front on the whole system: its title, and the name and path of its app. Screen perception skips excluded windows with it. */
+export interface ForegroundWindowInfo {
+  title: string
+  app: string
+  path: string
+}
+/** The window in front, from `get-windows`. Undefined when the system tells no window, for example on Wayland. */
+export const electronForegroundWindow = defineInvokeEventa<ForegroundWindowInfo | undefined>('eventa:invoke:electron:foreground-window')
 /**
  * What the fullscreen mode shows on the right, in either window that hosts it.
  *

@@ -131,6 +131,8 @@ devtools:
         away: 'The owner is away since {time}.'
         greeting: 'Last greeting: {time}'
         welcome-back: 'Last welcome back: {time}'
+      screen:
+        title: Screen
       topics:
         title: Topics
         thread: 'Current topic: {topic} ({count} lines, heat {heat})'

@@ -4,6 +4,7 @@ import { useInitiativeStore } from '@proj-airi/stage-ui/stores/initiative'
 import { INSPECTOR_WATCH_REFRESH_MS, useInitiativeInspectorStore } from '@proj-airi/stage-ui/stores/initiative-inspector'
 import { useIntentionsStore } from '@proj-airi/stage-ui/stores/intentions'
 import { useMissionsStore } from '@proj-airi/stage-ui/stores/missions'
+import { usePerceptionStatusStore } from '@proj-airi/stage-ui/stores/perception-status'
 import { usageByPurpose, usageDayOf, useUsageStore } from '@proj-airi/stage-ui/stores/usage'
 import { GhostButton } from '@proj-airi/ui'
 import { useIntervalFn, useNow } from '@vueuse/core'
@@ -19,6 +20,7 @@ const intentions = useIntentionsStore()
 const { active: activeMissions } = storeToRefs(useMissionsStore())
 const { records: usageRecords } = storeToRefs(useUsageStore())
 const { changes: talkChanges, reset: resetTalkChanges } = useTalkChanges()
+const { status: perception } = storeToRefs(usePerceptionStatusStore())
 
 const KEY = 'tamagotchi.settings.devtools.pages.initiative-inspector'
 /** The graph shows this much time. */
@@ -190,6 +192,22 @@ function timeLabel(epochMs: number) {
         <li>{{ t(`${KEY}.topics.distinct`, { value: number(topics.variety.distinct2) }) }}</li>
         <li>{{ t(`${KEY}.topics.entropy`, { value: number(topics.variety.typeEntropy) }) }}</li>
         <li>{{ t(`${KEY}.topics.similarity`, { value: topics.variety.topicSimilarity === undefined ? '-' : number(topics.variety.topicSimilarity) }) }}</li>
+      </ul>
+    </section>
+
+    <section :class="['flex flex-col', 'gap-2', 'rounded-xl', 'bg-neutral-100 dark:bg-neutral-900', 'p-4']">
+      <h2 :class="['text-sm font-medium']">
+        {{ t(`${KEY}.screen.title`) }}
+      </h2>
+      <ul :class="['flex flex-col', 'gap-1', 'text-sm', 'tabular-nums']">
+        <li>{{ t(`settings.pages.modules.perception.states.${perception.state}`) }}</li>
+        <li>{{ t('settings.pages.modules.perception.frames', { count: perception.frames, size: (perception.bytes / 1_000_000).toFixed(1) }) }}</li>
+        <li v-if="perception.knowsForeground">
+          {{ t('settings.pages.modules.perception.foreground', { app: perception.foregroundApp ?? '-' }) }}{{ perception.excludedNow ? ` · ${t('settings.pages.modules.perception.excluded-now')}` : '' }}
+        </li>
+        <li v-if="perception.knowsForeground">
+          {{ t('settings.pages.modules.perception.excluded', { count: perception.excluded }) }}
+        </li>
       </ul>
     </section>
 

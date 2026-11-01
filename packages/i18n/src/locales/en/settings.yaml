@@ -1126,6 +1126,31 @@ pages:
         owner: you stopped it
         away: you left
         quiet: you asked for quiet
+    perception:
+      title: Screen perception
+      description: The character sees your screen
+      unsupported: Screen perception does not run in this app. It runs in the desktop app and in the web app on a computer.
+      enable: Let the character see the screen
+      enable-description: The app keeps the last minute of your screen in memory only, never on the disk. When the character looks at the screen in a later version, it sends frames to the provider of your chat model. An eye button on the stage shows that perception runs, and one click pauses it.
+      paused: Paused
+      paused-description: Nothing is captured while perception is paused. The pause holds after a restart.
+      start: Start
+      states:
+        off: Perception is off.
+        paused: Perception is paused.
+        needs-share: Choose a window or a tab to share.
+        starting: The capture starts.
+        running: The character sees the screen.
+        interrupted: The screen is locked, or the device sleeps.
+        ended: The shared screen or window went away.
+        failed: The capture could not start.
+      frames: 'Frames in memory: {count} ({size} MB)'
+      foreground: 'App in front: {app}'
+      excluded-now: skipped by the exclusion list
+      excluded: 'Frames skipped by the exclusion list: {count}'
+      exclusions: Exclusion list
+      exclusions-description: One app name or word of a window title on each line. While a matching window is in front, no frame is taken. Case does not count, and an English entry matches whole words only.
+      web-share: The web app cannot tell the window in front, so the exclusion list does not work. Share one window or one tab, not the whole screen.
     memory-long-term:
       description: Long-term memory specific settings and management
       enable: Use long-term memory

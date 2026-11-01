@@ -29,6 +29,7 @@ import { useSpeechStore } from '../stores/modules/speech'
 import { useTwitterStore } from '../stores/modules/twitter'
 import { useWebSearchStore } from '../stores/modules/web-search'
 import { useOnboardingStore } from '../stores/onboarding'
+import { usePerceptionStore } from '../stores/perception'
 import { useProviderStore } from '../stores/providers/provider'
 import { useRecipesStore } from '../stores/recipes'
 import { useSettings, useSettingsAudioDevice } from '../stores/settings'
@@ -64,6 +65,7 @@ export function useDataMaintenance() {
   const recipesStore = useRecipesStore()
   const missionsStore = useMissionsStore()
   const initiativeStore = useInitiativeStore()
+  const perceptionStore = usePerceptionStore()
   const intentionsStore = useIntentionsStore()
   const historySummaryStore = useHistorySummaryStore()
   const usageStore = useUsageStore()
@@ -98,6 +100,7 @@ export function useDataMaintenance() {
       () => recipesStore.resetState(),
       () => missionsStore.resetState(),
       () => initiativeStore.resetState(),
+      () => perceptionStore.resetState(),
       () => intentionsStore.resetState(),
       () => historySummaryStore.resetState(),
       () => usageStore.resetState(),

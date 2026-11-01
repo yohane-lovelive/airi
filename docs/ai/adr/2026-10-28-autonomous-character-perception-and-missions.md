@@ -177,6 +177,23 @@ These rules keep menus, transitions, and desktop switches from counting as large
 - **App switch dwell.** An app switch counts only after the owner stays in the new app for some seconds. A switch to the desktop or a file manager gets a low salience.
 - **Labels from the model (later).** The model can label a screen in a timeline note, for example "menu". The detector then gives that screen a low salience.
 
+Step 3-1 built the screen source, the ring buffer, and the privacy rules as follows. No frame goes to the model yet.
+
+- **Screen source.** Each app passes a `ScreenSource` to the perception runner. It starts a capture, and it can tell the window in front and a lock or sleep.
+  - The desktop app captures the primary display without a prompt, through `electron-screen-capture`.
+  - The main process reads the window in front with `get-windows` 9.3.0, through the eventa invoke `electronForegroundWindow`. Electron cannot tell it. Version 10 was too new for the `minimumReleaseAge` rule of the repository.
+  - The web app uses `getDisplayMedia`. A start needs a click of the owner after each page load. The picker offers a window first, and it leaves out the AIRI tab. A phone browser is not supported.
+- **Ring buffer.** The renderer leader takes 2 frames each second and keeps the last 60 seconds, 120 frames at most, in memory only.
+  - Each frame is a JPEG of 1280 pixels at most on its long side, and a 64 by 36 grayscale thumbnail for the detectors. A worker encodes the frames.
+  - A pause, a lock, a leader change, or an end of the share drops the frames.
+- **Privacy.**
+  - Settings > Modules > Screen perception turns it on. It is off by default.
+  - An eye button shows while perception is on, in the controls island of the desktop app and in the chat header. One click pauses or resumes it, and the pause holds after a restart.
+  - The exclusion list matches the app name, the app file name, or the window title of the window in front. A match skips the frame before it is taken. An English entry matches whole words only.
+  - The default list holds password managers, messengers, and banking words. The web app cannot tell the window in front, so Settings recommend a share of one window or one tab.
+  - A screen lock or sleep stops the capture until the owner is back. When the share goes away, the capture ends, and the owner starts it again.
+- **Inspector.** The status store replicates the state, the frame count, the app in front, and the count of skipped frames to every window. The window title stays out of it.
+
 ### Frame policy
 
 The frame policy chooses which frames go to the model in each turn. It is a replaceable part. A developer setting selects it, and replay evaluation chooses the default.
@@ -567,8 +584,8 @@ The order follows dependencies. Each step uses the parts of the earlier steps. E
 | 0 | Policy core without the screen: pressure, gates, inner state, and speech types in `core-agent`. Evaluation harness with synthetic events. | Done |
 | 1 | Mission base: the time trigger, the instance store, and the tools. Also the `mustSpeak` notice, the `reminder` template, and the mission list. | Done |
 | 2 | Autonomous talk without the screen: connect the policy core to `notifyConversation`. Add the prompt budget, intentions, owner control, usage by purpose, and the inspector. | Done |
-| 2b | Daily rhythm and small talk: templates as recipes, the `greeting`, `welcome-back`, and `small-talk` templates, topic seeds, and the time of day. Measure variety. | In progress: 2b-1 (greeting, welcome back, time of day) and 2b-2a (topic labels, heat, seeds, variety), and 2b-2b (the `small-talk` template) are done. |
-| 3 | Perception: the adapters, ring buffer, detectors, frame policies, image budget, recorder, replay, timeline, scene state, `commentary` with interruptions, and `watch`. | To do |
+| 2b | Daily rhythm and small talk: templates as recipes, the `greeting`, `welcome-back`, and `small-talk` templates, topic seeds, and the time of day. Measure variety. | Done. Templates as recipes still wait. |
+| 3 | Perception: the adapters, ring buffer, detectors, frame policies, image budget, recorder, replay, timeline, scene state, `commentary` with interruptions, and `watch`. | In progress: 3-1 is done. |
 | 4 | Motion: the model capability check, the procedural layer, the library with `ACT` markers, expression sync, and the upper-body layer. | To do |
 | 5 | Generated motion, game audio, recall from memory, and polish. Recall needs the memory ADR. | To do |
 
@@ -580,6 +597,17 @@ Step 2 has four parts. Each part is one change.
 | 2-2 | Intentions, owner control with words, and implicit feedback. | Done |
 | 2-3 | Usage by purpose and the inspector. | Done |
 | 2-4 | The prompt budget: the top memories and the history summary. It changes every request, so it comes last. | Done |
+
+Step 3 has six parts. Each part is one change. Detector events reach the pressure only in 3-3, when the model can also see the frames.
+
+| Part | Content | State |
+| --- | --- | --- |
+| 3-1 | The screen sources of the desktop and web apps, the ring buffer, and the privacy rules: opt-in, the indicator and pause, the exclusion list, and the stop on lock. | Done |
+| 3-2 | The detectors: settle then compare, familiar screens, the baseline for each app, the app switch dwell, and long still periods. The inspector lists the events. | To do |
+| 3-3 | The decision turn with frames: `fresh-keyframes` as the first default frame policy until replay chooses one, images in the transient notice, the image budget, events as pressure, and screen text as untrusted data. | To do |
+| 3-4 | The timeline and the scene state. | To do |
+| 3-5 | The `commentary` and `watch` templates. | To do |
+| 3-6 | The recorder, the replay evaluation, and the `contact-sheet` and `scene-anchor` frame policies. | To do |
 
 Step 4 does not depend on steps 0 to 3. It comes after them so that the speech output format changes only once.
 The memory ADR has its own steps. They can run beside steps 1 to 4.

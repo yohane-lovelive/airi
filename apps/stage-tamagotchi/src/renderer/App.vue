@@ -26,6 +26,7 @@ import { useHearingStore } from '@proj-airi/stage-ui/stores/modules/hearing'
 import { useSpeechStore } from '@proj-airi/stage-ui/stores/modules/speech'
 import { useVisionStore } from '@proj-airi/stage-ui/stores/modules/vision'
 import { useOnboardingStore } from '@proj-airi/stage-ui/stores/onboarding'
+import { usePerceptionRunnerStore } from '@proj-airi/stage-ui/stores/perception-runner'
 import { usePerfTracerBridgeStore } from '@proj-airi/stage-ui/stores/perf-tracer-bridge'
 import { listProvidersForPluginHost, shouldPublishPluginHostCapabilities } from '@proj-airi/stage-ui/stores/plugin-host-capabilities'
 import { useSettings, useSettingsAudioDevice } from '@proj-airi/stage-ui/stores/settings'
@@ -70,6 +71,7 @@ import { electronPluginToolsChanged } from '../shared/eventa/plugin/tools'
 import { initializeElectronAuthCallbackBridge } from './bridges/electron-auth-callback'
 import { initializeIOTraceHubBridge } from './bridges/io-trace-hub'
 import { createElectronOwnerPresenceSource } from './bridges/owner-presence'
+import { createElectronScreenSource } from './bridges/screen-source'
 import { initializeStageThreeRuntimeTraceBridge } from './bridges/stage-three-runtime-trace'
 import { useLanguage } from './composables/use-language'
 import { useFullscreenStore } from './stores/fullscreen'
@@ -168,6 +170,7 @@ function createFullStageRuntime() {
   const characterOrchestratorStore = useCharacterOrchestratorStore()
   const missionRunnerStore = useMissionRunnerStore()
   const initiativeRunnerStore = useInitiativeRunnerStore()
+  const perceptionRunnerStore = usePerceptionRunnerStore()
   const settingsSyncStore = useSettingsSyncStore()
   const inferencePreload = useInferencePreload()
   const pluginHostInspectorStore = usePluginHostInspectorStore()
@@ -339,6 +342,7 @@ function createFullStageRuntime() {
         characterOrchestratorStore.initialize(syncedPinia)
         missionRunnerStore.initialize(syncedPinia)
         initiativeRunnerStore.initialize(syncedPinia, createElectronOwnerPresenceSource(context.value))
+        perceptionRunnerStore.initialize(syncedPinia, createElectronScreenSource(context.value))
         settingsSyncStore.initialize(syncedPinia)
       }
 
