@@ -264,6 +264,7 @@ perception:
   pause: 画面の知覚を一時停止
   resume: 画面の知覚を再開
   start: 画面の知覚を開始
+  recording: 画面を録画中です。クリックで知覚を一時停止し、録画を止めます。
 missions:
   fixed-reminder: 'リマインド: {text}'
   fixed-watch: '見張り: {condition}'

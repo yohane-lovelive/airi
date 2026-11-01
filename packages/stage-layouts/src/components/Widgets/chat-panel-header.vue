@@ -59,7 +59,7 @@ const activeSessionTitle = computed(() => {
           'size-8 shrink-0 rounded-lg outline-none',
           'text-neutral-500 hover:bg-primary-100/60 hover:text-primary-700 dark:text-neutral-400 dark:hover:bg-primary-900/40 dark:hover:text-primary-200',
           'focus-visible:outline-2 focus-visible:outline-primary-500 focus-visible:outline-offset-1',
-          perception.active.value ? 'text-primary-600 dark:text-primary-300' : '',
+          perception.recording.value ? 'text-red-500 dark:text-red-400' : perception.active.value ? 'text-primary-600 dark:text-primary-300' : '',
         ]"
         :title="perception.label.value"
         :aria-label="perception.label.value"

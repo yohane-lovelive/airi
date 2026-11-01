@@ -1,10 +1,12 @@
 import type { ScreenEvent } from '@proj-airi/stage-shared/perception'
 import type { SyncedPiniaRuntime } from 'pinia-plugin-synced'
 
+import type { PerceptionRecorderSink, RecorderEvent } from '../libs/perception/recorder'
 import type { ScreenSource } from '../libs/perception/screen-source'
 import type { PerceptionState } from './perception-status'
 
 import { errorMessageFrom } from '@moeru/std'
+import { encodeBase64 } from '@moeru/std/base64'
 import { ScreenDetector } from '@proj-airi/stage-shared/perception'
 import { defineStore } from 'pinia'
 import { onScopeDispose, watch } from 'vue'
@@ -38,6 +40,8 @@ const TARGET_CHECK_INTERVAL_MS = 5_000
  * - A commentary sets a target app. The desktop then captures the front window of that app only, and it takes frames
  *   only while that app is in front. When the window closes, the target-closed listeners hear it.
  * - The decision turn of the initiative runner reads the frames and the events.
+ * - While the owner asks for it, the desktop app records each frame of the ring, the screen events, and the owner
+ *   messages to the disk for replay evaluation. Excluded frames are not recorded, and a stop of the capture stops it.
  *
  * Use when:
  * - An app starts its renderer. Call `initialize` once with the synced Pinia runtime and the screen source of the app.
@@ -76,6 +80,11 @@ export const usePerceptionRunnerStore = defineStore('perception-runner', () => {
   let targetInFront = false
   let lastTargetCheckAt = 0
   const targetClosedListeners = new Set<(app: string) => void>()
+  let recorder: PerceptionRecorderSink | undefined
+  /** The recording that runs now. Writes go one after another, so the frames stay in order. */
+  let recording: { id: string, startedAt: number, frames: number } | undefined
+  let recordingStarting = false
+  let recordQueue: Promise<void> = Promise.resolve()
 
   function createDetector() {
     return new ScreenDetector({ width: FRAME_LIMITS.thumbnailWidth, height: FRAME_LIMITS.thumbnailHeight })
@@ -125,12 +134,49 @@ export const usePerceptionRunnerStore = defineStore('perception-runner', () => {
       excludedNow,
       knowsForeground: Boolean(source?.foreground),
       ...(target ? { target, targetInFront } : {}),
+      ...(recording ? { recording: { ...recording } } : {}),
+      canRecord: Boolean(recorder),
       activity: stream ? detector.activity : 0,
       events: recentEvents,
       ...(foregroundApp ? { foregroundApp } : {}),
       ...(failure ? { error: failure } : {}),
       updatedAt: now,
     })
+  }
+
+  /** Queues one write of the recording. A failure only logs, so the capture goes on. */
+  function record(write: (id: string) => Promise<void>) {
+    const id = recording?.id
+    if (!id || !recorder)
+      return
+    recordQueue = recordQueue.then(() => write(id)).catch(error => console.warn('[perception] Failed to write the recording:', errorMessageFrom(error)))
+  }
+
+  /** Starts or stops the recording to match the owner's request and the capture. */
+  function syncRecording() {
+    if (!recorder || !isLeader())
+      return
+    const wanted = statusStore.recordingWanted && Boolean(stream)
+    if (wanted && !recording && !recordingStarting) {
+      recordingStarting = true
+      void recorder.start().then((info) => {
+        recording = { id: info.id, startedAt: info.startedAt, frames: 0 }
+      }).catch((error) => {
+        console.warn('[perception] Failed to start the recording:', errorMessageFrom(error))
+        statusStore.requestRecording(false)
+      }).finally(() => {
+        recordingStarting = false
+        publish(true)
+      })
+    }
+    else if (!wanted && recording) {
+      const sink = recorder
+      recording = undefined
+      recordQueue = recordQueue.then(async () => {
+        await sink.stop()
+      }).catch(error => console.warn('[perception] Failed to stop the recording:', errorMessageFrom(error)))
+      publish(true)
+    }
   }
 
   function stopCapture() {
@@ -187,6 +233,8 @@ export const usePerceptionRunnerStore = defineStore('perception-runner', () => {
           }
           ended = true
           stopCapture()
+          if (statusStore.recordingWanted)
+            statusStore.requestRecording(false)
           publish(true)
         }, { once: true })
       }
@@ -194,6 +242,7 @@ export const usePerceptionRunnerStore = defineStore('perception-runner', () => {
       video = element
       excluded = 0
       ticker.start()
+      syncRecording()
     }
     catch (error) {
       failure = errorMessageFrom(error) ?? 'The capture did not start.'
@@ -208,6 +257,9 @@ export const usePerceptionRunnerStore = defineStore('perception-runner', () => {
   /** Starts or stops the capture to match the settings, the leadership, and the device state. */
   function sync() {
     if (!wanted()) {
+      // A pause, a lock, or a leader change also ends the recording. A new target only restarts the capture.
+      if (statusStore.recordingWanted && isLeader())
+        statusStore.requestRecording(false)
       if (stream || video)
         stopCapture()
       publish(true)
@@ -258,8 +310,22 @@ export const usePerceptionRunnerStore = defineStore('perception-runner', () => {
       if (!stream)
         return
       ring.push(frame)
+      if (recording) {
+        recording.frames += 1
+        const app = foregroundApp
+        record(async (id) => {
+          const result = await recorder!.appendFrame(id, { at, image: new Uint8Array(await frame.image.arrayBuffer()), thumbnail: encodeBase64(frame.thumbnail), ...(app ? { app } : {}) })
+          // The main process stops a recording at its time or size limit.
+          if (result.stopped && recording?.id === id) {
+            recording = undefined
+            statusStore.requestRecording(false)
+            publish(true)
+          }
+        })
+      }
       const events = detector.observe({ at, thumbnail: frame.thumbnail, ...(foregroundApp ? { app: foregroundApp } : {}) })
       if (events.length) {
+        recordEvents(events.map(event => ({ kind: 'screen', at: event.at, type: event.type, salience: event.salience, ...(event.app ? { app: event.app } : {}) })))
         recentEvents = [...recentEvents, ...events].slice(-RECENT_EVENT_COUNT)
         publish(true)
         for (const listener of eventListeners)
@@ -292,10 +358,17 @@ export const usePerceptionRunnerStore = defineStore('perception-runner', () => {
       publish(true)
   }
 
+  watch(() => statusStore.recordingWanted, () => syncRecording())
+
   watch(() => statusStore.startRequestedAt, () => {
     if (isLeader())
       void startFromGesture()
   })
+
+  function recordEvents(events: RecorderEvent[]) {
+    if (events.length)
+      record(id => recorder!.appendEvents(id, events))
+  }
 
   /**
    * Sets the app whose window a commentary watches, or clears it. The capture starts again for the new target.
@@ -326,12 +399,14 @@ export const usePerceptionRunnerStore = defineStore('perception-runner', () => {
    *
    * @param syncedPinia The synced Pinia runtime. Only its leader captures.
    * @param screenSource Where the app captures the screen. Without it, perception does not run in this app.
+   * @param recorderSink Where the screen recorder writes. Only the desktop app has one.
    */
-  function initialize(syncedPinia: SyncedPiniaRuntime, screenSource?: ScreenSource) {
+  function initialize(syncedPinia: SyncedPiniaRuntime, screenSource?: ScreenSource, recorderSink?: PerceptionRecorderSink) {
     if (leadership)
       return
     leadership = syncedPinia
     source = screenSource
+    recorder = recorderSink
     perception.supported = Boolean(screenSource?.supported)
     stopInterruptListener = screenSource?.onInterrupt?.((value) => {
       interrupted = value
@@ -378,6 +453,10 @@ export const usePerceptionRunnerStore = defineStore('perception-runner', () => {
     /** The activity level of the screen now, from 0 to 1. */
     activity: () => (stream ? detector.activity : 0),
     setTarget,
+    /** Notes an owner message in the recording that runs now. The text stays out. */
+    recordOwnerMessage: (at: number) => recordEvents([{ kind: 'owner-message', at }]),
+    /** The recordings on the device, and their actions. Undefined in an app that cannot record. */
+    recorder: () => recorder,
     startFromGesture,
     initialize,
     dispose,

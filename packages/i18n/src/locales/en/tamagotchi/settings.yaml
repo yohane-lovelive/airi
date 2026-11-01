@@ -83,6 +83,22 @@ devtools:
   pages:
     context-flow:
       title: Context Flow
+    perception-recorder:
+      title: Screen Recorder
+      description: Record the screen that the character sees, for replay evaluation
+      intro: A developer tool. It writes each frame that screen perception takes, the app in front, the screen events, and the times of your messages to a folder on this device. Recordings never leave the device. Excluded windows are not recorded.
+      unsupported: Only the desktop app can record the screen.
+      needs-perception: Turn screen perception on and let it run, then start a recording.
+      start: Start recording
+      stop: Stop recording
+      open-folder: Open the folder
+      recording: 'Recording: {count} frames'
+      limits: A recording stops by itself after 20 minutes or 1 GB. A pause of perception, a screen lock, or the end of the share also stops it.
+      recordings: Recordings
+      summary: '{frames} frames · {minutes} min · {size} MB'
+      now: recording now
+      delete: Delete the recording
+      empty: No recordings yet.
     initiative-inspector:
       title: Autonomous Speech Inspector
       description: See why the character talks on its own or stays quiet

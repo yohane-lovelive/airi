@@ -72,6 +72,7 @@ import { electronPluginToolsChanged } from '../shared/eventa/plugin/tools'
 import { initializeElectronAuthCallbackBridge } from './bridges/electron-auth-callback'
 import { initializeIOTraceHubBridge } from './bridges/io-trace-hub'
 import { createElectronOwnerPresenceSource } from './bridges/owner-presence'
+import { createElectronPerceptionRecorder } from './bridges/perception-recorder'
 import { createElectronScreenSource } from './bridges/screen-source'
 import { initializeStageThreeRuntimeTraceBridge } from './bridges/stage-three-runtime-trace'
 import { useLanguage } from './composables/use-language'
@@ -344,7 +345,7 @@ function createFullStageRuntime() {
         characterOrchestratorStore.initialize(syncedPinia)
         missionRunnerStore.initialize(syncedPinia)
         initiativeRunnerStore.initialize(syncedPinia, createElectronOwnerPresenceSource(context.value))
-        perceptionRunnerStore.initialize(syncedPinia, createElectronScreenSource(context.value))
+        perceptionRunnerStore.initialize(syncedPinia, createElectronScreenSource(context.value), createElectronPerceptionRecorder(context.value))
         watchRunnerStore.initialize(syncedPinia)
         settingsSyncStore.initialize(syncedPinia)
       }

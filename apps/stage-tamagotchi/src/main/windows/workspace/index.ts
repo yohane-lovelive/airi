@@ -6,6 +6,7 @@ import type { ServerChannel } from '../../services/airi/channel-server'
 import type { GodotStageManager } from '../../services/airi/godot-stage'
 import type { IOTraceRecordingService } from '../../services/airi/io-trace-recording'
 import type { McpManager } from '../../services/airi/mcp-servers'
+import type { PerceptionRecorderService } from '../../services/airi/perception-recorder'
 import type { AutoUpdater } from '../../services/electron/auto-updater'
 import type { GlobalShortcutService } from '../../services/electron/global-shortcut'
 import type { ChatWindowManager } from '../chat'
@@ -78,6 +79,7 @@ export function setupWorkspaceWindowManager(params: {
   globalShortcut: GlobalShortcutService
   spotlightWindow: SpotlightWindowManager
   ioTraceRecording: IOTraceRecordingService
+  perceptionRecorder: PerceptionRecorderService
   getMainWindow: () => BrowserWindow | undefined
   isActive: () => boolean
   /** Opens settings where the fullscreen mode says, for a link inside the window. */
@@ -144,6 +146,7 @@ export function setupWorkspaceWindowManager(params: {
       globalShortcut: params.globalShortcut,
       spotlightWindow: params.spotlightWindow,
       ioTraceRecording: params.ioTraceRecording,
+      perceptionRecorder: params.perceptionRecorder,
     })
 
     // `onlySameWindow` hears only this window, so no other window can close it or change what it shows.

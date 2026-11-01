@@ -86,6 +86,12 @@ const menu = computed(() => [
     to: '/devtools/initiative',
   },
   {
+    title: t('tamagotchi.settings.devtools.pages.perception-recorder.title'),
+    description: t('tamagotchi.settings.devtools.pages.perception-recorder.description'),
+    icon: 'i-solar:videocamera-record-bold-duotone',
+    to: '/devtools/perception-recorder',
+  },
+  {
     title: t('tamagotchi.settings.devtools.pages.context-flow.title'),
     description: 'Inspect incoming context updates and outgoing chat stream events',
     icon: 'i-solar:chat-square-call-bold-duotone',

@@ -1,6 +1,7 @@
 import type { SyncedPiniaRuntime } from 'pinia-plugin-synced'
 
 import type { ForegroundWindow } from '../libs/perception/exclusion'
+import type { PerceptionRecorderSink, RecorderEvent, RecorderFrame } from '../libs/perception/recorder'
 import type { ScreenSource } from '../libs/perception/screen-source'
 
 import { createPinia, disposePinia, setActivePinia } from 'pinia'
@@ -63,7 +64,7 @@ function canvasSource(options: { foreground?: () => ForegroundWindow, needsGestu
   return { source, streams, interrupt: (value: boolean) => interrupt?.(value), setScene: (value: number) => (scene = value) }
 }
 
-async function createLeader(source: ScreenSource) {
+async function createLeader(source: ScreenSource, recorder?: PerceptionRecorderSink) {
   const pinia = createPinia()
   const runtime = createSyncedPiniaPlugin({ callTimeout: 1000, leadership: 'leader-only', namespace: `perception:${crypto.randomUUID()}` })
   pinia.use(runtime.plugin)
@@ -72,7 +73,7 @@ async function createLeader(source: ScreenSource) {
   setActivePinia(pinia)
   await vi.waitFor(() => expect(runtime.isLeader()).toBe(true))
   const runner = usePerceptionRunnerStore()
-  runner.initialize(runtime, source)
+  runner.initialize(runtime, source, recorder)
   return { runner, perception: usePerceptionStore(), status: usePerceptionStatusStore() }
 }
 
@@ -199,5 +200,48 @@ describe('usePerceptionRunnerStore', { timeout: 60_000 }, () => {
 
     open = false
     await expect.poll(() => closed, { timeout: 15_000 }).toEqual(['Game'])
+  })
+
+  it('records the frames of the ring and owner messages while asked, skips excluded frames, and stops on a pause', async () => {
+    let window: ForegroundWindow = { title: 'Match', app: 'Game' }
+    const screen = canvasSource({ foreground: () => window })
+    const frames: RecorderFrame[] = []
+    const events: RecorderEvent[] = []
+    const recorder: PerceptionRecorderSink = {
+      start: vi.fn(async () => ({ id: 'rec-1', startedAt: Date.now(), frames: 0, bytes: 0, recording: true })),
+      appendFrame: vi.fn(async (_id: string, frame: RecorderFrame) => {
+        frames.push(frame)
+        return {}
+      }),
+      appendEvents: vi.fn(async (_id: string, added: RecorderEvent[]) => {
+        events.push(...added)
+      }),
+      stop: vi.fn(async () => undefined),
+      list: vi.fn(async () => []),
+      remove: vi.fn(async () => true),
+      openFolder: vi.fn(async () => {}),
+    }
+    const { runner, perception, status } = await createLeader(screen.source, recorder)
+    perception.enabled = true
+    await expect.poll(() => status.status.state, { timeout: 15_000 }).toBe('running')
+    expect(status.status.canRecord).toBe(true)
+
+    status.requestRecording(true)
+    await expect.poll(() => frames.length, { timeout: 15_000 }).toBeGreaterThan(1)
+    expect(frames[0]).toMatchObject({ app: 'Game', thumbnail: expect.any(String) })
+    expect(frames[0].image.byteLength).toBeGreaterThan(0)
+    runner.recordOwnerMessage(1_234)
+    await expect.poll(() => events).toContainEqual({ kind: 'owner-message', at: 1_234 })
+
+    window = { title: 'Vault', app: 'Bitwarden' }
+    await expect.poll(() => status.status.excludedNow, { timeout: 15_000 }).toBe(true)
+    const recorded = frames.length
+    await new Promise(resolve => setTimeout(resolve, 1_200))
+    expect(frames.length).toBeLessThanOrEqual(recorded + 1)
+    expect(frames.every(frame => frame.app !== 'Bitwarden')).toBe(true)
+
+    perception.paused = true
+    await expect.poll(() => recorder.stop).toHaveBeenCalled()
+    expect(status.recordingWanted).toBe(false)
   })
 })

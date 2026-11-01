@@ -408,6 +408,7 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
     if (event.type === 'owner-message') {
       dropRunningTurn()
       noteScreenHistory([{ at: message.createdAt ?? Date.now(), text: 'The owner sent a message', source: 'code' }])
+      perceptionRunner.recordOwnerMessage(message.createdAt ?? Date.now())
     }
     observe(event)
   })

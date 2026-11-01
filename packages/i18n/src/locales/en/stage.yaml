@@ -429,6 +429,7 @@ perception:
   pause: Pause screen perception
   resume: Resume screen perception
   start: Start screen perception
+  recording: Recording the screen. Click to pause perception and stop the recording.
 missions:
   fixed-reminder: 'Reminder: {text}'
   fixed-watch: 'Watch: {condition}'

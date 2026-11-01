@@ -3,6 +3,7 @@ import type { ServerChannel } from '../../services/airi/channel-server'
 import type { GodotStageManager } from '../../services/airi/godot-stage'
 import type { IOTraceRecordingService } from '../../services/airi/io-trace-recording'
 import type { McpManager } from '../../services/airi/mcp-servers'
+import type { PerceptionRecorderService } from '../../services/airi/perception-recorder'
 import type { AutoUpdater } from '../../services/electron/auto-updater'
 import type { GlobalShortcutService } from '../../services/electron/global-shortcut'
 import type { DevtoolsWindowManager } from '../devtools'
@@ -47,6 +48,7 @@ export function setupSettingsWindowReusableFunc(params: {
   globalShortcut: GlobalShortcutService
   spotlightWindow: SpotlightWindowManager
   ioTraceRecording: IOTraceRecordingService
+  perceptionRecorder: PerceptionRecorderService
 }): SettingsWindowManager {
   const defaultRoute = '/settings'
   let currentRoute = defaultRoute
@@ -86,6 +88,7 @@ export function setupSettingsWindowReusableFunc(params: {
       globalShortcut: params.globalShortcut,
       spotlightWindow: params.spotlightWindow,
       ioTraceRecording: params.ioTraceRecording,
+      perceptionRecorder: params.perceptionRecorder,
     })
     // The Developer page asks for the devtools of the main window. The workspace window shows the same page and opens
     // its own devtools instead, so this handler is not in `setupSettingsWindowInvokes`.

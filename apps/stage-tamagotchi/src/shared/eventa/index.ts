@@ -57,6 +57,37 @@ export interface OpenWindowInfo extends ForegroundWindowInfo {
 }
 /** The open windows, front to back, from `get-windows`. Commentary finds its target window with it. */
 export const electronOpenWindows = defineInvokeEventa<OpenWindowInfo[]>('eventa:invoke:electron:open-windows')
+/** One frame of a screen recording: the JPEG bytes, the base64 grayscale thumbnail, and the app in front. */
+export interface PerceptionRecordedFrame {
+  at: number
+  image: Uint8Array
+  thumbnail: string
+  app?: string
+}
+/** One line of `events.jsonl` in a screen recording: a screen event, or an owner message without its text. */
+export type PerceptionRecordedEvent
+  = | { kind: 'screen', at: number, type: string, salience: number, app?: string }
+    | { kind: 'owner-message', at: number }
+/** One screen recording on the device. */
+export interface PerceptionRecordingInfo {
+  id: string
+  startedAt: number
+  endedAt?: number
+  frames: number
+  bytes: number
+  /** Whether it records now. */
+  recording: boolean
+}
+/** The screen recorder of replay evaluation. Only the desktop app has it, and recordings never leave the device. */
+export const electronPerceptionRecorder = {
+  start: defineInvokeEventa<PerceptionRecordingInfo>('eventa:invoke:electron:perception-recorder:start'),
+  appendFrame: defineInvokeEventa<{ stopped?: 'time' | 'size' | 'not-recording' }, { id: string, frame: PerceptionRecordedFrame }>('eventa:invoke:electron:perception-recorder:append-frame'),
+  appendEvents: defineInvokeEventa<void, { id: string, events: PerceptionRecordedEvent[] }>('eventa:invoke:electron:perception-recorder:append-events'),
+  stop: defineInvokeEventa<PerceptionRecordingInfo | undefined>('eventa:invoke:electron:perception-recorder:stop'),
+  list: defineInvokeEventa<PerceptionRecordingInfo[]>('eventa:invoke:electron:perception-recorder:list'),
+  remove: defineInvokeEventa<boolean, { id: string }>('eventa:invoke:electron:perception-recorder:remove'),
+  openFolder: defineInvokeEventa<void>('eventa:invoke:electron:perception-recorder:open-folder'),
+}
 /**
  * What the fullscreen mode shows on the right, in either window that hosts it.
  *

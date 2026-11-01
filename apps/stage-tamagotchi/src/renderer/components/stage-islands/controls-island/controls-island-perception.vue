@@ -10,7 +10,7 @@ defineProps<{
 }>()
 
 // The button shows while screen perception is on, so the owner always sees it and can pause it with one click.
-const { visible, active, icon, label, press } = usePerceptionIndicator()
+const { visible, active, recording, icon, label, press } = usePerceptionIndicator()
 </script>
 
 <template>
@@ -26,7 +26,7 @@ const { visible, active, icon, label, press } = usePerceptionIndicator()
         :class="[
           iconClass,
           icon,
-          active ? 'text-primary-600 dark:text-primary-300' : 'text-neutral-800 dark:text-neutral-300',
+          recording ? 'text-red-500 dark:text-red-400' : active ? 'text-primary-600 dark:text-primary-300' : 'text-neutral-800 dark:text-neutral-300',
         ]"
       />
     </ControlButton>

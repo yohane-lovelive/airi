@@ -75,7 +75,8 @@ The character can see the screen of the device. It is step 3 of [the autonomy AD
 - Watch: `useWatchRunnerStore()` (`stores/watch-runner.ts`) checks the running watch on the leader. A check sends a crop of its region to the chat model outside the conversation and reads the `report_watch` answer. A yes sends a `mustSpeak` notice and ends the watch.
 - The initiative runner turns screen events into pressure. In a drive turn, `buildScreenTurn` (`libs/perception/screen-turn.ts`) picks frames with `fresh-keyframes` inside the image budget (`libs/perception/image-budget.ts`), and attaches them to the transient notice. They never reach the disk.
 - `usePerceptionStatusStore()` carries the state to every window. `usePerceptionIndicator()` gives the stage button that shows perception and pauses it.
-- Use it to read the recent screen in later steps, for example the detectors and the decision turn. Do not use it to store frames: nothing reaches the disk.
+- The desktop app passes a `PerceptionRecorderSink` (`libs/perception/recorder.ts`) as the third argument of `initialize`. While `requestRecording(true)` of the status store holds, the runner records the frames, the screen events, and the owner messages for replay evaluation. It is the only way that frames reach the disk.
+- Use it to read the recent screen, for example the detectors and the decision turn. Do not use it to store frames: only the recorder does.
 
 Settings > Modules > Screen perception changes the settings and shows the state.
 

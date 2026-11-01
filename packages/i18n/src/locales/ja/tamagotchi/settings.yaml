@@ -77,6 +77,22 @@ devtools:
   pages:
     context-flow:
       title: コンテキストのフロー
+    perception-recorder:
+      title: 画面の録画
+      description: キャラクターが見る画面を、リプレイ評価のために録画します
+      intro: 開発者向けのツールです。画面の知覚が取った各フレーム、前面のアプリ、画面の出来事、あなたのメッセージの時刻を、この端末のフォルダーに書きます。録画は端末から出ません。除外したウィンドウは録画しません。
+      unsupported: 画面を録画できるのはデスクトップアプリだけです。
+      needs-perception: 画面の知覚をオンにして動かしてから、録画を始めてください。
+      start: 録画を開始
+      stop: 録画を停止
+      open-folder: フォルダーを開く
+      recording: '録画中: {count} フレーム'
+      limits: 録画は 20 分か 1 GB で自動で止まります。知覚の一時停止、画面のロック、共有の終わりでも止まります。
+      recordings: 録画
+      summary: '{frames} フレーム · {minutes} 分 · {size} MB'
+      now: 録画中
+      delete: 録画を削除
+      empty: まだ録画はありません。
     initiative-inspector:
       title: 自律発話インスペクター
       description: キャラクターが自分から話す理由と、黙っている理由を表示します

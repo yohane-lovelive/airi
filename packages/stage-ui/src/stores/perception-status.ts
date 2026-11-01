@@ -40,6 +40,10 @@ export interface PerceptionStatus {
   target?: string
   /** Whether the target app is in front. Frames pause while it is not. */
   targetInFront?: boolean
+  /** The screen recording that runs now. */
+  recording?: { id: string, startedAt: number, frames: number }
+  /** Whether this app can record the screen. Only the desktop app can. */
+  canRecord: boolean
   /** The recent screen events, newest last. */
   events: ScreenEvent[]
   updatedAt: number
@@ -51,13 +55,15 @@ export interface PerceptionStatus {
  * `requestStart`. Nothing persists.
  */
 export const usePerceptionStatusStore = defineStore('perception-status', () => {
-  const status = ref<PerceptionStatus>({ state: 'off', frames: 0, bytes: 0, excluded: 0, excludedNow: false, knowsForeground: false, activity: 0, events: [], updatedAt: 0 })
+  const status = ref<PerceptionStatus>({ state: 'off', frames: 0, bytes: 0, excluded: 0, excludedNow: false, knowsForeground: false, activity: 0, events: [], canRecord: false, updatedAt: 0 })
 
   /**
    * Epoch milliseconds of the last start request from a window that does not capture, for example the settings window
    * of the desktop app. The leader starts the capture when it changes.
    */
   const startRequestedAt = ref(0)
+  /** Whether the owner asked for a screen recording. The leader records while it holds and frames come in. */
+  const recordingWanted = ref(false)
 
   function report(next: PerceptionStatus) {
     status.value = next
@@ -67,11 +73,17 @@ export const usePerceptionStatusStore = defineStore('perception-status', () => {
     startRequestedAt.value = Date.now()
   }
 
+  function requestRecording(on: boolean) {
+    recordingWanted.value = on
+  }
+
   return {
     status,
     startRequestedAt,
+    recordingWanted,
     report,
     requestStart,
+    requestRecording,
   }
 }, {
   synced: {

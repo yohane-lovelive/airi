@@ -560,6 +560,15 @@ The recorder obeys these rules:
 - The exclusion list also applies to the recorder.
 - Recordings never leave the device.
 
+Step 3-6a built the recorder as follows.
+
+- **Desktop only.** A browser cannot write a folder, and the recorder is a developer tool, so only the desktop app records.
+- **Content.** Each frame of the ring as a JPEG, its time, its app in front without the title, its grayscale thumbnail, the screen events, and the times of the owner messages without their text. This is enough to replay detection and decisions in step 3-6b.
+- **No audio yet.** The ADR records audio too, but the app captures no audio until game audio in step 5.
+- **Folder.** The main process writes `perception-recordings/<start time>/` in the user data folder of the app: `frames/<n>.jpg`, `frames.jsonl`, `events.jsonl`, and `manifest.json`. The folder is fixed. Settings show and open it, and a choice of folder can come later.
+- **Control.** Settings > Developer > Screen Recorder starts and stops a recording, lists the recordings, deletes one, and opens the folder. A recording needs running perception. A pause, a screen lock, a leader change, or the end of the share stops it. While it records, the eye button turns into a red record mark.
+- **Limits.** A recording stops by itself after 20 minutes or 1 GB. At 2 frames each second, it writes about 13 MB each minute. A delete touches only the folders of the recordings.
+
 ### Game audio (later)
 
 Story games tell events with voice lines. A transcript of the game audio can enter the timeline, so commentary can follow the story.
@@ -638,7 +647,7 @@ The order follows dependencies. Each step uses the parts of the earlier steps. E
 | 1 | Mission base: the time trigger, the instance store, and the tools. Also the `mustSpeak` notice, the `reminder` template, and the mission list. | Done |
 | 2 | Autonomous talk without the screen: connect the policy core to `notifyConversation`. Add the prompt budget, intentions, owner control, usage by purpose, and the inspector. | Done |
 | 2b | Daily rhythm and small talk: templates as recipes, the `greeting`, `welcome-back`, and `small-talk` templates, topic seeds, and the time of day. Measure variety. | Done. Templates as recipes still wait. |
-| 3 | Perception: the adapters, ring buffer, detectors, frame policies, image budget, recorder, replay, timeline, scene state, `commentary` with interruptions, and `watch`. | In progress: 3-1 to 3-5b are done. 3-6 is next. |
+| 3 | Perception: the adapters, ring buffer, detectors, frame policies, image budget, recorder, replay, timeline, scene state, `commentary` with interruptions, and `watch`. | In progress: 3-1 to 3-6a are done. |
 | 4 | Motion: the model capability check, the procedural layer, the library with `ACT` markers, expression sync, and the upper-body layer. | To do |
 | 5 | Generated motion, game audio, recall from memory, and polish. Recall needs the memory ADR. | To do |
 
@@ -651,7 +660,7 @@ Step 2 has four parts. Each part is one change.
 | 2-3 | Usage by purpose and the inspector. | Done |
 | 2-4 | The prompt budget: the top memories and the history summary. It changes every request, so it comes last. | Done |
 
-Step 3 has seven parts. Each part is one change. Detector events reach the pressure only in 3-3, when the model can also see the frames.
+Step 3 has nine parts. Each part is one change. Detector events reach the pressure only in 3-3, when the model can also see the frames.
 
 | Part | Content | State |
 | --- | --- | --- |
@@ -661,7 +670,9 @@ Step 3 has seven parts. Each part is one change. Detector events reach the press
 | 3-4 | The timeline and the scene state, written with markers. | Done |
 | 3-5a | The `commentary` template with the target window, its pace, its budget, and interruptions. | Done |
 | 3-5b | The `watch` template with check turns and named regions. | Done |
-| 3-6 | The recorder, the replay evaluation, and the `contact-sheet` and `scene-anchor` frame policies. | To do |
+| 3-6a | The screen recorder of the desktop app. | Done |
+| 3-6b | The replay evaluation suite. | To do |
+| 3-6c | The `contact-sheet` and `scene-anchor` frame policies, and a developer setting to choose the policy. | To do |
 
 Step 4 does not depend on steps 0 to 3. It comes after them so that the speech output format changes only once.
 The memory ADR has its own steps. They can run beside steps 1 to 4.
