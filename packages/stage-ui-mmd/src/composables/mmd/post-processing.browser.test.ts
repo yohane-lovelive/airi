@@ -1,4 +1,4 @@
-import { PerspectiveCamera, Scene, Vector3, WebGLRenderer } from 'three'
+import { Mesh, MeshBasicMaterial, PerspectiveCamera, PlaneGeometry, Scene, Vector3, WebGLRenderer } from 'three'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { DEFAULT_MMD_GRAPHICS_ADJUSTMENTS, resolveMMDGraphics } from '../../utils/mmd-graphics'
@@ -33,6 +33,37 @@ describe('mMDPostProcessing', () => {
 
     expect(renderer.autoClear).toBe(true)
     expect(renderer.toneMappingExposure).toBe(1)
+  })
+
+  // ROOT CAUSE:
+  //
+  // The library bloom blurred the alpha with the colors, and its blend kept the larger alpha. A transparent window
+  // then showed a dark haze around the model.
+  //
+  // We fixed this with a bloom that adds light only.
+  it('keeps the transparent area around a bright model transparent', () => {
+    const renderer = new WebGLRenderer({ canvas: document.createElement('canvas'), alpha: true })
+    renderers.push(renderer)
+    renderer.setSize(64, 64, false)
+    renderer.setClearColor(0x000000, 0)
+    const scene = new Scene()
+    const model = new Mesh(new PlaneGeometry(0.5, 0.5), new MeshBasicMaterial({ color: 0xFFFFFF }))
+    model.position.z = -2
+    scene.add(model)
+
+    const postProcessing = new MMDPostProcessing(renderer, scene, new PerspectiveCamera())
+    postProcessing.apply(resolveMMDGraphics('high', DEFAULT_MMD_GRAPHICS_ADJUSTMENTS)!)
+    postProcessing.render(0)
+
+    const gl = renderer.getContext()
+    // The model covers about the middle 17 pixels. The first pixel reads beside it, where the blur is strongest.
+    const beside = new Uint8Array(4)
+    gl.readPixels(18, 32, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, beside)
+    const center = new Uint8Array(4)
+    gl.readPixels(32, 32, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, center)
+    expect(beside[3]).toBe(0)
+    expect(center[3]).toBe(255)
+    postProcessing.dispose()
   })
 
   it('renders ambient occlusion for the high preset with physical shading', () => {

@@ -18,7 +18,8 @@ reaching feature parity with the Live2D and VRM renderers:
   the view. The sharp depth follows the model height. The quality preset
   is `off` by default, which renders as before. Each device keeps its own
   preset, because GPUs differ. The alpha channel survives, so a transparent
-  window still shows the desktop behind the model.
+  window still shows the desktop behind the model. Bloom adds light only, so
+  it never darkens the desktop around the model.
 - **Shading** (`utils/mmd-pbr`, `utils/mmd-materials`,
   `composables/mmd/physical-lighting`): `toon` (the default) keeps the loaded
   toon materials. `hybrid` swaps each material for a physically based twin,

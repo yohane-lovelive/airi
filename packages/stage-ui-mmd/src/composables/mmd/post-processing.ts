@@ -1,3 +1,4 @@
+import type { BloomEffectOptions } from 'postprocessing'
 import type { Camera, Scene, WebGLRenderer } from 'three'
 
 import type { MMDGraphicsConfig, MMDToneMapping } from '../../utils/mmd-graphics'
@@ -30,6 +31,30 @@ const TONE_MAPPING_MODE: Record<MMDToneMapping, ToneMappingMode> = {
 const MAX_BOKEH_SCALE = 3
 /** Color offset at the edges of the view at chromatic aberration strength 1, relative to the view size. */
 const MAX_CHROMATIC_OFFSET = 0.004
+
+/** The bloom shader of the library, with an output alpha of 0. */
+const LIGHT_ONLY_BLOOM_SHADER = `#ifdef FRAMEBUFFER_PRECISION_HIGH
+uniform mediump sampler2D map;
+#else
+uniform lowp sampler2D map;
+#endif
+uniform float intensity;
+void mainImage(const in vec4 inputColor, const in vec2 uv, out vec4 outputColor) {
+  outputColor = vec4(texture2D(map, uv).rgb * intensity, 0.0);
+}`
+
+/** Bloom that adds light only, and keeps the alpha of the scene. */
+class LightOnlyBloomEffect extends BloomEffect {
+  constructor(options: BloomEffectOptions) {
+    super(options)
+    // NOTICE:
+    // A transparent window showed a dark, flickering haze around the model.
+    // The library bloom blurs the alpha with the colors, and its blend keeps the larger alpha.
+    // Source: `bloom.frag` and the blend functions in `node_modules/postprocessing/build/index.js` (6.39.4).
+    // Remove it when the library bloom keeps the alpha of its input.
+    this.setFragmentShader(LIGHT_ONLY_BLOOM_SHADER)
+  }
+}
 
 /**
  * Renders the MMD scene through post-processing: ambient occlusion, depth of field, bloom, tone mapping, color grading,
@@ -103,7 +128,7 @@ export class MMDPostProcessing {
       effects.push(this.depthOfField)
     }
     if (config.bloom) {
-      effects.push(new BloomEffect({
+      effects.push(new LightOnlyBloomEffect({
         intensity: config.bloom.intensity,
         luminanceThreshold: config.bloom.threshold,
         luminanceSmoothing: 0.1,
