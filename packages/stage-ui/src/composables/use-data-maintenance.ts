@@ -11,6 +11,7 @@ import { clearSherpawModelAssets } from '../libs/providers/providers/sherpaw/mod
 import { useChatStore } from '../stores/chat'
 import { useChatSessionStore } from '../stores/chat/session-store'
 import { useDisplayModelsStore } from '../stores/display-models'
+import { useHistorySummaryStore } from '../stores/history-summary'
 import { useInitiativeStore } from '../stores/initiative'
 import { useIntentionsStore } from '../stores/intentions'
 import { useMcpStore } from '../stores/mcp'
@@ -64,6 +65,7 @@ export function useDataMaintenance() {
   const missionsStore = useMissionsStore()
   const initiativeStore = useInitiativeStore()
   const intentionsStore = useIntentionsStore()
+  const historySummaryStore = useHistorySummaryStore()
   const usageStore = useUsageStore()
   const voiceprintStore = useVoiceprintStore()
 
@@ -97,6 +99,7 @@ export function useDataMaintenance() {
       () => missionsStore.resetState(),
       () => initiativeStore.resetState(),
       () => intentionsStore.resetState(),
+      () => historySummaryStore.resetState(),
       () => usageStore.resetState(),
     ].map(reset => Promise.resolve().then(reset)))
     const failure = results.find(result => result.status === 'rejected')

@@ -42,7 +42,8 @@ describe('memory store', () => {
     expect(other.id).not.toBe(game.id)
     expect(memory.entries).toHaveLength(2)
     expect(memory.read(game.id, 'airi')?.body).toBe('Minecraft.')
-    expect(memory.indexFor('airi')).toBe(`Your own:\n- ${other.id}: What the owner plays.\n- ${game.id}: What the owner plays now.`)
+    // The index lists the newest entries first, so the changed entry leads.
+    expect(memory.indexFor('airi')).toBe(`Your own:\n- ${game.id}: What the owner plays now.\n- ${other.id}: What the owner plays.`)
   })
 
   // A card keeps its own memories. Only the owner makes one general, and then every card reads it.

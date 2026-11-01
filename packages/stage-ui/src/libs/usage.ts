@@ -14,9 +14,10 @@ import { formatLocalDateTime } from '@proj-airi/core-agent'
  * - `voice-assist`: the voice end judgement and the transcript rewrite.
  * - `tool-card`: a card program for a tool result.
  * - `artistry`: the image prompt of the artistry module.
+ * - `history-summary`: the summary of the older messages of a conversation.
  * - `other`: a call that names no purpose.
  */
-export const USAGE_PURPOSES = ['owner-reply', 'initiative', 'mission', 'task', 'scene', 'vision', 'voice-assist', 'tool-card', 'artistry', 'other'] as const
+export const USAGE_PURPOSES = ['owner-reply', 'initiative', 'mission', 'task', 'scene', 'vision', 'voice-assist', 'tool-card', 'artistry', 'history-summary', 'other'] as const
 
 export type UsagePurpose = typeof USAGE_PURPOSES[number]
 

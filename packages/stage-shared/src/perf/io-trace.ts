@@ -74,6 +74,17 @@ export const IOAttributes = {
   LLMInputMessageCount: `${customPrefix}.llm.input_message_count`,
   LLMInputMessageRoles: `${customPrefix}.llm.input_message_roles`,
   LLMInputUserMessageCount: `${customPrefix}.llm.input_user_message_count`,
+  /** The characters of the system prompt: the persona, the memory index, and the format rules. */
+  LLMPromptSystemChars: `${customPrefix}.llm.prompt.system_chars`,
+  /** The characters of the memory index inside the system prompt. */
+  LLMPromptMemoryIndexChars: `${customPrefix}.llm.prompt.memory_index_chars`,
+  /** The characters of the summary of the older messages. 0 without a summary. */
+  LLMPromptSummaryChars: `${customPrefix}.llm.prompt.summary_chars`,
+  /** The count of stored messages that the summary stands for. */
+  LLMPromptSummarizedMessages: `${customPrefix}.llm.prompt.summarized_messages`,
+  /** The turns after the system prompt and the summary, and their serialized characters. */
+  LLMPromptHistoryTurns: `${customPrefix}.llm.prompt.history_turns`,
+  LLMPromptHistoryChars: `${customPrefix}.llm.prompt.history_chars`,
   LLMOutputChunkCount: `${customPrefix}.llm.output_chunk_count`,
   LLMOutputChunkLengths: `${customPrefix}.llm.output_chunk_lengths`,
   LLMTextLength: `${customPrefix}.llm.text_length`,

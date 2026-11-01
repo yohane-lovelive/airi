@@ -82,6 +82,8 @@ The stream context carries `speaks`. Only a send that is neither `background` no
 
 With `getSystemPrompt`, each run reads the identity of its own session when it starts. Stored system messages are skipped.
 
+With `projectHistory`, the host shortens the history of each request, for example to a summary and the recent messages. The stored history stays whole. The summary goes after the system prompt as a context turn.
+
 ## Recipes
 
 A recipe is a skill with `instructions` steps. `usableRecipes` keeps enabled and approved recipes.

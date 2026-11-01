@@ -617,8 +617,8 @@ describe('chat store contract', () => {
     // The session character's wake word tool joins every turn. It is not a selectable stored tool.
     // Reply cards are on by default, so the owner's chat also gets the card tool and the icon search of cards.
     expect(resolvedToolNames).toEqual([
-      ['stage_widgets', 'configure_wake_words', 'builtIn_readMemory', 'builtIn_writeMemory', 'builtIn_forgetMemory', 'builtIn_useRecipe', 'builtIn_proposeRecipe', 'builtIn_drawCard', 'builtIn_searchIcons'],
-      ['stage_widgets', 'configure_wake_words', 'builtIn_readMemory', 'builtIn_writeMemory', 'builtIn_forgetMemory', 'builtIn_useRecipe', 'builtIn_proposeRecipe', 'builtIn_drawCard', 'builtIn_searchIcons'],
+      ['stage_widgets', 'configure_wake_words', 'builtIn_readMemory', 'builtIn_searchMemory', 'builtIn_writeMemory', 'builtIn_forgetMemory', 'builtIn_useRecipe', 'builtIn_proposeRecipe', 'builtIn_drawCard', 'builtIn_searchIcons'],
+      ['stage_widgets', 'configure_wake_words', 'builtIn_readMemory', 'builtIn_searchMemory', 'builtIn_writeMemory', 'builtIn_forgetMemory', 'builtIn_useRecipe', 'builtIn_proposeRecipe', 'builtIn_drawCard', 'builtIn_searchIcons'],
     ])
   })
 

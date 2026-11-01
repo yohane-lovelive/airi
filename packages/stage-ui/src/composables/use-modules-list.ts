@@ -6,6 +6,7 @@ import { useI18n } from 'vue-i18n'
 
 import factorioIcon from '../assets/factorio-simple.png'
 
+import { useHistorySummaryStore } from '../stores/history-summary'
 import { useInitiativeStore } from '../stores/initiative'
 import { useMemoryStore } from '../stores/memory'
 import { useMissionsStore } from '../stores/missions'
@@ -54,6 +55,7 @@ export function useModulesList() {
   const memoryStore = useMemoryStore()
   const missionsStore = useMissionsStore()
   const initiativeStore = useInitiativeStore()
+  const historySummaryStore = useHistorySummaryStore()
   const toolCardsStore = useToolCardsStore()
   const beatSyncState = ref<BeatSyncDetectorState>()
   const beatSyncSupported = isBeatSyncSupported()
@@ -130,7 +132,7 @@ export function useModulesList() {
       description: t('settings.pages.modules.memory-short-term.description'),
       icon: 'i-solar:bookmark-bold-duotone',
       to: '/settings/modules/memory-short-term',
-      configured: false,
+      configured: historySummaryStore.enabled,
       category: 'essential',
     },
     {

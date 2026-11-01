@@ -19,6 +19,16 @@ export interface ChatSessionTask {
   endedAt?: number
 }
 
+/** A summary of the older messages of a session. Requests send it in place of those messages. */
+export interface ChatHistorySummary {
+  text: string
+  /** The last message that the summary holds. Requests send the messages after it as they are. */
+  throughMessageId: string
+  /** The count of messages that the summary holds. */
+  coveredCount: number
+  createdAt: number
+}
+
 export interface ChatSessionMeta {
   sessionId: string
   userId: string
@@ -36,6 +46,8 @@ export interface ChatSessionMeta {
   title?: string
   createdAt: number
   updatedAt: number
+  /** A summary of the older messages. It stays on the device and never syncs to the cloud. */
+  historySummary?: ChatHistorySummary
   /** Control events inform later agent requests without adding user messages. */
   controlEvents?: StoredVoiceInterruption[]
   /**

@@ -59,6 +59,16 @@ The character can start to talk without an owner message. It is step 2 of [the a
 Settings > Modules > Autonomous speech changes the settings. It also shows the changes from the owner's words, and resets them.
 Settings > Developer > Autonomous Speech Inspector shows why the character talks or stays quiet.
 
+## Prompt budget
+
+Each chat request has parts with limits. It is step 2-4 of [the autonomy ADR](../../docs/ai/adr/2026-10-28-autonomous-character-perception-and-missions.md).
+
+- `useHistorySummaryStore()` in `stores/history-summary.ts` gives the chat runtime a summary and the recent messages of a long conversation. After each send, it writes a new summary in the background when the recent part passes its limits. `libs/history-summary.ts` holds the limits and the pure rules.
+- The session meta keeps the summary on the device. The chat view still shows every message.
+- Settings > Modules > Short-Term Memory turns the summary on or off. It is on by default.
+- The memory index lists 50 entries at most (`libs/memory-index.ts`). `builtIn_searchMemory` finds the rest by shared character pairs.
+- `libs/prompt-parts.ts` measures each part of a request for IO traces.
+
 ## Model usage
 
 `useUsageStore()` in `stores/usage.ts` keeps the tokens and images of model calls for each day, purpose, and model. IndexedDB keeps 30 days on the device, and the records never sync.

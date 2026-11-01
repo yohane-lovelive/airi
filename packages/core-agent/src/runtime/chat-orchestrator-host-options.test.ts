@@ -15,7 +15,7 @@ const provider: GenerationProvider = {
 
 type Stream = (model: string, chatProvider: GenerationProvider, conversation: Conversation, options?: StreamOptions) => Promise<void>
 
-function createHarness(options: Partial<Pick<ChatOrchestratorRuntimeDeps, 'getSystemPrompt'>> = {}) {
+function createHarness(options: Partial<Pick<ChatOrchestratorRuntimeDeps, 'getSystemPrompt' | 'projectHistory'>> = {}) {
   const messages: Record<string, ChatHistoryItem[]> = {}
   const stream = vi.fn<Stream>(async (_model, _provider, _conversation, streamOptions) => {
     await streamOptions?.onStreamEvent?.({ type: 'text-delta', text: 'reply' })
@@ -93,6 +93,27 @@ describe('chat orchestrator host options', () => {
     expect(harness.prompt()).toContain('identity of session-1')
     expect(harness.prompt()).not.toContain('stored identity')
     expect(harness.prompt()).toContain('main question')
+  })
+
+  // A long session sends a summary and the recent messages. The stored history must stay whole for the chat view.
+  it('sends the projected history with its summary after the identity, and keeps the stored history whole', async () => {
+    const harness = createHarness({
+      getSystemPrompt: () => 'identity',
+      projectHistory: (_sessionId, messages) => ({ messages: messages.slice(-1), summary: 'The owner talked about a trip.' }),
+    })
+    harness.messages['session-1'] = [
+      { role: 'user', content: 'old question', id: 'old-user' },
+      { role: 'assistant', content: 'old answer', id: 'old-assistant', slices: [], tool_results: [] },
+    ]
+
+    await harness.runtime.ingest('new question', { model: 'test', chatProvider: provider })
+
+    const conversation = harness.stream.mock.calls[0]?.[2]
+    expect(conversation?.turns.map(turn => turn.id)).toEqual(['system-identity', 'history-summary', expect.any(String)])
+    expect(harness.prompt()).toContain('The owner talked about a trip.')
+    expect(harness.prompt()).toContain('new question')
+    expect(harness.prompt()).not.toContain('old question')
+    expect(harness.messages['session-1']?.map(message => message.id)).toEqual(['old-user', 'old-assistant', expect.any(String), expect.any(String)])
   })
 
   // Like a slash command, an invoked skill joins the owner's message and stays there for later requests.

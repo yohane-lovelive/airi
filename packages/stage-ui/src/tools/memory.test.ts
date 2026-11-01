@@ -2,13 +2,14 @@ import type { MemoryEntry, MemoryWrite } from '../types/memory'
 
 import { describe, expect, it, vi } from 'vitest'
 
-import { composeMemoryPrompt, createMemoryTools, FORGET_MEMORY_TOOL_NAME, READ_MEMORY_TOOL_NAME, WRITE_MEMORY_TOOL_NAME } from './memory'
+import { composeMemoryPrompt, createMemoryTools, FORGET_MEMORY_TOOL_NAME, READ_MEMORY_TOOL_NAME, SEARCH_MEMORY_TOOL_NAME, WRITE_MEMORY_TOOL_NAME } from './memory'
 
 const entry: MemoryEntry = { id: 'nickname-id', description: 'What the owner likes to be called.', body: 'Yumeka.', updatedAt: 0 }
 
 function options() {
   return {
     read: vi.fn((id: string) => id === 'nickname-id' ? entry : undefined),
+    search: vi.fn((query: string) => query === 'name' ? [entry] : []),
     write: vi.fn(async (input: MemoryWrite): Promise<MemoryEntry> => ({ ...input, id: input.id ?? `${input.description}-id`, updatedAt: 0 })),
     forget: vi.fn(async () => true),
   }
@@ -18,10 +19,10 @@ describe('memory tools', () => {
   it('reads, writes, and forgets through the store bound to the run persona', async () => {
     const bound = options()
     const tools = await createMemoryTools(bound)
-    const [read, write, forget] = tools
+    const [read, search, write, forget] = tools
     const call = { messages: [], toolCallId: 'call' }
 
-    expect(tools.map(tool => tool.function.name)).toEqual([READ_MEMORY_TOOL_NAME, WRITE_MEMORY_TOOL_NAME, FORGET_MEMORY_TOOL_NAME])
+    expect(tools.map(tool => tool.function.name)).toEqual([READ_MEMORY_TOOL_NAME, SEARCH_MEMORY_TOOL_NAME, WRITE_MEMORY_TOOL_NAME, FORGET_MEMORY_TOOL_NAME])
     // One call reads or writes every entry that the turn needs.
     expect(await read!.execute({ ids: ['nickname-id', 'unknown'] }, call)).toBe('nickname-id (general): Yumeka.\nNo memory entry with id "unknown".')
     // An id changes that entry. A null id adds an entry, and the store gives it an id.
@@ -29,11 +30,14 @@ describe('memory tools', () => {
     expect(bound.write).toHaveBeenNthCalledWith(1, { id: 'nickname-id', description: 'Yumeka.', body: 'Yumeka.' })
     expect(bound.write).toHaveBeenNthCalledWith(2, { id: undefined, description: 'Tokyo.', body: 'Tokyo.' })
     expect(await forget!.execute({ id: 'nickname-id' }, call)).toBe('Forgot memory "nickname-id".')
+    // The index lists the newest entries only, so a search finds the older ones by their words.
+    expect(await search!.execute({ query: 'name' }, call)).toBe('- nickname-id: What the owner likes to be called.')
+    expect(await search!.execute({ query: 'cat' }, call)).toBe('No memory entry matches.')
   })
 
   // Strict function calling rejects a schema whose objects leave a property out of `required`.
   it('declares every write property as required, in each entry too', async () => {
-    const [, write] = await createMemoryTools(options())
+    const [, , write] = await createMemoryTools(options())
     const parameters = write!.function.parameters as { required: string[], properties: Record<string, unknown>, additionalProperties: boolean }
     const item = (parameters.properties.entries as { items: typeof parameters }).items
 

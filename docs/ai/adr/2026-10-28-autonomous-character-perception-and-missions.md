@@ -150,6 +150,16 @@ Code builds each request in the same shape. Each part has a limit.
 - The model reads details with tools. Code does not put them into the prompt in advance.
 - IO traces record the size of each part, so a trace shows when a prompt holds too much.
 
+Step 2-4 built the prompt budget as follows. It covers every chat request, not only autonomous turns.
+
+- History summary: when more than 60 messages or about 40,000 characters follow the summary, the chat model of the session folds all but the last 20 messages into a new summary of 1,500 characters at most. Requests send the summary and the messages after it. The summary moves in large steps, so the cached prefix changes only every few dozen messages.
+- The summary runs in the background after a send, as the `history-summary` usage purpose. Until it is ready, requests send the whole history. The chat view always shows every message.
+- The session meta on the device keeps the summary and its last message. When that message is deleted, the summary no longer fits, and requests send the whole history until a new summary comes.
+- Settings > Modules > Short-Term Memory turns the summary on or off, and shows and removes the summary of the open conversation. It is on by default.
+- Memory: the index lists 50 entries at most, the card's own entries first, newest first. `builtIn_searchMemory` finds the others by shared character pairs, which also works for Japanese. Recall of the top 5 memories by meaning needs embeddings, so the memory ADR builds it.
+- IO traces record the characters of the system prompt, the memory index, the summary, and the history, and the count of summarized messages.
+- No owner profile exists yet, so it has no part. The timeline and the mission instruction come with their steps.
+
 ### Perception
 
 - Capture runs on the device and costs nothing. A ring buffer holds frames at up to 2 frames per second for the last 60 seconds. It lives in memory only.
@@ -526,7 +536,7 @@ The order follows dependencies. Each step uses the parts of the earlier steps. E
 | --- | --- | --- |
 | 0 | Policy core without the screen: pressure, gates, inner state, and speech types in `core-agent`. Evaluation harness with synthetic events. | Done |
 | 1 | Mission base: the time trigger, the instance store, and the tools. Also the `mustSpeak` notice, the `reminder` template, and the mission list. | Done |
-| 2 | Autonomous talk without the screen: connect the policy core to `notifyConversation`. Add the prompt budget, intentions, owner control, usage by purpose, and the inspector. | In progress |
+| 2 | Autonomous talk without the screen: connect the policy core to `notifyConversation`. Add the prompt budget, intentions, owner control, usage by purpose, and the inspector. | Done |
 | 2b | Daily rhythm and small talk: templates as recipes, the `greeting`, `welcome-back`, and `small-talk` templates, topic seeds, and the time of day. Measure variety. | To do |
 | 3 | Perception: the adapters, ring buffer, detectors, frame policies, image budget, recorder, replay, timeline, scene state, `commentary` with interruptions, and `watch`. | To do |
 | 4 | Motion: the model capability check, the procedural layer, the library with `ACT` markers, expression sync, and the upper-body layer. | To do |
@@ -539,7 +549,7 @@ Step 2 has four parts. Each part is one change.
 | 2-1 | Connect the policy to the conversation: the runner on the leader, the transient notice, the situation block, the gates, typing detection, the cancel on owner input, and the settings. | Done |
 | 2-2 | Intentions, owner control with words, and implicit feedback. | Done |
 | 2-3 | Usage by purpose and the inspector. | Done |
-| 2-4 | The prompt budget: the top memories and the history summary. It changes every request, so it comes last. | To do |
+| 2-4 | The prompt budget: the top memories and the history summary. It changes every request, so it comes last. | Done |
 
 Step 4 does not depend on steps 0 to 3. It comes after them so that the speech output format changes only once.
 The memory ADR has its own steps. They can run beside steps 1 to 4.

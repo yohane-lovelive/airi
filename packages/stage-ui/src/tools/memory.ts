@@ -9,10 +9,14 @@ import { toJsonSchema } from 'xsschema'
 export const READ_MEMORY_TOOL_NAME = 'builtIn_readMemory'
 export const WRITE_MEMORY_TOOL_NAME = 'builtIn_writeMemory'
 export const FORGET_MEMORY_TOOL_NAME = 'builtIn_forgetMemory'
+export const SEARCH_MEMORY_TOOL_NAME = 'builtIn_searchMemory'
 
 const idSchema = pipe(string(), minLength(1), description('The entry id, as the memory index shows it.'))
 const readParameters = strictObject({
   ids: pipe(array(idSchema), minLength(1), description('Every entry that the reply needs, so one call reads them all.')),
+})
+const searchParameters = strictObject({
+  query: pipe(string(), minLength(1), maxLength(200), description('Words of the fact that you look for, for example "birthday" or "誕生日".')),
 })
 /** Forgetting an entry takes only its id. */
 const forgetParameters = strictObject({ id: idSchema })
@@ -36,6 +40,7 @@ export function composeMemoryPrompt(index: string) {
     '',
     'Long-term memory. You keep it yourself. Each index line gives the id of one remembered fact, and states the fact or when it matters.',
     `Read entries with ${READ_MEMORY_TOOL_NAME} when they matter for your reply. An index line that already states the fact needs no read.`,
+    `The index lists the newest entries only. When it does not show what you need, search older entries with ${SEARCH_MEMORY_TOOL_NAME}.`,
     `Save with ${WRITE_MEMORY_TOOL_NAME} only when someone asks you to remember something, or states a lasting fact. Most turns save nothing.`,
     'One fact per entry. To update an entry, write it with its id instead of adding a near copy. Never save what a recipe already holds, your own rules, codes, passwords, or secrets.',
     `Forget an entry by its id with ${FORGET_MEMORY_TOOL_NAME} when it turns out wrong or someone asks. General entries belong to the owner, so you cannot change or forget them.`,
@@ -46,6 +51,8 @@ export function composeMemoryPrompt(index: string) {
 /** What the memory tools change. The caller binds them to the run's character card. */
 interface CreateMemoryToolsOptions {
   read: (id: string) => MemoryEntry | undefined
+  /** The entries that best match a query, best first. */
+  search: (query: string) => MemoryEntry[]
   write: (entry: MemoryWrite) => Promise<MemoryEntry | undefined>
   forget: (id: string) => Promise<boolean>
 }
@@ -65,6 +72,18 @@ export async function createMemoryTools(options: CreateMemoryToolsOptions): Prom
           const entry = options.read(id)
           return entry ? `${entry.id} (${entry.persona ? 'yours' : 'general'}): ${entry.body}` : `No memory entry with id "${id}".`
         }).join('\n')
+      },
+    }),
+    rawTool({
+      name: SEARCH_MEMORY_TOOL_NAME,
+      description: 'Search long-term memory for entries that the index does not list. Returns their ids and index lines.',
+      parameters: await toJsonSchema(searchParameters),
+      execute: async (rawInput) => {
+        const parsed = safeParse(searchParameters, rawInput)
+        if (!parsed.success)
+          return 'Give the words to search for.'
+        const found = options.search(parsed.output.query)
+        return found.length ? found.map(entry => `- ${entry.id}: ${entry.description}`).join('\n') : 'No memory entry matches.'
       },
     }),
     rawTool({

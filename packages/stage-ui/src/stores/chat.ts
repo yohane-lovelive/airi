@@ -36,6 +36,7 @@ import {
   AIRI_CHAT_ROUND_ID_HEADER,
   AIRI_CHAT_SESSION_ID_HEADER,
 } from '../libs/product-signals/headers'
+import { promptPartSizes } from '../libs/prompt-parts'
 import { getSpeechBusContext, voiceGenerationEnded } from '../services/speech/bus'
 import { composeDrawCardPrompt, createDrawCardTool, DRAW_CARD_TOOL_NAME, drawCardContent } from '../tools/draw-card'
 import { createIntentionTools, createTalkLevelTool } from '../tools/initiative'
@@ -59,6 +60,7 @@ import { staysLocal } from './chat/session-locality'
 import { useChatSessionStore } from './chat/session-store'
 import { useChatStreamStore } from './chat/stream-store'
 import { useContextObservabilityStore } from './devtools/context-observability'
+import { useHistorySummaryStore } from './history-summary'
 import { useInitiativeStore } from './initiative'
 import { useIntentionsStore } from './intentions'
 import { useMemoryStore } from './memory'
@@ -284,6 +286,9 @@ export const useChatStore = defineStore('chat', () => {
   const chatStream = useChatStreamStore()
   const chatContext = useChatContextStore()
   const cardStore = useAiriCardStore()
+  const historySummary = useHistorySummaryStore()
+  /** The count of messages that the summary stood for in the last request of each session, for its IO trace. */
+  const summarizedCounts = new Map<string, number>()
   const recipes = useRecipesStore()
   const memory = useMemoryStore()
   const missions = useMissionsStore()
@@ -680,7 +685,7 @@ export const useChatStore = defineStore('chat', () => {
     const persona = personaOf(sessionId)
     const sourceTools = async () => [
       ...(typeof tools === 'function' ? await tools() ?? [] : tools ?? []),
-      ...memory.enabled ? await createMemoryTools({ read: id => memory.read(id, persona), write: entry => memory.write(entry, persona), forget: id => memory.forget(id, persona) }) : [],
+      ...memory.enabled ? await createMemoryTools({ read: id => memory.read(id, persona), search: query => memory.search(query, persona), write: entry => memory.write(entry, persona), forget: id => memory.forget(id, persona) }) : [],
     ]
     // A recipe's own session runs only that recipe. It cannot start recipes, save them, or choose silence.
     if (isTaskSession(sessionId))
@@ -907,6 +912,14 @@ export const useChatStore = defineStore('chat', () => {
       [IOAttributes.TurnId]: options?.requestCorrelation?.turnId ?? '',
     })
     llmSpan.setAttribute(IOAttributes.LLMInputMessageRoles, providerMessages.map(message => message.role))
+    const parts = promptPartSizes(providerContext)
+    const sessionId = options?.requestCorrelation?.conversationId
+    llmSpan.setAttribute(IOAttributes.LLMPromptSystemChars, parts.systemChars)
+    llmSpan.setAttribute(IOAttributes.LLMPromptMemoryIndexChars, sessionId && memory.enabled ? memory.indexFor(personaOf(sessionId)).length : 0)
+    llmSpan.setAttribute(IOAttributes.LLMPromptSummaryChars, parts.summaryChars)
+    llmSpan.setAttribute(IOAttributes.LLMPromptSummarizedMessages, sessionId ? summarizedCounts.get(sessionId) ?? 0 : 0)
+    llmSpan.setAttribute(IOAttributes.LLMPromptHistoryTurns, parts.historyTurns)
+    llmSpan.setAttribute(IOAttributes.LLMPromptHistoryChars, parts.historyChars)
     const llmRequestTs = performance.now()
     let llmFirstTokenEmitted = false
 
@@ -1073,6 +1086,12 @@ export const useChatStore = defineStore('chat', () => {
     getSystemPromptSupplement: () => llmToolsetPromptsStore.activeToolsetPrompt,
     // Identity follows the session's persona at request time, so a card switch never rewrites another session.
     getSystemPrompt: sessionSystemPrompt,
+    // A long conversation sends a summary and its recent messages. The stored history stays whole.
+    projectHistory: (sessionId, messages) => {
+      const projected = historySummary.project(sessionId, messages)
+      summarizedCounts.set(sessionId, projected.coveredCount)
+      return projected
+    },
     runtimeContextProviders: [
       () => createRuntimePromptContext(runtimePrompt.value),
       createMinecraftContext,
@@ -1213,6 +1232,7 @@ export const useChatStore = defineStore('chat', () => {
     requests.set(key, { sessionId, purpose: usagePurposeOf(sessionId, options.notice), abort, request })
     void request.accepted.catch(() => {})
     void request.done.finally(() => requests.delete(key)).catch(() => {})
+    void request.done.then(() => historySummary.summarize(sessionId)).catch(() => {})
     return request.done
   }
 
@@ -1419,6 +1439,8 @@ export const useChatStore = defineStore('chat', () => {
     requests.set(key, { sessionId: payload.sessionId, purpose: usagePurposeOf(payload.sessionId, extra.notice), abort, request })
     void request.accepted.catch(() => {})
     void request.done.finally(() => requests.delete(key)).catch(() => {})
+    // A finished send can push the recent history past its limits. The summary runs in the background.
+    void request.done.then(() => historySummary.summarize(payload.sessionId)).catch(() => {})
 
     return request
   }

@@ -561,6 +561,7 @@ pages:
       voice-assist: 音声入力の補助
       tool-card: ツールカード
       artistry: 画像生成
+      history-summary: 履歴の要約
       other: その他
   memory:
     description: 記憶が保存され、整理される場所
@@ -983,6 +984,12 @@ pages:
     memory-short-term:
       description: 短期記憶固有の設定と管理
       title: 短期記憶
+      summary: 古いメッセージを要約する
+      summary-description: 長い会話では、キャラクターは古いメッセージの要約と、最近のメッセージをそのまま受け取ります。要約はチャットモデルが裏で書き、そのたびにモデルを 1 回呼びます。チャットの画面には、すべてのメッセージが残ります。
+      current: この会話の要約
+      covered: '古いメッセージ {count} 件を含みます。{time} に作成。'
+      empty: まだ要約はありません。会話が長くなると作られます。
+      remove: 削除
     messaging-discord:
       description: Discordでのチャットとボイスチャット
       enable: Discord連携を有効にする

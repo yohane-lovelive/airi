@@ -344,6 +344,11 @@ export interface ChatOrchestratorRuntimeDeps {
    * With it, history carries no identity. Stored system messages are skipped, so a persona edit or switch reaches the next send of its own sessions only.
    */
   getSystemPrompt?: (sessionId: string) => string | undefined
+  /**
+   * Shortens the history of one request, for example to a summary and the recent messages. Stored history stays whole.
+   * It returns the messages to send, and a summary of the older messages that it left out.
+   */
+  projectHistory?: (sessionId: string, messages: ChatHistoryItem[]) => { messages: ChatHistoryItem[], summary?: string }
   /** Runtime context providers ingested immediately before prompt composition. */
   runtimeContextProviders?: Array<() => ContextMessage | null | undefined>
   /**
@@ -993,7 +998,9 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
 
       // Identity comes from the session's persona at request time. Without a host identity, the stored history keeps its own system message.
       const systemPrompt = deps.getSystemPrompt?.(sessionId)
-      const context = buildContext(deps.getSystemPrompt ? sessionMessagesForSend.filter(message => message.role !== 'system') : sessionMessagesForSend)
+      const history = deps.getSystemPrompt ? sessionMessagesForSend.filter(message => message.role !== 'system') : sessionMessagesForSend
+      const projectedHistory: { messages: ChatHistoryItem[], summary?: string } = deps.projectHistory?.(sessionId, history) ?? { messages: history }
+      const context = buildContext(projectedHistory.messages)
       // The stored notice ends the history. Only this request tells the model that it can stay quiet about it.
       if (options.notice) {
         const lastTurn = context.turns.at(-1)
@@ -1021,6 +1028,16 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
           systemMessage.content.push({ type: 'text', text: `\n\n${systemPromptSupplement}` })
         else
           context.turns.unshift({ id: 'system-supplement', type: 'system', authority: 'system', content: [{ type: 'text', text: systemPromptSupplement }] })
+      }
+      // The summary stands for the left-out messages, so it comes after the system prompt and before the recent history.
+      if (projectedHistory.summary?.trim()) {
+        const firstHistoryIndex = context.turns.findIndex(turn => turn.type !== 'system' || turn.authority !== 'system')
+        context.turns.splice(firstHistoryIndex < 0 ? context.turns.length : firstHistoryIndex, 0, {
+          id: 'history-summary',
+          type: 'system',
+          authority: 'context',
+          content: [{ type: 'summary', text: projectedHistory.summary }],
+        })
       }
 
       const contextsSnapshot = deps.context.snapshot()

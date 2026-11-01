@@ -624,6 +624,7 @@ pages:
       voice-assist: Voice input help
       tool-card: Tool cards
       artistry: Artistry
+      history-summary: History summaries
       other: Other
   memory:
     description: Where memories got stored, and organized
@@ -1201,6 +1202,12 @@ pages:
     memory-short-term:
       description: Short-term memory specific settings and management
       title: Short-Term Memory
+      summary: Summarize older messages
+      summary-description: In a long conversation, the character gets a summary of the older messages and the recent messages as they are. The chat model writes the summary in the background, and it costs a model call. The chat view keeps every message.
+      current: Summary of this conversation
+      covered: 'Holds {count} older messages. Written {time}.'
+      empty: No summary yet. It comes when the conversation gets long.
+      remove: Remove
     messaging-discord:
       description: Chat & voice chat over Discord
       title: Discord

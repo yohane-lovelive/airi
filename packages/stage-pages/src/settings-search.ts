@@ -33,6 +33,7 @@ export const settingsSearchModules: Readonly<Record<string, SettingsSearchModule
   'modules:memories': () => import('./pages/settings/modules/memory-long-term-memories.search'),
   'modules:recipes': () => import('./pages/settings/modules/memory-long-term-recipes.search'),
   'modules:missions': { routes: ['/settings/modules/missions'] },
+  'modules:memory-short-term': { routes: ['/settings/modules/memory-short-term'] },
   'modules:initiative': { routes: ['/settings/modules/initiative'] },
   'settings:providers': () => import('./pages/settings/providers/index.search'),
   'settings:usage': { routes: ['/settings/usage'] },
