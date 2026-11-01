@@ -55,6 +55,10 @@ export const useInitiativeStore = defineStore('initiative', () => {
    * across a restart, and an ended part has no effect.
    */
   const talkControl = useLocalStorageManualReset<TalkControl>('initiative/talk-control', {})
+  /** Whether the character greets the owner when the app starts after a long quiet time. */
+  const greetingEnabled = useLocalStorageManualReset<boolean>('initiative/greeting-enabled', true)
+  /** Whether the character welcomes the owner back after time away from the device. */
+  const welcomeBackEnabled = useLocalStorageManualReset<boolean>('initiative/welcome-back-enabled', true)
   /**
    * Whether this app runs autonomous speech. The initiative runner sets it when an app initializes it, so Settings of
    * an app without a runner, for example the mobile app, can say that the feature does not run there.
@@ -110,6 +114,8 @@ export const useInitiativeStore = defineStore('initiative', () => {
     quietHoursStart.reset()
     quietHoursEnd.reset()
     talkControl.reset()
+    greetingEnabled.reset()
+    welcomeBackEnabled.reset()
   }
 
   return {
@@ -120,6 +126,8 @@ export const useInitiativeStore = defineStore('initiative', () => {
     quietHoursStart,
     quietHoursEnd,
     talkControl,
+    greetingEnabled,
+    welcomeBackEnabled,
     supported,
     settingsAt,
     applyTalkRequest,

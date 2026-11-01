@@ -1,14 +1,17 @@
 export {
   createInitiativeState,
+  dayPartOf,
   decideInitiative,
   initiativeReadout,
   initiativeTimeFrom,
   isSpeechStale,
   observeInitiative,
+  requestRhythmTurn,
   resolveInitiativeOptions,
   unansweredIntervalFactor,
 } from './initiative'
 export type {
+  DayPart,
   InitiativeDecision,
   InitiativeEvent,
   InitiativeHost,
@@ -16,6 +19,7 @@ export type {
   InitiativeModeOptions,
   InitiativeOptions,
   InitiativeReadout,
+  InitiativeRhythm,
   InitiativeSettings,
   InitiativeState,
   InitiativeTime,

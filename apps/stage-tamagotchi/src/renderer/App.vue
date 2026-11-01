@@ -69,6 +69,7 @@ import {
 import { electronPluginToolsChanged } from '../shared/eventa/plugin/tools'
 import { initializeElectronAuthCallbackBridge } from './bridges/electron-auth-callback'
 import { initializeIOTraceHubBridge } from './bridges/io-trace-hub'
+import { createElectronOwnerPresenceSource } from './bridges/owner-presence'
 import { initializeStageThreeRuntimeTraceBridge } from './bridges/stage-three-runtime-trace'
 import { useLanguage } from './composables/use-language'
 import { useFullscreenStore } from './stores/fullscreen'
@@ -337,7 +338,7 @@ function createFullStageRuntime() {
       if (!isWidgetsWindow) {
         characterOrchestratorStore.initialize(syncedPinia)
         missionRunnerStore.initialize(syncedPinia)
-        initiativeRunnerStore.initialize(syncedPinia)
+        initiativeRunnerStore.initialize(syncedPinia, createElectronOwnerPresenceSource(context.value))
         settingsSyncStore.initialize(syncedPinia)
       }
 

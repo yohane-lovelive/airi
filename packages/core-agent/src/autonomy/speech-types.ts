@@ -35,6 +35,16 @@ export interface SpeechTypeContext {
   readonly eventShare: number
   /** Speech types of the last spoken turns, newest last. */
   readonly recentTypes: readonly SpeechType[]
+  /** Whether it is night. At night, quiet types come more often than jokes and questions. */
+  readonly night?: boolean
+}
+
+/** At night, each type weight is multiplied by its factor. A missing type keeps its weight. */
+const NIGHT_FACTORS: Partial<Record<SpeechType, number>> = {
+  'joke': 0.5,
+  'ask': 0.7,
+  'think-aloud': 1.3,
+  'watch-quietly': 1.5,
 }
 
 /**
@@ -74,7 +84,7 @@ function speechTypeWeights(context: SpeechTypeContext): number[] {
   }
 
   return SPEECH_TYPES.map((type) => {
-    let weight = base[type]
+    let weight = base[type] * (context.night ? NIGHT_FACTORS[type] ?? 1 : 1)
     for (const [index, recent] of context.recentTypes.entries()) {
       if (recent !== type)
         continue

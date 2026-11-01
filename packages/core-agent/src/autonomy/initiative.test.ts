@@ -9,6 +9,7 @@ import {
   initiativeTimeFrom,
   isSpeechStale,
   observeInitiative,
+  requestRhythmTurn,
   resolveInitiativeOptions,
   unansweredIntervalFactor,
 } from './initiative'
@@ -364,5 +365,41 @@ describe('readout', () => {
     expect(readout).toMatchObject({ waitReason: 'refractory', refractoryLeftMs: 80_000, unanswered: 1, budget: { turns: 1, limit: 200 } })
     expect(readout.intervalFactor).toBeCloseTo(1.3)
     expect(initiativeReadout(spoke, { ...IDLE, ownerActive: true }, at(911), options).waitReason).toBe('owner-active')
+  })
+})
+
+describe('daily rhythm', () => {
+  const options = resolveInitiativeOptions({ quietHours: { startMinutes: 23 * 60, endMinutes: 7 * 60 } })
+
+  // A greeting comes when the owner opens the app, not when the drive is high enough.
+  it('starts a greeting without drive, and counts it in the budget', () => {
+    const result = requestRhythmTurn(createInitiativeState(at(0)), 'greeting', IDLE, at(1), options)
+
+    expect(result.decision).toMatchObject({ kind: 'turn', trigger: 'greeting' })
+    expect(result.state.turn?.trigger).toBe('greeting')
+    expect(result.state.budget.turns).toBe(1)
+  })
+
+  it('starts a welcome back in the rest after a turn', () => {
+    const spoke = observeInitiative(withTurn(options), { type: 'turn-finished', outcome: 'spoke' }, at(901), options)
+
+    expect(requestRhythmTurn(spoke, 'welcome-back', IDLE, at(911), options).decision.kind).toBe('turn')
+  })
+
+  // Owner input, quiet times, and the budget still win over the rhythm.
+  it('waits for owner input, quiet hours, a requested quiet time, and the budget', () => {
+    const start = createInitiativeState(at(0))
+
+    expect(requestRhythmTurn(start, 'greeting', { ...IDLE, ownerActive: true }, at(1), options).decision).toEqual({ kind: 'wait', reason: 'owner-active' })
+    expect(requestRhythmTurn(start, 'greeting', IDLE, at(1, '2026-10-29', 23 * 60 + 30), options).decision).toEqual({ kind: 'wait', reason: 'quiet-hours' })
+    expect(requestRhythmTurn(start, 'greeting', IDLE, at(1), { ...options, quietUntil: START + 60_000 }).decision).toEqual({ kind: 'wait', reason: 'owner-quiet' })
+    expect(requestRhythmTurn(start, 'greeting', IDLE, at(1), { ...options, dailyTurnBudget: 0 }).decision).toEqual({ kind: 'wait', reason: 'daily-budget' })
+  })
+
+  it('raises the threshold at night', () => {
+    const state = createInitiativeState(at(0))
+
+    expect(initiativeReadout(state, IDLE, at(1, '2026-10-29', 23 * 60), resolveInitiativeOptions()).threshold).toBeCloseTo(1.5)
+    expect(initiativeReadout(state, IDLE, at(1, '2026-10-29', 12 * 60), resolveInitiativeOptions()).threshold).toBeCloseTo(1)
   })
 })

@@ -3,9 +3,11 @@ import type EventEmitter from 'node:events'
 import type { createContext } from '@moeru/eventa/adapters/electron/main'
 import type { BrowserWindow } from 'electron'
 
+import { defineInvokeHandler } from '@moeru/eventa'
 import { electronEvents } from '@proj-airi/electron-eventa'
 import { powerMonitor } from 'electron'
 
+import { electronSystemIdleSeconds } from '../../../shared/eventa'
 import { onAppBeforeQuit } from '../../libs/bootkit/lifecycle'
 
 export function createPowerMonitorService(params: { context: ReturnType<typeof createContext>['context'], window: BrowserWindow }) {
@@ -28,4 +30,6 @@ export function createPowerMonitorService(params: { context: ReturnType<typeof c
   onOff(powerMonitor, 'resume', () => params.context.emit(electronEvents.powerMonitor.resumed, undefined))
   onOff(powerMonitor, 'lock-screen', () => params.context.emit(electronEvents.powerMonitor.lockScreen, undefined))
   onOff(powerMonitor, 'unlock-screen', () => params.context.emit(electronEvents.powerMonitor.unlockScreen, undefined))
+  // Autonomous speech reads the idle time to tell when the owner left the computer and came back.
+  defineInvokeHandler(params.context, electronSystemIdleSeconds, () => powerMonitor.getSystemIdleTime())
 }

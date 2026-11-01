@@ -2,6 +2,8 @@ import type { InitiativeMode, InitiativeTrigger } from './initiative'
 import type { Intention } from './intentions'
 import type { SpeechType } from './speech-types'
 
+import { dayPartOf } from './initiative'
+
 /** The count of recent lines in the notice. The model reads them to avoid the same opening and structure. */
 export const INITIATIVE_RECENT_LINE_COUNT = 3
 
@@ -28,12 +30,16 @@ export interface InitiativeNoticeContext {
   readonly recentLines: readonly string[]
   /** The open intentions of the character, oldest first. */
   readonly intentions?: readonly Intention[]
+  /** How long the owner was away, for a welcome back. */
+  readonly awayMs?: number
 }
 
 const TRIGGER_REASONS: Record<InitiativeTrigger, string> = {
-  event: 'something happened',
-  boredom: 'it has been quiet for a while',
-  intention: 'you wanted to do something later',
+  'event': 'something happened',
+  'boredom': 'it has been quiet for a while',
+  'intention': 'you wanted to do something later',
+  'greeting': 'the owner just opened the app. Greet the owner in a way that fits the time of day and how long ago you last talked',
+  'welcome-back': 'the owner just came back to the computer after time away. Welcome the owner back in a few words',
 }
 
 const SPEECH_TYPE_HINTS: Record<SpeechType, string> = {
@@ -59,10 +65,12 @@ export function initiativeNoticeText(context: InitiativeNoticeContext): string {
   const lines = [
     'Autonomous turn: nobody asked you to speak. You can start talking on your own, or stay quiet.',
     `- Why now: ${TRIGGER_REASONS[context.trigger]}.`,
-    `- Time of day: ${partOfDay(context.localMinutes)}.`,
+    `- Time of day: ${dayPartOf(context.localMinutes)}.`,
     `- Since the owner's last message: ${durationSince(context.lastOwnerAt, context.now)}.`,
     `- Since your last line: ${durationSince(context.lastSpokeAt, context.now)}.`,
   ]
+  if (context.awayMs !== undefined)
+    lines.push(`- The owner was away for: ${durationSince(context.now - context.awayMs, context.now)}.`)
   if (context.mode === 'commentary')
     lines.push('- Mode: commentary. Keep it to one short sentence.')
   if (context.speechType)
@@ -80,17 +88,6 @@ export function initiativeNoticeText(context: InitiativeNoticeContext): string {
   }
   lines.push('Keep it short and natural, one or two sentences.')
   return lines.join('\n')
-}
-
-function partOfDay(localMinutes: number) {
-  const hour = Math.floor(localMinutes / 60)
-  if (hour >= 5 && hour < 11)
-    return 'morning'
-  if (hour >= 11 && hour < 17)
-    return 'afternoon'
-  if (hour >= 17 && hour < 22)
-    return 'evening'
-  return 'night'
 }
 
 function durationSince(at: number | undefined, now: number) {

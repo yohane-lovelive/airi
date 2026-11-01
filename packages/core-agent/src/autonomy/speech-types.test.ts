@@ -60,4 +60,14 @@ describe('speech type draw', () => {
 
     expect(draws(first)).toEqual(draws(second))
   })
+
+  // At night, the character talks quietly: fewer jokes and questions, more passing thoughts and quiet remarks.
+  it('favors quiet speech at night', () => {
+    const day = shares(NEUTRAL)
+    const night = shares({ ...NEUTRAL, night: true })
+
+    expect(night.joke).toBeLessThan(day.joke)
+    expect(night.ask).toBeLessThan(day.ask)
+    expect(night['watch-quietly']).toBeGreaterThan(day['watch-quietly'])
+  })
 })

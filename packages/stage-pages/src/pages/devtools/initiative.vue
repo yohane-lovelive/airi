@@ -31,6 +31,7 @@ useIntervalFn(() => inspector.markWatching(), INSPECTOR_WATCH_REFRESH_MS, { imme
 
 const now = useNow({ interval: 1_000 })
 const readout = computed(() => snapshot.value && now.value.getTime() - snapshot.value.at < STALE_AFTER_MS ? snapshot.value.readout : undefined)
+const rhythm = computed(() => readout.value ? snapshot.value?.rhythm : undefined)
 
 /** Drive and threshold samples of this page. Each page keeps its own history from the time it opened. */
 const history = ref<Array<{ at: number, drive: number, threshold: number }>>([])
@@ -156,6 +157,15 @@ function timeLabel(epochMs: number) {
           {{ t(`${KEY}.pace.refractory`, { seconds: Math.ceil(readout.refractoryLeftMs / 1_000) }) }}
         </li>
         <li>{{ t(`${KEY}.pace.recent-types`, { types: readout.recentTypes.join(', ') || '-' }) }}</li>
+        <li v-if="rhythm?.awaySince">
+          {{ t(`${KEY}.rhythm.away`, { time: timeLabel(rhythm.awaySince) }) }}
+        </li>
+        <li v-else>
+          {{ t(`${KEY}.rhythm.present`) }}
+        </li>
+        <li v-if="rhythm?.lastRhythm">
+          {{ t(`${KEY}.rhythm.${rhythm.lastRhythm.rhythm}`, { time: timeLabel(rhythm.lastRhythm.at) }) }}
+        </li>
       </ul>
     </section>
 

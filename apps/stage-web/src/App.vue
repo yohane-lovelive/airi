@@ -33,6 +33,7 @@ import { toast, Toaster } from 'vue-sonner'
 
 import PerformanceOverlay from './components/Devtools/PerformanceOverlay.vue'
 
+import { usePageOwnerPresence } from './composables/owner-presence'
 import { usePWAStore } from './stores/pwa'
 
 usePWAStore()
@@ -52,6 +53,7 @@ const serverChannelStore = useModsServerChannelStore()
 const characterOrchestratorStore = useCharacterOrchestratorStore()
 const missionRunnerStore = useMissionRunnerStore()
 const initiativeRunnerStore = useInitiativeRunnerStore()
+const ownerPresence = usePageOwnerPresence()
 const settingsSyncStore = useSettingsSyncStore()
 const settingsAudioDeviceStore = useSettingsAudioDevice()
 const { showingSetup } = storeToRefs(onboardingStore)
@@ -157,7 +159,7 @@ async function loadStartup() {
       contextBridgeStore.initialize()
       characterOrchestratorStore.initialize(syncedPinia)
       missionRunnerStore.initialize(syncedPinia)
-      initiativeRunnerStore.initialize(syncedPinia)
+      initiativeRunnerStore.initialize(syncedPinia, ownerPresence)
       settingsSyncStore.initialize(syncedPinia)
     })
     await startup.run('modelData', () => displayModelsStore.loadDisplayModelsFromIndexedDB())

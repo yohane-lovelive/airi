@@ -54,4 +54,13 @@ describe('initiativeNoticeText', () => {
   it('asks for one short sentence in commentary', () => {
     expect(initiativeNoticeText(context({ mode: 'commentary', trigger: 'event' }))).toContain('Mode: commentary. Keep it to one short sentence.')
   })
+
+  it('asks for a greeting that fits the time, and tells how long the owner was away for a welcome back', () => {
+    expect(initiativeNoticeText(context({ trigger: 'greeting', localMinutes: 7 * 60 }))).toContain('Greet the owner in a way that fits the time of day')
+    expect(initiativeNoticeText(context({ trigger: 'greeting', localMinutes: 7 * 60 }))).toContain('Time of day: morning.')
+
+    const welcome = initiativeNoticeText(context({ trigger: 'welcome-back', awayMs: 95 * 60_000 }))
+    expect(welcome).toContain('Welcome the owner back')
+    expect(welcome).toContain('The owner was away for: about 1 hour.')
+  })
 })

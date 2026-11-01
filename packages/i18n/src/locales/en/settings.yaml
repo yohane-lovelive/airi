@@ -1080,6 +1080,10 @@ pages:
       quiet-hours-description: In this time, the character does not start to talk. It still answers you.
       quiet-hours-start: Start
       quiet-hours-end: End
+      greeting: Greet me when the app starts
+      greeting-description: When the open chat has been quiet for 3 hours or more, the character greets you to fit the time of day.
+      welcome-back: Welcome me back
+      welcome-back-description: When you come back after 30 minutes or more away, the character says a few words. The desktop app counts input in any app, and the web app counts input in this page.
       talk-changes: Changes from your words
       talk-changes-description: 'You can ask in chat, for example "be quiet for 30 minutes" or "you can talk more". A lasting change moves the talk interval above.'
       talk-changes-empty: No changes for a time now.

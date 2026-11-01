@@ -330,6 +330,16 @@ The last two templates give a daily rhythm. These rules complete it:
 - The time of day changes the inner state. Energy is lower late at night, and the speech hints change with the time.
 - The desktop app reads time away from the system idle time. The web app uses the Idle Detection API, or page focus when the API is not available.
 
+Step 2b-1 built the daily rhythm as follows. Step 2b-2 builds small talk and topic seeds.
+
+- The greeting and the welcome back are rhythm turns in code, not mission templates. They need no instances, so templates as recipes wait until the owner or the model makes templates.
+- `requestRhythmTurn` of `core-agent` starts them without the drive and the threshold. The refractory time does not hold them, but owner input, speech, a running turn, a quiet time, quiet hours, and the daily budget do. A rhythm turn that the gates hold for two minutes is dropped.
+- Greeting: at the first tick of the leader, an open conversation that was quiet for 3 hours or more gets a greeting. The notice gives the time of day and the time since the last message.
+- Welcome back: no input for 10 minutes makes the owner away. A screen lock or sleep makes the owner away at once. A return after 30 minutes or more gets a welcome back, but not within 10 minutes of another rhythm turn. The notice gives the time away.
+- The desktop app reads `powerMonitor.getSystemIdleTime()` every 15 seconds through an eventa invoke. The web app counts input and visibility of the page only, because the Idle Detection API asks for a permission.
+- Night is 22:00 to 05:00. At night, the threshold is 1.5 times higher. Jokes and questions get lower weights, and passing thoughts and quiet remarks get higher ones.
+- Settings > Modules > Autonomous speech turns the greeting and the welcome back on or off. Both are on by default. The inspector shows whether the owner is away and the last rhythm turn.
+
 - Code checks each value that the model gives. The model can only create and stop instances.
 - A mission instruction has 500 characters at most. It never replaces the persona.
 - One foreground mission runs at a time, for example commentary or small talk. Background missions, such as reminders and watches, enter the prompt only when they fire.
@@ -537,7 +547,7 @@ The order follows dependencies. Each step uses the parts of the earlier steps. E
 | 0 | Policy core without the screen: pressure, gates, inner state, and speech types in `core-agent`. Evaluation harness with synthetic events. | Done |
 | 1 | Mission base: the time trigger, the instance store, and the tools. Also the `mustSpeak` notice, the `reminder` template, and the mission list. | Done |
 | 2 | Autonomous talk without the screen: connect the policy core to `notifyConversation`. Add the prompt budget, intentions, owner control, usage by purpose, and the inspector. | Done |
-| 2b | Daily rhythm and small talk: templates as recipes, the `greeting`, `welcome-back`, and `small-talk` templates, topic seeds, and the time of day. Measure variety. | To do |
+| 2b | Daily rhythm and small talk: templates as recipes, the `greeting`, `welcome-back`, and `small-talk` templates, topic seeds, and the time of day. Measure variety. | In progress: 2b-1 (greeting, welcome back, time of day) is done. 2b-2 (small talk, topic seeds) is next. |
 | 3 | Perception: the adapters, ring buffer, detectors, frame policies, image budget, recorder, replay, timeline, scene state, `commentary` with interruptions, and `watch`. | To do |
 | 4 | Motion: the model capability check, the procedural layer, the library with `ACT` markers, expression sync, and the upper-body layer. | To do |
 | 5 | Generated motion, game audio, recall from memory, and polish. Recall needs the memory ADR. | To do |

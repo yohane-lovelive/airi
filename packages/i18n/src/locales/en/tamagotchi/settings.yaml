@@ -126,6 +126,11 @@ devtools:
       until: until {time}
       none: None.
       usage-today: Tokens today
+      rhythm:
+        present: The owner is at the device.
+        away: 'The owner is away since {time}.'
+        greeting: 'Last greeting: {time}'
+        welcome-back: 'Last welcome back: {time}'
     presence-bubble:
       title: Presence Bubble
       description: Drive the bubble above the character and watch it in the main window

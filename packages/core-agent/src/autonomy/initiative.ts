@@ -154,6 +154,29 @@ const INNER_DYNAMICS = {
   unansweredIntervalStep: 1.3,
   /** The idle interval grows up to this multiple of its setting. */
   maxUnansweredIntervalFactor: 3,
+  /** At night, the threshold is this much higher, so the character talks less. */
+  nightThresholdFactor: 1.5,
+}
+
+/** A part of the local day. The notice names it, and the night changes the threshold and the speech types. */
+export type DayPart = 'morning' | 'afternoon' | 'evening' | 'night'
+
+/**
+ * The part of the day at a local time. The night runs from 22:00 to 05:00.
+ *
+ * @example
+ * dayPartOf(23 * 60)
+ * // => 'night'
+ */
+export function dayPartOf(localMinutes: number): DayPart {
+  const hour = Math.floor(localMinutes / 60)
+  if (hour >= 5 && hour < 11)
+    return 'morning'
+  if (hour >= 11 && hour < 17)
+    return 'afternoon'
+  if (hour >= 17 && hour < 22)
+    return 'evening'
+  return 'night'
 }
 
 /** The inner state of the character. Code updates it from time and events, and the speech type draw reads it. */
@@ -171,8 +194,16 @@ export interface InnerState {
   readonly curiosity: number
 }
 
-/** Why a turn started: the larger part of the drive. */
-export type InitiativeTrigger = 'event' | 'boredom' | 'intention'
+/**
+ * A turn of the daily rhythm. It starts at a moment, not from the drive.
+ *
+ * - `greeting`: the owner opened the app.
+ * - `welcome-back`: the owner came back after time away.
+ */
+export type InitiativeRhythm = 'greeting' | 'welcome-back'
+
+/** Why a turn started: the largest part of the drive, or a turn of the daily rhythm. */
+export type InitiativeTrigger = 'event' | 'boredom' | 'intention' | InitiativeRhythm
 
 /** A decided turn that waits for its result. */
 export interface PendingTurn {
@@ -372,7 +403,7 @@ export function decideInitiative(
   const jitter = current.jitter ?? 1 + (random() * 2 - 1) * options.thresholdJitter
   current = { ...current, jitter }
 
-  const threshold = energyFactorOf(current.inner) * jitter
+  const threshold = thresholdOf(current.inner, jitter, time)
   const { total: drive, intention: intentionDrive } = driveOf(current, host)
   if (drive < threshold)
     return { state: current, decision: { kind: 'wait', reason: 'below-threshold' } }
@@ -380,7 +411,7 @@ export function decideInitiative(
   const trigger = triggerOf(current.pressure, current.inner.boredom, intentionDrive)
   const speechType = random() < options.hintlessShare
     ? undefined
-    : drawSpeechType({ ...current.inner, eventShare: current.pressure / drive, recentTypes: current.recentTypes }, random)
+    : drawSpeechType({ ...current.inner, eventShare: current.pressure / drive, recentTypes: current.recentTypes, night: dayPartOf(time.localMinutes) === 'night' }, random)
   const mood = clamp(current.inner.mood + (random() * 2 - 1) * INNER_DYNAMICS.moodDrift, -1, 1)
 
   const turn: PendingTurn = { startedAt: time.now, trigger, ...(speechType ? { speechType } : {}) }
@@ -392,6 +423,33 @@ export function decideInitiative(
       budget: { day: current.budget.day, turns: current.budget.turns + 1 },
     },
     decision: { kind: 'turn', trigger, drive, threshold, ...(speechType ? { speechType } : {}) },
+  }
+}
+
+/**
+ * Starts a turn of the daily rhythm, for example a greeting when the owner opens the app.
+ *
+ * The drive and the threshold do not count, and the refractory time does not hold it. Every other gate holds, so owner
+ * input, a quiet time, quiet hours, and the daily budget still win. On `wait`, the host can ask again soon.
+ */
+export function requestRhythmTurn(
+  state: InitiativeState,
+  rhythm: InitiativeRhythm,
+  host: InitiativeHost,
+  time: InitiativeTime,
+  options: InitiativeOptions,
+): { state: InitiativeState, decision: InitiativeDecision } {
+  let current = advance(state, time.now, options)
+  if (current.budget.day !== time.localDay)
+    current = { ...current, budget: { day: time.localDay, turns: 0 } }
+
+  const reason = waitReason(current, host, time, options)
+  if (reason && reason !== 'refractory')
+    return { state: current, decision: { kind: 'wait', reason } }
+
+  return {
+    state: { ...current, turn: { startedAt: time.now, trigger: rhythm }, budget: { day: current.budget.day, turns: current.budget.turns + 1 } },
+    decision: { kind: 'turn', trigger: rhythm, drive: driveOf(current, host).total, threshold: thresholdOf(current.inner, current.jitter ?? 1, time) },
   }
 }
 
@@ -428,7 +486,7 @@ export function initiativeReadout(state: InitiativeState, host: InitiativeHost, 
     current = { ...current, budget: { day: time.localDay, turns: 0 } }
 
   const drive = driveOf(current, host)
-  const threshold = energyFactorOf(current.inner) * (current.jitter ?? 1)
+  const threshold = thresholdOf(current.inner, current.jitter ?? 1, time)
   const reason = waitReason(current, host, time, options) ?? (drive.total < threshold ? 'below-threshold' : undefined)
   return {
     mode: current.mode,
@@ -560,9 +618,11 @@ export function unansweredIntervalFactor(unanswered: number): number {
   return Math.min(INNER_DYNAMICS.maxUnansweredIntervalFactor, INNER_DYNAMICS.unansweredIntervalStep ** Math.max(0, unanswered))
 }
 
-/** Low energy raises the threshold. */
-function energyFactorOf(inner: InnerState) {
-  return 1 + (1 - inner.energy) * INNER_DYNAMICS.energyThresholdGain
+/** Low energy and the night raise the threshold. */
+function thresholdOf(inner: InnerState, jitter: number, time: InitiativeTime) {
+  const energyFactor = 1 + (1 - inner.energy) * INNER_DYNAMICS.energyThresholdGain
+  const nightFactor = dayPartOf(time.localMinutes) === 'night' ? INNER_DYNAMICS.nightThresholdFactor : 1
+  return energyFactor * nightFactor * jitter
 }
 
 /** The drive and its parts. Intentions add a capped part. */

@@ -6,7 +6,7 @@ import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
-const { enabled, idleIntervalMinutes, dailyTurnBudget, quietHoursEnabled, quietHoursStart, quietHoursEnd } = storeToRefs(useInitiativeStore())
+const { enabled, idleIntervalMinutes, dailyTurnBudget, quietHoursEnabled, quietHoursStart, quietHoursEnd, greetingEnabled, welcomeBackEnabled } = storeToRefs(useInitiativeStore())
 const { changes: talkChanges, reset: resetTalkChanges } = useTalkChanges()
 
 const KEY = 'settings.pages.modules.initiative'
@@ -41,6 +41,11 @@ const KEY = 'settings.pages.modules.initiative'
         <FieldInput v-model="quietHoursStart" type="time" :label="t(`${KEY}.quiet-hours-start`)" />
         <FieldInput v-model="quietHoursEnd" type="time" :label="t(`${KEY}.quiet-hours-end`)" />
       </div>
+    </div>
+
+    <div :class="['flex flex-col', 'gap-4', 'rounded-xl', 'bg-neutral-100 dark:bg-neutral-900', 'p-4']">
+      <FieldCheckbox v-model="greetingEnabled" :label="t(`${KEY}.greeting`)" :description="t(`${KEY}.greeting-description`)" />
+      <FieldCheckbox v-model="welcomeBackEnabled" :label="t(`${KEY}.welcome-back`)" :description="t(`${KEY}.welcome-back-description`)" />
     </div>
 
     <section :class="['flex flex-col', 'gap-2', 'rounded-xl', 'bg-neutral-50 dark:bg-neutral-800/60', 'p-4']">

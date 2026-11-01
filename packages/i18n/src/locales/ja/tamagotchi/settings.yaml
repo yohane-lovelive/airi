@@ -120,6 +120,11 @@ devtools:
       until: '{time} まで'
       none: なし。
       usage-today: 今日のトークン量
+      rhythm:
+        present: オーナーは端末の前にいます。
+        away: 'オーナーは {time} から離席中です。'
+        greeting: '最後のあいさつ: {time}'
+        welcome-back: '最後のおかえり: {time}'
     presence-bubble:
       title: プレゼンスバブル
       description: キャラクターの頭上のバブルを操作し、メインウィンドウで確認します

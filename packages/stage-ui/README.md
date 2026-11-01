@@ -55,6 +55,7 @@ The character can start to talk without an owner message. It is step 2 of [the a
 
 - `useInitiativeInspectorStore()` in `stores/initiative-inspector.ts` carries a readout of the policy from the leader. The runner publishes it each second, but only while a window watches.
 - `useTalkChanges()` lists the changes from the owner's words as text, for Settings and the inspector.
+- The daily rhythm: at app start, a conversation quiet for hours gets a greeting. After time away, the owner gets a welcome back. Each app passes an `OwnerPresenceSource` (`libs/initiative/presence.ts`) to `initialize`. The desktop app reads the system idle time, and the web app reads the input of its page.
 
 Settings > Modules > Autonomous speech changes the settings. It also shows the changes from the owner's words, and resets them.
 Settings > Developer > Autonomous Speech Inspector shows why the character talks or stays quiet.

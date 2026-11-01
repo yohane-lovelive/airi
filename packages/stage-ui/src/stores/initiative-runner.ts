@@ -1,13 +1,16 @@
-import type { InitiativeDecision, InitiativeEvent, InitiativeHost, InitiativeState } from '@proj-airi/core-agent'
+import type { InitiativeDecision, InitiativeEvent, InitiativeHost, InitiativeRhythm, InitiativeState, InitiativeWaitReason } from '@proj-airi/core-agent'
 import type { SyncedPiniaRuntime } from 'pinia-plugin-synced'
 
+import type { OwnerPresence, OwnerPresenceSource } from '../libs/initiative/presence'
+
 import { errorMessageFrom } from '@moeru/std'
-import { createInitiativeState, decideInitiative, initiativeNoticeText, initiativeReadout, initiativeTimeFrom, observeInitiative, resolveInitiativeOptions } from '@proj-airi/core-agent'
+import { createInitiativeState, decideInitiative, initiativeNoticeText, initiativeReadout, initiativeTimeFrom, observeInitiative, requestRhythmTurn, resolveInitiativeOptions } from '@proj-airi/core-agent'
 import { nanoid } from 'nanoid'
 import { defineStore, storeToRefs } from 'pinia'
 import { computed, onScopeDispose, readonly, shallowRef, watch } from 'vue'
 
 import { INITIATIVE_SOURCE, initiativeConversationFacts, initiativeEventOf } from '../libs/initiative/conversation'
+import { markAway, observePresence, OWNER_PRESENCE_LIMITS, shouldGreet } from '../libs/initiative/presence'
 import { isOwnerTyping } from '../libs/initiative/typing'
 import { Ticker } from '../workers/ticker'
 import { useSpeakingStore } from './audio'
@@ -23,6 +26,9 @@ import { useVoiceMessagesStore } from './voice-messages'
 /** The policy decides once each second. The drive changes slowly, so a finer check adds nothing. */
 const TICK_INTERVAL_MS = 1_000
 
+/** Gates that hold for longer than a pending rhythm turn waits. A greeting or a welcome back then never starts. */
+const LASTING_WAIT_REASONS: readonly InitiativeWaitReason[] = ['quiet-hours', 'owner-quiet', 'daily-budget']
+
 /**
  * Runs autonomous speech on the renderer leader: the character starts to talk without an owner message.
  *
@@ -35,6 +41,9 @@ const TICK_INTERVAL_MS = 1_000
  * - The open intentions add drive, and the situation block lists them. The owner's temporary changes, for example a
  *   quiet time, change the options at each tick.
  * - While a window watches the inspector, each tick publishes a readout of the policy to it.
+ * - The daily rhythm adds two turns that the drive does not start. At app start, a conversation quiet for hours gets a
+ *   greeting. When the owner comes back after time away, the character welcomes the owner back. The presence source of
+ *   the app tells when the owner left and came back. A rhythm turn that the gates hold for two minutes is dropped.
  * - Owner input wins. The owner types in a chat input of any window, speaks, or queues a message. Then no turn starts,
  *   and a turn in flight is cancelled and closes as `dropped`. A dropped turn keeps its drive, so the character speaks
  *   again with fresh context once the owner stops.
@@ -61,6 +70,17 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
   const ticker = new Ticker(TICK_INTERVAL_MS, tick)
   let leadership: SyncedPiniaRuntime | undefined
   let stopLeadershipListener: (() => void) | undefined
+  let presenceSource: OwnerPresenceSource | undefined
+  let stopAwayListener: (() => void) | undefined
+  /** Whether the owner is away now. The leader reads the presence source to keep it. */
+  const presence = shallowRef<OwnerPresence>({})
+  let lastPresenceReadAt = 0
+  /** Whether this runner checked the greeting of this app start. It greets once at most. */
+  let greetingChecked = false
+  /** A greeting or a welcome back that waits for the gates. */
+  let pendingRhythm: { rhythm: InitiativeRhythm, until: number, awayMs?: number } | undefined
+  /** The last greeting or welcome back that started, for the inspector and the gap between them. */
+  const lastRhythm = shallowRef<{ rhythm: InitiativeRhythm, at: number }>()
 
   const ownerSpeaking = computed(() => voiceMessages.isRecording || voice.state?.phase === 'capturing')
   const activeMessages = computed(() => chatSession.getSessionMessagesIfLoaded(activeSessionId.value))
@@ -94,7 +114,7 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
     void chat.cancelTurn({ sessionId: running.sessionId, turnId: running.turnId })
   }
 
-  async function runTurn(decision: Extract<InitiativeDecision, { kind: 'turn' }>, sessionId: string) {
+  async function runTurn(decision: Extract<InitiativeDecision, { kind: 'turn' }>, sessionId: string, awayMs?: number) {
     const date = new Date()
     const time = initiativeTimeFrom(date)
     const facts = initiativeConversationFacts(chatSession.getSessionMessages(sessionId))
@@ -106,6 +126,7 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
       localMinutes: time.localMinutes,
       ...facts,
       intentions: intentions.openAt(time.now),
+      ...(awayMs !== undefined ? { awayMs } : {}),
     })
     const turn = { sessionId, turnId: nanoid(), dropped: false }
     running = turn
@@ -136,12 +157,50 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
     const time = initiativeTimeFrom(new Date())
     const currentHost = host(time.now)
     const options = optionsAt(time.now)
-    const { state: next, decision } = decideInitiative(state.value ?? createInitiativeState(time), currentHost, time, Math.random, options)
+    checkGreeting(time.now)
+    readPresence(time.now)
+
+    const current = state.value ?? createInitiativeState(time)
+    const rhythm = pendingRhythm && pendingRhythm.until > time.now ? pendingRhythm : undefined
+    const { state: next, decision } = rhythm
+      ? requestRhythmTurn(current, rhythm.rhythm, currentHost, time, options)
+      : decideInitiative(current, currentHost, time, Math.random, options)
     state.value = next
+    if (!rhythm || decision.kind === 'turn' || LASTING_WAIT_REASONS.includes(decision.reason))
+      pendingRhythm = undefined
+    if (rhythm && decision.kind === 'turn')
+      lastRhythm.value = { rhythm: rhythm.rhythm, at: time.now }
+
     if (inspector.isWatched(time.now))
-      inspector.publish(initiativeReadout(next, currentHost, time, options), time.now)
+      inspector.publish(initiativeReadout(next, currentHost, time, options), time.now, { awaySince: presence.value.awaySince, lastRhythm: lastRhythm.value })
     if (decision.kind === 'turn')
-      void runTurn(decision, sessionId)
+      void runTurn(decision, sessionId, rhythm?.awayMs)
+  }
+
+  /** At the first tick with the open conversation, a conversation quiet for hours gets a greeting. */
+  function checkGreeting(now: number) {
+    if (greetingChecked)
+      return
+    greetingChecked = true
+    const facts = initiativeConversationFacts(activeMessages.value ?? [])
+    const lastMessageAt = Math.max(facts.lastOwnerAt ?? -Infinity, facts.lastSpokeAt ?? -Infinity)
+    if (initiative.greetingEnabled && shouldGreet(Number.isFinite(lastMessageAt) ? lastMessageAt : undefined, now))
+      pendingRhythm = { rhythm: 'greeting', until: now + OWNER_PRESENCE_LIMITS.rhythmHoldMs }
+  }
+
+  /** Reads the idle time now and then. A return after a long absence asks for a welcome back. */
+  function readPresence(now: number) {
+    if (!presenceSource || now - lastPresenceReadAt < OWNER_PRESENCE_LIMITS.pollMs)
+      return
+    lastPresenceReadAt = now
+    void presenceSource.idleMs().then((idleMs) => {
+      const readAt = Date.now()
+      const { presence: next, returnedAfterMs } = observePresence(presence.value, idleMs, readAt)
+      presence.value = next
+      const recentRhythm = lastRhythm.value && readAt - lastRhythm.value.at < OWNER_PRESENCE_LIMITS.rhythmGapMs
+      if (returnedAfterMs !== undefined && returnedAfterMs >= OWNER_PRESENCE_LIMITS.welcomeBackAfterMs && initiative.welcomeBackEnabled && !recentRhythm && !pendingRhythm)
+        pendingRhythm = { rhythm: 'welcome-back', until: readAt + OWNER_PRESENCE_LIMITS.rhythmHoldMs, awayMs: returnedAfterMs }
+    }).catch(error => console.warn('[initiative] Failed to read the idle time:', errorMessageFrom(error)))
   }
 
   // Each new message of the open conversation can change the drive. A switch to another conversation is not an event.
@@ -172,11 +231,20 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
       dropRunningTurn()
   })
 
-  /** Starts the ticker while this renderer leads. Later calls do nothing. */
-  function initialize(syncedPinia: SyncedPiniaRuntime) {
+  /**
+   * Starts the ticker while this renderer leads. Later calls do nothing.
+   *
+   * @param syncedPinia The synced Pinia runtime. Only its leader runs the policy.
+   * @param source Where the app reads whether the owner is at the device. Without it, no welcome back comes.
+   */
+  function initialize(syncedPinia: SyncedPiniaRuntime, source?: OwnerPresenceSource) {
     if (leadership)
       return
     leadership = syncedPinia
+    presenceSource = source
+    stopAwayListener = source?.onAway?.(() => {
+      presence.value = markAway(presence.value, Date.now())
+    })
     initiative.supported = true
     stopLeadershipListener = syncedPinia.onLeadershipChange((isLeader) => {
       if (isLeader) {
@@ -194,6 +262,9 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
   function dispose() {
     stopLeadershipListener?.()
     stopLeadershipListener = undefined
+    stopAwayListener?.()
+    stopAwayListener = undefined
+    presenceSource = undefined
     ticker.stop()
     leadership = undefined
     state.value = undefined

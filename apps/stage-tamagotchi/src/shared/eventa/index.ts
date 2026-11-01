@@ -41,6 +41,8 @@ export const electronOpenMainDevtools = defineInvokeEventa('eventa:invoke:electr
 export const electronCenterMainWindow = defineInvokeEventa<Rectangle>('eventa:invoke:electron:windows:main:center')
 export const electronOpenEditor = defineInvokeEventa<void>('eventa:invoke:electron:windows:editor:open')
 export const electronOpenSettings = defineInvokeEventa<void, { route?: string }>('eventa:invoke:electron:windows:settings:open')
+/** Seconds since the last keyboard or mouse input on the whole system, from `powerMonitor.getSystemIdleTime()`. */
+export const electronSystemIdleSeconds = defineInvokeEventa<number>('eventa:invoke:electron:power-monitor:system-idle-seconds')
 /**
  * What the fullscreen mode shows on the right, in either window that hosts it.
  *
