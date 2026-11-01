@@ -431,4 +431,5 @@ perception:
   start: Start screen perception
 missions:
   fixed-reminder: 'Reminder: {text}'
+  fixed-watch: 'Watch: {condition}'
   notification-title: Reminder from AIRI

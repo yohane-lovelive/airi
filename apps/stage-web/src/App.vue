@@ -24,6 +24,7 @@ import { useSettings, useSettingsAudioDevice } from '@proj-airi/stage-ui/stores/
 import { useSettingsSyncStore } from '@proj-airi/stage-ui/stores/settings-sync'
 import { useSettingsStageModel } from '@proj-airi/stage-ui/stores/settings/stage-model'
 import { useStartupResourcesStore } from '@proj-airi/stage-ui/stores/startup-resources'
+import { useWatchRunnerStore } from '@proj-airi/stage-ui/stores/watch-runner'
 import { ErrorBoundary, useTheme } from '@proj-airi/ui'
 import { StageTransitionGroup } from '@proj-airi/ui-transitions'
 import { storeToRefs } from 'pinia'
@@ -57,6 +58,7 @@ const missionRunnerStore = useMissionRunnerStore()
 const initiativeRunnerStore = useInitiativeRunnerStore()
 const ownerPresence = usePageOwnerPresence()
 const perceptionRunnerStore = usePerceptionRunnerStore()
+const watchRunnerStore = useWatchRunnerStore()
 const settingsSyncStore = useSettingsSyncStore()
 const settingsAudioDeviceStore = useSettingsAudioDevice()
 const { showingSetup } = storeToRefs(onboardingStore)
@@ -164,6 +166,7 @@ async function loadStartup() {
       missionRunnerStore.initialize(syncedPinia)
       initiativeRunnerStore.initialize(syncedPinia, ownerPresence)
       perceptionRunnerStore.initialize(syncedPinia, createPageScreenSource())
+      watchRunnerStore.initialize(syncedPinia)
       settingsSyncStore.initialize(syncedPinia)
     })
     await startup.run('modelData', () => displayModelsStore.loadDisplayModelsFromIndexedDB())

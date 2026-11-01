@@ -91,6 +91,31 @@ export function thumbnailDiff(left: Uint8Array, right: Uint8Array): number {
 }
 
 /**
+ * The mean brightness change between two thumbnails inside one box, from 0 to 1. The box holds shares of the width and
+ * the height, for example the top right third.
+ *
+ * @example
+ * regionDiff(before, after, 64, 36, { x: 2 / 3, y: 0, width: 1 / 3, height: 1 / 3 })
+ * // => the change of the top right cell only
+ */
+export function regionDiff(left: Uint8Array, right: Uint8Array, width: number, height: number, box: { x: number, y: number, width: number, height: number }): number {
+  const startX = Math.max(0, Math.floor(box.x * width))
+  const startY = Math.max(0, Math.floor(box.y * height))
+  const endX = Math.min(width, Math.max(startX + 1, Math.round((box.x + box.width) * width)))
+  const endY = Math.min(height, Math.max(startY + 1, Math.round((box.y + box.height) * height)))
+  let sum = 0
+  let count = 0
+  for (let y = startY; y < endY; y++) {
+    for (let x = startX; x < endX; x++) {
+      const index = y * width + x
+      sum += Math.abs((left[index] ?? 0) - (right[index] ?? 0))
+      count += 1
+    }
+  }
+  return count ? sum / (count * 255) : 0
+}
+
+/**
  * A 64-bit difference hash of a thumbnail: 9 by 8 block means, one bit for each pair of horizontal neighbors.
  * Near screens give hashes with few different bits, also after small shifts in brightness.
  */

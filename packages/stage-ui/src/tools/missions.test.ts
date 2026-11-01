@@ -1,6 +1,6 @@
-import type { CommentaryRequest, MissionInstance, ReminderRequest, SmallTalkRequest } from '@proj-airi/core-agent'
+import type { CommentaryRequest, MissionInstance, ReminderRequest, SmallTalkRequest, WatchRequest } from '@proj-airi/core-agent'
 
-import { createCommentary, createReminder, createSmallTalk, formatLocalDateTime } from '@proj-airi/core-agent'
+import { createCommentary, createReminder, createSmallTalk, createWatch, formatLocalDateTime } from '@proj-airi/core-agent'
 import { describe, expect, it, vi } from 'vitest'
 
 import { createMissionTools, LIST_MISSIONS_TOOL_NAME, START_MISSION_TOOL_NAME, STOP_MISSION_TOOL_NAME } from './missions'
@@ -32,10 +32,16 @@ async function createHarness() {
       missions.push(result.mission)
     return result
   })
+  const addWatch = vi.fn(async (request: WatchRequest) => {
+    const result = createWatch({ id: `mission-${missions.length + 1}`, sessionId: 'session-1', request, appInFront: 'Game', now: Date.now(), missions })
+    if (result.ok)
+      missions.push(result.mission)
+    return result
+  })
   const stop = vi.fn(async (id: string) => missions.some(mission => mission.id === id))
-  const tools = await createMissionTools({ missions: () => missions, addReminder, addSmallTalk, addCommentary, stop })
+  const tools = await createMissionTools({ missions: () => missions, addReminder, addSmallTalk, addCommentary, addWatch, stop })
   const run = (name: string, input: unknown) => tools.find(tool => tool.function.name === name)!.execute(input, { messages: [], toolCallId: 'call-1' })
-  return { missions, addReminder, addSmallTalk, addCommentary, stop, run }
+  return { missions, addReminder, addSmallTalk, addCommentary, addWatch, stop, run }
 }
 
 describe('mission tools', () => {
@@ -137,13 +143,24 @@ describe('mission tools', () => {
 
   it('offers every value shape in the parameter schema', async () => {
     const harness = await createHarness()
-    const tools = await createMissionTools({ missions: () => harness.missions, addReminder: harness.addReminder, addSmallTalk: harness.addSmallTalk, addCommentary: harness.addCommentary, stop: harness.stop })
+    const tools = await createMissionTools({ missions: () => harness.missions, addReminder: harness.addReminder, addSmallTalk: harness.addSmallTalk, addCommentary: harness.addCommentary, addWatch: harness.addWatch, stop: harness.stop })
     const parameters = tools.find(tool => tool.function.name === START_MISSION_TOOL_NAME)!.function.parameters
 
     expect(parameters).toMatchObject({ properties: { values: { anyOf: [
       expect.objectContaining({ required: ['text', 'start', 'repeat'] }),
       expect.objectContaining({ required: ['minutes'] }),
       expect.objectContaining({ required: ['app', 'minutes'] }),
+      expect.objectContaining({ required: ['condition', 'app', 'region', 'minutes'] }),
     ] } } })
+  })
+
+  it('starts a watch of a region in the app in front', async () => {
+    const harness = await createHarness()
+
+    const started = await harness.run(START_MISSION_TOOL_NAME, { template: 'watch', values: { condition: 'HP is below half', app: '', region: 'top-right', minutes: 60 } })
+
+    expect(harness.addWatch).toHaveBeenCalledWith({ condition: 'HP is below half', app: '', region: 'top-right', minutes: 60 })
+    expect(started).toContain('watch "HP is below half" in Game (top-right)')
+    expect(await harness.run(START_MISSION_TOOL_NAME, { template: 'watch', values: { condition: 'x', app: '', region: 'middle', minutes: 60 } })).toContain('Mission not started')
   })
 })

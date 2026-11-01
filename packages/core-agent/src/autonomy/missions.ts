@@ -1,11 +1,15 @@
+import type { WatchRegion } from './watch'
+
 import { formatTimePrefix } from '../messages/datetime-prefix'
+import { WATCH_REGIONS } from './watch'
 
 /**
  * The life of a mission instance.
  *
  * - `scheduled`: it waits for `nextRunAt`. A repeated reminder stays here after each run.
- * - `running`: a foreground mission, for example small talk or commentary, runs now.
- * - `done`: a reminder that runs once reached the owner, or a foreground mission reached its time limit.
+ * - `running`: small talk, commentary, or a watch runs now.
+ * - `done`: a reminder that runs once reached the owner, a running mission reached its time limit, or the condition of a
+ *   watch held.
  * - `stopped`: the owner or the model stopped it, or a foreground mission ended early.
  * - `missed`: a reminder that runs once came due while the app was closed, longer ago than the age limit.
  */
@@ -18,9 +22,10 @@ export type MissionStatus = 'scheduled' | 'running' | 'done' | 'stopped' | 'miss
  * - `owner`: the owner or the model stopped it.
  * - `away`: the owner left the device during small talk.
  * - `quiet`: the owner asked for quiet during a foreground mission.
- * - `target-closed`: the window of a commentary closed.
+ * - `target-closed`: the window of a commentary or a watch closed.
+ * - `condition`: the condition of a watch held, and the owner heard it.
  */
-export type MissionEndReason = 'time' | 'owner' | 'away' | 'quiet' | 'target-closed'
+export type MissionEndReason = 'time' | 'owner' | 'away' | 'quiet' | 'target-closed' | 'condition'
 
 /**
  * How a reminder repeats. Weekly days use `Date.getDay()` numbers: 0 is Sunday and 6 is Saturday.
@@ -92,6 +97,31 @@ export interface CommentaryValues {
   readonly endsAt: number
 }
 
+/** A watch request, as the model asks for it. */
+export interface WatchRequest {
+  /** What to wait for, in the owner's words, for example "HP is below half". */
+  readonly condition: string
+  /** The app of the window to watch. Empty for the app in front. */
+  readonly app: string
+  readonly region: WatchRegion
+  /** How long the watch waits at most. */
+  readonly minutes: number
+}
+
+/** The stored values of a `watch` instance. */
+export interface WatchValues {
+  readonly condition: string
+  readonly app: string
+  readonly region: WatchRegion
+  readonly minutes: number
+  /** Epoch milliseconds. The watch ends at this time, if the condition did not hold. */
+  readonly endsAt: number
+  /** Epoch milliseconds of the last check. */
+  readonly lastCheckAt?: number
+  /** What the last check saw, in a few words. */
+  readonly lastSeen?: string
+}
+
 /** What every mission instance has, whatever its template. */
 interface MissionBase {
   readonly id: string
@@ -125,8 +155,17 @@ export interface CommentaryMission extends MissionBase {
   readonly values: CommentaryValues
 }
 
+/** A background mission: code checks one region of a window, and the character speaks once when the condition holds. */
+export interface WatchMission extends MissionBase {
+  readonly template: 'watch'
+  readonly values: WatchValues
+}
+
 /** One mission that the model created from the owner's words. The template tells the shape of its values. */
-export type MissionInstance = ReminderMission | SmallTalkMission | CommentaryMission
+export type MissionInstance = ReminderMission | SmallTalkMission | CommentaryMission | WatchMission
+
+/** A mission that runs until an end rule, with a time limit: small talk, commentary, or a watch. */
+export type RunningMission = SmallTalkMission | CommentaryMission | WatchMission
 
 /** A mission that runs in the foreground with a voice. One runs at a time. */
 export type ForegroundMission = SmallTalkMission | CommentaryMission
@@ -157,9 +196,22 @@ export const MISSION_TEMPLATES: readonly MissionTemplate[] = [
     description: 'Watch one window, for example a game or a video, and comment on it in short lines, when the owner asks for it. It ends when the window closes, at its time limit, or when the owner asks to stop or for quiet.',
     values: '{ "app": the app of the window to watch, "" for the app in front, "minutes": 5-180, 60 when the owner names no time }',
   },
+  {
+    name: 'watch',
+    description: 'Watch one region of a window and tell the owner once when a condition holds, when the owner asks, for example "tell me when HP is below half". Code checks the region, and you speak when it holds. One watch runs at a time.',
+    values: `{ "condition": what to wait for, in the owner's words, "app": the app of the window, "" for the app in front, "region": ${WATCH_REGIONS.map(region => `"${region}"`).join(' | ')}, "minutes": 5-360, 60 when the owner names no time }`,
+  },
 ]
 
 const MINUTE_MS = 60_000
+
+/** Limits of a watch. */
+export const WATCH_MISSION_LIMITS = {
+  maxConditionLength: 200,
+  minMinutes: 5,
+  maxMinutes: 360,
+  defaultMinutes: 60,
+} as const
 
 /** Limits of commentary. The pace comes from the commentary mode of the initiative policy. */
 export const COMMENTARY_MISSION_LIMITS = {
@@ -337,7 +389,7 @@ export function settleMissionRun(mission: ReminderMission, outcome: 'delivered' 
  */
 export function stopMission(mission: MissionInstance, now: number, reason: MissionEndReason = 'owner'): MissionInstance {
   const { nextRunAt: _ended, ...rest } = mission
-  return { ...rest, status: reason === 'time' ? 'done' : 'stopped', endReason: reason, updatedAt: now }
+  return { ...rest, status: reason === 'time' || reason === 'condition' ? 'done' : 'stopped', endReason: reason, updatedAt: now }
 }
 
 /** Whether a mission is active: a reminder that waits, or a foreground mission that runs. */
@@ -406,7 +458,57 @@ export function createCommentary(input: { id: string, sessionId: string, request
 
 /** The foreground mission that runs at `now`. A mission past its time limit does not count, also before the runner ends it. */
 export function activeForegroundMission(missions: readonly MissionInstance[], now: number): ForegroundMission | undefined {
-  return missions.find((mission): mission is ForegroundMission => mission.template !== 'reminder' && mission.status === 'running' && mission.values.endsAt > now)
+  return missions.find((mission): mission is ForegroundMission => (mission.template === 'small-talk' || mission.template === 'commentary') && mission.status === 'running' && mission.values.endsAt > now)
+}
+
+/**
+ * Creates a watch from the request that the model gave. An empty app takes the app in front. On a refusal, `reason`
+ * tells the model what to change. One watch runs at a time.
+ */
+export function createWatch(input: { id: string, sessionId: string, request: WatchRequest, appInFront?: string, now: number, missions: readonly MissionInstance[] }): { ok: true, mission: WatchMission } | { ok: false, reason: string } {
+  const condition = input.request.condition.trim().replace(/\s+/g, ' ')
+  const { maxConditionLength, minMinutes, maxMinutes } = WATCH_MISSION_LIMITS
+  if (!condition)
+    return { ok: false, reason: 'The watch needs a condition.' }
+  if (condition.length > maxConditionLength)
+    return { ok: false, reason: `The condition has more than ${maxConditionLength} characters. Make it shorter.` }
+  if (!WATCH_REGIONS.includes(input.request.region))
+    return { ok: false, reason: `The region must be one of ${WATCH_REGIONS.join(', ')}.` }
+  const { minutes } = input.request
+  if (!Number.isInteger(minutes) || minutes < minMinutes || minutes > maxMinutes)
+    return { ok: false, reason: `A watch needs a whole number of minutes from ${minMinutes} to ${maxMinutes}.` }
+  const app = input.request.app.trim() || input.appInFront?.trim() || ''
+  if (!app)
+    return { ok: false, reason: 'No app to watch. Ask the owner which app, or ask the owner to bring it to the front.' }
+  if (activeWatch(input.missions, input.now))
+    return { ok: false, reason: 'A watch already runs. Keep it, or stop it first.' }
+  return {
+    ok: true,
+    mission: {
+      id: input.id,
+      template: 'watch',
+      values: { condition, app, region: input.request.region, minutes, endsAt: input.now + minutes * MINUTE_MS },
+      sessionId: input.sessionId,
+      status: 'running',
+      createdAt: input.now,
+      updatedAt: input.now,
+    },
+  }
+}
+
+/** The watch that runs at `now`, if any. */
+export function activeWatch(missions: readonly MissionInstance[], now: number): WatchMission | undefined {
+  return missions.find((mission): mission is WatchMission => mission.template === 'watch' && mission.status === 'running' && mission.values.endsAt > now)
+}
+
+/** Records one check of a watch: its time and what it saw. */
+export function recordWatchCheck(mission: WatchMission, at: number, seen: string): WatchMission {
+  return { ...mission, values: { ...mission.values, lastCheckAt: at, lastSeen: seen.trim().slice(0, 200) }, updatedAt: at }
+}
+
+/** The `mustSpeak` notice when the condition of a watch holds. */
+export function watchNoticeText(mission: WatchMission, seen: string) {
+  return `The watch that the owner asked for found its condition: "${mission.values.condition}". What the check saw: ${seen.trim() || 'it holds'}. Tell the owner now.`
 }
 
 /** The commentary that runs at `now`, if any. */
@@ -415,9 +517,9 @@ export function activeCommentary(missions: readonly MissionInstance[], now: numb
   return running?.template === 'commentary' ? running : undefined
 }
 
-/** The running foreground missions whose time limit passed at `now`. The runner ends each one with the reason `time`. */
-export function foregroundPastLimit(missions: readonly MissionInstance[], now: number): ForegroundMission[] {
-  return missions.filter((mission): mission is ForegroundMission => mission.template !== 'reminder' && mission.status === 'running' && mission.values.endsAt <= now)
+/** The running missions whose time limit passed at `now`. The runner ends each one with the reason `time`. */
+export function runningPastLimit(missions: readonly MissionInstance[], now: number): RunningMission[] {
+  return missions.filter((mission): mission is RunningMission => mission.template !== 'reminder' && mission.status === 'running' && mission.values.endsAt <= now)
 }
 
 /** The small talk that runs at `now`. Small talk past its time limit does not count, also before the runner ends it. */
@@ -440,15 +542,15 @@ export type MustSpeakNotify = (notice: { source: string, text: string, reply?: s
  * Resolves to `spoke` when the model spoke, `fixed` when the fixed text played, and `unspoken` when nothing played.
  * On `unspoken`, the host shows the fixed text in another way, for example an operating system notification.
  */
-export async function deliverReminder(notify: MustSpeakNotify, text: string, fixedText: string): Promise<'spoke' | 'fixed' | 'unspoken'> {
-  let outcome = await notify({ source: 'mission:reminder', text })
+export async function deliverReminder(notify: MustSpeakNotify, text: string, fixedText: string, source = 'mission:reminder'): Promise<'spoke' | 'fixed' | 'unspoken'> {
+  let outcome = await notify({ source, text })
   if (outcome === 'silent')
-    outcome = await notify({ source: 'mission:reminder', text: `The owner has not heard this yet.\n${text}` })
+    outcome = await notify({ source, text: `The owner has not heard this yet.\n${text}` })
   if (outcome === 'spoke')
     return 'spoke'
 
   const fixed = await notify({
-    source: 'mission:reminder:fixed',
+    source: `${source}:fixed`,
     text: 'The model gave no reply, so the app spoke the reminder with a fixed text.',
     reply: fixedText,
   })

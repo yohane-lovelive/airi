@@ -60,12 +60,16 @@ const FIRST_SCREEN_TURN_LOOKBACK_MS = 60_000
 
 /** The note that the timeline gets when a mission starts or ends. */
 function missionNote(mission: MissionInstance, change: 'started' | 'ended') {
-  const what = mission.template === 'small-talk'
-    ? `small talk (${mission.values.minutes} min)`
-    : mission.template === 'commentary'
-      ? `commentary on ${mission.values.app}`
-      : `reminder "${mission.values.text}"`
-  return `Mission ${change}: ${what}`
+  switch (mission.template) {
+    case 'small-talk':
+      return `Mission ${change}: small talk (${mission.values.minutes} min)`
+    case 'commentary':
+      return `Mission ${change}: commentary on ${mission.values.app}`
+    case 'watch':
+      return `Mission ${change}: watch "${mission.values.condition}" in ${mission.values.app}`
+    case 'reminder':
+      return `Mission ${change}: reminder "${mission.values.text}"`
+  }
 }
 
 /** The recent autonomous turns that the runner remembers, so it interrupts only its own speech. */
@@ -455,15 +459,23 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
       observe({ type: 'perceived', salience: event.salience * scale })
   })
 
-  // A commentary watches the window of its app. The perception runner captures it, and its close ends the commentary.
+  // A commentary or a watch looks at the window of its app. The perception runner captures it, and its close ends the
+  // mission. A commentary wins over a watch, and the watch then waits until its app is in front.
   watch(() => {
-    const commentary = missions.enabled ? missions.active.find(mission => mission.template === 'commentary') : undefined
-    return commentary?.template === 'commentary' ? commentary.values.app : undefined
+    if (!missions.enabled)
+      return undefined
+    const commentary = missions.active.find(mission => mission.template === 'commentary')
+    const watching = missions.active.find(mission => mission.template === 'watch')
+    if (commentary?.template === 'commentary')
+      return commentary.values.app
+    return watching?.template === 'watch' ? watching.values.app : undefined
   }, app => perceptionRunner.setTarget(app), { immediate: true })
-  const stopTargetClosed = perceptionRunner.onTargetClosed(() => {
-    const commentary = commentaryAt(Date.now())
-    if (commentary && leadership?.isLeader())
-      void missions.stop(commentary.id, 'target-closed').catch(error => console.warn('[initiative] Failed to end the commentary:', errorMessageFrom(error)))
+  const stopTargetClosed = perceptionRunner.onTargetClosed((app) => {
+    if (!leadership?.isLeader())
+      return
+    const target = missions.active.find(mission => (mission.template === 'commentary' || mission.template === 'watch') && mission.values.app === app)
+    if (target)
+      void missions.stop(target.id, 'target-closed').catch(error => console.warn('[initiative] Failed to end the mission of a closed window:', errorMessageFrom(error)))
   })
 
   // A mission that starts or ends is part of what happened while the character watched the screen. The first read of

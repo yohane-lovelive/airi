@@ -618,6 +618,7 @@ pages:
       owner-reply: Replies to you
       initiative: Autonomous speech
       commentary: Commentary
+      watch: Watch checks
       mission: Missions
       task: Background tasks
       scene: Replies to other people
@@ -1125,12 +1126,27 @@ pages:
         until: 'Until {time}'
       commentary:
         name: 'Commentary on {app}'
+      watch:
+        name: 'Watch {app}: {condition}'
+        last-seen: 'last check: {text}'
+        regions:
+          full: whole window
+          top: top
+          bottom: bottom
+          left: left
+          right: right
+          center: center
+          top-left: top left
+          top-right: top right
+          bottom-left: bottom left
+          bottom-right: bottom right
       end-reason:
         time: time is up
         owner: you stopped it
         away: you left
         quiet: you asked for quiet
         target-closed: the window closed
+        condition: the condition held
     perception:
       title: Screen perception
       description: The character sees your screen

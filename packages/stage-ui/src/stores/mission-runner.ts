@@ -2,7 +2,7 @@ import type { MissionInstance } from '@proj-airi/core-agent'
 import type { SyncedPiniaRuntime } from 'pinia-plugin-synced'
 
 import { errorMessageFrom } from '@moeru/std'
-import { collectDueMissions, deliverReminder, foregroundPastLimit, missedRemindersNoticeText, reminderNoticeText } from '@proj-airi/core-agent'
+import { collectDueMissions, deliverReminder, missedRemindersNoticeText, reminderNoticeText, runningPastLimit } from '@proj-airi/core-agent'
 import { groupBy } from 'es-toolkit'
 import { defineStore, storeToRefs } from 'pinia'
 import { onScopeDispose } from 'vue'
@@ -19,7 +19,8 @@ const TICK_INTERVAL_MS = 1_000
 
 /**
  * Runs the missions on the renderer leader: it finds due reminders and makes sure that the owner gets each one. It ends
- * small talk and commentary at their time limit. Both speak through the initiative runner.
+ * small talk, commentary, and watches at their time limit. Small talk and commentary speak through the initiative
+ * runner, and the watch runner checks the watches.
  *
  * State model:
  * - The missions store keeps the persisted instances. This store keeps only runtime state: the ticker and the ids of
@@ -107,7 +108,7 @@ export const useMissionRunnerStore = defineStore('mission-runner', () => {
     for (const mission of expired)
       void run([mission.id], () => missions.settle(mission.id, 'expired', now))
 
-    for (const mission of foregroundPastLimit(waiting, now)) {
+    for (const mission of runningPastLimit(waiting, now)) {
       void run([mission.id], async () => {
         await missions.stop(mission.id, 'time')
       })

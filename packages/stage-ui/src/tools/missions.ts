@@ -1,7 +1,7 @@
-import type { CommentaryRequest, MissionInstance, ReminderRepeat, ReminderRequest, ReminderStart, SmallTalkRequest } from '@proj-airi/core-agent'
+import type { CommentaryRequest, MissionInstance, ReminderRepeat, ReminderRequest, ReminderStart, SmallTalkRequest, WatchRequest } from '@proj-airi/core-agent'
 import type { Tool } from '@xsai/shared-chat'
 
-import { COMMENTARY_MISSION_LIMITS, formatTimePrefix, isMissionActive, MISSION_TEMPLATES, SMALL_TALK_LIMITS } from '@proj-airi/core-agent'
+import { COMMENTARY_MISSION_LIMITS, formatTimePrefix, isMissionActive, MISSION_TEMPLATES, SMALL_TALK_LIMITS, WATCH_MISSION_LIMITS, WATCH_REGIONS } from '@proj-airi/core-agent'
 import { rawTool } from '@xsai/tool'
 import { array, description, integer, maxLength, maxValue, minLength, minValue, number, picklist, pipe, safeParse, strictObject, string, summarize, union } from 'valibot'
 import { toJsonSchema } from 'xsschema'
@@ -32,15 +32,23 @@ const commentaryValues = strictObject({
   app: pipe(string(), maxLength(120), description('The app of the window to watch, as the owner names it. An empty string for the app in front.')),
   minutes: pipe(number(), integer(), description(`The longest time of the commentary, ${COMMENTARY_MISSION_LIMITS.minMinutes} to ${COMMENTARY_MISSION_LIMITS.maxMinutes} minutes. ${COMMENTARY_MISSION_LIMITS.defaultMinutes} when the owner names no time.`)),
 })
+const watchValues = strictObject({
+  condition: pipe(string(), minLength(1), maxLength(WATCH_MISSION_LIMITS.maxConditionLength), description('What to wait for, in the owner\'s words, for example "HP is below half".')),
+  app: pipe(string(), maxLength(120), description('The app of the window to watch, as the owner names it. An empty string for the app in front.')),
+  region: pipe(picklist(WATCH_REGIONS), description('Where in the window to look, from the owner\'s words, for example "top-right" for "the top right". "full" when the owner names no place.')),
+  minutes: pipe(number(), integer(), description(`The longest time to wait, ${WATCH_MISSION_LIMITS.minMinutes} to ${WATCH_MISSION_LIMITS.maxMinutes} minutes. ${WATCH_MISSION_LIMITS.defaultMinutes} when the owner names no time.`)),
+})
 const startParameters = strictObject({
   template: pipe(picklist(MISSION_TEMPLATES.map(template => template.name)), description('The mission template.')),
-  values: pipe(union([reminderValues, smallTalkValues, commentaryValues]), description('The values of the template: the reminder, small-talk, or commentary values.')),
+  values: pipe(union([reminderValues, smallTalkValues, commentaryValues, watchValues]), description('The values of the template: the reminder, small-talk, commentary, or watch values.')),
 })
 
 /** The template whose values have this shape. */
 function templateOfValues(values: object) {
   if ('text' in values)
     return 'reminder'
+  if ('condition' in values)
+    return 'watch'
   return 'app' in values ? 'commentary' : 'small-talk'
 }
 const listParameters = strictObject({})
@@ -52,6 +60,7 @@ interface CreateMissionToolsOptions {
   addReminder: (request: ReminderRequest) => Promise<{ ok: true, mission: MissionInstance } | { ok: false, reason: string }>
   addSmallTalk: (request: SmallTalkRequest) => Promise<{ ok: true, mission: MissionInstance } | { ok: false, reason: string }>
   addCommentary: (request: CommentaryRequest) => Promise<{ ok: true, mission: MissionInstance } | { ok: false, reason: string }>
+  addWatch: (request: WatchRequest) => Promise<{ ok: true, mission: MissionInstance } | { ok: false, reason: string }>
   stop: (id: string) => Promise<boolean>
 }
 
@@ -86,6 +95,8 @@ function describeMission(mission: MissionInstance) {
     return `- ${mission.id}: small-talk, until ${formatTimePrefix(mission.values.endsAt).trim()}`
   if (mission.template === 'commentary')
     return `- ${mission.id}: commentary on ${mission.values.app}, until ${formatTimePrefix(mission.values.endsAt).trim()} or until the window closes`
+  if (mission.template === 'watch')
+    return `- ${mission.id}: watch "${mission.values.condition}" in ${mission.values.app} (${mission.values.region}), until ${formatTimePrefix(mission.values.endsAt).trim()}`
   const repeat = describeRepeat(mission.values.repeat)
   const next = mission.nextRunAt === undefined ? mission.status : `next ${formatTimePrefix(mission.nextRunAt).trim()}`
   return `- ${mission.id}: ${mission.template}, "${mission.values.text}", ${repeat}, ${next}`
@@ -100,7 +111,7 @@ export async function createMissionTools(options: CreateMissionToolsOptions): Pr
   return [
     rawTool({
       name: START_MISSION_TOOL_NAME,
-      description: `Start a mission when the owner asks for one, for example a reminder, small talk, or commentary. Use it only for the owner's own request. Templates:\n${templates}`,
+      description: `Start a mission when the owner asks for one, for example a reminder, small talk, commentary, or a watch. Use it only for the owner's own request. Templates:\n${templates}`,
       parameters: await toJsonSchema(startParameters),
       execute: async (rawInput) => {
         const parsed = safeParse(startParameters, rawInput)
@@ -111,9 +122,11 @@ export async function createMissionTools(options: CreateMissionToolsOptions): Pr
           return `Mission not started: the values do not match the template "${template}".`
         const result = 'text' in values
           ? await options.addReminder({ text: values.text, start: startOf(values.start), repeat: repeatOf(values.repeat) })
-          : 'app' in values
-            ? await options.addCommentary({ app: values.app, minutes: values.minutes })
-            : await options.addSmallTalk({ minutes: values.minutes })
+          : 'condition' in values
+            ? await options.addWatch({ condition: values.condition, app: values.app, region: values.region, minutes: values.minutes })
+            : 'app' in values
+              ? await options.addCommentary({ app: values.app, minutes: values.minutes })
+              : await options.addSmallTalk({ minutes: values.minutes })
         if (!result.ok)
           return `Mission not started: ${result.reason}`
         return `Started mission:\n${describeMission(result.mission)}`

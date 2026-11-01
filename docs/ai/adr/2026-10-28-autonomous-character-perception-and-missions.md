@@ -407,6 +407,15 @@ Step 2b-1 built the daily rhythm as follows. Step 2b-2 builds topics and small t
 - A notice gets a `mustSpeak` option. Today a notice stays silent when the model gives no visible reply, so it cannot carry a reminder.
 - A watch uses a check turn, not a speech turn. A change in the region, or a slow timer, starts the check.
 - In a check turn, the model gets a small crop and answers with a tool. Only a "yes" starts a `mustSpeak` notice.
+
+Step 3-5b built the `watch` template as follows.
+
+- **Start.** The model starts it with `builtIn_startMission`: the condition in the owner's words, the app, empty for the app in front, a region, and 5 to 360 minutes, 60 by default. Code refuses it while screen perception is off, and while another watch runs.
+- **Region.** The ADR did not tell how the owner names the region. The model picks a named region from the owner's words: the whole window, or one cell of a 3 by 3 grid, for example `top-right`. Free coordinates would be a guess.
+- **One at a time.** One watch runs at a time, so the capture has one target. A watch is a background mission, so it runs beside small talk or commentary. A commentary keeps the capture, and the watch then checks only while its app is in front.
+- **Check turn.** The watch runner checks at once, then on a change of 0.03 in the region of the thumbnails, at most every 10 seconds, and at least every 60 seconds. It sends a crop of 512 pixels at most to the chat model of the conversation, outside the conversation, with the usage purpose `watch`. The model answers with `report_watch`, and the call stops after the answer. Each check counts one image in the image budget, and checks wait while the budget is empty.
+- **Yes.** A "yes" sends a `mustSpeak` notice with the reminder fallbacks: one more try, then a fixed text. The watch ends as `done` with the reason `condition`, and the timeline notes it.
+- **End.** The watch also ends when its window closes, when the owner stops it, and at its time limit. The time limit is a guard that the ADR did not name.
 - IndexedDB keeps the instances on the device, one record for each instance, in the shape of the recipe records.
 - The renderer leader checks the clock.
 
@@ -629,7 +638,7 @@ The order follows dependencies. Each step uses the parts of the earlier steps. E
 | 1 | Mission base: the time trigger, the instance store, and the tools. Also the `mustSpeak` notice, the `reminder` template, and the mission list. | Done |
 | 2 | Autonomous talk without the screen: connect the policy core to `notifyConversation`. Add the prompt budget, intentions, owner control, usage by purpose, and the inspector. | Done |
 | 2b | Daily rhythm and small talk: templates as recipes, the `greeting`, `welcome-back`, and `small-talk` templates, topic seeds, and the time of day. Measure variety. | Done. Templates as recipes still wait. |
-| 3 | Perception: the adapters, ring buffer, detectors, frame policies, image budget, recorder, replay, timeline, scene state, `commentary` with interruptions, and `watch`. | In progress: 3-1 to 3-5a are done. |
+| 3 | Perception: the adapters, ring buffer, detectors, frame policies, image budget, recorder, replay, timeline, scene state, `commentary` with interruptions, and `watch`. | In progress: 3-1 to 3-5b are done. 3-6 is next. |
 | 4 | Motion: the model capability check, the procedural layer, the library with `ACT` markers, expression sync, and the upper-body layer. | To do |
 | 5 | Generated motion, game audio, recall from memory, and polish. Recall needs the memory ADR. | To do |
 
@@ -651,7 +660,7 @@ Step 3 has seven parts. Each part is one change. Detector events reach the press
 | 3-3 | The decision turn with frames: `fresh-keyframes` as the first default frame policy until replay chooses one, images in the transient notice, the image budget, events as pressure, and screen text as untrusted data. | Done |
 | 3-4 | The timeline and the scene state, written with markers. | Done |
 | 3-5a | The `commentary` template with the target window, its pace, its budget, and interruptions. | Done |
-| 3-5b | The `watch` template with check turns. | To do |
+| 3-5b | The `watch` template with check turns and named regions. | Done |
 | 3-6 | The recorder, the replay evaluation, and the `contact-sheet` and `scene-anchor` frame policies. | To do |
 
 Step 4 does not depend on steps 0 to 3. It comes after them so that the speech output format changes only once.

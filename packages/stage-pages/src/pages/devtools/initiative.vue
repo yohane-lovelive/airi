@@ -292,7 +292,8 @@ function timeLabel(epochMs: number) {
       </h2>
       <ul v-if="activeMissions.length" :class="['flex flex-col', 'gap-1', 'text-sm']">
         <li v-for="mission in activeMissions" :key="mission.id">
-          {{ mission.template === 'reminder' ? mission.values.text : mission.template === 'commentary' ? t('settings.pages.modules.missions.commentary.name', { app: mission.values.app }) : t('settings.pages.modules.missions.small-talk.name') }}
+          {{ mission.template === 'reminder' ? mission.values.text : mission.template === 'commentary' ? t('settings.pages.modules.missions.commentary.name', { app: mission.values.app }) : mission.template === 'watch' ? t('settings.pages.modules.missions.watch.name', { condition: mission.values.condition, app: mission.values.app }) : t('settings.pages.modules.missions.small-talk.name') }}
+          <span v-if="mission.template === 'watch' && mission.values.lastSeen" :class="['text-xs', 'text-neutral-500 dark:text-neutral-400']">· {{ t('settings.pages.modules.missions.watch.last-seen', { text: mission.values.lastSeen }) }}</span>
           <span v-if="mission.template !== 'reminder'" :class="['text-xs', 'text-neutral-500 dark:text-neutral-400']">· {{ t(`${KEY}.until`, { time: timeLabel(mission.values.endsAt) }) }}</span>
           <span v-else-if="mission.nextRunAt" :class="['text-xs', 'text-neutral-500 dark:text-neutral-400']">· {{ timeLabel(mission.nextRunAt) }}</span>
         </li>

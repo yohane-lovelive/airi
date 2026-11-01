@@ -1,9 +1,9 @@
-import type { CommentaryRequest, MissionEndReason, ReminderRequest, SmallTalkRequest } from '@proj-airi/core-agent'
+import type { CommentaryRequest, MissionEndReason, ReminderRequest, SmallTalkRequest, WatchRequest } from '@proj-airi/core-agent'
 
 import type { MissionRecord } from '../database/repos/missions.repo'
 
 import { errorMessageFrom } from '@moeru/std'
-import { activeCommentary, activeForegroundMission, activeSmallTalk, createCommentary, createReminder, createSmallTalk, isMissionActive, settleMissionRun, stopMission } from '@proj-airi/core-agent'
+import { activeCommentary, activeForegroundMission, activeSmallTalk, activeWatch, createCommentary, createReminder, createSmallTalk, createWatch, isMissionActive, recordWatchCheck, settleMissionRun, stopMission } from '@proj-airi/core-agent'
 import { useLocalStorageManualReset } from '@proj-airi/stage-shared/composables'
 import { useBroadcastChannel } from '@vueuse/core'
 import { nanoid } from 'nanoid'
@@ -12,10 +12,10 @@ import { computed, ref, watch } from 'vue'
 
 import { missionsRepo } from '../database/repos/missions.repo'
 
-export type { CommentaryRequest, MissionInstance, ReminderRequest, SmallTalkRequest } from '@proj-airi/core-agent'
+export type { CommentaryRequest, MissionInstance, ReminderRequest, SmallTalkRequest, WatchRequest } from '@proj-airi/core-agent'
 
 /**
- * Missions that the model created from the owner's words, for example reminders, small talk, and commentary.
+ * Missions that the model created from the owner's words, for example reminders, small talk, commentary, and watches.
  * IndexedDB keeps the instances. After each change, the other windows read them again.
  *
  * Use when:
@@ -101,6 +101,28 @@ export const useMissionsStore = defineStore('missions', () => {
     return result
   }
 
+  /** Starts a watch in an owner conversation. An empty app takes `appInFront`. On a refusal, `reason` tells the model what to change. */
+  async function addWatch(request: WatchRequest, sessionId: string, appInFront?: string) {
+    const stored = (await missionsRepo.list()).map(record => record.mission)
+    const result = createWatch({ id: nanoid(), sessionId, request, ...(appInFront ? { appInFront } : {}), now: Date.now(), missions: stored })
+    if (!result.ok)
+      return result
+    await missionsRepo.add(result.mission)
+    await publish([result.mission.id])
+    return result
+  }
+
+  /** The watch that runs now, if any. */
+  function watchAt(now: number) {
+    return activeWatch(missions.value, now)
+  }
+
+  /** Records one check of a running watch. A watch that ended in the meantime stays ended. */
+  async function recordCheck(id: string, at: number, seen: string) {
+    await missionsRepo.change(id, stored => stored.template === 'watch' && stored.status === 'running' ? recordWatchCheck(stored, at, seen) : undefined)
+    await publish([id])
+  }
+
   /** Ends a mission. Resolves to whether an active mission ended. `owner` is the owner's or the model's stop. */
   async function stop(id: string, reason: MissionEndReason = 'owner') {
     let stopped = false
@@ -177,8 +199,11 @@ export const useMissionsStore = defineStore('missions', () => {
     addSmallTalk,
     stop,
     addCommentary,
+    addWatch,
     smallTalkAt,
     commentaryAt,
+    watchAt,
+    recordCheck,
     endForeground,
     settle,
     removeEnded,

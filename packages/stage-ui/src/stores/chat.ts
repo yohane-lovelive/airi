@@ -722,6 +722,10 @@ export const useChatStore = defineStore('chat', () => {
                 return { ok: false, reason: 'Screen perception is off. The owner can turn it on in Settings > Modules > Screen perception.' }
               return missions.addCommentary(request, sessionId, perceptionRunner.foregroundApp())
             },
+            // A watch checks the screen, so it needs screen perception on.
+            addWatch: async request => perception.enabled && perception.supported
+              ? missions.addWatch(request, sessionId, perceptionRunner.foregroundApp())
+              : { ok: false, reason: 'Screen perception is off. The owner can turn it on in Settings > Modules > Screen perception.' },
             stop: id => missions.stop(id),
           })
         : []),

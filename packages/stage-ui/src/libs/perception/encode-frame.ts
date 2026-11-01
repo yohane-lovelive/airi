@@ -53,3 +53,26 @@ export async function scaleImage(image: Blob, maxLongSide: number): Promise<Blob
     bitmap.close()
   }
 }
+
+/**
+ * Cuts one box out of a JPEG and scales it down to `maxLongSide` pixels on its long side. The box holds shares of the
+ * width and the height. A watch check sends this crop, not the whole frame.
+ */
+export async function cropImage(image: Blob, box: { x: number, y: number, width: number, height: number }, maxLongSide: number): Promise<Blob> {
+  const bitmap = await createImageBitmap(image)
+  try {
+    const sx = Math.round(box.x * bitmap.width)
+    const sy = Math.round(box.y * bitmap.height)
+    const sw = Math.max(1, Math.min(bitmap.width - sx, Math.round(box.width * bitmap.width)))
+    const sh = Math.max(1, Math.min(bitmap.height - sy, Math.round(box.height * bitmap.height)))
+    const scale = Math.min(1, maxLongSide / Math.max(sw, sh))
+    const width = Math.max(1, Math.round(sw * scale))
+    const height = Math.max(1, Math.round(sh * scale))
+    const canvas = new OffscreenCanvas(width, height)
+    canvas.getContext('2d')!.drawImage(bitmap, sx, sy, sw, sh, 0, 0, width, height)
+    return await canvas.convertToBlob({ type: 'image/jpeg', quality: FRAME_LIMITS.jpegQuality })
+  }
+  finally {
+    bitmap.close()
+  }
+}

@@ -266,4 +266,5 @@ perception:
   start: 画面の知覚を開始
 missions:
   fixed-reminder: 'リマインド: {text}'
+  fixed-watch: '見張り: {condition}'
   notification-title: AIRI からのリマインド

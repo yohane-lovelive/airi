@@ -26,10 +26,16 @@ watch(enabled, (on) => {
 function nameOf(mission: MissionInstance) {
   if (mission.template === 'commentary')
     return t(`${KEY}.commentary.name`, { app: mission.values.app })
+  if (mission.template === 'watch')
+    return t(`${KEY}.watch.name`, { condition: mission.values.condition, app: mission.values.app })
   return mission.template === 'reminder' ? mission.values.text : t(`${KEY}.small-talk.name`)
 }
 
 function repeatLabel(mission: MissionInstance) {
+  if (mission.template === 'watch') {
+    const region = t(`${KEY}.watch.regions.${mission.values.region}`)
+    return mission.values.lastSeen ? `${region} · ${t(`${KEY}.watch.last-seen`, { text: mission.values.lastSeen })}` : region
+  }
   if (mission.template !== 'reminder')
     return t(`${KEY}.small-talk.minutes`, { count: mission.values.minutes })
   const { repeat } = mission.values

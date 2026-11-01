@@ -31,7 +31,7 @@ const detector = new ScreenDetector({ width: 64, height: 36 })
 const events = detector.observe({ at: Date.now(), thumbnail, app: 'Code' })
 ```
 
-It settles before it compares, it knows familiar screens and the usual change of each app, and it counts an app switch after a dwell time. `DETECTOR_LIMITS` holds the thresholds.
+`regionDiff` measures the change inside one part of two thumbnails, for example for a watch. `ScreenDetector` settles before it compares, it knows familiar screens and the usual change of each app, and it counts an app switch after a dwell time. `DETECTOR_LIMITS` holds the thresholds.
 
 ## Do not use this package
 

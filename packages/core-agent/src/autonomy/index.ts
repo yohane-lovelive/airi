@@ -38,22 +38,27 @@ export {
   activeCommentary,
   activeForegroundMission,
   activeSmallTalk,
+  activeWatch,
   collectDueMissions,
   COMMENTARY_MISSION_LIMITS,
   createCommentary,
   createReminder,
   createSmallTalk,
+  createWatch,
   deliverReminder,
-  foregroundPastLimit,
   formatLocalDateTime,
   isMissionActive,
   missedRemindersNoticeText,
   MISSION_TEMPLATES,
   parseLocalDateTime,
+  recordWatchCheck,
   reminderNoticeText,
+  runningPastLimit,
   settleMissionRun,
   SMALL_TALK_LIMITS,
   stopMission,
+  WATCH_MISSION_LIMITS,
+  watchNoticeText,
 } from './missions'
 export type {
   CommentaryMission,
@@ -72,9 +77,13 @@ export type {
   ReminderRequest,
   ReminderStart,
   ReminderValues,
+  RunningMission,
   SmallTalkMission,
   SmallTalkRequest,
   SmallTalkValues,
+  WatchMission,
+  WatchRequest,
+  WatchValues,
 } from './missions'
 export { SPEECH_TYPES } from './speech-types'
 export type { SpeechType } from './speech-types'
@@ -105,3 +114,5 @@ export {
   topicVariety,
 } from './topics'
 export type { TopicLine, TopicSeed, TopicSeedRequest, TopicSeedSource, TopicSimilarity, TopicThread, TopicVariety } from './topics'
+export { regionBox, shouldCheckWatch, WATCH_LIMITS, WATCH_REGIONS, watchCheckInstruction } from './watch'
+export type { RegionBox, WatchRegion } from './watch'

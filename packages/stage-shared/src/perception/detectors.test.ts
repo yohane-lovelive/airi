@@ -2,7 +2,7 @@ import type { ScreenEvent } from './detectors'
 
 import { describe, expect, it } from 'vitest'
 
-import { DETECTOR_LIMITS, differenceHash, ScreenDetector, thumbnailDiff } from './detectors'
+import { DETECTOR_LIMITS, differenceHash, regionDiff, ScreenDetector, thumbnailDiff } from './detectors'
 
 const WIDTH = 64
 const HEIGHT = 36
@@ -47,6 +47,21 @@ describe('thumbnail comparison', () => {
     const distance = (left: Uint8Array, right: Uint8Array) => left.reduce((sum, bit, index) => sum + (bit === right[index] ? 0 : 1), 0)
     expect(distance(base, brighter)).toBeLessThanOrEqual(DETECTOR_LIMITS.familiarDistance)
     expect(distance(base, other)).toBeGreaterThan(DETECTOR_LIMITS.familiarDistance)
+  })
+})
+
+describe('regionDiff', () => {
+  it('measures the change inside the box only', () => {
+    const before = new Uint8Array(WIDTH * HEIGHT)
+    const after = new Uint8Array(WIDTH * HEIGHT)
+    // Only the top left cell changes.
+    for (let y = 0; y < HEIGHT / 3; y++) {
+      for (let x = 0; x < WIDTH / 3; x++)
+        after[y * WIDTH + x] = 255
+    }
+
+    expect(regionDiff(before, after, WIDTH, HEIGHT, { x: 0, y: 0, width: 1 / 3, height: 1 / 3 })).toBeGreaterThan(0.9)
+    expect(regionDiff(before, after, WIDTH, HEIGHT, { x: 2 / 3, y: 2 / 3, width: 1 / 3, height: 1 / 3 })).toBe(0)
   })
 })
 

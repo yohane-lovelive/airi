@@ -17,7 +17,7 @@ import { formatLocalDateTime } from '@proj-airi/core-agent'
  * - `history-summary`: the summary of the older messages of a conversation.
  * - `other`: a call that names no purpose.
  */
-export const USAGE_PURPOSES = ['owner-reply', 'initiative', 'commentary', 'mission', 'task', 'scene', 'vision', 'voice-assist', 'tool-card', 'artistry', 'history-summary', 'timeline', 'other'] as const
+export const USAGE_PURPOSES = ['owner-reply', 'initiative', 'commentary', 'watch', 'mission', 'task', 'scene', 'vision', 'voice-assist', 'tool-card', 'artistry', 'history-summary', 'timeline', 'other'] as const
 
 export type UsagePurpose = typeof USAGE_PURPOSES[number]
 

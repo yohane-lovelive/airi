@@ -5,17 +5,20 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   activeCommentary,
   activeSmallTalk,
+  activeWatch,
   collectDueMissions,
   createCommentary,
   createReminder,
   createSmallTalk,
+  createWatch,
   deliverReminder,
-  foregroundPastLimit,
   formatLocalDateTime,
   isMissionActive,
   missedRemindersNoticeText,
   parseLocalDateTime,
+  recordWatchCheck,
   reminderNoticeText,
+  runningPastLimit,
   settleMissionRun,
   stopMission,
 } from './missions'
@@ -321,8 +324,8 @@ describe('small talk', () => {
 
     expect(activeSmallTalk([mission], NOW + 9 * MINUTE)?.id).toBe('talk')
     expect(activeSmallTalk([mission], NOW + 10 * MINUTE)).toBeUndefined()
-    expect(foregroundPastLimit([mission], NOW + 10 * MINUTE).map(entry => entry.id)).toEqual(['talk'])
-    expect(foregroundPastLimit([mission, reminder()], NOW + 9 * MINUTE)).toEqual([])
+    expect(runningPastLimit([mission], NOW + 10 * MINUTE).map(entry => entry.id)).toEqual(['talk'])
+    expect(runningPastLimit([mission, reminder()], NOW + 9 * MINUTE)).toEqual([])
   })
 
   it('ends as done at the time limit and as stopped otherwise, with the reason', () => {
@@ -368,7 +371,42 @@ describe('commentary', () => {
     if (!result.ok)
       throw new Error(result.reason)
 
-    expect(foregroundPastLimit([result.mission], NOW + 5 * MINUTE).map(mission => mission.id)).toEqual(['watch'])
+    expect(runningPastLimit([result.mission], NOW + 5 * MINUTE).map(mission => mission.id)).toEqual(['watch'])
     expect(stopMission(result.mission, NOW, 'target-closed')).toMatchObject({ status: 'stopped', endReason: 'target-closed' })
+  })
+})
+
+describe('watch', () => {
+  function watch(request: Partial<{ condition: string, app: string, region: 'full' | 'top-right', minutes: number }> = {}, missions: MissionInstance[] = []) {
+    return createWatch({ id: 'watch-1', sessionId: 'session-1', request: { condition: 'HP is below half', app: '', region: 'top-right', minutes: 60, ...request }, appInFront: 'Game', now: NOW, missions })
+  }
+
+  it('waits for a condition in one region of the app in front, beside a foreground mission', () => {
+    const talk = createSmallTalk({ id: 'talk', sessionId: 's', request: { minutes: 30 }, now: NOW, missions: [] })
+    if (!talk.ok)
+      throw new Error(talk.reason)
+
+    expect(watch({}, [talk.mission])).toMatchObject({ ok: true, mission: { template: 'watch', status: 'running', values: { condition: 'HP is below half', app: 'Game', region: 'top-right', endsAt: NOW + HOUR } } })
+  })
+
+  it('refuses an empty condition, a wrong region or time, and a second watch', () => {
+    expect(watch({ condition: '  ' }).ok).toBe(false)
+    expect(watch({ region: 'middle' as 'full' }).ok).toBe(false)
+    expect(watch({ minutes: 361 }).ok).toBe(false)
+    const first = watch()
+    if (!first.ok)
+      throw new Error(first.reason)
+    expect(watch({}, [first.mission])).toEqual({ ok: false, reason: expect.stringContaining('A watch already runs') })
+    expect(activeWatch([first.mission], NOW)?.id).toBe('watch-1')
+  })
+
+  it('records its checks, ends as done when the condition holds, and at its time limit', () => {
+    const result = watch({ minutes: 5 })
+    if (!result.ok)
+      throw new Error(result.reason)
+
+    expect(recordWatchCheck(result.mission, NOW + MINUTE, 'HP is full').values).toMatchObject({ lastCheckAt: NOW + MINUTE, lastSeen: 'HP is full' })
+    expect(stopMission(result.mission, NOW, 'condition')).toMatchObject({ status: 'done', endReason: 'condition' })
+    expect(runningPastLimit([result.mission], NOW + 5 * MINUTE).map(mission => mission.id)).toEqual(['watch-1'])
   })
 })

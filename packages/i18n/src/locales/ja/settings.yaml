@@ -555,6 +555,7 @@ pages:
       owner-reply: あなたへの返答
       initiative: 自律発話
       commentary: 実況
+      watch: 見張りの確認
       mission: ミッション
       task: バックグラウンドタスク
       scene: ほかの人への返答
@@ -991,12 +992,27 @@ pages:
         until: '{time} まで'
       commentary:
         name: '{app} の実況'
+      watch:
+        name: '{app} の見張り: {condition}'
+        last-seen: '前回の確認: {text}'
+        regions:
+          full: ウィンドウ全体
+          top: 上
+          bottom: 下
+          left: 左
+          right: 右
+          center: 中央
+          top-left: 左上
+          top-right: 右上
+          bottom-left: 左下
+          bottom-right: 右下
       end-reason:
         time: 時間切れ
         owner: あなたが止めました
         away: あなたが離席しました
         quiet: あなたが静かにと頼みました
         target-closed: ウィンドウが閉じました
+        condition: 条件が満たされました
     perception:
       title: 画面の知覚
       description: キャラクターがあなたの画面を見ます

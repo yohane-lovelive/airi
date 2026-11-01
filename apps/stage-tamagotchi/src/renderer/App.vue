@@ -32,6 +32,7 @@ import { listProvidersForPluginHost, shouldPublishPluginHostCapabilities } from 
 import { useSettings, useSettingsAudioDevice } from '@proj-airi/stage-ui/stores/settings'
 import { useSettingsSyncStore } from '@proj-airi/stage-ui/stores/settings-sync'
 import { useSettingsStageModel } from '@proj-airi/stage-ui/stores/settings/stage-model'
+import { useWatchRunnerStore } from '@proj-airi/stage-ui/stores/watch-runner'
 import { useTheme } from '@proj-airi/ui'
 import { isEqual } from 'es-toolkit'
 import { storeToRefs } from 'pinia'
@@ -171,6 +172,7 @@ function createFullStageRuntime() {
   const missionRunnerStore = useMissionRunnerStore()
   const initiativeRunnerStore = useInitiativeRunnerStore()
   const perceptionRunnerStore = usePerceptionRunnerStore()
+  const watchRunnerStore = useWatchRunnerStore()
   const settingsSyncStore = useSettingsSyncStore()
   const inferencePreload = useInferencePreload()
   const pluginHostInspectorStore = usePluginHostInspectorStore()
@@ -343,6 +345,7 @@ function createFullStageRuntime() {
         missionRunnerStore.initialize(syncedPinia)
         initiativeRunnerStore.initialize(syncedPinia, createElectronOwnerPresenceSource(context.value))
         perceptionRunnerStore.initialize(syncedPinia, createElectronScreenSource(context.value))
+        watchRunnerStore.initialize(syncedPinia)
         settingsSyncStore.initialize(syncedPinia)
       }
 
