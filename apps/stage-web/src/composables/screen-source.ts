@@ -15,13 +15,19 @@ function canShareScreen() {
  * leaves out the AIRI tab itself.
  */
 export function createPageScreenSource(): ScreenSource {
+  // NOTICE:
+  // `selfBrowserSurface` is a Chromium option that the DOM types of TypeScript do not list yet.
+  // Without it, the picker offers the AIRI tab, and a capture of AIRI itself shows only the character.
+  // Source: https://developer.chrome.com/docs/web-platform/screen-sharing-controls
+  // Removal condition: the TypeScript DOM library lists `selfBrowserSurface` in `DisplayMediaStreamOptions`.
+  const options: DisplayMediaStreamOptions & { selfBrowserSurface: 'exclude' } = {
+    video: { displaySurface: 'window' },
+    audio: false,
+    selfBrowserSurface: 'exclude',
+  }
   return {
     supported: canShareScreen(),
     needsGesture: true,
-    start: () => navigator.mediaDevices.getDisplayMedia(({
-      video: { displaySurface: 'window' },
-      audio: false,
-      selfBrowserSurface: 'exclude',
-    })),
+    start: () => navigator.mediaDevices.getDisplayMedia(options),
   }
 }
