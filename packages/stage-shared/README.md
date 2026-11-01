@@ -22,6 +22,17 @@ The `speaker-model` entrypoint pins the CAM++ speaker embedding pack. The render
 import { speakerModel } from '@proj-airi/stage-shared/speaker-model'
 ```
 
+The `perception` entrypoint owns the screen detectors of autonomous speech. `ScreenDetector` reads grayscale thumbnails and gives screen events and an activity level, with no model call:
+
+```ts
+import { ScreenDetector } from '@proj-airi/stage-shared/perception'
+
+const detector = new ScreenDetector({ width: 64, height: 36 })
+const events = detector.observe({ at: Date.now(), thumbnail, app: 'Code' })
+```
+
+It settles before it compares, it knows familiar screens and the usual change of each app, and it counts an app switch after a dwell time. `DETECTOR_LIMITS` holds the thresholds.
+
 ## Do not use this package
 
 Keep Electron IPC definitions in the Electron application. Keep UI state and actions in `@proj-airi/stage-ui`. Keep Extension runtime and manifest behavior in `@proj-airi/plugin-sdk`.

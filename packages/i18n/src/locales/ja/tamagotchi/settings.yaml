@@ -127,6 +127,14 @@ devtools:
         welcome-back: '最後のおかえり: {time}'
       screen:
         title: 画面
+        activity: '画面の動き: {value}'
+        events: 最近の画面の出来事
+        salience: '顕著度 {value}'
+        familiar: 見慣れた画面
+        types:
+          scene-change: '{app} で場面が変わりました'
+          app-switch: '{app} に切り替わりました'
+          still: '{app} の画面が長く止まっています'
       topics:
         title: 話題
         thread: '今の話題: {topic}（{count} 行、熱 {heat}）'

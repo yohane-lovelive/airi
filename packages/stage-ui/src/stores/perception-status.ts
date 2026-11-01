@@ -1,3 +1,5 @@
+import type { ScreenEvent } from '@proj-airi/stage-shared/perception'
+
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
@@ -32,6 +34,10 @@ export interface PerceptionStatus {
   knowsForeground: boolean
   /** The reason of a failed start. */
   error?: string
+  /** How much the screen moves now, from 0 to 1. */
+  activity: number
+  /** The recent screen events, newest last. */
+  events: ScreenEvent[]
   updatedAt: number
 }
 
@@ -41,7 +47,7 @@ export interface PerceptionStatus {
  * `requestStart`. Nothing persists.
  */
 export const usePerceptionStatusStore = defineStore('perception-status', () => {
-  const status = ref<PerceptionStatus>({ state: 'off', frames: 0, bytes: 0, excluded: 0, excludedNow: false, knowsForeground: false, updatedAt: 0 })
+  const status = ref<PerceptionStatus>({ state: 'off', frames: 0, bytes: 0, excluded: 0, excludedNow: false, knowsForeground: false, activity: 0, events: [], updatedAt: 0 })
 
   /**
    * Epoch milliseconds of the last start request from a window that does not capture, for example the settings window

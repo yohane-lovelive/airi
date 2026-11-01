@@ -133,6 +133,14 @@ devtools:
         welcome-back: 'Last welcome back: {time}'
       screen:
         title: Screen
+        activity: 'Screen activity: {value}'
+        events: Recent screen events
+        salience: 'salience {value}'
+        familiar: familiar screen
+        types:
+          scene-change: 'Scene change in {app}'
+          app-switch: 'Switch to {app}'
+          still: 'Still screen in {app}'
       topics:
         title: Topics
         thread: 'Current topic: {topic} ({count} lines, heat {heat})'

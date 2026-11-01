@@ -17,7 +17,7 @@ const contexts: Array<{ pinia: ReturnType<typeof createPinia>, runtime: SyncedPi
 const timers: ReturnType<typeof setInterval>[] = []
 
 /** A screen that is a canvas. Its stream is live, so the runner takes real frames from it. */
-function canvasSource(options: { foreground?: () => ForegroundWindow, needsGesture?: boolean } = {}) {
+function canvasSource(options: { foreground?: () => ForegroundWindow, needsGesture?: boolean, steady?: boolean } = {}) {
   const canvas = document.createElement('canvas')
   canvas.width = 320
   canvas.height = 180
@@ -42,14 +42,24 @@ function canvasSource(options: { foreground?: () => ForegroundWindow, needsGestu
       }
     },
   }
-  // A canvas stream sends a frame only after a change, so the screen keeps changing like a real one.
+  // A canvas stream sends a frame only after a draw. A moving screen flickers in one corner. A steady screen draws the
+  // same scene again, so frames come, and the scene changes only when the test sets another one.
   let tick = 0
+  let scene = 0
   timers.push(setInterval(() => {
     tick += 1
+    if (options.steady) {
+      const gradient = context.createLinearGradient(0, 0, 320, 180)
+      gradient.addColorStop(0, scene ? '#111111' : '#eeeeee')
+      gradient.addColorStop(1, scene ? '#eeeeee' : '#111111')
+      context.fillStyle = gradient
+      context.fillRect(0, 0, 320, 180)
+      return
+    }
     context.fillStyle = tick % 2 ? '#3366ff' : '#ff6633'
     context.fillRect(0, 0, 40, 40)
   }, 50))
-  return { source, streams, interrupt: (value: boolean) => interrupt?.(value) }
+  return { source, streams, interrupt: (value: boolean) => interrupt?.(value), setScene: (value: number) => (scene = value) }
 }
 
 async function createLeader(source: ScreenSource) {
@@ -150,5 +160,18 @@ describe('usePerceptionRunnerStore', () => {
     track.dispatchEvent(new Event('ended'))
     await expect.poll(() => status.status.state).toBe('ended')
     expect(runner.frames()).toHaveLength(0)
+  })
+
+  it('reports a scene change from the detectors after the new screen settles', async () => {
+    const screen = canvasSource({ steady: true })
+    const { runner, perception, status } = await createLeader(screen.source)
+    perception.enabled = true
+    await expect.poll(() => runner.frames().length, { timeout: 5_000 }).toBeGreaterThan(3)
+    expect(runner.events()).toEqual([])
+
+    screen.setScene(1)
+    await expect.poll(() => runner.events().length, { timeout: 5_000 }).toBe(1)
+    expect(runner.events()[0]).toMatchObject({ type: 'scene-change', familiar: false })
+    await expect.poll(() => status.status.events).toHaveLength(1)
   })
 })

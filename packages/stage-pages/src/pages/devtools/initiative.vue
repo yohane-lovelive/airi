@@ -90,6 +90,11 @@ function number(value: number, digits = 2) {
   return value.toLocaleString(locale.value, { minimumFractionDigits: digits, maximumFractionDigits: digits })
 }
 
+/** A time with seconds, because screen events come seconds apart. */
+function secondsLabel(epochMs: number) {
+  return new Date(epochMs).toLocaleTimeString(locale.value, { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+}
+
 function timeLabel(epochMs: number) {
   return new Date(epochMs).toLocaleTimeString(locale.value, { hour: '2-digit', minute: '2-digit' })
 }
@@ -208,7 +213,25 @@ function timeLabel(epochMs: number) {
         <li v-if="perception.knowsForeground">
           {{ t('settings.pages.modules.perception.excluded', { count: perception.excluded }) }}
         </li>
+        <li v-if="perception.state === 'running'">
+          {{ t(`${KEY}.screen.activity`, { value: number(perception.activity) }) }}
+        </li>
       </ul>
+      <h3 :class="['mt-1', 'text-xs font-medium', 'text-neutral-500 dark:text-neutral-400']">
+        {{ t(`${KEY}.screen.events`) }}
+      </h3>
+      <ul v-if="perception.events.length" :class="['flex flex-col', 'gap-1', 'text-sm', 'tabular-nums']">
+        <li v-for="event in [...perception.events].reverse()" :key="`${event.at}-${event.type}`">
+          <span :class="['text-xs', 'text-neutral-500 dark:text-neutral-400']">{{ secondsLabel(event.at) }}</span>
+          {{ t(`${KEY}.screen.types.${event.type}`, { app: event.app ?? '-' }) }}
+          <span :class="['text-xs', 'text-neutral-500 dark:text-neutral-400']">
+            · {{ t(`${KEY}.screen.salience`, { value: number(event.salience) }) }}{{ event.type === 'scene-change' && event.familiar ? ` · ${t(`${KEY}.screen.familiar`)}` : '' }}
+          </span>
+        </li>
+      </ul>
+      <p v-else :class="['text-xs', 'text-neutral-500 dark:text-neutral-400']">
+        {{ t(`${KEY}.none`) }}
+      </p>
     </section>
 
     <section :class="['flex flex-col', 'gap-2', 'rounded-xl', 'bg-neutral-100 dark:bg-neutral-900', 'p-4']">

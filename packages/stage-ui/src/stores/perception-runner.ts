@@ -1,9 +1,11 @@
+import type { ScreenEvent } from '@proj-airi/stage-shared/perception'
 import type { SyncedPiniaRuntime } from 'pinia-plugin-synced'
 
 import type { ScreenSource } from '../libs/perception/screen-source'
 import type { PerceptionState } from './perception-status'
 
 import { errorMessageFrom } from '@moeru/std'
+import { ScreenDetector } from '@proj-airi/stage-shared/perception'
 import { defineStore } from 'pinia'
 import { onScopeDispose, watch } from 'vue'
 
@@ -16,6 +18,8 @@ import { usePerceptionStatusStore } from './perception-status'
 
 /** The status goes to other windows at most this often. A frame comes twice as often. */
 const PUBLISH_INTERVAL_MS = 1_000
+/** The status keeps this many recent screen events for the inspector. */
+const RECENT_EVENT_COUNT = 20
 
 /**
  * Captures the screen on the renderer leader and keeps the frames of the last minute in memory.
@@ -27,7 +31,9 @@ const PUBLISH_INTERVAL_MS = 1_000
  *   exclusion list is skipped before the frame is taken.
  * - The desktop app starts the capture by itself. The web app needs a click of the owner, so it waits in `needs-share`.
  * - When the shared screen or window goes away, the capture ends, and the owner starts it again.
- * - Frames do not reach the model yet. The detectors and the decision turn read them in later steps of the ADR.
+ * - The screen detectors read each frame and its app in front. They give screen events and an activity level. A skipped
+ *   frame makes them settle again, so the change around an excluded window is no event.
+ * - Frames and events do not reach the model yet. The decision turn reads them in a later step of the ADR.
  *
  * Use when:
  * - An app starts its renderer. Call `initialize` once with the synced Pinia runtime and the screen source of the app.
@@ -57,6 +63,12 @@ export const usePerceptionRunnerStore = defineStore('perception-runner', () => {
   let excludedNow = false
   let foregroundApp: string | undefined
   let lastPublished: { state: PerceptionState, at: number } | undefined
+  let detector = createDetector()
+  let recentEvents: ScreenEvent[] = []
+
+  function createDetector() {
+    return new ScreenDetector({ width: FRAME_LIMITS.thumbnailWidth, height: FRAME_LIMITS.thumbnailHeight })
+  }
 
   function isLeader() {
     return Boolean(leadership?.isLeader())
@@ -101,6 +113,8 @@ export const usePerceptionRunnerStore = defineStore('perception-runner', () => {
       excluded,
       excludedNow,
       knowsForeground: Boolean(source?.foreground),
+      activity: stream ? detector.activity : 0,
+      events: recentEvents,
       ...(foregroundApp ? { foregroundApp } : {}),
       ...(failure ? { error: failure } : {}),
       updatedAt: now,
@@ -118,6 +132,7 @@ export const usePerceptionRunnerStore = defineStore('perception-runner', () => {
     }
     video = undefined
     ring.clear()
+    detector = createDetector()
     excludedNow = false
     foregroundApp = undefined
   }
@@ -190,6 +205,7 @@ export const usePerceptionRunnerStore = defineStore('perception-runner', () => {
         excludedNow = Boolean(window && exclusionMatch(window, perception.exclusions))
         if (excludedNow) {
           excluded += 1
+          detector.skip(at)
           return
         }
       }
@@ -198,8 +214,14 @@ export const usePerceptionRunnerStore = defineStore('perception-runner', () => {
       const bitmap = await createImageBitmap(video)
       const frame = await encoder.encode(bitmap, at)
       // A pause or a lock during the encode dropped the ring, so its frame must not come back.
-      if (stream)
-        ring.push(frame)
+      if (!stream)
+        return
+      ring.push(frame)
+      const events = detector.observe({ at, thumbnail: frame.thumbnail, ...(foregroundApp ? { app: foregroundApp } : {}) })
+      if (events.length) {
+        recentEvents = [...recentEvents, ...events].slice(-RECENT_EVENT_COUNT)
+        publish(true)
+      }
     }
     catch (error) {
       console.warn('[perception] Failed to take a frame:', errorMessageFrom(error))
@@ -275,6 +297,8 @@ export const usePerceptionRunnerStore = defineStore('perception-runner', () => {
   return {
     /** The frames of the last minute, oldest first. Empty on a renderer that does not capture. */
     frames: () => ring.frames(),
+    /** The recent screen events, newest last. */
+    events: () => recentEvents,
     startFromGesture,
     initialize,
     dispose,

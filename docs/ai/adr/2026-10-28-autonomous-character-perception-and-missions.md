@@ -194,6 +194,22 @@ Step 3-1 built the screen source, the ring buffer, and the privacy rules as foll
   - A screen lock or sleep stops the capture until the owner is back. When the share goes away, the capture ends, and the owner starts it again.
 - **Inspector.** The status store replicates the state, the frame count, the app in front, and the count of skipped frames to every window. The window title stays out of it.
 
+Step 3-2 built the detectors as follows. Their events do not reach the pressure yet.
+
+- `ScreenDetector` in `packages/stage-shared` reads the 64 by 36 thumbnails, the time, and the app in front. It runs in the perception runner on the leader, with no model call.
+- **Frame change.** The mean brightness change between frames, from 0 to 1.
+- **Activity.** A moving average of the frame change, with a half-life of 5 seconds. It is a level, not an event. Commentary uses it for its pace in step 3-5.
+- **Settle, then compare.** A frame with a change of 0.01 or more starts a movement. Two still frames, one second, settle the screen. Then the detector compares the new still screen with the last still screen. A change of 0.02 or more is a `scene-change` event.
+- **Noise floor.** A screen that never stops, for example an animated game lobby, never settles with a fixed threshold. A desktop check showed this. The detector therefore follows the usual frame change: it rises with a half-life of 15 seconds and falls with one of 2 seconds. A frame below 1.5 times this floor is still, and a scene change must be at least 2 times the floor.
+- **Familiar screens.** The detector keeps the 64-bit difference hashes of the last 32 still screens. A new screen within 6 bits of one of them keeps 0.3 of its salience.
+- **Baseline for each app.** Each app has a moving average of its scene changes, which starts at 0.05. The salience is the change over the baseline, divided by three times the baseline. On the web, all frames share one baseline.
+- **App switch dwell.** On the desktop, an `app-switch` event comes after the owner stays in the new app for 5 seconds. A switch to the desktop, a file manager, or AIRI has the salience 0.2, and other switches have 0.5. The screen change of the switch itself is no scene change.
+- **Long still periods.** A screen without change for 3 minutes gives one `still` event with the salience 0.1.
+- **Excluded frames.** After a skipped frame, the detector settles again and does not compare with the screen before it. It never learns the app of an excluded window.
+- **Loud sounds wait.** The app does not capture audio yet. System audio also holds the voices of friends in a call, and the ADR captures the audio of one process only. The native module for that comes with game audio in step 5, so the loud sound detector comes there too.
+- `DETECTOR_LIMITS` holds the thresholds. Synthetic frame streams set the first values, and replay evaluation in step 3-6 tunes them.
+- The inspector shows the activity and the last 20 events: the time, the type, the salience, the app, and whether the screen was familiar.
+
 ### Frame policy
 
 The frame policy chooses which frames go to the model in each turn. It is a replaceable part. A developer setting selects it, and replay evaluation chooses the default.
@@ -585,7 +601,7 @@ The order follows dependencies. Each step uses the parts of the earlier steps. E
 | 1 | Mission base: the time trigger, the instance store, and the tools. Also the `mustSpeak` notice, the `reminder` template, and the mission list. | Done |
 | 2 | Autonomous talk without the screen: connect the policy core to `notifyConversation`. Add the prompt budget, intentions, owner control, usage by purpose, and the inspector. | Done |
 | 2b | Daily rhythm and small talk: templates as recipes, the `greeting`, `welcome-back`, and `small-talk` templates, topic seeds, and the time of day. Measure variety. | Done. Templates as recipes still wait. |
-| 3 | Perception: the adapters, ring buffer, detectors, frame policies, image budget, recorder, replay, timeline, scene state, `commentary` with interruptions, and `watch`. | In progress: 3-1 is done. |
+| 3 | Perception: the adapters, ring buffer, detectors, frame policies, image budget, recorder, replay, timeline, scene state, `commentary` with interruptions, and `watch`. | In progress: 3-1 and 3-2 are done. |
 | 4 | Motion: the model capability check, the procedural layer, the library with `ACT` markers, expression sync, and the upper-body layer. | To do |
 | 5 | Generated motion, game audio, recall from memory, and polish. Recall needs the memory ADR. | To do |
 
@@ -603,7 +619,7 @@ Step 3 has six parts. Each part is one change. Detector events reach the pressur
 | Part | Content | State |
 | --- | --- | --- |
 | 3-1 | The screen sources of the desktop and web apps, the ring buffer, and the privacy rules: opt-in, the indicator and pause, the exclusion list, and the stop on lock. | Done |
-| 3-2 | The detectors: settle then compare, familiar screens, the baseline for each app, the app switch dwell, and long still periods. The inspector lists the events. | To do |
+| 3-2 | The detectors: settle then compare, familiar screens, the baseline for each app, the app switch dwell, and long still periods. The inspector lists the events. The loud sound detector waits for step 5. | Done |
 | 3-3 | The decision turn with frames: `fresh-keyframes` as the first default frame policy until replay chooses one, images in the transient notice, the image budget, events as pressure, and screen text as untrusted data. | To do |
 | 3-4 | The timeline and the scene state. | To do |
 | 3-5 | The `commentary` and `watch` templates. | To do |
