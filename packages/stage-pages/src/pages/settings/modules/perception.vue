@@ -1,15 +1,17 @@
 <script setup lang="ts">
+import { IMAGE_BUDGET_LIMITS } from '@proj-airi/stage-ui/libs/perception/image-budget'
 import { usePerceptionStore } from '@proj-airi/stage-ui/stores/perception'
 import { usePerceptionRunnerStore } from '@proj-airi/stage-ui/stores/perception-runner'
 import { usePerceptionStatusStore } from '@proj-airi/stage-ui/stores/perception-status'
-import { Alert, Button, FieldCheckbox, FieldTextArea } from '@proj-airi/ui'
+import { Alert, Button, FieldCheckbox, FieldRange, FieldTextArea } from '@proj-airi/ui'
+import { useNow } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
 const perception = usePerceptionStore()
-const { enabled, paused, exclusions, supported } = storeToRefs(perception)
+const { enabled, paused, exclusions, imagesPerHour, supported } = storeToRefs(perception)
 const { status } = storeToRefs(usePerceptionStatusStore())
 const runner = usePerceptionRunnerStore()
 
@@ -25,6 +27,8 @@ const exclusionText = computed({
 
 const canStart = computed(() => ['needs-share', 'ended', 'failed'].includes(status.value.state))
 const megabytes = computed(() => (status.value.bytes / 1_000_000).toFixed(1))
+const now = useNow({ interval: 10_000 })
+const budget = computed(() => perception.budgetAt(now.value.getTime()))
 </script>
 
 <template>
@@ -34,6 +38,17 @@ const megabytes = computed(() => (status.value.bytes / 1_000_000).toFixed(1))
     <div :class="['flex flex-col', 'gap-4', 'rounded-xl', 'bg-neutral-100 dark:bg-neutral-900', 'p-4']">
       <FieldCheckbox v-model="enabled" :label="t(`${KEY}.enable`)" :description="t(`${KEY}.enable-description`)" />
       <FieldCheckbox v-if="enabled" v-model="paused" :label="t(`${KEY}.paused`)" :description="t(`${KEY}.paused-description`)" />
+      <FieldRange
+        v-model="imagesPerHour"
+        :label="t(`${KEY}.images-per-hour`)"
+        :description="t(`${KEY}.images-per-hour-description`)"
+        :min="IMAGE_BUDGET_LIMITS.minImagesPerHour"
+        :max="IMAGE_BUDGET_LIMITS.maxImagesPerHour"
+        :step="1"
+      />
+      <p :class="['text-xs', 'text-neutral-500 dark:text-neutral-400', 'tabular-nums']">
+        {{ t(`${KEY}.images-sent`, { used: budget.used, limit: budget.limit }) }}
+      </p>
     </div>
 
     <section v-if="enabled" :class="['flex flex-col', 'gap-2', 'rounded-xl', 'bg-neutral-50 dark:bg-neutral-800/60', 'p-4']">

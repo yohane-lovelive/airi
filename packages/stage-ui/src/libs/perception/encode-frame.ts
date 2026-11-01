@@ -32,3 +32,24 @@ export async function encodeFrame(bitmap: ImageBitmap, at: number): Promise<Capt
     bitmap.close()
   }
 }
+
+/**
+ * Scales a JPEG down to `maxLongSide` pixels on its long side. A smaller image passes as it is.
+ * A decision turn sends older frames smaller than the newest one.
+ */
+export async function scaleImage(image: Blob, maxLongSide: number): Promise<Blob> {
+  const bitmap = await createImageBitmap(image)
+  try {
+    const scale = maxLongSide / Math.max(bitmap.width, bitmap.height)
+    if (scale >= 1)
+      return image
+    const width = Math.max(1, Math.round(bitmap.width * scale))
+    const height = Math.max(1, Math.round(bitmap.height * scale))
+    const canvas = new OffscreenCanvas(width, height)
+    canvas.getContext('2d')!.drawImage(bitmap, 0, 0, width, height)
+    return await canvas.convertToBlob({ type: 'image/jpeg', quality: FRAME_LIMITS.jpegQuality })
+  }
+  finally {
+    bitmap.close()
+  }
+}

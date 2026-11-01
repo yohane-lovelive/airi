@@ -429,6 +429,7 @@ export const useChatStore = defineStore('chat', () => {
    * Tells a conversation about work outside it, for example a finished background task or a due reminder.
    * The main agent reads the notice and decides what to say, or stays quiet. With `mustSpeak`, it is asked to speak.
    * With `reply`, the run speaks that fixed text and makes no model call. With `transient`, history keeps only the reply.
+   * `attachments` go with the notice, for example frames of the screen. A transient notice keeps them out of history.
    * Only the owner's own conversation gets a notice, so background results never reach a scene.
    * `messageId` names the turn, so the caller can cancel it with `cancelTurn`.
    *
@@ -437,14 +438,14 @@ export const useChatStore = defineStore('chat', () => {
    */
   async function notifyConversation(
     sessionId: string,
-    notice: { source: string, text: string, mustSpeak?: boolean, reply?: string, transient?: boolean },
+    notice: { source: string, text: string, mustSpeak?: boolean, reply?: string, transient?: boolean, attachments?: ChatAttachment[] },
     messageId?: string,
   ): Promise<'spoke' | 'silent' | 'failed' | 'skipped'> {
     if (!isOwnerSession(sessionId))
       return 'skipped'
     try {
-      const { text, ...options } = notice
-      const result = await executeSend({ sessionId, text, ...(messageId ? { messageId } : {}) }, { notice: options })
+      const { text, attachments, ...options } = notice
+      const result = await executeSend({ sessionId, text, ...(messageId ? { messageId } : {}), ...(attachments?.length ? { attachments } : {}) }, { notice: options })
       return result.messages.some(message => message.role === 'assistant') ? 'spoke' : 'silent'
     }
     catch (error) {
@@ -1394,7 +1395,8 @@ export const useChatStore = defineStore('chat', () => {
       model: modelId,
       chatProvider,
       messageId: payload.messageId,
-      attachments: await storeChatAttachments(payload.attachments, payload.sessionId),
+      // A transient notice is never stored, so its attachments, for example frames of the screen, stay off the disk too.
+      attachments: extra.notice?.transient ? payload.attachments : await storeChatAttachments(payload.attachments, payload.sessionId),
       input: payload.input,
       replyToMessageId: payload.replyToMessageId,
       toolReferences: payload.tools,

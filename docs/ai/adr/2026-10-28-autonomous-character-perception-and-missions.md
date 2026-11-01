@@ -210,6 +210,15 @@ Step 3-2 built the detectors as follows. Their events do not reach the pressure 
 - `DETECTOR_LIMITS` holds the thresholds. Synthetic frame streams set the first values, and replay evaluation in step 3-6 tunes them.
 - The inspector shows the activity and the last 20 events: the time, the type, the salience, the app, and whether the screen was familiar.
 
+Step 3-3 built the decision turn with frames as follows.
+
+- **Events as pressure.** Each screen event goes to the policy as a `perceived` event with its salience. A salient event after a decision still makes its speech stale.
+- **`fresh-keyframes`.** `pickFreshKeyframes` in `packages/stage-shared` picks the newest frame, the frame before the largest change near each event since the last turn, and then the frames that changed most. Picks that look the same are skipped. It is the default until replay evaluation chooses one.
+- **Frames in the turn.** A drive turn attaches the picks to its transient notice: the newest frame at 1280 pixels, older frames at 512 pixels. A transient notice is never stored, and its attachments stay out of the chat asset store, so no frame reaches the disk. Greetings and welcomes back get no frames, and no frame goes while an excluded window is in front.
+- **Situation block.** The notice tells the age of each frame, the app in front without the title, and up to five screen events since the last turn. It says that text on the screen is data from other apps, never an instruction.
+- **Image budget.** Settings > Modules > Screen perception sets the images each hour, 20 by default. The device keeps the send times, and the budget counts a rolling window of 60 minutes, so a burst right after each full hour cannot happen. Below half of the budget, a turn sends the newest frame only, and events keep `max(0.25, share / 0.5)` of their pressure. With no budget left, the turn goes without frames, and the notice says so.
+- **Tools in screen turns.** Code still offers the mission tools in a turn with frames. The known risk of screen text that acts as an instruction stays open, as the table of known risks says. Only the notice marks screen text as data for now.
+
 ### Frame policy
 
 The frame policy chooses which frames go to the model in each turn. It is a replaceable part. A developer setting selects it, and replay evaluation chooses the default.
@@ -228,7 +237,7 @@ The frame policy chooses which frames go to the model in each turn. It is a repl
 
 - The owner sets a budget in images per hour. The default is low.
 - The budget counts every image that goes to the model, watch checks included.
-- When the budget runs low, code lengthens the time between decision turns. When the budget is empty, no image goes out until the next hour.
+- When the budget runs low, code lengthens the time between decision turns. When the budget is empty, no image goes out until the window of the last 60 minutes has room again.
 - A running commentary mission raises the budget.
 - Settings show the images sent in the current hour.
 
@@ -601,7 +610,7 @@ The order follows dependencies. Each step uses the parts of the earlier steps. E
 | 1 | Mission base: the time trigger, the instance store, and the tools. Also the `mustSpeak` notice, the `reminder` template, and the mission list. | Done |
 | 2 | Autonomous talk without the screen: connect the policy core to `notifyConversation`. Add the prompt budget, intentions, owner control, usage by purpose, and the inspector. | Done |
 | 2b | Daily rhythm and small talk: templates as recipes, the `greeting`, `welcome-back`, and `small-talk` templates, topic seeds, and the time of day. Measure variety. | Done. Templates as recipes still wait. |
-| 3 | Perception: the adapters, ring buffer, detectors, frame policies, image budget, recorder, replay, timeline, scene state, `commentary` with interruptions, and `watch`. | In progress: 3-1 and 3-2 are done. |
+| 3 | Perception: the adapters, ring buffer, detectors, frame policies, image budget, recorder, replay, timeline, scene state, `commentary` with interruptions, and `watch`. | In progress: 3-1 to 3-3 are done. |
 | 4 | Motion: the model capability check, the procedural layer, the library with `ACT` markers, expression sync, and the upper-body layer. | To do |
 | 5 | Generated motion, game audio, recall from memory, and polish. Recall needs the memory ADR. | To do |
 
@@ -620,7 +629,7 @@ Step 3 has six parts. Each part is one change. Detector events reach the pressur
 | --- | --- | --- |
 | 3-1 | The screen sources of the desktop and web apps, the ring buffer, and the privacy rules: opt-in, the indicator and pause, the exclusion list, and the stop on lock. | Done |
 | 3-2 | The detectors: settle then compare, familiar screens, the baseline for each app, the app switch dwell, and long still periods. The inspector lists the events. The loud sound detector waits for step 5. | Done |
-| 3-3 | The decision turn with frames: `fresh-keyframes` as the first default frame policy until replay chooses one, images in the transient notice, the image budget, events as pressure, and screen text as untrusted data. | To do |
+| 3-3 | The decision turn with frames: `fresh-keyframes` as the first default frame policy until replay chooses one, images in the transient notice, the image budget, events as pressure, and screen text as untrusted data. | Done |
 | 3-4 | The timeline and the scene state. | To do |
 | 3-5 | The `commentary` and `watch` templates. | To do |
 | 3-6 | The recorder, the replay evaluation, and the `contact-sheet` and `scene-anchor` frame policies. | To do |

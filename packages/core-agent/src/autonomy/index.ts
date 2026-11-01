@@ -29,7 +29,7 @@ export type {
   PendingTurn,
 } from './initiative'
 export { INITIATIVE_RECENT_LINE_COUNT, initiativeNoticeText } from './initiative-notice'
-export type { InitiativeNoticeContext } from './initiative-notice'
+export type { InitiativeNoticeContext, InitiativeScreenContext } from './initiative-notice'
 export { createIntention, INTENTION_LIMITS, openIntentions } from './intentions'
 export type { Intention, IntentionRequest } from './intentions'
 export {

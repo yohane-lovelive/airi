@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 import { DEFAULT_PERCEPTION_EXCLUSIONS } from '../libs/perception/exclusion'
+import { IMAGE_BUDGET_LIMITS, imageBudgetState, imagesInWindow } from '../libs/perception/image-budget'
 
 /**
  * The owner settings of screen perception: the character sees the screen of the device.
@@ -23,6 +24,10 @@ export const usePerceptionStore = defineStore('perception', () => {
   const paused = useLocalStorageManualReset<boolean>('perception/paused', false)
   /** Apps and words of window titles. A frame of a matching window in front is skipped. */
   const exclusions = useLocalStorageManualReset<string[]>('perception/exclusions', [...DEFAULT_PERCEPTION_EXCLUSIONS])
+  /** The most frames that go to the model in one hour. Each frame of a decision turn counts. */
+  const imagesPerHour = useLocalStorageManualReset<number>('perception/images-per-hour', IMAGE_BUDGET_LIMITS.defaultImagesPerHour)
+  /** When frames went to the model, in the last hour. The device keeps them, so a restart does not reset the budget. */
+  const sentImageTimes = useLocalStorageManualReset<number[]>('perception/sent-image-times', [])
   /**
    * Whether this app runs screen perception. The perception runner sets it when an app initializes it with a source
    * that can capture, so Settings of another app can say that the feature does not run there.
@@ -33,18 +38,35 @@ export const usePerceptionStore = defineStore('perception', () => {
     paused.value = !paused.value
   }
 
+  /** The image budget at `now`. */
+  function budgetAt(now: number) {
+    const limit = Math.round(Math.min(IMAGE_BUDGET_LIMITS.maxImagesPerHour, Math.max(IMAGE_BUDGET_LIMITS.minImagesPerHour, imagesPerHour.value)))
+    return imageBudgetState(sentImageTimes.value, limit, now)
+  }
+
+  /** Records frames that went to the model. Times older than the budget window drop out. */
+  function recordImages(count: number, at: number) {
+    sentImageTimes.value = [...imagesInWindow(sentImageTimes.value, at), ...Array.from<number>({ length: count }).fill(at)]
+  }
+
   function resetState() {
     enabled.reset()
     paused.reset()
     exclusions.reset()
+    imagesPerHour.reset()
+    sentImageTimes.reset()
   }
 
   return {
     enabled,
     paused,
     exclusions,
+    imagesPerHour,
+    sentImageTimes,
     supported,
     togglePaused,
+    budgetAt,
+    recordImages,
     resetState,
   }
 })

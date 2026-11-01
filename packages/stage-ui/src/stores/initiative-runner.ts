@@ -1,4 +1,4 @@
-import type { InitiativeDecision, InitiativeEvent, InitiativeHost, InitiativeRhythm, InitiativeState, InitiativeTime, InitiativeWaitReason, SpeechType, TopicSeed } from '@proj-airi/core-agent'
+import type { ChatAttachment, InitiativeDecision, InitiativeEvent, InitiativeHost, InitiativeRhythm, InitiativeScreenContext, InitiativeState, InitiativeTime, InitiativeWaitReason, SpeechType, TopicSeed } from '@proj-airi/core-agent'
 import type { SyncedPiniaRuntime } from 'pinia-plugin-synced'
 
 import type { OwnerPresence, OwnerPresenceSource } from '../libs/initiative/presence'
@@ -28,6 +28,8 @@ import { INITIATIVE_SOURCE, initiativeConversationFacts, initiativeEventOf } fro
 import { markAway, observePresence, OWNER_PRESENCE_LIMITS, shouldGreet } from '../libs/initiative/presence'
 import { initiativeTopicLines, memoryTopicSeeds } from '../libs/initiative/topics'
 import { isOwnerTyping } from '../libs/initiative/typing'
+import { eventPressureFactor } from '../libs/perception/image-budget'
+import { buildScreenTurn } from '../libs/perception/screen-turn'
 import { Ticker } from '../workers/ticker'
 import { useSpeakingStore } from './audio'
 import { useChatStore } from './chat'
@@ -38,6 +40,8 @@ import { useIntentionsStore } from './intentions'
 import { useMemoryStore } from './memory'
 import { useMissionsStore } from './missions'
 import { useOwnerTypingStore } from './owner-typing'
+import { usePerceptionStore } from './perception'
+import { usePerceptionRunnerStore } from './perception-runner'
 import { useVoiceStore } from './voice'
 import { useVoiceMessagesStore } from './voice-messages'
 
@@ -45,6 +49,8 @@ import { useVoiceMessagesStore } from './voice-messages'
 const TICK_INTERVAL_MS = 1_000
 
 const DAY_MS = 24 * 60 * 60_000
+/** The first turn with the screen treats the frames of this time as news. */
+const FIRST_SCREEN_TURN_LOOKBACK_MS = 60_000
 
 /** Gates that hold for longer than a pending rhythm turn waits. A greeting or a welcome back then never starts. */
 const LASTING_WAIT_REASONS: readonly InitiativeWaitReason[] = ['quiet-hours', 'owner-quiet', 'daily-budget']
@@ -64,6 +70,9 @@ const LASTING_WAIT_REASONS: readonly InitiativeWaitReason[] = ['quiet-hours', 'o
  *   for a new topic.
  * - Small talk that the owner asked for makes the idle pace faster, and the situation block names it. When the owner
  *   leaves, the runner ends the small talk.
+ * - Screen perception feeds the drive: each screen event adds pressure by its salience, less when the image budget
+ *   runs low. A drive turn while perception runs attaches the frames that `fresh-keyframes` picks, inside the image
+ *   budget. The notice keeps them out of history, so they never reach the disk.
  * - The open intentions add drive, and the situation block lists them. The owner's temporary changes, for example a
  *   quiet time, change the options at each tick.
  * - While a window watches the inspector, each tick publishes a readout of the policy to it.
@@ -89,6 +98,8 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
   const inspector = useInitiativeInspectorStore()
   const memory = useMemoryStore()
   const missions = useMissionsStore()
+  const perception = usePerceptionStore()
+  const perceptionRunner = usePerceptionRunnerStore()
   const { activeSessionId } = storeToRefs(chatSession)
 
   /** The policy state. Undefined while the feature is off or this renderer does not lead. */
@@ -115,6 +126,8 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
   let lastSeeds: TopicSeed[] = []
   /** When a spoken turn last offered each seed. A seed rests for a while after that. It is runtime state only. */
   const seedOfferedAt = new Map<string, number>()
+  /** When the last turn with the screen started. Later frames and events are news to the model. */
+  let lastScreenTurnAt: number | undefined
 
   const ownerSpeaking = computed(() => voiceMessages.isRecording || voice.state?.phase === 'capturing')
   const activeMessages = computed(() => chatSession.getSessionMessagesIfLoaded(activeSessionId.value))
@@ -174,6 +187,33 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
     return { thread, seeds }
   }
 
+  /**
+   * The screen part of a drive turn while perception runs and no excluded window is in front. Records the frames that
+   * go to the model in the image budget.
+   */
+  async function screenOf(now: number): Promise<{ context: InitiativeScreenContext, attachments: ChatAttachment[] } | undefined> {
+    if (!perception.enabled || !perceptionRunner.running() || perceptionRunner.excludedNow())
+      return undefined
+    try {
+      const turn = await buildScreenTurn({
+        frames: perceptionRunner.frames(),
+        events: perceptionRunner.events(),
+        ...(perceptionRunner.foregroundApp() ? { app: perceptionRunner.foregroundApp() } : {}),
+        budget: perception.budgetAt(now),
+        since: lastScreenTurnAt ?? now - FIRST_SCREEN_TURN_LOOKBACK_MS,
+        now,
+      })
+      lastScreenTurnAt = now
+      if (turn.attachments.length)
+        perception.recordImages(turn.attachments.length, now)
+      return turn
+    }
+    catch (error) {
+      console.warn('[initiative] Failed to prepare the screen frames:', errorMessageFrom(error))
+      return undefined
+    }
+  }
+
   async function runTurn(decision: Extract<InitiativeDecision, { kind: 'turn' }>, sessionId: string, awayMs?: number) {
     const date = new Date()
     const time = initiativeTimeFrom(date)
@@ -183,6 +223,7 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
     const topics = rhythm ? undefined : topicsOf(sessionId, time)
     const smallTalk = rhythm ? undefined : smallTalkAt(time.now)
     lastSeeds = topics?.seeds ?? []
+    const screen = rhythm ? undefined : await screenOf(time.now)
     const text = initiativeNoticeText({
       mode: state.value?.mode ?? 'idle',
       trigger: decision.trigger,
@@ -193,6 +234,7 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
       intentions: intentions.openAt(time.now),
       ...(awayMs !== undefined ? { awayMs } : {}),
       ...(smallTalk ? { smallTalkEndsAt: smallTalk.values.endsAt } : {}),
+      ...(screen ? { screen: screen.context } : {}),
       ...(topics?.thread ? { thread: topics.thread } : {}),
       ...(topics?.seeds.length ? { seeds: topics.seeds } : {}),
     })
@@ -200,7 +242,7 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
     running = turn
     let outcome: 'spoke' | 'silent' | 'dropped' | 'failed' = 'failed'
     try {
-      const result = await chat.notifyConversation(sessionId, { source: INITIATIVE_SOURCE, text, transient: true }, turn.turnId)
+      const result = await chat.notifyConversation(sessionId, { source: INITIATIVE_SOURCE, text, transient: true, ...(screen?.attachments.length ? { attachments: screen.attachments } : {}) }, turn.turnId)
       outcome = turn.dropped ? 'dropped' : result === 'spoke' ? 'spoke' : result === 'failed' ? 'failed' : 'silent'
     }
     catch (error) {
@@ -313,6 +355,16 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
       void missions.endSmallTalk('away').catch(error => console.warn('[initiative] Failed to end small talk:', errorMessageFrom(error)))
   })
 
+  // Each screen event pushes the drive. A low image budget weakens it, so turns with frames come less often.
+  const stopScreenEvents = perceptionRunner.onEvents((events) => {
+    if (!state.value)
+      return
+    // The policy counts salience squared, so the square root of the factor scales the pressure by the factor.
+    const scale = Math.sqrt(eventPressureFactor(perception.budgetAt(Date.now())))
+    for (const event of events)
+      observe({ type: 'perceived', salience: event.salience * scale })
+  })
+
   // The owner starts to speak, or queues a message behind the turn. Either one makes the turn stale.
   watch(() => ownerSpeaking.value || chat.pendingQueuedSendCount > 0, (ownerFirst) => {
     if (ownerFirst)
@@ -354,6 +406,7 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
   }
 
   function dispose() {
+    stopScreenEvents()
     stopLeadershipListener?.()
     stopLeadershipListener = undefined
     stopAwayListener?.()

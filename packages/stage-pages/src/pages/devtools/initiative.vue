@@ -4,6 +4,7 @@ import { useInitiativeStore } from '@proj-airi/stage-ui/stores/initiative'
 import { INSPECTOR_WATCH_REFRESH_MS, useInitiativeInspectorStore } from '@proj-airi/stage-ui/stores/initiative-inspector'
 import { useIntentionsStore } from '@proj-airi/stage-ui/stores/intentions'
 import { useMissionsStore } from '@proj-airi/stage-ui/stores/missions'
+import { usePerceptionStore } from '@proj-airi/stage-ui/stores/perception'
 import { usePerceptionStatusStore } from '@proj-airi/stage-ui/stores/perception-status'
 import { usageByPurpose, usageDayOf, useUsageStore } from '@proj-airi/stage-ui/stores/usage'
 import { GhostButton } from '@proj-airi/ui'
@@ -21,6 +22,7 @@ const { active: activeMissions } = storeToRefs(useMissionsStore())
 const { records: usageRecords } = storeToRefs(useUsageStore())
 const { changes: talkChanges, reset: resetTalkChanges } = useTalkChanges()
 const { status: perception } = storeToRefs(usePerceptionStatusStore())
+const perceptionSettings = usePerceptionStore()
 
 const KEY = 'tamagotchi.settings.devtools.pages.initiative-inspector'
 /** The graph shows this much time. */
@@ -216,6 +218,7 @@ function timeLabel(epochMs: number) {
         <li v-if="perception.state === 'running'">
           {{ t(`${KEY}.screen.activity`, { value: number(perception.activity) }) }}
         </li>
+        <li>{{ t('settings.pages.modules.perception.images-sent', { used: perceptionSettings.budgetAt(now.getTime()).used, limit: perceptionSettings.budgetAt(now.getTime()).limit }) }}</li>
       </ul>
       <h3 :class="['mt-1', 'text-xs font-medium', 'text-neutral-500 dark:text-neutral-400']">
         {{ t(`${KEY}.screen.events`) }}

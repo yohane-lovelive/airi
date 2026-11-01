@@ -20,6 +20,8 @@ export const FRAME_LIMITS = {
   maxFrames: 120,
   /** A frame is scaled down to this many pixels on its long side. A larger frame costs more tokens and memory. */
   maxLongSide: 1280,
+  /** A decision turn sends the frames other than the newest one at this size. */
+  smallLongSide: 512,
   jpegQuality: 0.75,
   thumbnailWidth: 64,
   thumbnailHeight: 36,

@@ -70,6 +70,7 @@ The character can see the screen of the device. It is step 3 of [the autonomy AD
 - The runner on the leader takes 2 frames each second into a `FrameRing` (`libs/perception/frame-ring.ts`). It keeps the last minute in memory only. `FrameEncoder` (`workers/frame-encoder`) makes a JPEG and a grayscale thumbnail of each frame.
 - `exclusionMatch` (`libs/perception/exclusion.ts`) skips the frames of excluded windows in front. `usePerceptionStore()` keeps the switch, the pause, and the exclusion list.
 - `ScreenDetector` of `@proj-airi/stage-shared/perception` reads each frame. The runner keeps the last 20 screen events and the activity level, and the status store shows them in the inspector.
+- The initiative runner turns screen events into pressure. In a drive turn, `buildScreenTurn` (`libs/perception/screen-turn.ts`) picks frames with `fresh-keyframes` inside the image budget (`libs/perception/image-budget.ts`), and attaches them to the transient notice. They never reach the disk.
 - `usePerceptionStatusStore()` carries the state to every window. `usePerceptionIndicator()` gives the stage button that shows perception and pauses it.
 - Use it to read the recent screen in later steps, for example the detectors and the decision turn. Do not use it to store frames: nothing reaches the disk.
 

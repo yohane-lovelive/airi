@@ -65,6 +65,7 @@ export const usePerceptionRunnerStore = defineStore('perception-runner', () => {
   let lastPublished: { state: PerceptionState, at: number } | undefined
   let detector = createDetector()
   let recentEvents: ScreenEvent[] = []
+  const eventListeners = new Set<(events: readonly ScreenEvent[]) => void>()
 
   function createDetector() {
     return new ScreenDetector({ width: FRAME_LIMITS.thumbnailWidth, height: FRAME_LIMITS.thumbnailHeight })
@@ -221,6 +222,8 @@ export const usePerceptionRunnerStore = defineStore('perception-runner', () => {
       if (events.length) {
         recentEvents = [...recentEvents, ...events].slice(-RECENT_EVENT_COUNT)
         publish(true)
+        for (const listener of eventListeners)
+          listener(events)
       }
     }
     catch (error) {
@@ -299,6 +302,17 @@ export const usePerceptionRunnerStore = defineStore('perception-runner', () => {
     frames: () => ring.frames(),
     /** The recent screen events, newest last. */
     events: () => recentEvents,
+    /** Whether frames come in on this renderer now. */
+    running: () => Boolean(stream),
+    /** The app in front at the last frame, where the device can tell it. */
+    foregroundApp: () => foregroundApp,
+    /** Whether the last frame was skipped, because the window in front is excluded. */
+    excludedNow: () => excludedNow,
+    /** Calls the listener with each batch of new screen events. Returns a function that removes it. */
+    onEvents: (listener: (events: readonly ScreenEvent[]) => void) => {
+      eventListeners.add(listener)
+      return () => eventListeners.delete(listener)
+    },
     startFromGesture,
     initialize,
     dispose,

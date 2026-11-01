@@ -1131,10 +1131,13 @@ pages:
       description: The character sees your screen
       unsupported: Screen perception does not run in this app. It runs in the desktop app and in the web app on a computer.
       enable: Let the character see the screen
-      enable-description: The app keeps the last minute of your screen in memory only, never on the disk. When the character looks at the screen in a later version, it sends frames to the provider of your chat model. An eye button on the stage shows that perception runs, and one click pauses it.
+      enable-description: The app keeps the last minute of your screen in memory only, never on the disk. When the character decides whether to talk, it sends up to three frames to the provider of your chat model. The chat model must accept images. An eye button on the stage shows that perception runs, and one click pauses it.
       paused: Paused
       paused-description: Nothing is captured while perception is paused. The pause holds after a restart.
       start: Start
+      images-per-hour: Images each hour
+      images-per-hour-description: The most frames that go to the model in one hour. When half is used, each turn sends one frame, and screen events push less. When all is used, the character talks without seeing the screen.
+      images-sent: 'Images sent in the last hour: {used} of {limit}'
       states:
         off: Perception is off.
         paused: Perception is paused.
