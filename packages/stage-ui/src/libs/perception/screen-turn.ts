@@ -20,6 +20,8 @@ export interface ScreenTurnInput {
   /** The app in front, where the device can tell it. */
   readonly app?: string
   readonly budget: ImageBudgetState
+  /** The most frames for this turn. Commentary sends fewer. */
+  readonly maxImagesPerTurn?: number
   /** The time of the last turn with the screen. Frames and events after it are news. */
   readonly since: number
   readonly now: number
@@ -46,7 +48,7 @@ async function attachmentOf(image: Blob): Promise<ChatAttachment> {
  * - The initiative runner starts a decision turn while screen perception runs.
  */
 export async function buildScreenTurn(input: ScreenTurnInput): Promise<ScreenTurn> {
-  const count = imagesForTurn(input.budget)
+  const count = imagesForTurn(input.budget, input.maxImagesPerTurn)
   const fresh = input.events.filter(event => event.at > input.since)
   const picks = pickFreshKeyframes({ frames: input.frames, eventTimes: fresh.map(event => event.at), since: input.since, maxImages: count })
   const attachments = await Promise.all(picks.map(async ({ index, role }) => {

@@ -51,6 +51,12 @@ export interface ForegroundWindowInfo {
 }
 /** The window in front, from `get-windows`. Undefined when the system tells no window, for example on Wayland. */
 export const electronForegroundWindow = defineInvokeEventa<ForegroundWindowInfo | undefined>('eventa:invoke:electron:foreground-window')
+/** One open window. On Windows, `id` is the window handle, which the window sources of `desktopCapturer` also name. */
+export interface OpenWindowInfo extends ForegroundWindowInfo {
+  id: number
+}
+/** The open windows, front to back, from `get-windows`. Commentary finds its target window with it. */
+export const electronOpenWindows = defineInvokeEventa<OpenWindowInfo[]>('eventa:invoke:electron:open-windows')
 /**
  * What the fullscreen mode shows on the right, in either window that hosts it.
  *

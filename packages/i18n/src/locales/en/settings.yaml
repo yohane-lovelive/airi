@@ -617,6 +617,7 @@ pages:
     purposes:
       owner-reply: Replies to you
       initiative: Autonomous speech
+      commentary: Commentary
       mission: Missions
       task: Background tasks
       scene: Replies to other people
@@ -1122,11 +1123,14 @@ pages:
         name: Small talk
         minutes: '{count} min'
         until: 'Until {time}'
+      commentary:
+        name: 'Commentary on {app}'
       end-reason:
         time: time is up
         owner: you stopped it
         away: you left
         quiet: you asked for quiet
+        target-closed: the window closed
     perception:
       title: Screen perception
       description: The character sees your screen
@@ -1139,6 +1143,8 @@ pages:
       images-per-hour: Images each hour
       images-per-hour-description: The most frames that go to the model in one hour. When half is used, each turn sends one frame, and screen events push less. When all is used, the character talks without seeing the screen.
       images-sent: 'Images sent in the last hour: {used} of {limit}'
+      commentary-images-per-hour: Images each hour during commentary
+      commentary-images-per-hour-description: Commentary talks often, so it has its own budget. While a commentary runs, this limit replaces the one above. Each commentary turn sends two frames at most.
       states:
         off: Perception is off.
         paused: Perception is paused.

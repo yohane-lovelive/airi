@@ -36,6 +36,10 @@ export interface PerceptionStatus {
   error?: string
   /** How much the screen moves now, from 0 to 1. */
   activity: number
+  /** The app whose window a commentary watches. */
+  target?: string
+  /** Whether the target app is in front. Frames pause while it is not. */
+  targetInFront?: boolean
   /** The recent screen events, newest last. */
   events: ScreenEvent[]
   updatedAt: number

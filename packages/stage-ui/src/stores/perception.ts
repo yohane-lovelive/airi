@@ -26,6 +26,8 @@ export const usePerceptionStore = defineStore('perception', () => {
   const exclusions = useLocalStorageManualReset<string[]>('perception/exclusions', [...DEFAULT_PERCEPTION_EXCLUSIONS])
   /** The most frames that go to the model in one hour. Each frame of a decision turn counts. */
   const imagesPerHour = useLocalStorageManualReset<number>('perception/images-per-hour', IMAGE_BUDGET_LIMITS.defaultImagesPerHour)
+  /** The budget while a commentary runs. It replaces the normal budget then, because commentary turns come often. */
+  const commentaryImagesPerHour = useLocalStorageManualReset<number>('perception/commentary-images-per-hour', IMAGE_BUDGET_LIMITS.defaultCommentaryImagesPerHour)
   /** When frames went to the model, in the last hour. The device keeps them, so a restart does not reset the budget. */
   const sentImageTimes = useLocalStorageManualReset<number[]>('perception/sent-image-times', [])
   /**
@@ -38,9 +40,10 @@ export const usePerceptionStore = defineStore('perception', () => {
     paused.value = !paused.value
   }
 
-  /** The image budget at `now`. */
-  function budgetAt(now: number) {
-    const limit = Math.round(Math.min(IMAGE_BUDGET_LIMITS.maxImagesPerHour, Math.max(IMAGE_BUDGET_LIMITS.minImagesPerHour, imagesPerHour.value)))
+  /** The image budget at `now`. A running commentary uses its own limit. Both count the same sent frames. */
+  function budgetAt(now: number, commentary = false) {
+    const wanted = commentary ? commentaryImagesPerHour.value : imagesPerHour.value
+    const limit = Math.round(Math.min(IMAGE_BUDGET_LIMITS.maxImagesPerHour, Math.max(IMAGE_BUDGET_LIMITS.minImagesPerHour, wanted)))
     return imageBudgetState(sentImageTimes.value, limit, now)
   }
 
@@ -54,6 +57,7 @@ export const usePerceptionStore = defineStore('perception', () => {
     paused.reset()
     exclusions.reset()
     imagesPerHour.reset()
+    commentaryImagesPerHour.reset()
     sentImageTimes.reset()
   }
 
@@ -62,6 +66,7 @@ export const usePerceptionStore = defineStore('perception', () => {
     paused,
     exclusions,
     imagesPerHour,
+    commentaryImagesPerHour,
     sentImageTimes,
     supported,
     togglePaused,

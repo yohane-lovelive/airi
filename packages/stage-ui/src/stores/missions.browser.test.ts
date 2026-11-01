@@ -77,9 +77,23 @@ describe('missions store', () => {
     expect(missions.smallTalkAt(Date.now())?.values.minutes).toBe(30)
     expect(missions.active).toHaveLength(1)
 
-    expect(await missions.endSmallTalk('away')).toBe(true)
+    expect(await missions.endForeground('away', 'small-talk')).toBe(true)
     expect(missions.smallTalkAt(Date.now())).toBeUndefined()
     expect(missions.missions[0]).toMatchObject({ status: 'stopped', endReason: 'away' })
-    expect(await missions.endSmallTalk('away')).toBe(false)
+    expect(await missions.endForeground('away', 'small-talk')).toBe(false)
+  })
+
+  it('keeps commentary beside nothing else in the foreground, and leaves it running when the owner leaves', async () => {
+    const missions = createStore()
+    const started = await missions.addCommentary({ app: '', minutes: 60 }, 'session-1', 'Game')
+
+    expect(started.ok).toBe(true)
+    expect((await missions.addSmallTalk({ minutes: 10 }, 'session-1')).ok).toBe(false)
+    expect(missions.commentaryAt(Date.now())?.values.app).toBe('Game')
+
+    expect(await missions.endForeground('away', 'small-talk')).toBe(false)
+    expect(await missions.endForeground('target-closed')).toBe(true)
+    expect(missions.commentaryAt(Date.now())).toBeUndefined()
+    expect(missions.missions.at(-1)).toMatchObject({ status: 'stopped', endReason: 'target-closed' })
   })
 })

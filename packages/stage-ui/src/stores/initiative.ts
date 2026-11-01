@@ -2,7 +2,7 @@ import type { InitiativeSettings, TalkControl, TalkLevelRequest } from '@proj-ai
 
 import type { TalkLevelApplyResult } from '../tools/initiative'
 
-import { activeTalkControl, applyTalkLevel, SMALL_TALK_LIMITS, talkControlEffect } from '@proj-airi/core-agent'
+import { activeTalkControl, applyTalkLevel, commentaryIntervalFactor, resolveInitiativeOptions, SMALL_TALK_LIMITS, talkControlEffect } from '@proj-airi/core-agent'
 import { useLocalStorageManualReset } from '@proj-airi/stage-shared/composables'
 import { clamp } from 'es-toolkit'
 import { defineStore } from 'pinia'
@@ -15,6 +15,9 @@ export const INITIATIVE_LIMITS = {
   minDailyTurnBudget: 1,
   maxDailyTurnBudget: 1000,
 } as const
+
+/** The commentary interval of the policy defaults. The screen activity scales it. */
+const COMMENTARY_BASE_INTERVAL_MS = resolveInitiativeOptions().modes.commentary.boredomIntervalMs
 
 /** Reads `HH:mm` as minutes since midnight. Resolves to `undefined` for any other text. */
 function minutesOf(time: string) {
@@ -73,8 +76,10 @@ export const useInitiativeStore = defineStore('initiative', () => {
   /**
    * The settings for the policy at `now`, with the owner's temporary changes. Each value stays inside its limits.
    * While small talk runs, the idle pace is the pace of small talk. The owner's temporary factor still applies to it.
+   * While commentary runs, its interval follows the screen activity, from 0 to 1.
    */
-  function settingsAt(now: number, smallTalk = false): InitiativeSettings {
+  function settingsAt(now: number, foreground: { smallTalk?: boolean, commentaryActivity?: number } = {}): InitiativeSettings {
+    const smallTalk = Boolean(foreground.smallTalk)
     const { minDailyTurnBudget, maxDailyTurnBudget } = INITIATIVE_LIMITS
     const startMinutes = minutesOf(quietHoursStart.value)
     const endMinutes = minutesOf(quietHoursEnd.value)
@@ -85,6 +90,9 @@ export const useInitiativeStore = defineStore('initiative', () => {
         idle: smallTalk
           ? { boredomIntervalMs: SMALL_TALK_LIMITS.boredomIntervalMs * idleIntervalFactor, refractoryMs: SMALL_TALK_LIMITS.refractoryMs }
           : { boredomIntervalMs: clampedIdleIntervalMinutes() * idleIntervalFactor * 60_000 },
+        ...(foreground.commentaryActivity !== undefined
+          ? { commentary: { boredomIntervalMs: COMMENTARY_BASE_INTERVAL_MS * commentaryIntervalFactor(foreground.commentaryActivity) * idleIntervalFactor } }
+          : {}),
       },
       ...(quietHoursEnabled.value && startMinutes !== undefined && endMinutes !== undefined ? { quietHours: { startMinutes, endMinutes } } : {}),
       ...(quietUntil !== undefined ? { quietUntil } : {}),

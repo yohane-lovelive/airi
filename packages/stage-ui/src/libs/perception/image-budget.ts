@@ -5,8 +5,12 @@ export const IMAGE_BUDGET_LIMITS = {
   minImagesPerHour: 0,
   maxImagesPerHour: 120,
   defaultImagesPerHour: 20,
+  /** A running commentary raises the budget to its own setting, because its turns come often. */
+  defaultCommentaryImagesPerHour: 120,
   /** One decision turn sends at most this many frames. */
   maxImagesPerTurn: 3,
+  /** One commentary turn sends at most this many frames, so its frequent turns stay fast and cheap. */
+  maxCommentaryImagesPerTurn: 2,
   /** Below this share of the budget left, a turn sends the newest frame only, and events push less. */
   lowShare: 0.5,
   /** Events keep at least this share of their pressure when the budget runs low. */
@@ -41,13 +45,16 @@ export function imageBudgetState(sentAt: readonly number[], limit: number, now: 
   return { used, limit, remaining, share: limit > 0 ? remaining / limit : 0 }
 }
 
-/** How many frames one decision turn can send: up to three, the newest only when the budget runs low, none when empty. */
-export function imagesForTurn(budget: ImageBudgetState): number {
+/**
+ * How many frames one decision turn can send: up to `maxPerTurn`, the newest only when the budget runs low, none when
+ * empty.
+ */
+export function imagesForTurn(budget: ImageBudgetState, maxPerTurn: number = IMAGE_BUDGET_LIMITS.maxImagesPerTurn): number {
   if (budget.remaining <= 0)
     return 0
   if (budget.share < IMAGE_BUDGET_LIMITS.lowShare)
     return 1
-  return Math.min(IMAGE_BUDGET_LIMITS.maxImagesPerTurn, budget.remaining)
+  return Math.min(maxPerTurn, budget.remaining)
 }
 
 /**

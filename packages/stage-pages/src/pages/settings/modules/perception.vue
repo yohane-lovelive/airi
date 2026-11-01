@@ -11,7 +11,7 @@ import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
 const perception = usePerceptionStore()
-const { enabled, paused, exclusions, imagesPerHour, supported } = storeToRefs(perception)
+const { enabled, paused, exclusions, imagesPerHour, commentaryImagesPerHour, supported } = storeToRefs(perception)
 const { status } = storeToRefs(usePerceptionStatusStore())
 const runner = usePerceptionRunnerStore()
 
@@ -42,6 +42,14 @@ const budget = computed(() => perception.budgetAt(now.value.getTime()))
         v-model="imagesPerHour"
         :label="t(`${KEY}.images-per-hour`)"
         :description="t(`${KEY}.images-per-hour-description`)"
+        :min="IMAGE_BUDGET_LIMITS.minImagesPerHour"
+        :max="IMAGE_BUDGET_LIMITS.maxImagesPerHour"
+        :step="1"
+      />
+      <FieldRange
+        v-model="commentaryImagesPerHour"
+        :label="t(`${KEY}.commentary-images-per-hour`)"
+        :description="t(`${KEY}.commentary-images-per-hour-description`)"
         :min="IMAGE_BUDGET_LIMITS.minImagesPerHour"
         :max="IMAGE_BUDGET_LIMITS.maxImagesPerHour"
         :step="1"

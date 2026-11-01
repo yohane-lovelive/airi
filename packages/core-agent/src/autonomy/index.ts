@@ -1,3 +1,5 @@
+export { COMMENTARY_LIMITS, commentaryIntervalFactor, decideInterruption } from './commentary'
+export type { InterruptionDecision } from './commentary'
 export {
   createInitiativeState,
   dayPartOf,
@@ -33,11 +35,16 @@ export type { InitiativeNoticeContext, InitiativeScreenContext } from './initiat
 export { createIntention, INTENTION_LIMITS, openIntentions } from './intentions'
 export type { Intention, IntentionRequest } from './intentions'
 export {
+  activeCommentary,
+  activeForegroundMission,
   activeSmallTalk,
   collectDueMissions,
+  COMMENTARY_MISSION_LIMITS,
+  createCommentary,
   createReminder,
   createSmallTalk,
   deliverReminder,
+  foregroundPastLimit,
   formatLocalDateTime,
   isMissionActive,
   missedRemindersNoticeText,
@@ -46,10 +53,13 @@ export {
   reminderNoticeText,
   settleMissionRun,
   SMALL_TALK_LIMITS,
-  smallTalkPastLimit,
   stopMission,
 } from './missions'
 export type {
+  CommentaryMission,
+  CommentaryRequest,
+  CommentaryValues,
+  ForegroundMission,
   MissionEndReason,
   MissionInstance,
   MissionScheduleOptions,

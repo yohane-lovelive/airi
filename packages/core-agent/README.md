@@ -149,7 +149,8 @@ All functions are pure. The host passes the time and keeps the returned missions
 - `deliverReminder` makes sure that the owner hears a reminder: the model, one more try after an empty reply, then a fixed text without a model call.
 - `reminderNoticeText` and `missedRemindersNoticeText` write the notices. All missed reminders of one start share one notice.
 - `createSmallTalk` starts small talk for 5 to 120 minutes. One small talk runs at a time. `activeSmallTalk` finds it, and `smallTalkPastLimit` finds small talk past its time limit. `SMALL_TALK_LIMITS` has the pace: a 2-minute idle interval and a 45-second rest.
-- `stopMission` ends any mission with a reason: `time`, `owner`, `away`, or `quiet`. Small talk at its time limit is `done`, and every other end is `stopped`.
+- `createCommentary` starts commentary on the window of one app for 5 to 180 minutes. `activeForegroundMission`, `activeCommentary`, and `foregroundPastLimit` read the foreground missions. `commentaryIntervalFactor` paces commentary by the screen activity, and `decideInterruption` tells whether a new event cuts the current line.
+- `stopMission` ends any mission with a reason: `time`, `owner`, `away`, `quiet`, or `target-closed`. A foreground mission at its time limit is `done`, and every other end is `stopped`.
 
 A notice with `mustSpeak` asks the model to speak, and only reply text counts as a reply. A notice with `reply` streams that text with no model call, so history, speech, and expressions work as for a model reply.
 

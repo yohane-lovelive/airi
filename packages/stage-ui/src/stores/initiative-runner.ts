@@ -9,6 +9,7 @@ import {
   createInitiativeState,
   currentTopicThread,
   decideInitiative,
+  decideInterruption,
   initiativeNoticeText,
   initiativeReadout,
   initiativeTimeFrom,
@@ -24,11 +25,12 @@ import { nanoid } from 'nanoid'
 import { defineStore, storeToRefs } from 'pinia'
 import { computed, onScopeDispose, readonly, shallowRef, watch } from 'vue'
 
+import { extractMessageText } from '../libs/chat-sync/wire-message'
 import { INITIATIVE_SOURCE, initiativeConversationFacts, initiativeEventOf } from '../libs/initiative/conversation'
 import { markAway, observePresence, OWNER_PRESENCE_LIMITS, shouldGreet } from '../libs/initiative/presence'
 import { initiativeTopicLines, memoryTopicSeeds } from '../libs/initiative/topics'
 import { isOwnerTyping } from '../libs/initiative/typing'
-import { eventPressureFactor } from '../libs/perception/image-budget'
+import { eventPressureFactor, IMAGE_BUDGET_LIMITS } from '../libs/perception/image-budget'
 import { buildScreenTurn } from '../libs/perception/screen-turn'
 import { Ticker } from '../workers/ticker'
 import { useSpeakingStore } from './audio'
@@ -42,6 +44,7 @@ import { useMissionsStore } from './missions'
 import { useOwnerTypingStore } from './owner-typing'
 import { usePerceptionStore } from './perception'
 import { usePerceptionRunnerStore } from './perception-runner'
+import { useSpeechOutputControlStore } from './speech-output-control'
 import { useTimelineStore } from './timeline'
 import { useVoiceStore } from './voice'
 import { useVoiceMessagesStore } from './voice-messages'
@@ -57,9 +60,16 @@ const FIRST_SCREEN_TURN_LOOKBACK_MS = 60_000
 
 /** The note that the timeline gets when a mission starts or ends. */
 function missionNote(mission: MissionInstance, change: 'started' | 'ended') {
-  const what = mission.template === 'small-talk' ? `small talk (${mission.values.minutes} min)` : `reminder "${mission.values.text}"`
+  const what = mission.template === 'small-talk'
+    ? `small talk (${mission.values.minutes} min)`
+    : mission.template === 'commentary'
+      ? `commentary on ${mission.values.app}`
+      : `reminder "${mission.values.text}"`
   return `Mission ${change}: ${what}`
 }
+
+/** The recent autonomous turns that the runner remembers, so it interrupts only its own speech. */
+const RECENT_TURN_COUNT = 5
 
 /** Gates that hold for longer than a pending rhythm turn waits. A greeting or a welcome back then never starts. */
 const LASTING_WAIT_REASONS: readonly InitiativeWaitReason[] = ['quiet-hours', 'owner-quiet', 'daily-budget']
@@ -84,6 +94,10 @@ const LASTING_WAIT_REASONS: readonly InitiativeWaitReason[] = ['quiet-hours', 'o
  *   budget. The notice keeps them out of history, so they never reach the disk.
  * - While perception runs, code writes timeline notes: app switches, owner messages, and mission starts and ends. A
  *   drive turn with the screen gives the timeline of the conversation to the model, which adds notes with markers.
+ * - Commentary that the owner asked for switches the policy to its commentary mode, with a pace that follows the screen
+ *   activity. The perception runner then captures the window of its app. When that window closes, the commentary ends.
+ *   A very large screen event interrupts the commentary line that plays: the sentence ends first, or the largest events
+ *   cut it at once. The timeline notes the cut line.
  * - The open intentions add drive, and the situation block lists them. The owner's temporary changes, for example a
  *   quiet time, change the options at each tick.
  * - While a window watches the inspector, each tick publishes a readout of the policy to it.
@@ -112,6 +126,13 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
   const perception = usePerceptionStore()
   const perceptionRunner = usePerceptionRunnerStore()
   const timeline = useTimelineStore()
+  const speechControl = useSpeechOutputControlStore()
+  /** The newest autonomous turns, so an interruption stops only speech that this runner started. */
+  const recentTurnIds: string[] = []
+  /** The largest screen salience since the last turn started, and the one that the current line answers. */
+  let salienceSinceTurn = 0
+  let lineSalience = 0
+  let lastInterruptAt: number | undefined
   const { activeSessionId } = storeToRefs(chatSession)
 
   /** The policy state. Undefined while the feature is off or this renderer does not lead. */
@@ -149,9 +170,21 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
     return missions.enabled ? missions.smallTalkAt(now) : undefined
   }
 
-  /** The options at `now`. The owner's temporary changes and small talk end on their own, so each call reads them again. */
+  /** The commentary that runs at `now`. Missions that are off run no commentary. */
+  function commentaryAt(now: number) {
+    return missions.enabled ? missions.commentaryAt(now) : undefined
+  }
+
+  /**
+   * The options at `now`. The owner's temporary changes and the foreground missions end on their own, so each call
+   * reads them again. Commentary paces itself by the screen activity.
+   */
   function optionsAt(now: number) {
-    return resolveInitiativeOptions(initiative.settingsAt(now, Boolean(smallTalkAt(now))))
+    const commentary = commentaryAt(now)
+    return resolveInitiativeOptions(initiative.settingsAt(now, {
+      smallTalk: Boolean(smallTalkAt(now)),
+      ...(commentary ? { commentaryActivity: perceptionRunner.activity() } : {}),
+    }))
   }
 
   function host(now: number): InitiativeHost {
@@ -207,11 +240,13 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
     if (!perception.enabled || !perceptionRunner.running() || perceptionRunner.excludedNow())
       return undefined
     try {
+      const commentary = Boolean(commentaryAt(now))
       const turn = await buildScreenTurn({
         frames: perceptionRunner.frames(),
         events: perceptionRunner.events(),
         ...(perceptionRunner.foregroundApp() ? { app: perceptionRunner.foregroundApp() } : {}),
-        budget: perception.budgetAt(now),
+        budget: perception.budgetAt(now, commentary),
+        ...(commentary ? { maxImagesPerTurn: IMAGE_BUDGET_LIMITS.maxCommentaryImagesPerTurn } : {}),
         since: lastScreenTurnAt ?? now - FIRST_SCREEN_TURN_LOOKBACK_MS,
         now,
       })
@@ -254,6 +289,10 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
     })
     const turn = { sessionId, turnId: nanoid(), dropped: false }
     running = turn
+    recentTurnIds.push(turn.turnId)
+    recentTurnIds.splice(0, Math.max(0, recentTurnIds.length - RECENT_TURN_COUNT))
+    lineSalience = salienceSinceTurn
+    salienceSinceTurn = 0
     let outcome: 'spoke' | 'silent' | 'dropped' | 'failed' = 'failed'
     try {
       const result = await chat.notifyConversation(sessionId, { source: INITIATIVE_SOURCE, text, transient: true, ...(screen?.attachments.length ? { attachments: screen.attachments } : {}) }, turn.turnId)
@@ -292,7 +331,11 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
     checkGreeting(time.now)
     readPresence(time.now)
 
-    const current = state.value ?? createInitiativeState(time)
+    let current = state.value ?? createInitiativeState(time)
+    // The policy follows the foreground mission: commentary has its own pace.
+    const mode = commentaryAt(time.now) ? 'commentary' : 'idle'
+    if (current.mode !== mode)
+      current = observeInitiative(current, { type: 'mode-changed', mode }, time, options)
     const rhythm = pendingRhythm && pendingRhythm.until > time.now ? pendingRhythm : undefined
     const { state: next, decision } = rhythm
       ? requestRhythmTurn(current, rhythm.rhythm, currentHost, time, options)
@@ -368,7 +411,7 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
   // Small talk ends when the owner leaves the device. Only the leader writes the end.
   watch(() => presence.value.awaySince, (awaySince) => {
     if (awaySince !== undefined && leadership?.isLeader() && smallTalkAt(Date.now()))
-      void missions.endSmallTalk('away').catch(error => console.warn('[initiative] Failed to end small talk:', errorMessageFrom(error)))
+      void missions.endForeground('away', 'small-talk').catch(error => console.warn('[initiative] Failed to end small talk:', errorMessageFrom(error)))
   })
 
   /** Adds code notes to the timeline of the open conversation, while this renderer leads and perception runs. */
@@ -378,15 +421,49 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
     void timeline.addNotes(activeSessionId.value, notes).catch(error => console.warn('[initiative] Failed to write the timeline:', errorMessageFrom(error)))
   }
 
+  /**
+   * Interrupts the commentary line that plays now for a very large event. The current sentence ends first, unless the
+   * event is one of the largest. The new event then starts the next line, and the timeline notes the cut.
+   */
+  function interruptForEvent(salience: number, now: number) {
+    if (!commentaryAt(now) || !speaking.nowSpeaking)
+      return
+    const decision = decideInterruption({ salience, lineSalience, ...(lastInterruptAt !== undefined ? { lastInterruptAt } : {}), now })
+    const turns = speechControl.activeTurns.filter(turn => recentTurnIds.includes(turn.turnId))
+    if (decision === 'none' || !turns.length)
+      return
+    lastInterruptAt = now
+    void speechControl.interruptTurns(turns, { cause: 'commentary-event', afterCurrentClip: decision === 'after-sentence' })
+      .catch(error => console.warn('[initiative] Failed to interrupt the commentary line:', errorMessageFrom(error)))
+    const cut = chatSession.getSessionMessages(activeSessionId.value).findLast(message => message.role === 'assistant' && message.proactive && turns.some(turn => turn.turnId === message.proactive?.turnId))
+    const text = cut ? extractMessageText(cut).trim().slice(0, 80) : ''
+    noteScreenHistory([{ at: now, text: text ? `A new event cut the line "${text}"` : 'A new event cut the commentary line', source: 'code' }])
+  }
+
   // Each screen event pushes the drive. A low image budget weakens it, so turns with frames come less often.
   const stopScreenEvents = perceptionRunner.onEvents((events) => {
     noteScreenHistory(events.flatMap(event => event.type === 'app-switch' ? [{ at: event.at, text: `The owner switched to ${event.app}`, source: 'code' as const }] : []))
     if (!state.value)
       return
+    const now = Date.now()
+    const largest = Math.max(...events.map(event => event.salience))
+    salienceSinceTurn = Math.max(salienceSinceTurn, largest)
+    interruptForEvent(largest, now)
     // The policy counts salience squared, so the square root of the factor scales the pressure by the factor.
-    const scale = Math.sqrt(eventPressureFactor(perception.budgetAt(Date.now())))
+    const scale = Math.sqrt(eventPressureFactor(perception.budgetAt(now, Boolean(commentaryAt(now)))))
     for (const event of events)
       observe({ type: 'perceived', salience: event.salience * scale })
+  })
+
+  // A commentary watches the window of its app. The perception runner captures it, and its close ends the commentary.
+  watch(() => {
+    const commentary = missions.enabled ? missions.active.find(mission => mission.template === 'commentary') : undefined
+    return commentary?.template === 'commentary' ? commentary.values.app : undefined
+  }, app => perceptionRunner.setTarget(app), { immediate: true })
+  const stopTargetClosed = perceptionRunner.onTargetClosed(() => {
+    const commentary = commentaryAt(Date.now())
+    if (commentary && leadership?.isLeader())
+      void missions.stop(commentary.id, 'target-closed').catch(error => console.warn('[initiative] Failed to end the commentary:', errorMessageFrom(error)))
   })
 
   // A mission that starts or ends is part of what happened while the character watched the screen. The first read of
@@ -447,6 +524,7 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
 
   function dispose() {
     stopScreenEvents()
+    stopTargetClosed()
     stopLeadershipListener?.()
     stopLeadershipListener = undefined
     stopAwayListener?.()

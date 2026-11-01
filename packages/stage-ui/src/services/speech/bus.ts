@@ -55,6 +55,8 @@ export const voiceGenerationEnded = defineEventa<TurnRef & { status: 'finished' 
 export const voiceInterrupt = defineInvokeEventa<{ status: 'recorded' | 'failed' }, {
   turns: readonly TurnRef[]
   cause: string
+  /** Finishes the clip that plays now, for example the current sentence, and drops the rest. */
+  afterCurrentClip?: boolean
 }>('eventa:voice:interrupt')
 
 /** Commands match one source window, producer, session, and turn. A closed producer cannot reopen. */

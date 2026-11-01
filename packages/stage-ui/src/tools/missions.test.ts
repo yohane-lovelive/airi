@@ -1,6 +1,6 @@
-import type { MissionInstance, ReminderRequest, SmallTalkRequest } from '@proj-airi/core-agent'
+import type { CommentaryRequest, MissionInstance, ReminderRequest, SmallTalkRequest } from '@proj-airi/core-agent'
 
-import { createReminder, createSmallTalk, formatLocalDateTime } from '@proj-airi/core-agent'
+import { createCommentary, createReminder, createSmallTalk, formatLocalDateTime } from '@proj-airi/core-agent'
 import { describe, expect, it, vi } from 'vitest'
 
 import { createMissionTools, LIST_MISSIONS_TOOL_NAME, START_MISSION_TOOL_NAME, STOP_MISSION_TOOL_NAME } from './missions'
@@ -26,10 +26,16 @@ async function createHarness() {
       missions.push(result.mission)
     return result
   })
+  const addCommentary = vi.fn(async (request: CommentaryRequest) => {
+    const result = createCommentary({ id: `mission-${missions.length + 1}`, sessionId: 'session-1', request, appInFront: 'Game', now: Date.now(), missions })
+    if (result.ok)
+      missions.push(result.mission)
+    return result
+  })
   const stop = vi.fn(async (id: string) => missions.some(mission => mission.id === id))
-  const tools = await createMissionTools({ missions: () => missions, addReminder, addSmallTalk, stop })
+  const tools = await createMissionTools({ missions: () => missions, addReminder, addSmallTalk, addCommentary, stop })
   const run = (name: string, input: unknown) => tools.find(tool => tool.function.name === name)!.execute(input, { messages: [], toolCallId: 'call-1' })
-  return { missions, addReminder, addSmallTalk, stop, run }
+  return { missions, addReminder, addSmallTalk, addCommentary, stop, run }
 }
 
 describe('mission tools', () => {
@@ -120,11 +126,24 @@ describe('mission tools', () => {
     expect(refused).toContain('Mission not started: Small talk needs')
   })
 
-  it('offers both value shapes in the parameter schema', async () => {
+  it('starts commentary on the app in front, and refuses commentary values for small talk', async () => {
     const harness = await createHarness()
-    const tools = await createMissionTools({ missions: () => harness.missions, addReminder: harness.addReminder, addSmallTalk: harness.addSmallTalk, stop: harness.stop })
+
+    const started = await harness.run(START_MISSION_TOOL_NAME, { template: 'commentary', values: { app: '', minutes: 60 } })
+    expect(harness.addCommentary).toHaveBeenCalledWith({ app: '', minutes: 60 })
+    expect(started).toContain('commentary on Game')
+    expect(await harness.run(START_MISSION_TOOL_NAME, { template: 'small-talk', values: { app: 'Game', minutes: 30 } })).toContain('do not match the template')
+  })
+
+  it('offers every value shape in the parameter schema', async () => {
+    const harness = await createHarness()
+    const tools = await createMissionTools({ missions: () => harness.missions, addReminder: harness.addReminder, addSmallTalk: harness.addSmallTalk, addCommentary: harness.addCommentary, stop: harness.stop })
     const parameters = tools.find(tool => tool.function.name === START_MISSION_TOOL_NAME)!.function.parameters
 
-    expect(parameters).toMatchObject({ properties: { values: { anyOf: [expect.objectContaining({ required: ['text', 'start', 'repeat'] }), expect.objectContaining({ required: ['minutes'] })] } } })
+    expect(parameters).toMatchObject({ properties: { values: { anyOf: [
+      expect.objectContaining({ required: ['text', 'start', 'repeat'] }),
+      expect.objectContaining({ required: ['minutes'] }),
+      expect.objectContaining({ required: ['app', 'minutes'] }),
+    ] } } })
   })
 })

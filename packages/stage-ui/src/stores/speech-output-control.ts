@@ -57,6 +57,15 @@ export const useSpeechOutputControlStore = defineStore('speech-output-control', 
     return defineInvoke(context, voiceInterrupt)({ turns: targets, cause: request.reason }, { signal })
   }
 
+  /**
+   * Interrupts the speech of the given turns for a new event, for example during commentary. With `afterCurrentClip`,
+   * the current sentence ends first.
+   */
+  async function interruptTurns(turns: readonly TurnRef[], options: { cause: string, afterCurrentClip: boolean }) {
+    const signal = AbortSignal.any([lifetime.signal, connection.signal])
+    return defineInvoke(context, voiceInterrupt)({ turns, cause: options.cause, afterCurrentClip: options.afterCurrentClip }, { signal })
+  }
+
   function setSpeechMuted(muted: boolean) {
     speechMuted.value = muted
     if (!muted && speechVolume.value === 0)
@@ -81,5 +90,5 @@ export const useSpeechOutputControlStore = defineStore('speech-output-control', 
     }
   }
 
-  return { speechMuted, speechVolume, activeTurns, requestStopSpeaking, setSpeechMuted, toggleSpeechMuted, setSpeechVolume }
+  return { speechMuted, speechVolume, activeTurns, requestStopSpeaking, interruptTurns, setSpeechMuted, toggleSpeechMuted, setSpeechVolume }
 })

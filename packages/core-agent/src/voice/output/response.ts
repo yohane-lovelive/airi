@@ -441,14 +441,32 @@ export class VoiceResponse {
     void this.finish().catch(() => {})
   }
 
-  /** Triggering workflow: VoiceController.interrupt → close response delivery → fade playback and abort all producers. */
-  interrupt(cause: string, fadeMs: number): Promise<PlaybackReceipt> {
+  /**
+   * Triggering workflow: VoiceController.interrupt → close response delivery → fade playback and abort all producers.
+   * With `afterCurrentClip`, the clip that plays now ends on its own, for example at the end of its sentence, and the
+   * producers stop after it.
+   */
+  interrupt(cause: string, fadeMs: number, options: { afterCurrentClip?: boolean } = {}): Promise<PlaybackReceipt> {
     if (!this.closed) {
       this.outcome = 'interrupted'
-      this.stop(cause, fadeMs)
+      if (options.afterCurrentClip)
+        this.stopAfterCurrent(cause)
+      else
+        this.stop(cause, fadeMs)
       void this.finish().catch(() => {})
     }
     return this.silence ?? this.playback.finish()
+  }
+
+  private stopAfterCurrent(reason: string) {
+    this.sealed = true
+    // A producer can still stream the playing clip, so the producers stop only after that clip ends.
+    const silence = this.playback.stopAfterCurrent()
+    this.silence = silence
+    void silence.then(() => {
+      this.abort.abort(reason)
+      this.streams.forEach(stream => stream.cancel(reason))
+    }, () => {})
   }
 
   private stop(reason: string, fadeMs: number) {

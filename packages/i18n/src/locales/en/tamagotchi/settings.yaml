@@ -142,6 +142,8 @@ devtools:
       screen:
         title: Screen
         activity: 'Screen activity: {value}'
+        target: 'Watching the window of {app}'
+        target-hidden: 'Waiting: the window of {app} is not in front'
         events: Recent screen events
         salience: 'salience {value}'
         familiar: familiar screen

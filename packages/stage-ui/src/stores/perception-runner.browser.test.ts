@@ -17,7 +17,7 @@ const contexts: Array<{ pinia: ReturnType<typeof createPinia>, runtime: SyncedPi
 const timers: ReturnType<typeof setInterval>[] = []
 
 /** A screen that is a canvas. Its stream is live, so the runner takes real frames from it. */
-function canvasSource(options: { foreground?: () => ForegroundWindow, needsGesture?: boolean, steady?: boolean } = {}) {
+function canvasSource(options: { foreground?: () => ForegroundWindow, needsGesture?: boolean, steady?: boolean, windowOpen?: () => boolean } = {}) {
   const canvas = document.createElement('canvas')
   canvas.width = 320
   canvas.height = 180
@@ -35,6 +35,7 @@ function canvasSource(options: { foreground?: () => ForegroundWindow, needsGestu
       return stream
     }),
     ...(options.foreground ? { foreground: async () => options.foreground!() } : {}),
+    ...(options.windowOpen ? { windowOpen: async () => options.windowOpen!() } : {}),
     onInterrupt: (listener) => {
       interrupt = listener
       return () => {
@@ -173,5 +174,30 @@ describe('usePerceptionRunnerStore', { timeout: 60_000 }, () => {
     await expect.poll(() => runner.events().length, { timeout: 15_000 }).toBe(1)
     expect(runner.events()[0]).toMatchObject({ type: 'scene-change', familiar: false })
     await expect.poll(() => status.status.events).toHaveLength(1)
+  })
+
+  it('captures the target window of a commentary, sees it only in front, and reports its close', async () => {
+    let window: ForegroundWindow = { title: 'Match', app: 'Game' }
+    let open = true
+    const screen = canvasSource({ foreground: () => window, windowOpen: () => open })
+    const { runner, perception, status } = await createLeader(screen.source)
+    const closed: string[] = []
+    runner.onTargetClosed(app => closed.push(app))
+    perception.enabled = true
+    await expect.poll(() => status.status.state, { timeout: 15_000 }).toBe('running')
+
+    runner.setTarget('Game')
+    await expect.poll(() => screen.source.start).toHaveBeenLastCalledWith({ app: 'Game' })
+    await expect.poll(() => runner.frames().length, { timeout: 15_000 }).toBeGreaterThan(0)
+    await expect.poll(() => status.status, { timeout: 15_000 }).toMatchObject({ target: 'Game', targetInFront: true })
+
+    window = { title: 'Notes', app: 'Editor' }
+    const before = runner.frames().length
+    await expect.poll(() => status.status.targetInFront, { timeout: 15_000 }).toBe(false)
+    await new Promise(resolve => setTimeout(resolve, 1_200))
+    expect(runner.frames().length).toBeLessThanOrEqual(before + 1)
+
+    open = false
+    await expect.poll(() => closed, { timeout: 15_000 }).toEqual(['Game'])
   })
 })

@@ -4,9 +4,9 @@ import { formatTimePrefix } from '../messages/datetime-prefix'
  * The life of a mission instance.
  *
  * - `scheduled`: it waits for `nextRunAt`. A repeated reminder stays here after each run.
- * - `running`: a foreground mission, for example small talk, runs now.
- * - `done`: a reminder that runs once reached the owner, or small talk reached its time limit.
- * - `stopped`: the owner or the model stopped it, or small talk ended early.
+ * - `running`: a foreground mission, for example small talk or commentary, runs now.
+ * - `done`: a reminder that runs once reached the owner, or a foreground mission reached its time limit.
+ * - `stopped`: the owner or the model stopped it, or a foreground mission ended early.
  * - `missed`: a reminder that runs once came due while the app was closed, longer ago than the age limit.
  */
 export type MissionStatus = 'scheduled' | 'running' | 'done' | 'stopped' | 'missed'
@@ -14,12 +14,13 @@ export type MissionStatus = 'scheduled' | 'running' | 'done' | 'stopped' | 'miss
 /**
  * Why a mission ended.
  *
- * - `time`: small talk reached its time limit.
+ * - `time`: a foreground mission reached its time limit.
  * - `owner`: the owner or the model stopped it.
  * - `away`: the owner left the device during small talk.
- * - `quiet`: the owner asked for quiet during small talk.
+ * - `quiet`: the owner asked for quiet during a foreground mission.
+ * - `target-closed`: the window of a commentary closed.
  */
-export type MissionEndReason = 'time' | 'owner' | 'away' | 'quiet'
+export type MissionEndReason = 'time' | 'owner' | 'away' | 'quiet' | 'target-closed'
 
 /**
  * How a reminder repeats. Weekly days use `Date.getDay()` numbers: 0 is Sunday and 6 is Saturday.
@@ -74,6 +75,23 @@ export interface SmallTalkValues {
   readonly endsAt: number
 }
 
+/** A commentary request, as the model asks for it. */
+export interface CommentaryRequest {
+  /** The app of the window to watch. Empty for the app in front. */
+  readonly app: string
+  /** How long the commentary runs at most. */
+  readonly minutes: number
+}
+
+/** The stored values of a `commentary` instance. */
+export interface CommentaryValues {
+  /** The app of the window that the commentary watches. */
+  readonly app: string
+  readonly minutes: number
+  /** Epoch milliseconds. The commentary ends at this time, if the window is still open. */
+  readonly endsAt: number
+}
+
 /** What every mission instance has, whatever its template. */
 interface MissionBase {
   readonly id: string
@@ -101,8 +119,17 @@ export interface SmallTalkMission extends MissionBase {
   readonly values: SmallTalkValues
 }
 
+/** A foreground mission: the character watches one window and comments on it in short lines. */
+export interface CommentaryMission extends MissionBase {
+  readonly template: 'commentary'
+  readonly values: CommentaryValues
+}
+
 /** One mission that the model created from the owner's words. The template tells the shape of its values. */
-export type MissionInstance = ReminderMission | SmallTalkMission
+export type MissionInstance = ReminderMission | SmallTalkMission | CommentaryMission
+
+/** A mission that runs in the foreground with a voice. One runs at a time. */
+export type ForegroundMission = SmallTalkMission | CommentaryMission
 
 /** A template as the mission tools describe it to the model. */
 export interface MissionTemplate {
@@ -125,9 +152,21 @@ export const MISSION_TEMPLATES: readonly MissionTemplate[] = [
     description: 'Keep the owner company and talk more often, when the owner asks for it, for example "talk with me for a while". It ends at its time limit, when the owner leaves, or when the owner asks to stop or for quiet.',
     values: '{ "minutes": how long, 5-120, 30 when the owner names no time }',
   },
+  {
+    name: 'commentary',
+    description: 'Watch one window, for example a game or a video, and comment on it in short lines, when the owner asks for it. It ends when the window closes, at its time limit, or when the owner asks to stop or for quiet.',
+    values: '{ "app": the app of the window to watch, "" for the app in front, "minutes": 5-180, 60 when the owner names no time }',
+  },
 ]
 
 const MINUTE_MS = 60_000
+
+/** Limits of commentary. The pace comes from the commentary mode of the initiative policy. */
+export const COMMENTARY_MISSION_LIMITS = {
+  minMinutes: 5,
+  maxMinutes: 180,
+  defaultMinutes: 60,
+} as const
 
 /** Limits and pace of small talk. The initiative settings read the pace while small talk runs. */
 export const SMALL_TALK_LIMITS = {
@@ -319,8 +358,9 @@ export function createSmallTalk(input: { id: string, sessionId: string, request:
   const { minMinutes, maxMinutes } = SMALL_TALK_LIMITS
   if (!Number.isInteger(minutes) || minutes < minMinutes || minutes > maxMinutes)
     return { ok: false, reason: `Small talk needs a whole number of minutes from ${minMinutes} to ${maxMinutes}.` }
-  if (activeSmallTalk(input.missions, input.now))
-    return { ok: false, reason: 'Small talk already runs. Keep it, or stop it first.' }
+  const running = activeForegroundMission(input.missions, input.now)
+  if (running)
+    return { ok: false, reason: `${running.template === 'small-talk' ? 'Small talk' : 'Commentary'} already runs. Keep it, or stop it first.` }
   return {
     ok: true,
     mission: {
@@ -335,14 +375,54 @@ export function createSmallTalk(input: { id: string, sessionId: string, request:
   }
 }
 
+/**
+ * Creates commentary from the request that the model gave. An empty app takes the app in front. On a refusal, `reason`
+ * tells the model what to change. One foreground mission runs at a time.
+ */
+export function createCommentary(input: { id: string, sessionId: string, request: CommentaryRequest, appInFront?: string, now: number, missions: readonly MissionInstance[] }): { ok: true, mission: CommentaryMission } | { ok: false, reason: string } {
+  const { minutes } = input.request
+  const { minMinutes, maxMinutes } = COMMENTARY_MISSION_LIMITS
+  if (!Number.isInteger(minutes) || minutes < minMinutes || minutes > maxMinutes)
+    return { ok: false, reason: `Commentary needs a whole number of minutes from ${minMinutes} to ${maxMinutes}.` }
+  const app = input.request.app.trim() || input.appInFront?.trim() || ''
+  if (!app)
+    return { ok: false, reason: 'No app to watch. Ask the owner which app, or ask the owner to bring it to the front.' }
+  const running = activeForegroundMission(input.missions, input.now)
+  if (running)
+    return { ok: false, reason: `${running.template === 'small-talk' ? 'Small talk' : 'Commentary'} already runs. Keep it, or stop it first.` }
+  return {
+    ok: true,
+    mission: {
+      id: input.id,
+      template: 'commentary',
+      values: { app, minutes, endsAt: input.now + minutes * MINUTE_MS },
+      sessionId: input.sessionId,
+      status: 'running',
+      createdAt: input.now,
+      updatedAt: input.now,
+    },
+  }
+}
+
+/** The foreground mission that runs at `now`. A mission past its time limit does not count, also before the runner ends it. */
+export function activeForegroundMission(missions: readonly MissionInstance[], now: number): ForegroundMission | undefined {
+  return missions.find((mission): mission is ForegroundMission => mission.template !== 'reminder' && mission.status === 'running' && mission.values.endsAt > now)
+}
+
+/** The commentary that runs at `now`, if any. */
+export function activeCommentary(missions: readonly MissionInstance[], now: number): CommentaryMission | undefined {
+  const running = activeForegroundMission(missions, now)
+  return running?.template === 'commentary' ? running : undefined
+}
+
+/** The running foreground missions whose time limit passed at `now`. The runner ends each one with the reason `time`. */
+export function foregroundPastLimit(missions: readonly MissionInstance[], now: number): ForegroundMission[] {
+  return missions.filter((mission): mission is ForegroundMission => mission.template !== 'reminder' && mission.status === 'running' && mission.values.endsAt <= now)
+}
+
 /** The small talk that runs at `now`. Small talk past its time limit does not count, also before the runner ends it. */
 export function activeSmallTalk(missions: readonly MissionInstance[], now: number): SmallTalkMission | undefined {
   return missions.find((mission): mission is SmallTalkMission => mission.template === 'small-talk' && mission.status === 'running' && mission.values.endsAt > now)
-}
-
-/** The running small talk whose time limit passed at `now`. The runner ends each one with the reason `time`. */
-export function smallTalkPastLimit(missions: readonly MissionInstance[], now: number): SmallTalkMission[] {
-  return missions.filter((mission): mission is SmallTalkMission => mission.template === 'small-talk' && mission.status === 'running' && mission.values.endsAt <= now)
 }
 
 /** What happened to one notice: a reply with text was stored, no reply was stored, or the send failed. */

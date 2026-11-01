@@ -554,6 +554,7 @@ pages:
     purposes:
       owner-reply: あなたへの返答
       initiative: 自律発話
+      commentary: 実況
       mission: ミッション
       task: バックグラウンドタスク
       scene: ほかの人への返答
@@ -988,11 +989,14 @@ pages:
         name: 雑談
         minutes: '{count} 分'
         until: '{time} まで'
+      commentary:
+        name: '{app} の実況'
       end-reason:
         time: 時間切れ
         owner: あなたが止めました
         away: あなたが離席しました
         quiet: あなたが静かにと頼みました
+        target-closed: ウィンドウが閉じました
     perception:
       title: 画面の知覚
       description: キャラクターがあなたの画面を見ます
@@ -1005,6 +1009,8 @@ pages:
       images-per-hour: 1 時間あたりの画像
       images-per-hour-description: 1 時間にモデルへ送るフレームの上限です。半分を使うと、1 ターンに 1 枚だけを送り、画面の出来事の押す力も弱まります。すべて使うと、キャラクターは画面を見ずに話します。
       images-sent: '直近 1 時間に送った画像: {used} / {limit} 枚'
+      commentary-images-per-hour: 実況中の 1 時間あたりの画像
+      commentary-images-per-hour-description: 実況はよく話すので、別の予算を持ちます。実況の間は、上の上限の代わりにこの上限を使います。実況の 1 ターンで送るフレームは最大 2 枚です。
       states:
         off: 知覚はオフです。
         paused: 知覚は一時停止中です。

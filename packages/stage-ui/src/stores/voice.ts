@@ -334,8 +334,8 @@ export const useVoiceStore = defineStore('voice', () => {
     }
   }
 
-  function interrupt(turns: readonly TurnRef[], cause: string) {
-    return controller.interrupt({ turns, cause })
+  function interrupt(turns: readonly TurnRef[], cause: string, afterCurrentClip?: boolean) {
+    return controller.interrupt({ turns, cause, ...(afterCurrentClip ? { afterCurrentClip } : {}) })
   }
 
   /**
@@ -473,7 +473,7 @@ export const useVoiceStore = defineStore('voice', () => {
       }),
       context.on(voiceRequestTurns, () => context.emit(voiceTurnsChanged, activeTurns.value.map(turn => ({ ...turn })))),
       defineInvokeHandler(context, voiceGetTurns, () => activeTurns.value.map(turn => ({ ...turn }))),
-      defineInvokeHandler(context, voiceInterrupt, async request => ({ status: (await interrupt(request.turns, request.cause).done).status })),
+      defineInvokeHandler(context, voiceInterrupt, async request => ({ status: (await interrupt(request.turns, request.cause, request.afterCurrentClip).done).status })),
       defineInvokeHandler(context, voiceSpeechCommand, async (body) => {
         // The full key isolates a producer from other windows and turns.
         const key = JSON.stringify([body.originId, body.producerId, body.turn.sessionId, body.turn.turnId])

@@ -57,6 +57,32 @@ describe('playback', () => {
     expect((await other.finish()).status).toBe('silent')
   })
 
+  it('lets the playing clip end and drops the queue when it stops after the current clip', async () => {
+    const ended = Promise.withResolvers<PlayedAudio>()
+    const stop = vi.fn(async () => ({ throughMs: 0 }))
+    const play = vi.fn(() => ({ done: ended.promise, stop }))
+    const group = new Playback({ nowMs: () => 0, play }).openGroup('voice')
+    const first = group.enqueue({ id: 'one', audio: new Blob(['a']) })
+    const second = group.enqueue({ id: 'two', audio: new Blob(['b']) })
+    await expect.poll(() => play.mock.calls.length).toBe(1)
+
+    const stopping = group.stopAfterCurrent()
+    expect(await second).toBe('stopped')
+    expect(await group.enqueue({ id: 'late', audio: new Blob() })).toBe('stopped')
+    ended.resolve({ throughMs: 800 })
+
+    expect(await first).toBe('ended')
+    expect(await stopping).toEqual({ groupId: group.id, status: 'silent', played: [{ clipId: 'one', throughMs: 800 }] })
+    expect(stop).not.toHaveBeenCalled()
+    expect(play).toHaveBeenCalledTimes(1)
+  })
+
+  it('settles at once when it stops after the current clip with nothing playing', async () => {
+    const group = new Playback({ nowMs: () => 0, play: vi.fn() }).openGroup('voice')
+
+    expect(await group.stopAfterCurrent()).toEqual({ groupId: group.id, status: 'silent', played: [] })
+  })
+
   it('reports each clip on the driver clock so callers can align later output', async () => {
     const play = vi.fn((clip: PlaybackClip) => ({
       done: Promise.resolve({ throughMs: 500, interval: { startMs: clip.startAtMs ?? 1000, endMs: (clip.startAtMs ?? 1000) + 500 } }),

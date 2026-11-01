@@ -24,11 +24,13 @@ watch(enabled, (on) => {
 
 /** The name of a mission in the list: the reminder text, or the template for small talk. */
 function nameOf(mission: MissionInstance) {
+  if (mission.template === 'commentary')
+    return t(`${KEY}.commentary.name`, { app: mission.values.app })
   return mission.template === 'reminder' ? mission.values.text : t(`${KEY}.small-talk.name`)
 }
 
 function repeatLabel(mission: MissionInstance) {
-  if (mission.template === 'small-talk')
+  if (mission.template !== 'reminder')
     return t(`${KEY}.small-talk.minutes`, { count: mission.values.minutes })
   const { repeat } = mission.values
   if (repeat.kind === 'interval') {
@@ -44,9 +46,9 @@ function repeatLabel(mission: MissionInstance) {
 }
 
 function timeLabel(mission: MissionInstance) {
-  if (mission.template === 'small-talk' && mission.status === 'running')
+  if (mission.template !== 'reminder' && mission.status === 'running')
     return t(`${KEY}.small-talk.until`, { time: new Date(mission.values.endsAt).toLocaleTimeString(locale.value, { timeStyle: 'short' }) })
-  if (mission.endReason && mission.template === 'small-talk')
+  if (mission.endReason && mission.template !== 'reminder')
     return `${t(`${KEY}.status.${mission.status}`)} · ${t(`${KEY}.end-reason.${mission.endReason}`)}`
   if (mission.nextRunAt === undefined)
     return t(`${KEY}.status.${mission.status}`)

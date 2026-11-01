@@ -226,6 +226,9 @@ function timeLabel(epochMs: number) {
         <li v-if="perception.state === 'running'">
           {{ t(`${KEY}.screen.activity`, { value: number(perception.activity) }) }}
         </li>
+        <li v-if="perception.target">
+          {{ t(`${KEY}.screen.${perception.targetInFront ? 'target' : 'target-hidden'}`, { app: perception.target }) }}
+        </li>
         <li>{{ t('settings.pages.modules.perception.images-sent', { used: perceptionSettings.budgetAt(now.getTime()).used, limit: perceptionSettings.budgetAt(now.getTime()).limit }) }}</li>
       </ul>
       <h3 :class="['mt-1', 'text-xs font-medium', 'text-neutral-500 dark:text-neutral-400']">
@@ -289,8 +292,8 @@ function timeLabel(epochMs: number) {
       </h2>
       <ul v-if="activeMissions.length" :class="['flex flex-col', 'gap-1', 'text-sm']">
         <li v-for="mission in activeMissions" :key="mission.id">
-          {{ mission.template === 'reminder' ? mission.values.text : t('settings.pages.modules.missions.small-talk.name') }}
-          <span v-if="mission.template === 'small-talk'" :class="['text-xs', 'text-neutral-500 dark:text-neutral-400']">· {{ t(`${KEY}.until`, { time: timeLabel(mission.values.endsAt) }) }}</span>
+          {{ mission.template === 'reminder' ? mission.values.text : mission.template === 'commentary' ? t('settings.pages.modules.missions.commentary.name', { app: mission.values.app }) : t('settings.pages.modules.missions.small-talk.name') }}
+          <span v-if="mission.template !== 'reminder'" :class="['text-xs', 'text-neutral-500 dark:text-neutral-400']">· {{ t(`${KEY}.until`, { time: timeLabel(mission.values.endsAt) }) }}</span>
           <span v-else-if="mission.nextRunAt" :class="['text-xs', 'text-neutral-500 dark:text-neutral-400']">· {{ timeLabel(mission.nextRunAt) }}</span>
         </li>
       </ul>

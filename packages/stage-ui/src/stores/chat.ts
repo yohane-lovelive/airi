@@ -72,6 +72,8 @@ import { useHearingStore } from './modules/hearing'
 import { useStickersStore } from './modules/stickers'
 import { useVisionStore } from './modules/vision'
 import { useWebSearchStore } from './modules/web-search'
+import { usePerceptionStore } from './perception'
+import { usePerceptionRunnerStore } from './perception-runner'
 import { useRecipesStore } from './recipes'
 import { useTimelineStore } from './timeline'
 import { executeToolCallRerun } from './tool-call-rerun'
@@ -296,6 +298,8 @@ export const useChatStore = defineStore('chat', () => {
   const initiative = useInitiativeStore()
   const intentions = useIntentionsStore()
   const timeline = useTimelineStore()
+  const perception = usePerceptionStore()
+  const perceptionRunner = usePerceptionRunnerStore()
 
   /** The persona of a session. A session without one uses the selected card. */
   function personaOf(sessionId: string) {
@@ -470,7 +474,7 @@ export const useChatStore = defineStore('chat', () => {
     if (!notice)
       return 'owner-reply'
     if (notice.source === INITIATIVE_SOURCE)
-      return 'initiative'
+      return missions.commentaryAt(Date.now()) ? 'commentary' : 'initiative'
     if (notice.source.startsWith('mission:'))
       return 'mission'
     if (notice.source.startsWith('recipe:'))
@@ -710,6 +714,14 @@ export const useChatStore = defineStore('chat', () => {
             addSmallTalk: async request => initiative.enabled && initiative.supported
               ? missions.addSmallTalk(request, sessionId)
               : { ok: false, reason: 'Autonomous speech is off. The owner can turn it on in Settings > Modules > Autonomous speech.' },
+            // Commentary watches the screen and speaks through autonomous turns, so it needs both on.
+            addCommentary: async (request) => {
+              if (!initiative.enabled || !initiative.supported)
+                return { ok: false, reason: 'Autonomous speech is off. The owner can turn it on in Settings > Modules > Autonomous speech.' }
+              if (!perception.enabled || !perception.supported)
+                return { ok: false, reason: 'Screen perception is off. The owner can turn it on in Settings > Modules > Screen perception.' }
+              return missions.addCommentary(request, sessionId, perceptionRunner.foregroundApp())
+            },
             stop: id => missions.stop(id),
           })
         : []),
@@ -725,9 +737,9 @@ export const useChatStore = defineStore('chat', () => {
               answersOwner: () => answersOwnerMessage(sessionId, correlation.turnId),
               apply: async (request) => {
                 const result = initiative.applyTalkRequest(request)
-                // A request for quiet also ends small talk. Small talk that waits out a quiet time would surprise the owner.
+                // A request for quiet also ends small talk or commentary. One that waits out a quiet time would surprise the owner.
                 if (result.ok && request.kind === 'quiet')
-                  await missions.endSmallTalk('quiet')
+                  await missions.endForeground('quiet')
                 return result
               },
             }),

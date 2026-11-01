@@ -55,6 +55,11 @@ export interface PlaybackGroup {
   enqueue: (clip: PlaybackClip) => Promise<'ended' | 'stopped' | 'failed'>
   finish: () => Promise<PlaybackReceipt>
   stop: (options: { fadeMs: number }) => Promise<PlaybackReceipt>
+  /**
+   * Drops the queued clips and lets the clip that plays now end on its own, for example at the end of its sentence.
+   * The group then settles like a stopped group. Without a playing clip, it settles at once.
+   */
+  stopAfterCurrent: () => Promise<PlaybackReceipt>
 }
 
 /** Conversation ownership stays outside this audio-only contract. */
@@ -137,6 +142,20 @@ class OutputGroup implements PlaybackGroup {
         this.complete()
       }, cause => this.fail(cause))
     }
+    return this.completion.promise
+  }
+
+  stopAfterCurrent() {
+    if (this.stopping || this.settled)
+      return this.completion.promise
+    this.sealed = true
+    for (const entry of this.pending.splice(0)) {
+      void releaseClip(entry.clip)
+      entry.result.resolve('stopped')
+    }
+    // A sealed group without a queue completes when the playing clip ends. `next` runs then.
+    if (!this.active)
+      this.complete()
     return this.completion.promise
   }
 

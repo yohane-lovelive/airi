@@ -136,6 +136,8 @@ devtools:
       screen:
         title: 画面
         activity: '画面の動き: {value}'
+        target: '{app} のウィンドウを見ています'
+        target-hidden: '待機中: {app} のウィンドウが前面にありません'
         events: 最近の画面の出来事
         salience: '顕著度 {value}'
         familiar: 見慣れた画面

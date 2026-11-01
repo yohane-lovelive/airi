@@ -11,8 +11,13 @@ export interface ScreenSource {
   readonly supported: boolean
   /** Whether a start must run inside a click of the owner. */
   readonly needsGesture: boolean
-  /** Starts a capture. Resolves to a stream with a live video track. */
-  start: () => Promise<MediaStream>
+  /**
+   * Starts a capture. Resolves to a stream with a live video track. With `app`, the desktop captures the front window of
+   * that app only, for example the game of a commentary. The web captures the share that the owner chooses.
+   */
+  start: (options?: { app?: string }) => Promise<MediaStream>
+  /** Whether a window of the app is still open. Undefined where the device cannot tell it. */
+  windowOpen?: (app: string) => Promise<boolean>
   /** The window in front. Undefined where the device cannot tell it, for example on the web. */
   foreground?: () => Promise<ForegroundWindow | undefined>
   /**

@@ -3,18 +3,20 @@ import type { MissionInstance, MustSpeakNotify, NoticeOutcome, ReminderMission, 
 import { describe, expect, it, vi } from 'vitest'
 
 import {
+  activeCommentary,
   activeSmallTalk,
   collectDueMissions,
+  createCommentary,
   createReminder,
   createSmallTalk,
   deliverReminder,
+  foregroundPastLimit,
   formatLocalDateTime,
   isMissionActive,
   missedRemindersNoticeText,
   parseLocalDateTime,
   reminderNoticeText,
   settleMissionRun,
-  smallTalkPastLimit,
   stopMission,
 } from './missions'
 
@@ -319,8 +321,8 @@ describe('small talk', () => {
 
     expect(activeSmallTalk([mission], NOW + 9 * MINUTE)?.id).toBe('talk')
     expect(activeSmallTalk([mission], NOW + 10 * MINUTE)).toBeUndefined()
-    expect(smallTalkPastLimit([mission], NOW + 10 * MINUTE).map(entry => entry.id)).toEqual(['talk'])
-    expect(smallTalkPastLimit([mission, reminder()], NOW + 9 * MINUTE)).toEqual([])
+    expect(foregroundPastLimit([mission], NOW + 10 * MINUTE).map(entry => entry.id)).toEqual(['talk'])
+    expect(foregroundPastLimit([mission, reminder()], NOW + 9 * MINUTE)).toEqual([])
   })
 
   it('ends as done at the time limit and as stopped otherwise, with the reason', () => {
@@ -334,5 +336,39 @@ describe('small talk', () => {
 
   it('is never due as a reminder', () => {
     expect(collectDueMissions([smallTalk()], NOW + 2 * HOUR)).toEqual({ due: [], missed: [], expired: [] })
+  })
+})
+
+describe('commentary', () => {
+  function commentary(request: { app?: string, minutes?: number } = {}, missions: MissionInstance[] = []) {
+    return createCommentary({ id: 'watch', sessionId: 'session-1', request: { app: request.app ?? '', minutes: request.minutes ?? 60 }, appInFront: 'Game', now: NOW, missions })
+  }
+
+  it('watches the named app, or the app in front, until its time limit', () => {
+    expect(commentary({ app: 'Video Player' })).toMatchObject({ ok: true, mission: { template: 'commentary', status: 'running', values: { app: 'Video Player', minutes: 60, endsAt: NOW + HOUR } } })
+    expect(commentary()).toMatchObject({ ok: true, mission: { values: { app: 'Game' } } })
+  })
+
+  it('refuses without an app, outside 5 to 180 minutes, and beside another foreground mission', () => {
+    expect(createCommentary({ id: 'w', sessionId: 's', request: { app: ' ', minutes: 60 }, now: NOW, missions: [] })).toEqual({ ok: false, reason: expect.stringContaining('No app to watch') })
+    expect(commentary({ minutes: 181 }).ok).toBe(false)
+    const talk = createSmallTalk({ id: 'talk', sessionId: 's', request: { minutes: 30 }, now: NOW, missions: [] })
+    if (!talk.ok)
+      throw new Error(talk.reason)
+    expect(commentary({}, [talk.mission])).toEqual({ ok: false, reason: expect.stringContaining('Small talk already runs') })
+    const running = commentary()
+    if (!running.ok)
+      throw new Error(running.reason)
+    expect(createSmallTalk({ id: 'talk', sessionId: 's', request: { minutes: 30 }, now: NOW, missions: [running.mission] })).toEqual({ ok: false, reason: expect.stringContaining('Commentary already runs') })
+    expect(activeCommentary([running.mission], NOW)?.id).toBe('watch')
+  })
+
+  it('ends at its time limit, and with the reason when its window closes', () => {
+    const result = commentary({ minutes: 5 })
+    if (!result.ok)
+      throw new Error(result.reason)
+
+    expect(foregroundPastLimit([result.mission], NOW + 5 * MINUTE).map(mission => mission.id)).toEqual(['watch'])
+    expect(stopMission(result.mission, NOW, 'target-closed')).toMatchObject({ status: 'stopped', endReason: 'target-closed' })
   })
 })

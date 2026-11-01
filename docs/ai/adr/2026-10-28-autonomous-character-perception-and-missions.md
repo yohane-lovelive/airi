@@ -318,6 +318,16 @@ A new event can interrupt the current speech. These rules keep the speech cohere
 - Owner speech always stops the character. The character never interrupts the owner.
 - The timeline records the interrupted line, so the character can return to it later.
 
+Step 3-5a built commentary and interruptions as follows.
+
+- **Start.** The model starts the `commentary` template with `builtIn_startMission`: the app of the window to watch, empty for the app in front, and 5 to 180 minutes, 60 by default. Code refuses it while autonomous speech or screen perception is off, and while another foreground mission runs.
+- **Target window.** The desktop captures the front window of the app only. `get-windows` lists the open windows, and their Windows handle names the window source of `desktopCapturer`. Frames pause while the app is not in front. On the web, the shared window is the target.
+- **End.** The commentary ends when its window closes, as the ADR says, with the reason `target-closed`. The capture track ends, or a check every 5 seconds finds no window. It also ends when the owner says stop, on a request for quiet, and at its time limit. The time limit is a guard that the ADR did not name. Time away does not end it, because the owner can watch a video without input.
+- **Pace.** The policy switches to its commentary mode. Its interval follows the screen activity: 2 times on a still screen down to 0.5 times on a moving one, from the 45 seconds of the mode.
+- **Images.** While a commentary runs, its own budget replaces the normal one, 120 images each hour by default. A commentary turn sends two frames at most. The usage purpose is `commentary`.
+- **Interruptions.** An event of 0.8 or more that is 0.3 above the event of the current line interrupts the line. Below 0.95, the playing clip, one sentence, ends first, and the rest is dropped. From 0.95, the line stops at once with the fade of the voice controller. Another interruption waits 15 seconds. The timeline notes the cut line.
+- `stopAfterCurrent` of the playback groups in `pipelines-audio`, and `afterCurrentClip` of the voice controller and the speech bus, let the current sentence end.
+
 ### Timeline and scene state
 
 - The timeline is a list of short notes with times.
@@ -619,7 +629,7 @@ The order follows dependencies. Each step uses the parts of the earlier steps. E
 | 1 | Mission base: the time trigger, the instance store, and the tools. Also the `mustSpeak` notice, the `reminder` template, and the mission list. | Done |
 | 2 | Autonomous talk without the screen: connect the policy core to `notifyConversation`. Add the prompt budget, intentions, owner control, usage by purpose, and the inspector. | Done |
 | 2b | Daily rhythm and small talk: templates as recipes, the `greeting`, `welcome-back`, and `small-talk` templates, topic seeds, and the time of day. Measure variety. | Done. Templates as recipes still wait. |
-| 3 | Perception: the adapters, ring buffer, detectors, frame policies, image budget, recorder, replay, timeline, scene state, `commentary` with interruptions, and `watch`. | In progress: 3-1 to 3-4 are done. |
+| 3 | Perception: the adapters, ring buffer, detectors, frame policies, image budget, recorder, replay, timeline, scene state, `commentary` with interruptions, and `watch`. | In progress: 3-1 to 3-5a are done. |
 | 4 | Motion: the model capability check, the procedural layer, the library with `ACT` markers, expression sync, and the upper-body layer. | To do |
 | 5 | Generated motion, game audio, recall from memory, and polish. Recall needs the memory ADR. | To do |
 
@@ -632,7 +642,7 @@ Step 2 has four parts. Each part is one change.
 | 2-3 | Usage by purpose and the inspector. | Done |
 | 2-4 | The prompt budget: the top memories and the history summary. It changes every request, so it comes last. | Done |
 
-Step 3 has six parts. Each part is one change. Detector events reach the pressure only in 3-3, when the model can also see the frames.
+Step 3 has seven parts. Each part is one change. Detector events reach the pressure only in 3-3, when the model can also see the frames.
 
 | Part | Content | State |
 | --- | --- | --- |
@@ -640,7 +650,8 @@ Step 3 has six parts. Each part is one change. Detector events reach the pressur
 | 3-2 | The detectors: settle then compare, familiar screens, the baseline for each app, the app switch dwell, and long still periods. The inspector lists the events. The loud sound detector waits for step 5. | Done |
 | 3-3 | The decision turn with frames: `fresh-keyframes` as the first default frame policy until replay chooses one, images in the transient notice, the image budget, events as pressure, and screen text as untrusted data. | Done |
 | 3-4 | The timeline and the scene state, written with markers. | Done |
-| 3-5 | The `commentary` and `watch` templates. | To do |
+| 3-5a | The `commentary` template with the target window, its pace, its budget, and interruptions. | Done |
+| 3-5b | The `watch` template with check turns. | To do |
 | 3-6 | The recorder, the replay evaluation, and the `contact-sheet` and `scene-anchor` frame policies. | To do |
 
 Step 4 does not depend on steps 0 to 3. It comes after them so that the speech output format changes only once.

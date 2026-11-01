@@ -51,6 +51,32 @@ describe('voiceController output', () => {
     await controller.close()
   })
 
+  it('finishes the playing sentence and drops the rest when it stops after the current clip', async () => {
+    const firstEnded = Promise.withResolvers<{ throughMs: number }>()
+    const played: string[] = []
+    const stop = vi.fn(async () => ({ throughMs: 0 }))
+    const playback = new Playback({ nowMs: () => 0, play: (clip) => {
+      void (clip.audio as Blob).text().then(text => played.push(text))
+      return { done: played.length ? Promise.resolve({ throughMs: 1 }) : firstEnded.promise, stop }
+    } })
+    const controller = new VoiceController({ speech: () => ({ playback, synthesize: async request => new Blob([request.text]) }) })
+    const turn = { sessionId: 'alice', turnId: 'commentary' }
+    const response = controller.openResponse(turn)
+    const speech = response.openSpeech({ purpose: 'answer' })
+    await speech.write('First sentence. ')
+    await speech.write('Second sentence. ')
+    speech.end()
+    await expect.poll(() => played).toEqual(['First sentence.'])
+
+    const interruption = controller.interrupt({ turns: [turn], cause: 'screen-event', afterCurrentClip: true })
+    firstEnded.resolve({ throughMs: 900 })
+
+    expect(await interruption.silenced).toEqual([expect.objectContaining({ turn, status: 'silent' })])
+    expect(stop).not.toHaveBeenCalled()
+    expect(played).toEqual(['First sentence.'])
+    await controller.close()
+  })
+
   it('preserves earlier reserved speech when an intermediate producer is cancelled', async () => {
     const firstAudio = Promise.withResolvers<Blob>()
     const played: string[] = []

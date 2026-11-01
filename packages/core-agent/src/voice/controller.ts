@@ -240,7 +240,11 @@ export class VoiceController {
     return response
   }
 
-  interrupt(options: { turns: readonly TurnRef[], cause: string }): Interruption {
+  /**
+   * Interrupts the speech of the given turns. With `afterCurrentClip`, each turn finishes the clip that plays now and
+   * drops the rest, so the current sentence ends.
+   */
+  interrupt(options: { turns: readonly TurnRef[], cause: string, afterCurrentClip?: boolean }): Interruption {
     const id = nanoid()
     const fadeMs = this.options.fadeMs ?? 100
     const unique = new Map(options.turns.map(turn => [turnKey(turn), Object.freeze({ ...turn })]))
@@ -250,11 +254,11 @@ export class VoiceController {
       const response = this.responses.get(key)
       let record = this.interruptions.get(key)
       if (!record && response && !response.closed) {
-        record = { eventId: nanoid(), turn, cause: options.cause, silence: response.interrupt(options.cause, fadeMs) }
+        record = { eventId: nanoid(), turn, cause: options.cause, silence: response.interrupt(options.cause, fadeMs, { afterCurrentClip: options.afterCurrentClip }) }
         this.interruptions.set(key, record)
       }
 
-      const silence = record?.silence ?? response?.interrupt(options.cause, fadeMs)
+      const silence = record?.silence ?? response?.interrupt(options.cause, fadeMs, { afterCurrentClip: options.afterCurrentClip })
       if (silence) {
         const result = silence.then(playback => ({ turn, status: playback.status, playback, ...(playback.status === 'failed' ? { error: playback.error } : {}) }))
         return { record, result, known: true }

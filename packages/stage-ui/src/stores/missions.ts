@@ -1,9 +1,9 @@
-import type { MissionEndReason, ReminderRequest, SmallTalkRequest } from '@proj-airi/core-agent'
+import type { CommentaryRequest, MissionEndReason, ReminderRequest, SmallTalkRequest } from '@proj-airi/core-agent'
 
 import type { MissionRecord } from '../database/repos/missions.repo'
 
 import { errorMessageFrom } from '@moeru/std'
-import { activeSmallTalk, createReminder, createSmallTalk, isMissionActive, settleMissionRun, stopMission } from '@proj-airi/core-agent'
+import { activeCommentary, activeForegroundMission, activeSmallTalk, createCommentary, createReminder, createSmallTalk, isMissionActive, settleMissionRun, stopMission } from '@proj-airi/core-agent'
 import { useLocalStorageManualReset } from '@proj-airi/stage-shared/composables'
 import { useBroadcastChannel } from '@vueuse/core'
 import { nanoid } from 'nanoid'
@@ -12,10 +12,10 @@ import { computed, ref, watch } from 'vue'
 
 import { missionsRepo } from '../database/repos/missions.repo'
 
-export type { MissionInstance, ReminderRequest, SmallTalkRequest } from '@proj-airi/core-agent'
+export type { CommentaryRequest, MissionInstance, ReminderRequest, SmallTalkRequest } from '@proj-airi/core-agent'
 
 /**
- * Missions that the model created from the owner's words, for example reminders and small talk.
+ * Missions that the model created from the owner's words, for example reminders, small talk, and commentary.
  * IndexedDB keeps the instances. After each change, the other windows read them again.
  *
  * Use when:
@@ -87,6 +87,20 @@ export const useMissionsStore = defineStore('missions', () => {
     return result
   }
 
+  /**
+   * Starts commentary on one window in an owner conversation. An empty app takes `appInFront`. On a refusal, `reason`
+   * tells the model what to change.
+   */
+  async function addCommentary(request: CommentaryRequest, sessionId: string, appInFront?: string) {
+    const stored = (await missionsRepo.list()).map(record => record.mission)
+    const result = createCommentary({ id: nanoid(), sessionId, request, ...(appInFront ? { appInFront } : {}), now: Date.now(), missions: stored })
+    if (!result.ok)
+      return result
+    await missionsRepo.add(result.mission)
+    await publish([result.mission.id])
+    return result
+  }
+
   /** Ends a mission. Resolves to whether an active mission ended. `owner` is the owner's or the model's stop. */
   async function stop(id: string, reason: MissionEndReason = 'owner') {
     let stopped = false
@@ -106,10 +120,18 @@ export const useMissionsStore = defineStore('missions', () => {
     return activeSmallTalk(missions.value, now)
   }
 
-  /** Ends the small talk that runs now, for example when the owner leaves. Resolves to whether one ended. */
-  async function endSmallTalk(reason: MissionEndReason) {
-    const running = smallTalkAt(Date.now())
-    return running ? stop(running.id, reason) : false
+  /** The commentary that runs now, if any. */
+  function commentaryAt(now: number) {
+    return activeCommentary(missions.value, now)
+  }
+
+  /**
+   * Ends the foreground mission that runs now, for example on a request for quiet. With `only`, it ends that template
+   * only, for example small talk when the owner leaves. Resolves to whether one ended.
+   */
+  async function endForeground(reason: MissionEndReason, only?: 'small-talk' | 'commentary') {
+    const running = activeForegroundMission(missions.value, Date.now())
+    return running && (!only || running.template === only) ? stop(running.id, reason) : false
   }
 
   /**
@@ -154,8 +176,10 @@ export const useMissionsStore = defineStore('missions', () => {
     addReminder,
     addSmallTalk,
     stop,
+    addCommentary,
     smallTalkAt,
-    endSmallTalk,
+    commentaryAt,
+    endForeground,
     settle,
     removeEnded,
     resetState,
