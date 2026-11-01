@@ -60,6 +60,11 @@ export interface ChatAssistantMessage extends AssistantMessage {
    */
   pendingContent?: ChatSlicesToolContent['type']
   slices: ChatSlices[]
+  /**
+   * A few words that name the topic of the reply, from a `<|TOPIC ...|>` marker that the model wrote.
+   * Autonomous turns ask for it, so code can follow topics without another model call. It is not spoken or shown.
+   */
+  topic?: string
   tool_results: {
     id: string
     isError?: boolean

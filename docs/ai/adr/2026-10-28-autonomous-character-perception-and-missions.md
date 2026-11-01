@@ -330,7 +330,7 @@ The last two templates give a daily rhythm. These rules complete it:
 - The time of day changes the inner state. Energy is lower late at night, and the speech hints change with the time.
 - The desktop app reads time away from the system idle time. The web app uses the Idle Detection API, or page focus when the API is not available.
 
-Step 2b-1 built the daily rhythm as follows. Step 2b-2 builds small talk and topic seeds.
+Step 2b-1 built the daily rhythm as follows. Step 2b-2 builds topics and small talk.
 
 - The greeting and the welcome back are rhythm turns in code, not mission templates. They need no instances, so templates as recipes wait until the owner or the model makes templates.
 - `requestRhythmTurn` of `core-agent` starts them without the drive and the threshold. The refractory time does not hold them, but owner input, speech, a running turn, a quiet time, quiet hours, and the daily budget do. A rhythm turn that the gates hold for two minutes is dropped.
@@ -394,6 +394,16 @@ Topics flow. Code does not assign one topic for the whole talk.
 - **Heat.** Each thread has a heat that falls with each turn. It falls faster when the owner reacts little, for example with short replies, no reply, or no questions back.
 - **End of a thread.** A cold thread is no longer a choice. Code then offers related topics and new seeds.
 - **Topic history.** Each turn records a short topic label and its embedding. The pool avoids the topics of the same day and of recent days.
+
+Step 2b-2a built topics for every autonomous turn as follows. The `small-talk` template comes next.
+
+- **Topic label.** The notice asks the model to end its line with `<|TOPIC a few words|>`. The orchestrator stores the label on the reply as `topic`, like a sticker marker. The label is not spoken or shown, and it needs no extra model call.
+- **Topic history.** The runner reads the autonomous lines of the open conversation from the last 3 days. Each line has its label, or its text when it has no label. It needs no storage of its own.
+- **Thread and heat.** Consecutive lines with a similarity of 0.5 or more are one thread. A line that the owner answered multiplies the heat by 0.85. A line without an answer multiplies it by 0.55. At 0.35 or less, the thread is cold, and the notice asks for a new topic.
+- **Seeds.** The pool has the memory index lines of the card and calendar seeds: the month, the day of the week, and the start or end of a month or year. Code draws up to three seeds by weight. A seed near a recent topic gets a lower weight, and one with a similarity of 0.6 or more is not offered. A seed that a spoken turn offered rests for six hours. The similarity misses a seed in another language than the lines, for example an English calendar seed and a Japanese line, so the rest keeps the seed from coming back each turn. The rest lives in memory only.
+- Rhythm turns get no seeds, because they have their own reason. Intentions stay in their own list of the notice. Screen events come with step 3, and owner interests, character interests, and a seed call come later.
+- **Similarity.** Code compares topics with the share of shared character pairs. This is a temporary step: the client has no text embeddings yet. The similarity is a function that the host can replace. When the memory ADR adds embeddings, the stored labels get embeddings, and the similarity of embeddings replaces character pairs.
+- **Variety.** `core-agent` measures `distinct-2`, the entropy of the speech types, and the similarity of consecutive topics. The inspector shows the thread, the seeds of the last turn, and the variety of today's lines. The speech types of today live in memory only, so a restart begins again.
 
 ### Body: motion
 
@@ -547,7 +557,7 @@ The order follows dependencies. Each step uses the parts of the earlier steps. E
 | 0 | Policy core without the screen: pressure, gates, inner state, and speech types in `core-agent`. Evaluation harness with synthetic events. | Done |
 | 1 | Mission base: the time trigger, the instance store, and the tools. Also the `mustSpeak` notice, the `reminder` template, and the mission list. | Done |
 | 2 | Autonomous talk without the screen: connect the policy core to `notifyConversation`. Add the prompt budget, intentions, owner control, usage by purpose, and the inspector. | Done |
-| 2b | Daily rhythm and small talk: templates as recipes, the `greeting`, `welcome-back`, and `small-talk` templates, topic seeds, and the time of day. Measure variety. | In progress: 2b-1 (greeting, welcome back, time of day) is done. 2b-2 (small talk, topic seeds) is next. |
+| 2b | Daily rhythm and small talk: templates as recipes, the `greeting`, `welcome-back`, and `small-talk` templates, topic seeds, and the time of day. Measure variety. | In progress: 2b-1 (greeting, welcome back, time of day) and 2b-2a (topic labels, heat, seeds, variety) are done. 2b-2b (the `small-talk` template) is next. |
 | 3 | Perception: the adapters, ring buffer, detectors, frame policies, image budget, recorder, replay, timeline, scene state, `commentary` with interruptions, and `watch`. | To do |
 | 4 | Motion: the model capability check, the procedural layer, the library with `ACT` markers, expression sync, and the upper-body layer. | To do |
 | 5 | Generated motion, game audio, recall from memory, and polish. Recall needs the memory ADR. | To do |

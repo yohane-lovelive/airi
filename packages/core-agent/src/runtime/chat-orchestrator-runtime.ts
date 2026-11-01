@@ -10,6 +10,7 @@ import type { LlmUsage, StreamEvent, StreamOptions } from '../types/llm'
 
 import { createQueue } from '@proj-airi/stream-kit'
 
+import { topicFromMarker } from '../autonomy/topics'
 import { chatMessagesToTurns } from '../messages/chat-completions'
 import { formatTimePrefix } from '../messages/datetime-prefix'
 import { renderConversationPreview } from '../messages/preview'
@@ -944,14 +945,22 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
             return
           }
 
+          if (/^<\|TOPIC\b/.test(special)) {
+            // A topic label is data for code, like a sticker. Only the first label of visible speech counts.
+            const topic = categorizer.filterToSpeech(special, streamPosition) ? topicFromMarker(special) : undefined
+            if (topic && !buildingMessage.topic)
+              buildingMessage.topic = topic
+            return
+          }
+
           await hooks.emitTokenSpecialHooks(special, streamingMessageContext)
         },
         onEnd: async (fullText) => {
           if (shouldAbort())
             return
 
-          // Strip only sticker markers, including the escaped form accepted by the parser.
-          const speechText = fullText.replace(/<(?:\||\{'\|'\})STICKER\b[\s\S]*?(?:(?:\||\{'\|'\})>|$)/g, '')
+          // Strip only sticker and topic markers, including the escaped form accepted by the parser.
+          const speechText = fullText.replace(/<(?:\||\{'\|'\})(?:STICKER|TOPIC)\b[\s\S]*?(?:(?:\||\{'\|'\})>|$)/g, '')
           const finalCategorization = categorizeResponse(speechText, activeProvider)
 
           const reasoningContentField = buildingMessage.categorization?.reasoning?.trim()

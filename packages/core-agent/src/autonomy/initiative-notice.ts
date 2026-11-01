@@ -1,8 +1,10 @@
 import type { InitiativeMode, InitiativeTrigger } from './initiative'
 import type { Intention } from './intentions'
 import type { SpeechType } from './speech-types'
+import type { TopicSeed, TopicThread } from './topics'
 
 import { dayPartOf } from './initiative'
+import { TOPIC_LIMITS } from './topics'
 
 /** The count of recent lines in the notice. The model reads them to avoid the same opening and structure. */
 export const INITIATIVE_RECENT_LINE_COUNT = 3
@@ -32,6 +34,10 @@ export interface InitiativeNoticeContext {
   readonly intentions?: readonly Intention[]
   /** How long the owner was away, for a welcome back. */
   readonly awayMs?: number
+  /** The thread that the last autonomous lines follow. */
+  readonly thread?: TopicThread
+  /** Topics that the character can take up. The host draws them with `pickTopicSeeds`. */
+  readonly seeds?: readonly TopicSeed[]
 }
 
 const TRIGGER_REASONS: Record<InitiativeTrigger, string> = {
@@ -55,7 +61,8 @@ const SPEECH_TYPE_HINTS: Record<SpeechType, string> = {
  * Builds the situation block of one autonomous turn. It is the text of a transient notice.
  *
  * The block has a fixed shape and a size limit: the reason, the time of day, the time since the last messages, a light
- * hint, and the last lines of the character. The hint is optional, so the model can ignore it.
+ * hint, the current topic and a few topic ideas, and the last lines of the character. The hint and the ideas are
+ * optional, so the model can ignore them. The model ends its line with a topic label, so code can follow topics.
  *
  * @example
  * initiativeNoticeText({ mode: 'idle', trigger: 'boredom', speechType: 'ask', now, localMinutes: 1200, recentLines: [] })
@@ -81,12 +88,24 @@ export function initiativeNoticeText(context: InitiativeNoticeContext): string {
     lines.push(...context.intentions.map(intention => `  - ${intention.id}: "${truncate(intention.text, RECENT_LINE_MAX_LENGTH)}" (noted ${durationSince(intention.createdAt, context.now)} ago)`))
   }
 
+  if (context.thread) {
+    const topic = truncate(context.thread.topic, TOPIC_LIMITS.maxLabelLength)
+    lines.push(context.thread.cold
+      ? `- Your current topic "${topic}" is cold. Move to a new topic.`
+      : `- Your current topic: "${topic}". You can continue it or move to a related topic.`)
+  }
+  if (context.seeds?.length) {
+    lines.push('- Topic ideas, only if one fits:')
+    lines.push(...context.seeds.map(seed => `  - ${truncate(seed.text, TOPIC_LIMITS.maxSeedLength)}`))
+  }
+
   const recent = context.recentLines.slice(-INITIATIVE_RECENT_LINE_COUNT).map(line => line.trim()).filter(Boolean)
   if (recent.length) {
     lines.push('- Your last lines that you started. Do not repeat their opening or structure:')
     lines.push(...recent.map(line => `  - "${truncate(line, RECENT_LINE_MAX_LENGTH)}"`))
   }
   lines.push('Keep it short and natural, one or two sentences.')
+  lines.push('If you speak, end with <|TOPIC a few words|> that name your topic, in the language of your line. Nobody sees or hears it.')
   return lines.join('\n')
 }
 

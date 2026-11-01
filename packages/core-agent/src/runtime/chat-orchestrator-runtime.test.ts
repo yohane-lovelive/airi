@@ -1987,3 +1987,28 @@ it('isolates sticker catalogs, providers, and supplements across concurrent and 
     categorization: { speech: 'Reply ' },
   })
 })
+
+describe('chat topic markers', () => {
+  it('stores the first topic label without speech, special hooks, or a visible reply', async () => {
+    const harness = createHarness()
+    const literals: string[] = []
+    const specials: string[] = []
+    harness.runtime.hooks.onTokenLiteral(async (text) => {
+      literals.push(text)
+    })
+    harness.runtime.hooks.onTokenSpecial(async (text) => {
+      specials.push(text)
+    })
+    harness.stream.mockImplementationOnce(async (_model, _provider, _context, options) => {
+      for (const text of ['Ramen tonight? ', '<|TOP', 'IC ramen|>', '<|TOPIC other|>'])
+        await options?.onStreamEvent?.({ type: 'text-delta', text })
+    })
+    await harness.runtime.ingest('Hello', { model: 'test', chatProvider: provider })
+    const saved = harness.sessionMessages['session-1'].at(-1)
+
+    expect(saved).toMatchObject({ role: 'assistant', content: 'Ramen tonight? ', topic: 'ramen' })
+    expect(literals.join('')).toBe('Ramen tonight? ')
+    expect(specials).toEqual([])
+    expect(saved?.role === 'assistant' && saved.categorization?.speech).toBe('Ramen tonight? ')
+  })
+})

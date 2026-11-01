@@ -125,6 +125,16 @@ devtools:
         away: 'オーナーは {time} から離席中です。'
         greeting: '最後のあいさつ: {time}'
         welcome-back: '最後のおかえり: {time}'
+      topics:
+        title: 話題
+        thread: '今の話題: {topic}（{count} 行、熱 {heat}）'
+        thread-cold: '今の話題: {topic}（{count} 行、熱 {heat}）。冷えたので、次のターンで新しい話題を頼みます。'
+        no-thread: 最近の数日に、自律発話はありません。
+        seeds: '前のターンの話題の種: {seeds}'
+        variety: '今日の多様性（{count} 行）'
+        distinct: '言い回しの重複のなさ（distinct-2）: {value}'
+        entropy: '発話タイプのばらつき（エントロピー）: {value}'
+        similarity: '続く話題どうしの近さ: {value}'
     presence-bubble:
       title: プレゼンスバブル
       description: キャラクターの頭上のバブルを操作し、メインウィンドウで確認します

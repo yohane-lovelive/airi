@@ -60,3 +60,17 @@ export { SPEECH_TYPES } from './speech-types'
 export type { SpeechType } from './speech-types'
 export { activeTalkControl, applyTalkLevel, TALK_CONTROL_LIMITS, talkControlEffect } from './talk-control'
 export type { TalkControl, TalkLevelRequest, TalkLevelResult } from './talk-control'
+export {
+  bigramSimilarity,
+  calendarTopicSeeds,
+  characterBigrams,
+  currentTopicThread,
+  distinctN,
+  pickTopicSeeds,
+  speechTypeEntropy,
+  TOPIC_LIMITS,
+  topicFromMarker,
+  topicOf,
+  topicVariety,
+} from './topics'
+export type { TopicLine, TopicSeed, TopicSeedRequest, TopicSeedSource, TopicSimilarity, TopicThread, TopicVariety } from './topics'

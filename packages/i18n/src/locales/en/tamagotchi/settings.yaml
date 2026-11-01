@@ -131,6 +131,16 @@ devtools:
         away: 'The owner is away since {time}.'
         greeting: 'Last greeting: {time}'
         welcome-back: 'Last welcome back: {time}'
+      topics:
+        title: Topics
+        thread: 'Current topic: {topic} ({count} lines, heat {heat})'
+        thread-cold: 'Current topic: {topic} ({count} lines, heat {heat}). It is cold, so the next turn asks for a new topic.'
+        no-thread: No autonomous lines in the recent days.
+        seeds: 'Ideas of the last turn: {seeds}'
+        variety: 'Variety of today ({count} lines)'
+        distinct: 'Distinct phrases (distinct-2): {value}'
+        entropy: 'Speech type spread (entropy): {value}'
+        similarity: 'Similarity of consecutive topics: {value}'
     presence-bubble:
       title: Presence Bubble
       description: Drive the bubble above the character and watch it in the main window

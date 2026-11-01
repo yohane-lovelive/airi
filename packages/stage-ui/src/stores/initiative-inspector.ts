@@ -1,4 +1,4 @@
-import type { InitiativeReadout, InitiativeRhythm } from '@proj-airi/core-agent'
+import type { InitiativeReadout, InitiativeRhythm, TopicThread, TopicVariety } from '@proj-airi/core-agent'
 
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
@@ -14,11 +14,19 @@ export interface InitiativeInspectorRhythm {
   lastRhythm?: { rhythm: InitiativeRhythm, at: number }
 }
 
+/** What the runner knows about topics: the current thread, the seeds of the last drive turn, and today's variety. */
+export interface InitiativeInspectorTopics {
+  thread?: TopicThread
+  seeds: string[]
+  variety: TopicVariety
+}
+
 /** One readout of the policy and its time. */
 export interface InitiativeInspectorSnapshot {
   at: number
   readout: InitiativeReadout
   rhythm: InitiativeInspectorRhythm
+  topics: InitiativeInspectorTopics
 }
 
 /**
@@ -47,8 +55,8 @@ export const useInitiativeInspectorStore = defineStore('initiative-inspector', (
     return watchingUntil.value > now
   }
 
-  function publish(readout: InitiativeReadout, at: number, rhythm: InitiativeInspectorRhythm = {}) {
-    snapshot.value = { at, readout, rhythm }
+  function publish(readout: InitiativeReadout, at: number, rhythm: InitiativeInspectorRhythm, topics: InitiativeInspectorTopics) {
+    snapshot.value = { at, readout, rhythm, topics }
   }
 
   return {

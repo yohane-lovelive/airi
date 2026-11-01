@@ -32,6 +32,7 @@ useIntervalFn(() => inspector.markWatching(), INSPECTOR_WATCH_REFRESH_MS, { imme
 const now = useNow({ interval: 1_000 })
 const readout = computed(() => snapshot.value && now.value.getTime() - snapshot.value.at < STALE_AFTER_MS ? snapshot.value.readout : undefined)
 const rhythm = computed(() => readout.value ? snapshot.value?.rhythm : undefined)
+const topics = computed(() => readout.value ? snapshot.value?.topics : undefined)
 
 /** Drive and threshold samples of this page. Each page keeps its own history from the time it opened. */
 const history = ref<Array<{ at: number, drive: number, threshold: number }>>([])
@@ -166,6 +167,29 @@ function timeLabel(epochMs: number) {
         <li v-if="rhythm?.lastRhythm">
           {{ t(`${KEY}.rhythm.${rhythm.lastRhythm.rhythm}`, { time: timeLabel(rhythm.lastRhythm.at) }) }}
         </li>
+      </ul>
+    </section>
+
+    <section v-if="topics" :class="['flex flex-col', 'gap-2', 'rounded-xl', 'bg-neutral-100 dark:bg-neutral-900', 'p-4']">
+      <h2 :class="['text-sm font-medium']">
+        {{ t(`${KEY}.topics.title`) }}
+      </h2>
+      <ul :class="['flex flex-col', 'gap-1', 'text-sm', 'tabular-nums']">
+        <li v-if="topics.thread">
+          {{ t(`${KEY}.topics.${topics.thread.cold ? 'thread-cold' : 'thread'}`, { topic: topics.thread.topic, count: topics.thread.lines, heat: number(topics.thread.heat) }) }}
+        </li>
+        <li v-else>
+          {{ t(`${KEY}.topics.no-thread`) }}
+        </li>
+        <li>{{ t(`${KEY}.topics.seeds`, { seeds: topics.seeds.join(' / ') || '-' }) }}</li>
+      </ul>
+      <h3 :class="['mt-1', 'text-xs font-medium', 'text-neutral-500 dark:text-neutral-400']">
+        {{ t(`${KEY}.topics.variety`, { count: topics.variety.lines }) }}
+      </h3>
+      <ul :class="['flex flex-col', 'gap-1', 'text-sm', 'tabular-nums']">
+        <li>{{ t(`${KEY}.topics.distinct`, { value: number(topics.variety.distinct2) }) }}</li>
+        <li>{{ t(`${KEY}.topics.entropy`, { value: number(topics.variety.typeEntropy) }) }}</li>
+        <li>{{ t(`${KEY}.topics.similarity`, { value: topics.variety.topicSimilarity === undefined ? '-' : number(topics.variety.topicSimilarity) }) }}</li>
       </ul>
     </section>
 

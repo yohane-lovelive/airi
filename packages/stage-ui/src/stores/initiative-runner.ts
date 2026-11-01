@@ -1,16 +1,32 @@
-import type { InitiativeDecision, InitiativeEvent, InitiativeHost, InitiativeRhythm, InitiativeState, InitiativeWaitReason } from '@proj-airi/core-agent'
+import type { InitiativeDecision, InitiativeEvent, InitiativeHost, InitiativeRhythm, InitiativeState, InitiativeTime, InitiativeWaitReason, SpeechType, TopicSeed } from '@proj-airi/core-agent'
 import type { SyncedPiniaRuntime } from 'pinia-plugin-synced'
 
 import type { OwnerPresence, OwnerPresenceSource } from '../libs/initiative/presence'
 
 import { errorMessageFrom } from '@moeru/std'
-import { createInitiativeState, decideInitiative, initiativeNoticeText, initiativeReadout, initiativeTimeFrom, observeInitiative, requestRhythmTurn, resolveInitiativeOptions } from '@proj-airi/core-agent'
+import {
+  calendarTopicSeeds,
+  createInitiativeState,
+  currentTopicThread,
+  decideInitiative,
+  initiativeNoticeText,
+  initiativeReadout,
+  initiativeTimeFrom,
+  observeInitiative,
+  pickTopicSeeds,
+  requestRhythmTurn,
+  resolveInitiativeOptions,
+  TOPIC_LIMITS,
+  topicOf,
+  topicVariety,
+} from '@proj-airi/core-agent'
 import { nanoid } from 'nanoid'
 import { defineStore, storeToRefs } from 'pinia'
 import { computed, onScopeDispose, readonly, shallowRef, watch } from 'vue'
 
 import { INITIATIVE_SOURCE, initiativeConversationFacts, initiativeEventOf } from '../libs/initiative/conversation'
 import { markAway, observePresence, OWNER_PRESENCE_LIMITS, shouldGreet } from '../libs/initiative/presence'
+import { initiativeTopicLines, memoryTopicSeeds } from '../libs/initiative/topics'
 import { isOwnerTyping } from '../libs/initiative/typing'
 import { Ticker } from '../workers/ticker'
 import { useSpeakingStore } from './audio'
@@ -19,12 +35,15 @@ import { useChatSessionStore } from './chat/session-store'
 import { useInitiativeStore } from './initiative'
 import { useInitiativeInspectorStore } from './initiative-inspector'
 import { useIntentionsStore } from './intentions'
+import { useMemoryStore } from './memory'
 import { useOwnerTypingStore } from './owner-typing'
 import { useVoiceStore } from './voice'
 import { useVoiceMessagesStore } from './voice-messages'
 
 /** The policy decides once each second. The drive changes slowly, so a finer check adds nothing. */
 const TICK_INTERVAL_MS = 1_000
+
+const DAY_MS = 24 * 60 * 60_000
 
 /** Gates that hold for longer than a pending rhythm turn waits. A greeting or a welcome back then never starts. */
 const LASTING_WAIT_REASONS: readonly InitiativeWaitReason[] = ['quiet-hours', 'owner-quiet', 'daily-budget']
@@ -38,6 +57,10 @@ const LASTING_WAIT_REASONS: readonly InitiativeWaitReason[] = ['quiet-hours', 'o
  * - Each tick asks `decideInitiative`. On a turn, a transient notice goes to the conversation that the owner has open.
  *   History keeps the reply only, so silent turns leave no trace.
  * - Stored messages of that conversation feed the policy: an owner message, and a reply that no autonomous turn started.
+ * - Topics flow. The model ends each line with a topic label, and the reply keeps it. Each drive turn reads the lines
+ *   of recent days: the current thread and its heat, and a few seeds from the memory index and the calendar that are
+ *   far from the recent topics. A seed that a spoken turn offered rests for six hours. A cold thread asks the model
+ *   for a new topic.
  * - The open intentions add drive, and the situation block lists them. The owner's temporary changes, for example a
  *   quiet time, change the options at each tick.
  * - While a window watches the inspector, each tick publishes a readout of the policy to it.
@@ -61,6 +84,7 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
   const voiceMessages = useVoiceMessagesStore()
   const ownerTyping = useOwnerTypingStore()
   const inspector = useInitiativeInspectorStore()
+  const memory = useMemoryStore()
   const { activeSessionId } = storeToRefs(chatSession)
 
   /** The policy state. Undefined while the feature is off or this renderer does not lead. */
@@ -81,6 +105,12 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
   let pendingRhythm: { rhythm: InitiativeRhythm, until: number, awayMs?: number } | undefined
   /** The last greeting or welcome back that started, for the inspector and the gap between them. */
   const lastRhythm = shallowRef<{ rhythm: InitiativeRhythm, at: number }>()
+  /** The hinted speech types of today's spoken turns, for the variety in the inspector. It is runtime state only. */
+  let spokenTypes: { day: string, types: SpeechType[] } = { day: '', types: [] }
+  /** The seeds of the last drive turn, for the inspector. */
+  let lastSeeds: TopicSeed[] = []
+  /** When a spoken turn last offered each seed. A seed rests for a while after that. It is runtime state only. */
+  const seedOfferedAt = new Map<string, number>()
 
   const ownerSpeaking = computed(() => voiceMessages.isRecording || voice.state?.phase === 'capturing')
   const activeMessages = computed(() => chatSession.getSessionMessagesIfLoaded(activeSessionId.value))
@@ -114,10 +144,35 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
     void chat.cancelTurn({ sessionId: running.sessionId, turnId: running.turnId })
   }
 
+  /** The autonomous lines of a conversation in the recent days that topics avoid. */
+  function recentTopicLines(sessionId: string, now: number) {
+    return initiativeTopicLines(chatSession.getSessionMessages(sessionId), now - TOPIC_LIMITS.recentDays * DAY_MS)
+  }
+
+  /** The current thread and a few seeds far from the recent topics. */
+  function topicsOf(sessionId: string, time: InitiativeTime) {
+    const lines = recentTopicLines(sessionId, time.now)
+    const thread = currentTopicThread(lines)
+    const pool = [
+      ...(memory.enabled ? memoryTopicSeeds(memory.entries, chat.personaOf(sessionId)) : []),
+      ...calendarTopicSeeds(time.localDay),
+    ]
+    for (const [text, at] of seedOfferedAt) {
+      if (time.now - at >= TOPIC_LIMITS.seedRestMs)
+        seedOfferedAt.delete(text)
+    }
+    const seeds = pickTopicSeeds({ seeds: pool, recentTopics: lines.map(topicOf), resting: [...seedOfferedAt.keys()], random: Math.random })
+    return { thread, seeds }
+  }
+
   async function runTurn(decision: Extract<InitiativeDecision, { kind: 'turn' }>, sessionId: string, awayMs?: number) {
     const date = new Date()
     const time = initiativeTimeFrom(date)
     const facts = initiativeConversationFacts(chatSession.getSessionMessages(sessionId))
+    // A greeting and a welcome back have their own reason. Topic ideas would pull them away from it.
+    const rhythm = decision.trigger === 'greeting' || decision.trigger === 'welcome-back'
+    const topics = rhythm ? undefined : topicsOf(sessionId, time)
+    lastSeeds = topics?.seeds ?? []
     const text = initiativeNoticeText({
       mode: state.value?.mode ?? 'idle',
       trigger: decision.trigger,
@@ -127,6 +182,8 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
       ...facts,
       intentions: intentions.openAt(time.now),
       ...(awayMs !== undefined ? { awayMs } : {}),
+      ...(topics?.thread ? { thread: topics.thread } : {}),
+      ...(topics?.seeds.length ? { seeds: topics.seeds } : {}),
     })
     const turn = { sessionId, turnId: nanoid(), dropped: false }
     running = turn
@@ -140,6 +197,14 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
     }
     finally {
       running = undefined
+    }
+    if (outcome === 'spoke') {
+      for (const seed of topics?.seeds ?? [])
+        seedOfferedAt.set(seed.text, time.now)
+    }
+    if (outcome === 'spoke' && decision.speechType) {
+      const day = initiativeTimeFrom(new Date()).localDay
+      spokenTypes = { day, types: [...(spokenTypes.day === day ? spokenTypes.types : []), decision.speechType] }
     }
     observe({ type: 'turn-finished', outcome })
   }
@@ -172,9 +237,21 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
       lastRhythm.value = { rhythm: rhythm.rhythm, at: time.now }
 
     if (inspector.isWatched(time.now))
-      inspector.publish(initiativeReadout(next, currentHost, time, options), time.now, { awaySince: presence.value.awaySince, lastRhythm: lastRhythm.value })
+      inspector.publish(initiativeReadout(next, currentHost, time, options), time.now, { awaySince: presence.value.awaySince, lastRhythm: lastRhythm.value }, topicReadout(sessionId, time))
     if (decision.kind === 'turn')
       void runTurn(decision, sessionId, rhythm?.awayMs)
+  }
+
+  /** The current thread, the last seeds, and the variety of today's lines, for the inspector. */
+  function topicReadout(sessionId: string, time: InitiativeTime) {
+    const lines = recentTopicLines(sessionId, time.now)
+    const midnight = new Date(time.now).setHours(0, 0, 0, 0)
+    const thread = currentTopicThread(lines)
+    return {
+      ...(thread ? { thread } : {}),
+      seeds: lastSeeds.map(seed => seed.text),
+      variety: topicVariety(lines.filter(line => line.at >= midnight), spokenTypes.day === time.localDay ? spokenTypes.types : []),
+    }
   }
 
   /** At the first tick with the open conversation, a conversation quiet for hours gets a greeting. */

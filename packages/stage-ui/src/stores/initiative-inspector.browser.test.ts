@@ -58,9 +58,11 @@ describe('useInitiativeInspectorStore', () => {
     const { leader, follower } = await createWindows()
     const published = readout()
 
-    leader.store.publish(published, 1_000)
+    const topics = { thread: { topic: 'ラーメン', lines: 1, heat: 0.85, cold: false }, seeds: ['It is November.'], variety: { lines: 1, distinct2: 1, typeEntropy: 0 } }
+    leader.store.publish(published, 1_000, {}, topics)
 
     await expect.poll(() => follower.store.snapshot?.at).toBe(1_000)
     expect(follower.store.snapshot?.readout).toEqual(published)
+    expect(follower.store.snapshot?.topics).toEqual(topics)
   })
 })

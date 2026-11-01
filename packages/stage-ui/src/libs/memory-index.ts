@@ -1,5 +1,7 @@
 import type { MemoryEntry } from '../types/memory'
 
+import { characterBigrams } from '@proj-airi/core-agent'
+
 /** The memory index of a request lists at most this many entries. The model searches the rest. */
 export const MEMORY_INDEX_LIMIT = 50
 /** A memory search returns at most this many entries. */
@@ -21,18 +23,6 @@ export function memoryIndexEntries(entries: readonly MemoryEntry[], personaId: s
   return { own: listedOwn, general: listedGeneral, hidden: own.length + general.length - listedOwn.length - listedGeneral.length }
 }
 
-/** The pairs of neighbor characters in a text, without spaces and case. Japanese has no spaces, so words do not work. */
-function bigramsOf(text: string) {
-  const compact = text.toLowerCase().replace(/\s+/g, '')
-  const bigrams = new Set<string>()
-  for (let index = 0; index < compact.length - 1; index++)
-    bigrams.add(compact.slice(index, index + 2))
-  // A one-character query still finds entries that hold the character.
-  if (compact.length === 1)
-    bigrams.add(compact)
-  return bigrams
-}
-
 /**
  * Finds the entries that share the most character pairs with the query, best first. A tie goes to the newer entry.
  *
@@ -41,7 +31,7 @@ function bigramsOf(text: string) {
  * // => the entries whose description or body holds "誕生" or "生日"
  */
 export function searchMemories(entries: readonly MemoryEntry[], query: string, limit = MEMORY_SEARCH_LIMIT) {
-  const wanted = bigramsOf(query)
+  const wanted = characterBigrams(query)
   if (!wanted.size)
     return []
   return entries

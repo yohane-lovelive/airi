@@ -108,7 +108,8 @@ All functions are pure. The host passes the time, a random source, and the state
 - `initiativeReadout` reads what the policy sees at a time, without a decision: the drive and its parts, the threshold, the inner state, the gate reason, and the pace. An inspector shows it.
 - `requestRhythmTurn` starts a turn of the daily rhythm, a greeting or a welcome back, without the drive. The gates still hold it. `dayPartOf` names the part of the day. At night, the threshold is higher and quiet speech types come more often.
 - `resolveInitiativeOptions` fills owner settings with defaults: intervals, quiet hours, and the daily turn budget.
-- `initiativeNoticeText` writes the situation block of one turn: the reason, the time of day, the time since the last messages, the hint, the open intentions, and the last three autonomous lines.
+- `initiativeNoticeText` writes the situation block of one turn: the reason, the time of day, the time since the last messages, the hint, the current topic, a few topic ideas, the open intentions, and the last three autonomous lines. It asks the model to end its line with a `<|TOPIC ...|>` label, and the orchestrator stores the label on the reply as `topic`.
+- `currentTopicThread` finds the thread of the newest autonomous lines and its heat. `pickTopicSeeds` draws seeds far from the recent topics, and `calendarTopicSeeds` gives seeds from the date. `topicVariety` measures `distinct-2`, the speech type entropy, and the similarity of consecutive topics. Each one takes a `TopicSimilarity`. The default `bigramSimilarity` compares character pairs until embeddings exist.
 - `createIntention` and `openIntentions` check intentions: notes of what the character wants to do later. `INTENTION_LIMITS` has their count and time limits.
 - `applyTalkLevel` and `talkControlEffect` turn the owner's words, for example "be quiet for 30 minutes", into a quiet time and an interval factor.
 

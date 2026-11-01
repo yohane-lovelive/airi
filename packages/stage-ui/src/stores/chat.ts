@@ -1650,6 +1650,7 @@ export const useChatStore = defineStore('chat', () => {
     cancelPendingSends,
     getPendingQueuedSendSnapshot,
     openTurnSpan,
+    personaOf,
 
     clearHooks: runtime.hooks.clearHooks,
 

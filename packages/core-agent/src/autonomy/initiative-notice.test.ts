@@ -35,6 +35,20 @@ describe('initiativeNoticeText', () => {
     expect(initiativeNoticeText(context())).not.toContain('wanted to do')
   })
 
+  it('names the current topic, asks for a new one when it is cold, and lists the topic ideas', () => {
+    const warm = initiativeNoticeText(context({ thread: { topic: 'ラーメン', lines: 1, heat: 0.85, cold: false }, seeds: [{ text: 'It is November.', source: 'calendar' }] }))
+    expect(warm).toContain('Your current topic: "ラーメン". You can continue it or move to a related topic.')
+    expect(warm).toContain('Topic ideas, only if one fits:\n  - It is November.')
+
+    const cold = initiativeNoticeText(context({ thread: { topic: 'ラーメン', lines: 3, heat: 0.2, cold: true } }))
+    expect(cold).toContain('Your current topic "ラーメン" is cold. Move to a new topic.')
+    expect(cold).not.toContain('Topic ideas')
+  })
+
+  it('asks for a topic label at the end of the line', () => {
+    expect(initiativeNoticeText(context())).toContain('end with <|TOPIC a few words|>')
+  })
+
   it('gives the speech type as a light idea, and gives none in a hintless turn', () => {
     expect(initiativeNoticeText(context({ speechType: 'ask' }))).toContain('Idea, only if it fits: ask the owner a question.')
     expect(initiativeNoticeText(context())).not.toContain('Idea')
