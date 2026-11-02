@@ -88,6 +88,7 @@ Each chat request has parts with limits. It is step 2-4 of [the autonomy ADR](..
 - The session meta keeps the summary on the device. The chat view still shows every message.
 - Settings > Modules > Short-Term Memory turns the summary on or off. It is on by default.
 - The memory index lists 50 entries at most (`libs/memory-index.ts`). `builtIn_searchMemory` finds the rest by shared character pairs.
+- `useMemorySyncStore()` syncs the memories with the account on the leader, while the `memory-sync` experiment is on. `libs/memory-sync` maps an entry to its synced fields, and `applySyncChanges` of the memory store writes a round.
 - `libs/prompt-parts.ts` measures each part of a request for IO traces.
 
 ## Model usage

@@ -37,6 +37,12 @@ export const memoryRepo = {
     for (const id of ids)
       entries.delete(id)
   },
+  async applySync(saved: MemoryEntry[], removed: string[]) {
+    for (const entry of saved)
+      entries.set(entry.id, entry)
+    for (const id of removed)
+      entries.delete(id)
+  },
   async clear() {
     entries.clear()
   },

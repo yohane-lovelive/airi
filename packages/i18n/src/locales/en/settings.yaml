@@ -2549,6 +2549,9 @@ pages:
         settings_sync:
           title: Settings sync
           description: Sync your settings with your account when you are signed in, so other devices use the same settings. API keys and settings of this device, for example audio devices, stay here. Off by default.
+        memory_sync:
+          title: Memory sync
+          description: Sync Long-Term Memory with your account when you are signed in, so other devices remember the same facts. A self-hosted server that runs the memory search also finds memories by meaning. Off by default.
         fullscreen_workspace:
           title: Fullscreen workspace
           description: Open settings and the chat in a workspace that covers the screen, with the character on the left. Off by default.

@@ -49,6 +49,14 @@ The server is the source of truth for memories. It also owns the embeddings. A d
 - The renderer leader runs the sync, like the settings sync: after a local change, on sign-in, and when the window becomes visible.
 - The client experiment `memory-sync` turns it on. It is off by default.
 
+Step M2a built the sync as follows.
+
+- `useMemorySyncStore()` runs `synchronize` of `libs/document-sync` on the leader. A change in any window reaches it as `changeCount` of the memory store, and one run follows 1.5 seconds after a burst of writes.
+- `updatedAt` does not sync. It changes with every edit, so two devices would conflict on the time alone. An entry that reaches a device for the first time takes the creation time in its UUIDv7, so the index keeps the order of the facts.
+- Fields from another device go through a Valibot schema with the limits of the server. An entry with invalid fields stays as it is on the device.
+- The memory store writes the entries of a round at once, before it awaits the save, as `synchronize` needs. A read that started before the round does not replace them.
+- A run reads the entries again before it starts. An edit in another window during a run can still lose to a remote change of the same entry. A lock for the whole run would stop every memory write while the network answers, so the run takes this rare case.
+
 ### Retrieval interface
 
 `recallMemories({ query, personaId, limit })` returns the best entries for a query, best first. The card's own entries and the general entries take part.
@@ -98,7 +106,8 @@ Step M5 adds two background tasks with the usage purpose `memory`:
 | Step | Content | State |
 | --- | --- | --- |
 | M1 | Server: the `embedder` service, the memory feature of the field store, vectors on write, and the search and embed routes. | Done |
-| M2 | Client: the memory sync, `recallMemories`, recalled memories in the prompt, and `builtIn_searchMemory` by meaning. | To do |
+| M2a | Client: the memory sync. | Done |
+| M2b | Client: `recallMemories`, recalled memories in the prompt, and `builtIn_searchMemory` by meaning. | To do |
 | M3 | Autonomous readers: the `recall` speech type, the seeds, and the topic similarity by vectors. It finishes the recall of ADR 2026-10-28 step 5. | To do |
 | M4 | The floor between devices, and the sync of missions and intentions. | To do |
 | M5 | The owner profile and the memory work. | To do |

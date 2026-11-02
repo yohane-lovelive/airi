@@ -113,6 +113,29 @@ describe('memory store', () => {
     expect(await records.getItem(nickname.id)).toEqual({ id: nickname.id, updatedAt: expect.any(Number), deleted: true })
   })
 
+  it('applies a sync round to the entries at once, saves it, and tells the other windows', async () => {
+    const leader = createStore()
+    const other = createStore()
+    const kept = (await leader.write({ description: 'Food', body: 'Ramen.' }, 'airi'))!
+    const gone = (await leader.write({ description: 'Pet', body: 'A cat.' }, 'airi'))!
+    await other.ready()
+    const changesBefore = leader.changeCount
+
+    const applied = leader.applySyncChanges({
+      upserts: { [kept.id]: { description: 'Food', body: 'Sushi.', persona: 'airi' }, broken: { body: '' } },
+      removals: [gone.id],
+      conflictCopies: [],
+    })
+    // The sync reads the entries again in the same task, so they change before the save.
+    expect(leader.entries.map(entry => entry.body)).toEqual(['Sushi.'])
+
+    expect(await applied).toEqual({ rejected: ['broken'] })
+    expect(await records.getItem(gone.id)).toEqual({ id: gone.id, updatedAt: expect.any(Number), deleted: true })
+    await vi.waitFor(() => expect(other.read(kept.id, 'airi')?.body).toBe('Sushi.'))
+    // A sync of other devices is no change of this device, so it requests no new sync.
+    expect(leader.changeCount).toBe(changesBefore)
+  })
+
   it('moves the entries from localStorage once, with new ids, before it is ready', async () => {
     localStorage.setItem('memory/entries', JSON.stringify([
       { name: 'nickname', description: 'What the owner likes to be called.', body: 'Yumeka.', persona: 'airi', updatedAt: 10 },

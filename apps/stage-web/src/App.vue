@@ -9,6 +9,7 @@ import { useCharacterOrchestratorStore } from '@proj-airi/stage-ui/stores/charac
 import { useChatStore } from '@proj-airi/stage-ui/stores/chat'
 import { useDisplayModelsStore } from '@proj-airi/stage-ui/stores/display-models'
 import { useInitiativeRunnerStore } from '@proj-airi/stage-ui/stores/initiative-runner'
+import { useMemorySyncStore } from '@proj-airi/stage-ui/stores/memory-sync'
 import { useMissionRunnerStore } from '@proj-airi/stage-ui/stores/mission-runner'
 import { useModsServerChannelStore } from '@proj-airi/stage-ui/stores/mods/api/channel-server'
 import { useContextBridgeStore } from '@proj-airi/stage-ui/stores/mods/api/context-bridge'
@@ -60,6 +61,7 @@ const ownerPresence = usePageOwnerPresence()
 const perceptionRunnerStore = usePerceptionRunnerStore()
 const watchRunnerStore = useWatchRunnerStore()
 const settingsSyncStore = useSettingsSyncStore()
+const memorySyncStore = useMemorySyncStore()
 const settingsAudioDeviceStore = useSettingsAudioDevice()
 const { showingSetup } = storeToRefs(onboardingStore)
 const { isDark } = useTheme()
@@ -168,6 +170,7 @@ async function loadStartup() {
       perceptionRunnerStore.initialize(syncedPinia, createPageScreenSource())
       watchRunnerStore.initialize(syncedPinia)
       settingsSyncStore.initialize(syncedPinia)
+      memorySyncStore.initialize(syncedPinia)
     })
     await startup.run('modelData', () => displayModelsStore.loadDisplayModelsFromIndexedDB())
     await startup.run('modelSelection', () => settingsStore.initializeStageModel())

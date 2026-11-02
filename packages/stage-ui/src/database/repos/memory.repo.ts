@@ -90,6 +90,13 @@ export const memoryRepo = {
   async remove(ids: string[], updatedAt: number) {
     await write(() => Promise.all(ids.map(id => records.setItem<MemoryTombstone>(id, { id, updatedAt, deleted: true }))))
   },
+  /** Saves the entries of a sync round as they are, and replaces the removed ones with tombstones. */
+  async applySync(saved: MemoryEntry[], removed: string[], updatedAt: number) {
+    await write(() => Promise.all([
+      ...saved.map(entry => records.setItem<MemoryEntry>(entry.id, entry)),
+      ...removed.map(id => records.setItem<MemoryTombstone>(id, { id, updatedAt, deleted: true })),
+    ]))
+  },
   /** Deletes every record, tombstones too. Only deleting all data uses it. */
   async clear() {
     await write(() => records.clear())

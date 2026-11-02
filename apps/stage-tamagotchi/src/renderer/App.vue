@@ -16,6 +16,7 @@ import { useChatStore } from '@proj-airi/stage-ui/stores/chat'
 import { usePluginHostInspectorStore } from '@proj-airi/stage-ui/stores/devtools/plugin-host-debug'
 import { useDisplayModelsStore } from '@proj-airi/stage-ui/stores/display-models'
 import { useInitiativeRunnerStore } from '@proj-airi/stage-ui/stores/initiative-runner'
+import { useMemorySyncStore } from '@proj-airi/stage-ui/stores/memory-sync'
 import { useMissionRunnerStore } from '@proj-airi/stage-ui/stores/mission-runner'
 import { useModsServerChannelStore } from '@proj-airi/stage-ui/stores/mods/api/channel-server'
 import { useContextBridgeStore } from '@proj-airi/stage-ui/stores/mods/api/context-bridge'
@@ -175,6 +176,7 @@ function createFullStageRuntime() {
   const perceptionRunnerStore = usePerceptionRunnerStore()
   const watchRunnerStore = useWatchRunnerStore()
   const settingsSyncStore = useSettingsSyncStore()
+  const memorySyncStore = useMemorySyncStore()
   const inferencePreload = useInferencePreload()
   const pluginHostInspectorStore = usePluginHostInspectorStore()
   const stageWindowLifecycleStore = useStageWindowLifecycleStore()
@@ -348,6 +350,7 @@ function createFullStageRuntime() {
         perceptionRunnerStore.initialize(syncedPinia, createElectronScreenSource(context.value), createElectronPerceptionRecorder(context.value))
         watchRunnerStore.initialize(syncedPinia)
         settingsSyncStore.initialize(syncedPinia)
+        memorySyncStore.initialize(syncedPinia)
       }
 
       defineInvokeHandler(context.value, pluginProtocolListProviders, async () => listProvidersForPluginHost())
