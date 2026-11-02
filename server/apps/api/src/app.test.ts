@@ -17,6 +17,7 @@ function createTestDeps(webAppUrl = 'https://airi.moeru.ai') {
     db: { query: { user: { findFirst: vi.fn() } } } as never,
     characterCardService: {} as never,
     settingsSyncService: {} as never,
+    memoryService: {} as never,
     characterService: {} as never,
     chatService: {} as never,
     providerService: {} as never,

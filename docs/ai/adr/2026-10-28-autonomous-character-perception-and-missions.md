@@ -534,7 +534,7 @@ Generation:
 
 ### Memory and devices
 
-A separate ADR covers long-term memory and sync between devices. This ADR depends on it as follows:
+[ADR 2026-11-02](./2026-11-02-long-term-memory-and-recall.md) covers long-term memory and sync between devices. This ADR depends on it as follows:
 
 - A device that connects later gets the same memories and conversations.
 - The server keeps the presence record for the floor between devices.
@@ -723,7 +723,7 @@ The owner asked for this work between the steps. It is not in the step table, bu
 - Choose the default exclusion list with the owner.
 - Measure whether the OpenCode Go cache applies to images.
 - Find a CORS solution for the production web build.
-- Write the ADR for long-term memory and sync between devices. It also defines the floor between devices.
+- Build [ADR 2026-11-02](./2026-11-02-long-term-memory-and-recall.md) for long-term memory and sync between devices. It also defines the floor between devices.
 - Choose the native module for the capture of one process with the owner, before step 5.
 - [The idea notes](../context/autonomy-ideas.md) keep the features that the owner held for later.
 - Decide whether a realtime API enters a later ADR.

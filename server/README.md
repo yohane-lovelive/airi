@@ -8,10 +8,11 @@ while production deployment configuration remains in `proj-airi/airi-railway`.
 
 - `apps/api`: resource API, business domains, database migrations, and API runtime.
 - `apps/auth`: standalone Better Auth and OIDC service.
+- `apps/embedder`: local-only text embedder for the memory search, with EmbeddingGemma 2.
 - `packages/auth-shared`: Auth-owned database schema and principal contracts.
 - `packages/server-sdk-shared`: Eventa contracts for the hosted chat WebSocket.
 - `dev/caddy`: local-only public edge routing for the shared Auth/API origin.
-- `docker-compose.yaml`: complete local API + Auth + PostgreSQL + Redis + Caddy stack.
+- `docker-compose.yaml`: complete local API + Auth + embedder + PostgreSQL + Redis + Caddy stack.
 
 ## Run locally
 
@@ -82,6 +83,12 @@ Settings sync leaves API keys and the settings of one device on that device.
 `server/docs/ai/adr/2026-10-31-settings-sync.md` lists the rules.
 Sign in on your main device first. A new device takes the server settings
 on its first run.
+
+The stack also runs the memory embedder. Its first start downloads the text
+model of EmbeddingGemma 2, about 330 MB, into the `embedder_models` volume.
+The API finds memories by meaning only after that. Until then, the apps find
+them by shared characters. `server/docs/ai/adr/2026-11-02-memory-store-and-search.md`
+has the design.
 
 A phone cannot use `localhost`. It needs the server on an HTTPS address, for
 example through a private network tunnel. This guide does not cover that.

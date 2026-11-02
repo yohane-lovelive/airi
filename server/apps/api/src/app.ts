@@ -16,6 +16,7 @@ import type { DisplayModelService } from './services/domain/display-models'
 import type { FluxService } from './services/domain/flux'
 import type { FluxTransactionService } from './services/domain/flux-transaction'
 import type { LlmRouterService } from './services/domain/llm-router'
+import type { MemoryService } from './services/domain/memories'
 import type { PaymentService } from './services/domain/payment'
 import type { ProductEventService } from './services/domain/product-events'
 import type { ProviderCatalogService } from './services/domain/provider-catalog'
@@ -69,6 +70,7 @@ import { createDisplayModelRoutes } from './routes/display-models'
 import { createFluxRoutes } from './routes/flux'
 import { createInternalAuthRoutes } from './routes/internal-auth'
 import { createLlmRequestRoutes } from './routes/llm-requests'
+import { createMemoryRoutes } from './routes/memories'
 import { createV1Routes } from './routes/openai/v1'
 import { createProviderRoutes } from './routes/providers'
 import { createRevenuecatRoutes } from './routes/revenuecat'
@@ -78,6 +80,7 @@ import { createVoicePackRoutes } from './routes/voice-packs'
 import { accountEventsStream, createUserDeletedEventHandler } from './services/adapters/account-events'
 import { createConfigKVService } from './services/adapters/config-kv'
 import { createConfigKVStore } from './services/adapters/config-kv/store'
+import { createEmbedderClient } from './services/adapters/embedder'
 import { createS3ObjectStore } from './services/adapters/object-store'
 import { createOpenpanelSink } from './services/adapters/openpanel'
 import { createRevenuecatSubscriberClient } from './services/adapters/revenuecat-subscriber'
@@ -92,6 +95,7 @@ import { createDisplayModelService } from './services/domain/display-models'
 import { createFluxService } from './services/domain/flux'
 import { createFluxTransactionService } from './services/domain/flux-transaction'
 import { createConcurrencyLedger, createConfigSyncSubscriber, createLlmRouterService } from './services/domain/llm-router'
+import { createMemoryService } from './services/domain/memories'
 import { createPaymentService } from './services/domain/payment'
 import { createProductEventService } from './services/domain/product-events'
 import { createProviderCatalogService } from './services/domain/provider-catalog'
@@ -109,6 +113,7 @@ interface AppDeps {
   db: Database
   characterCardService: CharacterCardService
   settingsSyncService: SettingsSyncService
+  memoryService: MemoryService
   characterService: CharacterService
   chatService: ChatService
   providerService: ProviderService
@@ -410,6 +415,11 @@ export async function buildApp(deps: AppDeps) {
     .route('/api/v1/settings', createSettingsSyncRoutes(deps.settingsSyncService))
 
     /**
+     * Memory routes synchronize the long-term memories of a user between devices, and find them by meaning.
+     */
+    .route('/api/v1/memories', createMemoryRoutes(deps.memoryService))
+
+    /**
      * Display model routes sync imported Live2D and VRM originals through private object storage.
      */
     .route('/api/v1/display-models', createDisplayModelRoutes(deps.displayModelService))
@@ -652,6 +662,15 @@ export async function createApp() {
     build: ({ dependsOn }) => createSettingsSyncService(dependsOn.db),
   })
 
+  // Without EMBEDDER_URL the deployment runs no embedder. The memory sync still works, and the search answers 503.
+  const memoryService = injeca.provide('services:memories', {
+    dependsOn: { db, env: parsedEnv },
+    build: ({ dependsOn }) => createMemoryService(
+      dependsOn.db,
+      dependsOn.env.EMBEDDER_URL ? createEmbedderClient({ url: dependsOn.env.EMBEDDER_URL }) : undefined,
+    ),
+  })
+
   // Envelope crypto for at-rest upstream key decryption. Shared by provider
   // config rows, the LLM router (HTTP chat / TTS), and the audio-speech-ws
   // proxy (streaming TTS) so a single master-key change rotates every surface.
@@ -780,7 +799,7 @@ export async function createApp() {
   // Domain knowledge stays inside each service instead of being copied into
   // a parallel handler file.
   const userDeletionService = injeca.provide('services:userDeletion', {
-    dependsOn: { paymentService, fluxService, providerService, characterService, characterCardService, settingsSyncService, chatService, accountEvents },
+    dependsOn: { paymentService, fluxService, providerService, characterService, characterCardService, settingsSyncService, memoryService, chatService, accountEvents },
     build: ({ dependsOn }) => {
       const service = createUserDeletionService()
       // priority: 20 = financial / cache state (Flux balance + Redis),
@@ -792,6 +811,7 @@ export async function createApp() {
       service.register({ name: 'characters', priority: 30, softDelete: ({ userId }) => dependsOn.characterService.deleteAllForUser(userId) })
       service.register({ name: 'characterCards', priority: 30, softDelete: ({ userId }) => dependsOn.characterCardService.deleteAllForUser(userId) })
       service.register({ name: 'settings', priority: 30, softDelete: ({ userId }) => dependsOn.settingsSyncService.deleteAllForUser(userId) })
+      service.register({ name: 'memories', priority: 30, softDelete: ({ userId }) => dependsOn.memoryService.deleteAllForUser(userId) })
       service.register({ name: 'chats', priority: 30, softDelete: ({ userId }) => dependsOn.chatService.deleteAllForUser(userId) })
       service.register(createUserDeletedEventHandler(dependsOn.accountEvents))
       return service
@@ -826,6 +846,7 @@ export async function createApp() {
     db,
     characterCardService,
     settingsSyncService,
+    memoryService,
     characterService,
     chatService,
     providerService,
@@ -863,6 +884,7 @@ export async function createApp() {
     db: resolved.db,
     characterCardService: resolved.characterCardService,
     settingsSyncService: resolved.settingsSyncService,
+    memoryService: resolved.memoryService,
     characterService: resolved.characterService,
     chatService: resolved.chatService,
     providerService: resolved.providerService,

@@ -90,6 +90,7 @@ services:
       AWS_ACCESS_KEY_ID: airi-local
       AWS_SECRET_ACCESS_KEY: example-PAssw0rd-xHjDYR.b7N
       DATABASE_URL: postgres://postgres:example-PAssw0rd-xHjDYR.b7N@db:5432/postgres
+      EMBEDDER_URL: http://embedder:3000
       REDIS_URL: redis://redis:6379
       S3_BUCKET: airi-private
       S3_ENDPOINT: http://s3.localhost:6113
@@ -101,6 +102,23 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+
+  embedder:
+    build:
+      context: ..
+      dockerfile: server/apps/embedder/Dockerfile
+    environment:
+      EMBEDDER_CACHE_DIR: /models
+    volumes:
+      - embedder_models:/models
+    healthcheck:
+      # The image has no wget or curl, and the server listens only after the model loads.
+      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:3000/healthz').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      # The first start downloads the model.
+      start_period: 300s
 
   auth:
     build:
@@ -141,5 +159,6 @@ services:
 
 volumes:
   db_data:
+  embedder_models:
   redis_data:
   rustfs_data:
