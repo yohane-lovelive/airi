@@ -87,7 +87,8 @@ Each chat request has parts with limits. It is step 2-4 of [the autonomy ADR](..
 - `useHistorySummaryStore()` in `stores/history-summary.ts` gives the chat runtime a summary and the recent messages of a long conversation. After each send, it writes a new summary in the background when the recent part passes its limits. `libs/history-summary.ts` holds the limits and the pure rules.
 - The session meta keeps the summary on the device. The chat view still shows every message.
 - Settings > Modules > Short-Term Memory turns the summary on or off. It is on by default.
-- The memory index lists 50 entries at most (`libs/memory-index.ts`). `builtIn_searchMemory` finds the rest by shared character pairs.
+- The memory index lists 50 entries at most, 20 while the memory sync is active (`libs/memory-index.ts`).
+- `useMemoryRecallStore().recall` finds the memories that fit a text: by meaning on the server while the memory sync is active, by shared character pairs otherwise. The chat sends five of them with each owner message, and `builtIn_searchMemory` uses the same recall.
 - `useMemorySyncStore()` syncs the memories with the account on the leader, while the `memory-sync` experiment is on. `libs/memory-sync` maps an entry to its synced fields, and `applySyncChanges` of the memory store writes a round.
 - `libs/prompt-parts.ts` measures each part of a request for IO traces.
 

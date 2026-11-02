@@ -9,7 +9,7 @@ import { v7 as uuidv7 } from 'uuid'
 import { computed, ref, watch } from 'vue'
 
 import { memoryRepo } from '../database/repos/memory.repo'
-import { memoryIndexEntries, searchMemories } from '../libs/memory-index'
+import { memoryIndexEntries } from '../libs/memory-index'
 import { applyMemoryChanges } from '../libs/memory-sync'
 
 const LEGACY_ENTRIES_STORAGE_KEY = 'memory/entries'
@@ -102,22 +102,17 @@ export const useMemoryStore = defineStore('memory', () => {
 
   /**
    * The index for a card: its own memories, then general ones, each as an id and its description, newest first.
-   * It lists 50 entries at most, so a large memory does not fill every request. The model searches the rest.
+   * It lists `limit` entries at most, 50 by default, so a large memory does not fill every request. The model searches the rest.
    * A run reads it when it starts, from the entries that the window read last.
    */
-  function indexFor(personaId: string) {
+  function indexFor(personaId: string, limit?: number) {
     const line = (entry: MemoryEntry) => `- ${entry.id}: ${entry.description}`
-    const { own, general, hidden } = memoryIndexEntries(entries.value, personaId)
+    const { own, general, hidden } = memoryIndexEntries(entries.value, personaId, limit)
     return [
       ...(own.length ? [`Your own:\n${own.map(line).join('\n')}`] : []),
       ...(general.length ? [`General:\n${general.map(line).join('\n')}`] : []),
       ...(hidden ? [`${hidden} older entries are not listed.`] : []),
     ].join('\n')
-  }
-
-  /** The entries that a card can read and that best match the query: its own and general ones. */
-  function search(query: string, personaId: string) {
-    return searchMemories(entries.value.filter(entry => !entry.persona || entry.persona === personaId), query)
   }
 
   /** Reads an entry that the persona can see by its id: one of its own, or a general one. */
@@ -179,7 +174,6 @@ export const useMemoryStore = defineStore('memory', () => {
     changeCount: computed(() => changeCount.value),
     ready,
     indexFor,
-    search,
     read,
     write,
     makeGeneral,

@@ -78,6 +78,12 @@ export const IOAttributes = {
   LLMPromptSystemChars: `${customPrefix}.llm.prompt.system_chars`,
   /** The characters of the memory index inside the system prompt. */
   LLMPromptMemoryIndexChars: `${customPrefix}.llm.prompt.memory_index_chars`,
+  /** How the memories that go with the owner message were found: `meaning` on the server, or `characters` on the device. */
+  LLMPromptMemoryRecallMode: `${customPrefix}.llm.prompt.memory_recall_mode`,
+  /** The characters of the owner message that the recall searched with. */
+  LLMPromptMemoryRecallQueryChars: `${customPrefix}.llm.prompt.memory_recall_query_chars`,
+  /** The ids of the recalled memories, best first. */
+  LLMPromptMemoryRecalledIds: `${customPrefix}.llm.prompt.memory_recalled_ids`,
   /** The characters of the summary of the older messages. 0 without a summary. */
   LLMPromptSummaryChars: `${customPrefix}.llm.prompt.summary_chars`,
   /** The count of stored messages that the summary stands for. */

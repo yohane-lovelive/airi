@@ -142,6 +142,13 @@ devtools:
       until: until {time}
       none: None.
       usage-today: Tokens today
+      memory-recall:
+        title: Memory recall
+        none: No memories were recalled since the app started.
+        last: '{count} memories for a message of {chars} characters, {mode}, at {time}'
+        modes:
+          meaning: by meaning on the server
+          characters: by shared words on this device
       rhythm:
         present: The owner is at the device.
         away: 'The owner is away since {time}.'

@@ -4,6 +4,7 @@ import { useChatSessionStore } from '@proj-airi/stage-ui/stores/chat/session-sto
 import { useInitiativeStore } from '@proj-airi/stage-ui/stores/initiative'
 import { INSPECTOR_WATCH_REFRESH_MS, useInitiativeInspectorStore } from '@proj-airi/stage-ui/stores/initiative-inspector'
 import { useIntentionsStore } from '@proj-airi/stage-ui/stores/intentions'
+import { useMemoryRecallStore } from '@proj-airi/stage-ui/stores/memory-recall'
 import { useMissionsStore } from '@proj-airi/stage-ui/stores/missions'
 import { usePerceptionStore } from '@proj-airi/stage-ui/stores/perception'
 import { usePerceptionStatusStore } from '@proj-airi/stage-ui/stores/perception-status'
@@ -22,6 +23,7 @@ const { enabled } = storeToRefs(useInitiativeStore())
 const intentions = useIntentionsStore()
 const { active: activeMissions } = storeToRefs(useMissionsStore())
 const { records: usageRecords } = storeToRefs(useUsageStore())
+const { lastRecall } = storeToRefs(useMemoryRecallStore())
 const { changes: talkChanges, reset: resetTalkChanges } = useTalkChanges()
 const { status: perception } = storeToRefs(usePerceptionStatusStore())
 const perceptionSettings = usePerceptionStore()
@@ -330,6 +332,18 @@ function timeLabel(epochMs: number) {
       </ul>
       <p v-else :class="['text-xs', 'text-neutral-500 dark:text-neutral-400']">
         {{ t('settings.pages.usage.empty') }}
+      </p>
+    </section>
+
+    <section :class="['flex flex-col', 'gap-2', 'rounded-xl', 'bg-neutral-100 dark:bg-neutral-900', 'p-4']">
+      <h2 :class="['text-sm font-medium']">
+        {{ t(`${KEY}.memory-recall.title`) }}
+      </h2>
+      <p v-if="lastRecall" :class="['text-sm']">
+        {{ t(`${KEY}.memory-recall.last`, { count: lastRecall.count, chars: lastRecall.queryChars, mode: t(`${KEY}.memory-recall.modes.${lastRecall.mode}`), time: timeLabel(lastRecall.at) }) }}
+      </p>
+      <p v-else :class="['text-xs', 'text-neutral-500 dark:text-neutral-400']">
+        {{ t(`${KEY}.memory-recall.none`) }}
       </p>
     </section>
   </div>

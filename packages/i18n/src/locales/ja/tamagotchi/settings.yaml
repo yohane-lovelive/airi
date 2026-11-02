@@ -136,6 +136,13 @@ devtools:
       until: '{time} まで'
       none: なし。
       usage-today: 今日のトークン量
+      memory-recall:
+        title: 記憶の想起
+        none: アプリの起動後、まだ記憶を想起していません。
+        last: '{time} に、{chars} 文字のメッセージで {count} 件の記憶を{mode}想起しました'
+        modes:
+          meaning: サーバーで意味から
+          characters: この端末で共通の言葉から
       rhythm:
         present: オーナーは端末の前にいます。
         away: 'オーナーは {time} から離席中です。'

@@ -40,7 +40,7 @@ export function composeMemoryPrompt(index: string) {
     '',
     'Long-term memory. You keep it yourself. Each index line gives the id of one remembered fact, and states the fact or when it matters.',
     `Read entries with ${READ_MEMORY_TOOL_NAME} when they matter for your reply. An index line that already states the fact needs no read.`,
-    `The index lists the newest entries only. When it does not show what you need, search older entries with ${SEARCH_MEMORY_TOOL_NAME}.`,
+    `The index lists the newest entries only. Memories that fit the owner message can come with it. When neither shows what you need, search older entries with ${SEARCH_MEMORY_TOOL_NAME}.`,
     `Save with ${WRITE_MEMORY_TOOL_NAME} only when someone asks you to remember something, or states a lasting fact. Most turns save nothing.`,
     'One fact per entry. To update an entry, write it with its id instead of adding a near copy. Never save what a recipe already holds, your own rules, codes, passwords, or secrets.',
     `Forget an entry by its id with ${FORGET_MEMORY_TOOL_NAME} when it turns out wrong or someone asks. General entries belong to the owner, so you cannot change or forget them.`,
@@ -52,7 +52,7 @@ export function composeMemoryPrompt(index: string) {
 interface CreateMemoryToolsOptions {
   read: (id: string) => MemoryEntry | undefined
   /** The entries that best match a query, best first. */
-  search: (query: string) => MemoryEntry[]
+  search: (query: string) => Promise<MemoryEntry[]>
   write: (entry: MemoryWrite) => Promise<MemoryEntry | undefined>
   forget: (id: string) => Promise<boolean>
 }
@@ -82,7 +82,7 @@ export async function createMemoryTools(options: CreateMemoryToolsOptions): Prom
         const parsed = safeParse(searchParameters, rawInput)
         if (!parsed.success)
           return 'Give the words to search for.'
-        const found = options.search(parsed.output.query)
+        const found = await options.search(parsed.output.query)
         return found.length ? found.map(entry => `- ${entry.id}: ${entry.description}`).join('\n') : 'No memory entry matches.'
       },
     }),

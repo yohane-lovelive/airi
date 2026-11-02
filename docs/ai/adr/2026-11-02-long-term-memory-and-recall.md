@@ -76,6 +76,16 @@ The prompt budget of ADR 2026-10-28 gives recalled memories the top 5 and about 
 - An entry that the index already lists still appears in the recalled part with its body. The index shows only one line.
 - IO traces record the recall mode, the query characters, and the recalled ids.
 
+Step M2b built the recall as follows.
+
+- `recallMemories` in `libs/memory-recall.ts` merges the server results with the local entries that changed after the last sync. `useMemoryRecallStore()` calls the server and keeps the last recall for the inspector, without memory text.
+- Only the leader runs the sync, so only the leader knows the time of the last sync. A recall in another window takes the server results alone.
+- The chat recalls for a turn with the purpose `owner-reply`, before the LLM span starts. The recalled part joins the runtime context of the newest user turn in a copy of the request, under the source `memory:recall`.
+- The index limit follows the setting, not each answer of the server: 20 entries while the memory sync is active, 50 otherwise. A change of the limit with each answer would change the cached system prompt.
+- `builtIn_searchMemory` uses the same recall, so its results are the same as the recalled part.
+- The inspector shows the mode, the count, the query characters, and the time of the last recall.
+- A unit test checks that the recalled part goes into a copy of the request, so the stored history never holds it. The plan named a browser test of the whole chat store, but the copy is the only step that can reach the history.
+
 ### Autonomous readers
 
 - The `recall` speech type recalls entries for the current topic and the scene. Code puts one of them into the situation block.
@@ -107,7 +117,7 @@ Step M5 adds two background tasks with the usage purpose `memory`:
 | --- | --- | --- |
 | M1 | Server: the `embedder` service, the memory feature of the field store, vectors on write, and the search and embed routes. | Done |
 | M2a | Client: the memory sync. | Done |
-| M2b | Client: `recallMemories`, recalled memories in the prompt, and `builtIn_searchMemory` by meaning. | To do |
+| M2b | Client: `recallMemories`, recalled memories in the prompt, and `builtIn_searchMemory` by meaning. | Done |
 | M3 | Autonomous readers: the `recall` speech type, the seeds, and the topic similarity by vectors. It finishes the recall of ADR 2026-10-28 step 5. | To do |
 | M4 | The floor between devices, and the sync of missions and intentions. | To do |
 | M5 | The owner profile and the memory work. | To do |

@@ -588,7 +588,8 @@ describe('chat store contract', () => {
     await store.submit({ sessionId: 'session-2', messageId: 'bob-voice', text: 'For Bob' })
 
     expect(getChatProviderInstanceMock).toHaveBeenCalledWith('bob-provider', { reasoning: 'disabled' })
-    expect(llmStreamMock.mock.calls[0]?.[0]).toBe('bob-model')
+    // A submission resolves when it is accepted. The memory recall runs before the model call, so the call comes later.
+    await vi.waitFor(() => expect(llmStreamMock.mock.calls[0]?.[0]).toBe('bob-model'))
     expect(activeSessionIdRef.value).toBe('session-1')
   })
 

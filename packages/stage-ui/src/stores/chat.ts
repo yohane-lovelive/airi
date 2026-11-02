@@ -4,6 +4,7 @@ import type { WebSocketEventInputs } from '@proj-airi/server-sdk'
 import type { Message } from '@xsai/shared-chat'
 import type { SyncedPiniaRuntime } from 'pinia-plugin-synced'
 
+import type { MemoryRecallResult } from '../libs/memory-recall'
 import type { UsagePurpose } from '../libs/usage'
 import type { ChatHistoryItem, ChatToolReference } from '../types/chat'
 import type { ChatSessionTaskStatus, StoredVoiceInterruption } from '../types/chat-session'
@@ -29,6 +30,8 @@ import { useVisionInference } from '../composables/vision/use-vision-inference'
 import { chatAssetIdFrom, inlineConversationAssets, storeChatAttachments } from '../libs/chat-assets'
 import { extractMessageText, isCloudSyncableMessage } from '../libs/chat-sync'
 import { INITIATIVE_SOURCE } from '../libs/initiative/conversation'
+import { MEMORY_INDEX_LIMIT, MEMORY_INDEX_LIMIT_WITH_RECALL } from '../libs/memory-index'
+import { composeRecalledMemories, newestUserText, withRecalledMemories } from '../libs/memory-recall'
 import { syncedRoles } from '../libs/pinia/synced-context'
 import { createChatAnalyticsHooks, getProviderMode } from '../libs/product-signals/events/chat'
 import {
@@ -64,6 +67,8 @@ import { useHistorySummaryStore } from './history-summary'
 import { useInitiativeStore } from './initiative'
 import { useIntentionsStore } from './intentions'
 import { useMemoryStore } from './memory'
+import { useMemoryRecallStore } from './memory-recall'
+import { useMemorySyncStore } from './memory-sync'
 import { useMissionsStore } from './missions'
 import { useAiriCardStore } from './modules/airi-card'
 import { useAutonomousArtistryStore } from './modules/artistry-autonomous'
@@ -294,6 +299,8 @@ export const useChatStore = defineStore('chat', () => {
   const summarizedCounts = new Map<string, number>()
   const recipes = useRecipesStore()
   const memory = useMemoryStore()
+  const memorySync = useMemorySyncStore()
+  const memoryRecall = useMemoryRecallStore()
   const missions = useMissionsStore()
   const initiative = useInitiativeStore()
   const intentions = useIntentionsStore()
@@ -311,10 +318,16 @@ export const useChatStore = defineStore('chat', () => {
    * A recipe's own session adds the recipe's steps after the identity. They stay the same there, so its prefix stays cacheable.
    * The first request and every later model step read it, so a card edit reaches the next step.
    */
+  function memoryIndexOf(persona: string) {
+    // Recall by meaning brings the older entries with the owner message, so a short index does. The setting decides it,
+    // not each answer of the server, so the cached system prompt stays the same.
+    return memory.indexFor(persona, memorySync.active ? MEMORY_INDEX_LIMIT_WITH_RECALL : MEMORY_INDEX_LIMIT)
+  }
+
   function sessionSystemPrompt(sessionId: string) {
     const persona = personaOf(sessionId)
     const identity = composeSystemPrompt(cardStore.getSystemPrompt(persona))
-      + (memory.enabled ? composeMemoryPrompt(memory.indexFor(persona)) : '')
+      + (memory.enabled ? composeMemoryPrompt(memoryIndexOf(persona)) : '')
       + (drawsCards(sessionId) ? composeDrawCardPrompt() : '')
     const recipeId = chatSession.sessionMetas[sessionId]?.recipeId
     const recipe = recipeId ? recipes.recipes.find(entry => entry.id === recipeId) : undefined
@@ -692,7 +705,7 @@ export const useChatStore = defineStore('chat', () => {
     const persona = personaOf(sessionId)
     const sourceTools = async () => [
       ...(typeof tools === 'function' ? await tools() ?? [] : tools ?? []),
-      ...memory.enabled ? await createMemoryTools({ read: id => memory.read(id, persona), search: query => memory.search(query, persona), write: entry => memory.write(entry, persona), forget: id => memory.forget(id, persona) }) : [],
+      ...memory.enabled ? await createMemoryTools({ read: id => memory.read(id, persona), search: async query => (await memoryRecall.recall(query, persona)).entries, write: entry => memory.write(entry, persona), forget: id => memory.forget(id, persona) }) : [],
     ]
     // A recipe's own session runs only that recipe. It cannot start recipes, save them, or choose silence.
     if (isTaskSession(sessionId))
@@ -784,6 +797,14 @@ export const useChatStore = defineStore('chat', () => {
 
     // Stored messages reference their images and recordings. The provider request carries the bytes.
     context = await inlineConversationAssets(context)
+
+    // The memories that fit the owner message go with it for this request only. A notice recalls nothing yet.
+    let recalled: MemoryRecallResult | undefined
+    const query = newestUserText(context)
+    if (memory.enabled && correlation && query && usagePurposeOfTurn(correlation.conversationId, correlation.turnId) === 'owner-reply') {
+      recalled = await memoryRecall.recall(query, personaOf(correlation.conversationId))
+      context = withRecalledMemories(context, composeRecalledMemories(recalled))
+    }
 
     const visionStore = useVisionStore()
     // NOTICE:
@@ -944,7 +965,12 @@ export const useChatStore = defineStore('chat', () => {
     const parts = promptPartSizes(providerContext)
     const sessionId = options?.requestCorrelation?.conversationId
     llmSpan.setAttribute(IOAttributes.LLMPromptSystemChars, parts.systemChars)
-    llmSpan.setAttribute(IOAttributes.LLMPromptMemoryIndexChars, sessionId && memory.enabled ? memory.indexFor(personaOf(sessionId)).length : 0)
+    llmSpan.setAttribute(IOAttributes.LLMPromptMemoryIndexChars, sessionId && memory.enabled ? memoryIndexOf(personaOf(sessionId)).length : 0)
+    if (recalled) {
+      llmSpan.setAttribute(IOAttributes.LLMPromptMemoryRecallMode, recalled.mode)
+      llmSpan.setAttribute(IOAttributes.LLMPromptMemoryRecallQueryChars, query.length)
+      llmSpan.setAttribute(IOAttributes.LLMPromptMemoryRecalledIds, recalled.entries.map(entry => entry.id))
+    }
     llmSpan.setAttribute(IOAttributes.LLMPromptSummaryChars, parts.summaryChars)
     llmSpan.setAttribute(IOAttributes.LLMPromptSummarizedMessages, sessionId ? summarizedCounts.get(sessionId) ?? 0 : 0)
     llmSpan.setAttribute(IOAttributes.LLMPromptHistoryTurns, parts.historyTurns)

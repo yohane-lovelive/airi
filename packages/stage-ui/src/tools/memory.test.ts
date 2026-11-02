@@ -9,7 +9,7 @@ const entry: MemoryEntry = { id: 'nickname-id', description: 'What the owner lik
 function options() {
   return {
     read: vi.fn((id: string) => id === 'nickname-id' ? entry : undefined),
-    search: vi.fn((query: string) => query === 'name' ? [entry] : []),
+    search: vi.fn(async (query: string) => query === 'name' ? [entry] : []),
     write: vi.fn(async (input: MemoryWrite): Promise<MemoryEntry> => ({ ...input, id: input.id ?? `${input.description}-id`, updatedAt: 0 })),
     forget: vi.fn(async () => true),
   }
