@@ -142,6 +142,12 @@ devtools:
       until: until {time}
       none: None.
       usage-today: Tokens today
+      device-floor:
+        title: Device floor
+        'off': Not in use. Turn on Memory sync to let one device speak at a time.
+        held: This device holds the floor, so it speaks on its own.
+        other: 'Another device holds the floor ({id}), so this device stays quiet.'
+        unknown: The server did not answer, so this device speaks as before.
       memory-recall:
         title: Memory recall
         none: No memories were recalled since the app started.

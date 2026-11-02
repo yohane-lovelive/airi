@@ -107,7 +107,16 @@ Step M3 built the autonomous readers as follows.
 - The server keeps one presence record for each account: the device id, the time it connected, and the last heartbeat.
 - The device that connected first holds the floor. When its heartbeat stops for 30 seconds, the next device takes it.
 - Only the device with the floor runs autonomous speech and missions. A reply to an owner message plays on the device where the owner sent it.
-- The design of the presence route waits for step M4.
+- [Server ADR 2026-11-02 for the device floor](../../../server/docs/ai/adr/2026-11-02-device-floor.md) has the route.
+
+Step M4a built the floor as follows.
+
+- A row in PostgreSQL keeps the holder of each account. One conditional upsert gives the floor to the first device, keeps it for the holder, and moves it after 30 seconds without a heartbeat.
+- The device id is a random UUID in `localStorage`. It is not in the allow list of the settings sync, so it stays on the device.
+- `useDeviceFloorStore()` sends a heartbeat every 10 seconds from the leader, and gives the floor up on `pagehide`. The initiative runner and the watch runner run only on the device that holds the floor.
+- The floor is in use while the memory sync is active. Without an answer of the server for 30 seconds, the device acts as the holder. The ADR did not say what a device does without the server. The owner uses one device at a time, so a server outage must not keep the character quiet.
+- Reminders still run on every device until step M4b syncs them. Before that, a reminder exists on one device only.
+- The inspector shows whether this device holds the floor.
 
 ### Records beyond memories
 
@@ -128,7 +137,8 @@ Step M5 adds two background tasks with the usage purpose `memory`:
 | M2a | Client: the memory sync. | Done |
 | M2b | Client: `recallMemories`, recalled memories in the prompt, and `builtIn_searchMemory` by meaning. | Done |
 | M3 | Autonomous readers: the `recall` speech type, the seeds, and the topic similarity by vectors. It finishes the recall of ADR 2026-10-28 step 5. | Done |
-| M4 | The floor between devices, and the sync of missions and intentions. | To do |
+| M4a | The floor between devices. | Done |
+| M4b | The sync of reminders and intentions. | To do |
 | M5 | The owner profile and the memory work. | To do |
 
 ## Relation to other ADRs

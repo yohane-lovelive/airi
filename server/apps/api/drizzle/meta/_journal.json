@@ -253,6 +253,13 @@
       "when": 1793580532338,
       "tag": "0035_memories",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1793592649973,
+      "tag": "0036_device_floor",
+      "breakpoints": true
     }
   ]
 }

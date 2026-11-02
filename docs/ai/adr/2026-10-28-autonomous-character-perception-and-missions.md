@@ -77,7 +77,7 @@ The owner usually uses one device at a time. When two devices are open, one devi
 - The device that connected first holds the floor until it disconnects. Then the next device takes it.
 - Only the device that holds the floor runs autonomous speech and missions.
 - A reply to an owner message plays on the device where the owner sent it.
-- The floor needs a presence record on the server, so the memory ADR defines it. Until then, the owner opens one device at a time.
+- The floor needs a presence record on the server. Step M4a of [ADR 2026-11-02](./2026-11-02-long-term-memory-and-recall.md) adds it while the memory sync is active. Without the memory sync, the owner opens one device at a time.
 
 ### Speaking model
 

@@ -40,6 +40,7 @@ import { Ticker } from '../workers/ticker'
 import { useSpeakingStore } from './audio'
 import { useChatStore } from './chat'
 import { useChatSessionStore } from './chat/session-store'
+import { useDeviceFloorStore } from './device-floor'
 import { useInitiativeStore } from './initiative'
 import { useInitiativeInspectorStore } from './initiative-inspector'
 import { useIntentionsStore } from './intentions'
@@ -133,6 +134,7 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
   const inspector = useInitiativeInspectorStore()
   const memory = useMemoryStore()
   const memorySync = useMemorySyncStore()
+  const deviceFloor = useDeviceFloorStore()
   const memoryRecall = useMemoryRecallStore()
   // Topic labels and seeds compare by meaning while the memory sync is active, and by character pairs otherwise.
   const topicVectors = new TopicVectors({ embed: (texts, signal) => memoryRecall.embedTexts(texts, signal) })
@@ -386,7 +388,8 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
   }
 
   function tick() {
-    if (!leadership?.isLeader() || !initiative.enabled) {
+    // Another device of the account holds the floor, so it speaks and this one stays quiet.
+    if (!leadership?.isLeader() || !initiative.enabled || !deviceFloor.holdsFloor) {
       state.value = undefined
       return
     }

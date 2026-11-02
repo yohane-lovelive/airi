@@ -7,6 +7,7 @@ import { initializeAnalytics, isAnalyticsAvailableInBuild } from '@proj-airi/sta
 import { useAuthStore } from '@proj-airi/stage-ui/stores/auth'
 import { useCharacterOrchestratorStore } from '@proj-airi/stage-ui/stores/character'
 import { useChatStore } from '@proj-airi/stage-ui/stores/chat'
+import { useDeviceFloorStore } from '@proj-airi/stage-ui/stores/device-floor'
 import { useDisplayModelsStore } from '@proj-airi/stage-ui/stores/display-models'
 import { useInitiativeRunnerStore } from '@proj-airi/stage-ui/stores/initiative-runner'
 import { useMemorySyncStore } from '@proj-airi/stage-ui/stores/memory-sync'
@@ -62,6 +63,7 @@ const perceptionRunnerStore = usePerceptionRunnerStore()
 const watchRunnerStore = useWatchRunnerStore()
 const settingsSyncStore = useSettingsSyncStore()
 const memorySyncStore = useMemorySyncStore()
+const deviceFloorStore = useDeviceFloorStore()
 const settingsAudioDeviceStore = useSettingsAudioDevice()
 const { showingSetup } = storeToRefs(onboardingStore)
 const { isDark } = useTheme()
@@ -171,6 +173,7 @@ async function loadStartup() {
       watchRunnerStore.initialize(syncedPinia)
       settingsSyncStore.initialize(syncedPinia)
       memorySyncStore.initialize(syncedPinia)
+      deviceFloorStore.initialize(syncedPinia)
     })
     await startup.run('modelData', () => displayModelsStore.loadDisplayModelsFromIndexedDB())
     await startup.run('modelSelection', () => settingsStore.initializeStageModel())

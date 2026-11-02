@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { useTalkChanges } from '@proj-airi/stage-ui/composables/use-talk-changes'
 import { useChatSessionStore } from '@proj-airi/stage-ui/stores/chat/session-store'
+import { useDeviceFloorStore } from '@proj-airi/stage-ui/stores/device-floor'
 import { useInitiativeStore } from '@proj-airi/stage-ui/stores/initiative'
 import { INSPECTOR_WATCH_REFRESH_MS, useInitiativeInspectorStore } from '@proj-airi/stage-ui/stores/initiative-inspector'
 import { useIntentionsStore } from '@proj-airi/stage-ui/stores/intentions'
 import { useMemoryRecallStore } from '@proj-airi/stage-ui/stores/memory-recall'
+import { useMemorySyncStore } from '@proj-airi/stage-ui/stores/memory-sync'
 import { useMissionsStore } from '@proj-airi/stage-ui/stores/missions'
 import { usePerceptionStore } from '@proj-airi/stage-ui/stores/perception'
 import { usePerceptionStatusStore } from '@proj-airi/stage-ui/stores/perception-status'
@@ -24,6 +26,10 @@ const intentions = useIntentionsStore()
 const { active: activeMissions } = storeToRefs(useMissionsStore())
 const { records: usageRecords } = storeToRefs(useUsageStore())
 const { lastRecall } = storeToRefs(useMemoryRecallStore())
+const { active: memorySyncActive } = storeToRefs(useMemorySyncStore())
+const { answer: floorAnswer, holdsFloor } = storeToRefs(useDeviceFloorStore())
+/** Which line the floor shows: not in use, this device, another device, or no answer of the server. */
+const floorState = computed(() => !memorySyncActive.value ? 'off' : !floorAnswer.value ? 'unknown' : floorAnswer.value.held ? 'held' : holdsFloor.value ? 'unknown' : 'other')
 const { changes: talkChanges, reset: resetTalkChanges } = useTalkChanges()
 const { status: perception } = storeToRefs(usePerceptionStatusStore())
 const perceptionSettings = usePerceptionStore()
@@ -348,6 +354,15 @@ function timeLabel(epochMs: number) {
       </p>
       <p v-else :class="['text-xs', 'text-neutral-500 dark:text-neutral-400']">
         {{ t(`${KEY}.memory-recall.none`) }}
+      </p>
+    </section>
+
+    <section :class="['flex flex-col', 'gap-2', 'rounded-xl', 'bg-neutral-100 dark:bg-neutral-900', 'p-4']">
+      <h2 :class="['text-sm font-medium']">
+        {{ t(`${KEY}.device-floor.title`) }}
+      </h2>
+      <p :class="['text-sm']">
+        {{ t(`${KEY}.device-floor.${floorState}`, { id: floorAnswer?.holder ?? '-' }) }}
       </p>
     </section>
   </div>

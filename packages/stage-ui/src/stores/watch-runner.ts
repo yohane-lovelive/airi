@@ -20,6 +20,7 @@ import { FRAME_LIMITS } from '../libs/perception/frame-ring'
 import { Ticker } from '../workers/ticker'
 import { useChatStore } from './chat'
 import { useChatSessionStore } from './chat/session-store'
+import { useDeviceFloorStore } from './device-floor'
 import { useMissionsStore } from './missions'
 import { useAiriCardStore } from './modules/airi-card'
 import { usePerceptionStore } from './perception'
@@ -57,6 +58,7 @@ export const useWatchRunnerStore = defineStore('watch-runner', () => {
   const chatSession = useChatSessionStore()
   const cardStore = useAiriCardStore()
   const timeline = useTimelineStore()
+  const deviceFloor = useDeviceFloorStore()
   const { generateText } = useTextGeneration()
   const { t } = useI18n()
 
@@ -73,7 +75,8 @@ export const useWatchRunnerStore = defineStore('watch-runner', () => {
   }
 
   async function tick() {
-    if (!leadership?.isLeader() || !missions.enabled || checking)
+    // A watch speaks when its condition holds, so only the device that holds the floor checks it.
+    if (!leadership?.isLeader() || !missions.enabled || checking || !deviceFloor.holdsFloor)
       return
     const now = Date.now()
     const watch = missions.watchAt(now)

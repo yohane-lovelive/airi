@@ -13,6 +13,7 @@ import { isSherpawModelBundled, setSherpawModelAssetHost } from '@proj-airi/stag
 import { useAuthStore } from '@proj-airi/stage-ui/stores/auth'
 import { useCharacterOrchestratorStore } from '@proj-airi/stage-ui/stores/character'
 import { useChatStore } from '@proj-airi/stage-ui/stores/chat'
+import { useDeviceFloorStore } from '@proj-airi/stage-ui/stores/device-floor'
 import { usePluginHostInspectorStore } from '@proj-airi/stage-ui/stores/devtools/plugin-host-debug'
 import { useDisplayModelsStore } from '@proj-airi/stage-ui/stores/display-models'
 import { useInitiativeRunnerStore } from '@proj-airi/stage-ui/stores/initiative-runner'
@@ -177,6 +178,7 @@ function createFullStageRuntime() {
   const watchRunnerStore = useWatchRunnerStore()
   const settingsSyncStore = useSettingsSyncStore()
   const memorySyncStore = useMemorySyncStore()
+  const deviceFloorStore = useDeviceFloorStore()
   const inferencePreload = useInferencePreload()
   const pluginHostInspectorStore = usePluginHostInspectorStore()
   const stageWindowLifecycleStore = useStageWindowLifecycleStore()
@@ -351,6 +353,7 @@ function createFullStageRuntime() {
         watchRunnerStore.initialize(syncedPinia)
         settingsSyncStore.initialize(syncedPinia)
         memorySyncStore.initialize(syncedPinia)
+        deviceFloorStore.initialize(syncedPinia)
       }
 
       defineInvokeHandler(context.value, pluginProtocolListProviders, async () => listProvidersForPluginHost())

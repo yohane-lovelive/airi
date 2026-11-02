@@ -12,6 +12,7 @@ import type { LlmBillingService } from './services/domain/billing/llm-billing'
 import type { CharacterCardService } from './services/domain/character-cards'
 import type { CharacterService } from './services/domain/characters'
 import type { ChatService } from './services/domain/chats'
+import type { DeviceFloorService } from './services/domain/device-floor'
 import type { DisplayModelService } from './services/domain/display-models'
 import type { FluxService } from './services/domain/flux'
 import type { FluxTransactionService } from './services/domain/flux-transaction'
@@ -66,6 +67,7 @@ import { createChatWsV1Handlers } from './routes/chat-ws/v1'
 import { createChatWsV2Handlers } from './routes/chat-ws/v2'
 import { createChatWsPayloadLimit } from './routes/chat-ws/v2/payload-limit'
 import { createChatRoutes } from './routes/chats'
+import { createDeviceFloorRoutes } from './routes/device-floor'
 import { createDisplayModelRoutes } from './routes/display-models'
 import { createFluxRoutes } from './routes/flux'
 import { createInternalAuthRoutes } from './routes/internal-auth'
@@ -91,6 +93,7 @@ import { SpeechBilling } from './services/domain/billing/speech-billing'
 import { createCharacterCardService } from './services/domain/character-cards'
 import { createCharacterService } from './services/domain/characters'
 import { createChatService } from './services/domain/chats'
+import { createDeviceFloorService } from './services/domain/device-floor'
 import { createDisplayModelService } from './services/domain/display-models'
 import { createFluxService } from './services/domain/flux'
 import { createFluxTransactionService } from './services/domain/flux-transaction'
@@ -114,6 +117,7 @@ interface AppDeps {
   characterCardService: CharacterCardService
   settingsSyncService: SettingsSyncService
   memoryService: MemoryService
+  deviceFloorService: DeviceFloorService
   characterService: CharacterService
   chatService: ChatService
   providerService: ProviderService
@@ -420,6 +424,11 @@ export async function buildApp(deps: AppDeps) {
     .route('/api/v1/memories', createMemoryRoutes(deps.memoryService))
 
     /**
+     * Device floor routes decide which device of a user runs autonomous speech and missions.
+     */
+    .route('/api/v1/device-floor', createDeviceFloorRoutes(deps.deviceFloorService))
+
+    /**
      * Display model routes sync imported Live2D and VRM originals through private object storage.
      */
     .route('/api/v1/display-models', createDisplayModelRoutes(deps.displayModelService))
@@ -662,6 +671,11 @@ export async function createApp() {
     build: ({ dependsOn }) => createSettingsSyncService(dependsOn.db),
   })
 
+  const deviceFloorService = injeca.provide('services:deviceFloor', {
+    dependsOn: { db },
+    build: ({ dependsOn }) => createDeviceFloorService(dependsOn.db),
+  })
+
   // Without EMBEDDER_URL the deployment runs no embedder. The memory sync still works, and the search answers 503.
   const memoryService = injeca.provide('services:memories', {
     dependsOn: { db, env: parsedEnv },
@@ -799,7 +813,7 @@ export async function createApp() {
   // Domain knowledge stays inside each service instead of being copied into
   // a parallel handler file.
   const userDeletionService = injeca.provide('services:userDeletion', {
-    dependsOn: { paymentService, fluxService, providerService, characterService, characterCardService, settingsSyncService, memoryService, chatService, accountEvents },
+    dependsOn: { paymentService, fluxService, providerService, characterService, characterCardService, settingsSyncService, memoryService, deviceFloorService, chatService, accountEvents },
     build: ({ dependsOn }) => {
       const service = createUserDeletionService()
       // priority: 20 = financial / cache state (Flux balance + Redis),
@@ -812,6 +826,7 @@ export async function createApp() {
       service.register({ name: 'characterCards', priority: 30, softDelete: ({ userId }) => dependsOn.characterCardService.deleteAllForUser(userId) })
       service.register({ name: 'settings', priority: 30, softDelete: ({ userId }) => dependsOn.settingsSyncService.deleteAllForUser(userId) })
       service.register({ name: 'memories', priority: 30, softDelete: ({ userId }) => dependsOn.memoryService.deleteAllForUser(userId) })
+      service.register({ name: 'deviceFloor', priority: 30, softDelete: ({ userId }) => dependsOn.deviceFloorService.deleteAllForUser(userId) })
       service.register({ name: 'chats', priority: 30, softDelete: ({ userId }) => dependsOn.chatService.deleteAllForUser(userId) })
       service.register(createUserDeletedEventHandler(dependsOn.accountEvents))
       return service
@@ -847,6 +862,7 @@ export async function createApp() {
     characterCardService,
     settingsSyncService,
     memoryService,
+    deviceFloorService,
     characterService,
     chatService,
     providerService,
@@ -885,6 +901,7 @@ export async function createApp() {
     characterCardService: resolved.characterCardService,
     settingsSyncService: resolved.settingsSyncService,
     memoryService: resolved.memoryService,
+    deviceFloorService: resolved.deviceFloorService,
     characterService: resolved.characterService,
     chatService: resolved.chatService,
     providerService: resolved.providerService,
