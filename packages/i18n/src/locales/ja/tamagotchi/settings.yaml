@@ -174,6 +174,10 @@ devtools:
         thread-cold: '今の話題: {topic}（{count} 行、熱 {heat}）。冷えたので、次のターンで新しい話題を頼みます。'
         no-thread: 最近の数日に、自律発話はありません。
         seeds: '前のターンの話題の種: {seeds}'
+        compared-by:
+          vectors: 話題をサーバーで意味から比べています
+          characters: 話題をこの端末で共通の言葉から比べています
+        recalled-memory: '前の recall ターンに渡した記憶: {id}'
         variety: '今日の多様性（{count} 行）'
         distinct: '言い回しの重複のなさ（distinct-2）: {value}'
         entropy: '発話タイプのばらつき（エントロピー）: {value}'

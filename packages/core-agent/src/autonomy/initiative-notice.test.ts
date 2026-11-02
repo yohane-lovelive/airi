@@ -100,6 +100,14 @@ describe('initiativeNoticeText', () => {
     expect(initiativeNoticeText(context())).not.toContain('small talk')
   })
 
+  it('offers the recalled memory in a recall turn only, cut short', () => {
+    const text = initiativeNoticeText(context({ speechType: 'recall', recallMemory: `好物はラーメン${'。'.repeat(200)}` }))
+
+    expect(text).toContain('- A memory you can bring up: "好物はラーメン')
+    expect(text).toContain('…"')
+    expect(initiativeNoticeText(context({ speechType: 'ask', recallMemory: '好物はラーメン' }))).not.toContain('A memory you can bring up')
+  })
+
   it('asks for a topic label at the end of the line', () => {
     expect(initiativeNoticeText(context())).toContain('end with <|TOPIC a few words|>')
   })

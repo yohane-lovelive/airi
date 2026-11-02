@@ -11,10 +11,22 @@ import { useMemoryStore } from './memory'
 import { useMemorySyncStore } from './memory-sync'
 
 const SEARCH_PATH = '/api/v1/memories/search'
+const EMBED_PATH = '/api/v1/memories/embed'
 
 const SearchResponseSchema = object({
   records: array(object({ id: string(), score: number() })),
 })
+
+const EmbedResponseSchema = object({
+  records: array(object({ embedding: array(number()) })),
+})
+
+/** The server URL can have a path, so a route joins it as the document sync does. */
+function routeUrl(path: string) {
+  const url = new URL(SERVER_URL)
+  url.pathname = `${url.pathname.replace(/\/+$/, '')}${path}`
+  return url
+}
 
 /** The last recall, for the inspector. It holds no memory text. */
 export interface LastMemoryRecall {
@@ -40,10 +52,7 @@ export const useMemoryRecallStore = defineStore('memory-recall', () => {
   const lastRecall = ref<LastMemoryRecall>()
 
   async function searchOnServer(query: string, personaId: string, limit: number, signal: AbortSignal): Promise<MemoryRecallHit[]> {
-    // The server URL can have a path, so the route joins it as the document sync does.
-    const url = new URL(SERVER_URL)
-    url.pathname = `${url.pathname.replace(/\/+$/, '')}${SEARCH_PATH}`
-    const response = await authedFetch(url, {
+    const response = await authedFetch(routeUrl(SEARCH_PATH), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query: query.slice(0, 500), personaId, limit }),
@@ -71,9 +80,31 @@ export const useMemoryRecallStore = defineStore('memory-recall', () => {
     return result
   }
 
+  /**
+   * Vectors of short texts, for example topic labels, in order. The server keeps no text of them. It throws while the
+   * memory sync is not active, and on every failure, so the caller compares by shared characters.
+   */
+  async function embedTexts(texts: readonly string[], signal: AbortSignal): Promise<number[][]> {
+    if (!memorySync.active)
+      throw new Error('Memory sync is not active')
+    const response = await authedFetch(routeUrl(EMBED_PATH), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ texts }),
+      signal,
+    })
+    if (!response.ok)
+      throw new Error(`Memory embed answered ${response.status}`)
+    const { records } = parse(EmbedResponseSchema, await response.json())
+    if (records.length !== texts.length)
+      throw new Error('Memory embed answered a wrong count')
+    return records.map(record => record.embedding)
+  }
+
   return {
     lastRecall,
     recall,
+    embedTexts,
   }
 }, {
   synced: {

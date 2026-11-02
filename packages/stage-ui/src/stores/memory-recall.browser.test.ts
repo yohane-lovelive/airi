@@ -75,4 +75,15 @@ describe('memory recall store', () => {
     answerSearch(() => Response.json({ error: 'EMBEDDER_UNAVAILABLE' }, { status: 503 }))
     expect((await useMemoryRecallStore().recall('猫', 'airi')).mode).toBe('characters')
   })
+
+  it('embeds texts on the server only while the memory sync runs', async () => {
+    const signal = new AbortController().signal
+    await expect(useMemoryRecallStore().embedTexts(['ラーメン'], signal)).rejects.toThrow()
+
+    useAuthStore().user = { id: 'user-1', name: 'user-1', email: 'user-1@example.test', emailVerified: true, createdAt: new Date(), updatedAt: new Date() }
+    useFeatureFlagsStore().setPreference('memory-sync', true)
+    authedFetch.mockImplementation(async url => String(url).endsWith('/api/v1/memories/embed') ? Response.json({ records: [{ embedding: [1, 0] }] }) : new Response(null, { status: 404 }))
+
+    expect(await useMemoryRecallStore().embedTexts(['ラーメン'], signal)).toEqual([[1, 0]])
+  })
 })

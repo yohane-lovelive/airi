@@ -472,7 +472,7 @@ Step 2b-2a built topics for every autonomous turn as follows. The `small-talk` t
 - **Thread and heat.** Consecutive lines with a similarity of 0.5 or more are one thread. A line that the owner answered multiplies the heat by 0.85. A line without an answer multiplies it by 0.55. At 0.35 or less, the thread is cold, and the notice asks for a new topic.
 - **Seeds.** The pool has the memory index lines of the card and calendar seeds: the month, the day of the week, and the start or end of a month or year. Code draws up to three seeds by weight. A seed near a recent topic gets a lower weight, and one with a similarity of 0.6 or more is not offered. A seed that a spoken turn offered rests for six hours. The similarity misses a seed in another language than the lines, for example an English calendar seed and a Japanese line, so the rest keeps the seed from coming back each turn. The rest lives in memory only.
 - Rhythm turns get no seeds, because they have their own reason. Intentions stay in their own list of the notice. Screen events come with step 3, and owner interests, character interests, and a seed call come later.
-- **Similarity.** Code compares topics with the share of shared character pairs. This is a temporary step: the client has no text embeddings yet. The similarity is a function that the host can replace. When the memory ADR adds embeddings, the stored labels get embeddings, and the similarity of embeddings replaces character pairs.
+- **Similarity.** Code compares topics with the share of shared character pairs. The similarity is a function that the host can replace. Step M3 of [ADR 2026-11-02](./2026-11-02-long-term-memory-and-recall.md) compares labels by their vectors while the memory sync is active, on the same scale. Without a server, character pairs stay.
 - **Variety.** `core-agent` measures `distinct-2`, the entropy of the speech types, and the similarity of consecutive topics. The inspector shows the thread, the seeds of the last turn, and the variety of today's lines. The speech types of today live in memory only, so a restart begins again.
 
 Step 2b-2b built the `small-talk` template as follows.
@@ -672,7 +672,7 @@ The order follows dependencies. Each step uses the parts of the earlier steps. E
 | 2b | Daily rhythm and small talk: templates as recipes, the `greeting`, `welcome-back`, and `small-talk` templates, topic seeds, and the time of day. Measure variety. | Done. Templates as recipes still wait. |
 | 3 | Perception: the adapters, ring buffer, detectors, frame policies, image budget, recorder, replay, timeline, scene state, `commentary` with interruptions, and `watch`. | Done. |
 | 4 | Motion: the model capability check, the procedural layer, the library with `ACT` markers, expression sync, and the upper-body layer. | To do |
-| 5 | Generated motion, game audio, recall from memory, and polish. Recall needs the memory ADR. | To do |
+| 5 | Generated motion, game audio, recall from memory, and polish. Recall needs the memory ADR. | In progress: recall from memory is done with step M3 of ADR 2026-11-02. |
 
 Step 2 has four parts. Each part is one change.
 

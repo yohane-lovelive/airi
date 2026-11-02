@@ -120,9 +120,12 @@ export function createMemoryService(db: Database, embedder?: EmbedderClient) {
       return { records: await nearestMemories(db, ownerId, query, search.personaId, search.limit) }
     },
 
-    /** Vectors of short texts that the client compares with each other, for example topic labels. */
+    /**
+     * Vectors of short texts that the client compares with each other, for example topic labels. The query prefix
+     * separated same and other topics best for short Japanese labels, better than the prefix for sentence similarity.
+     */
     async embed(texts: readonly string[]) {
-      const embeddings = await requireEmbedder().embed(texts, 'similarity')
+      const embeddings = await requireEmbedder().embed(texts, 'query')
       return { records: embeddings.map(embedding => ({ embedding })) }
     },
   }

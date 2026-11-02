@@ -33,3 +33,28 @@ for (const [index, question] of questions.entries()) {
   process.stdout.write(`${question} -> ${memories[best]} (${scores.map(score => score.toFixed(3)).join(', ')}) ${Math.round(performance.now() - before)} ms\n`)
 }
 process.stdout.write(`dimensions ${documents[0].length}, correct ${correct}/${questions.length}\n`)
+
+// Topic labels: the API embeds them with the query prefix, which separated these groups best. The client maps the
+// cosine from 0.70 to 0.90 onto the scale of character pairs. These pairs show where the cosines fall.
+const labelPairs: [string, string, 'same' | 'near' | 'other'][] = [
+  ['ラーメン', 'ラーメン屋', 'same'],
+  ['ラーメン', '麺類', 'same'],
+  ['大阪旅行', '週末の旅行', 'same'],
+  ['猫', 'ペットの猫', 'same'],
+  ['LoL のランク戦', 'League of Legends', 'same'],
+  ['ラーメン', '夕ご飯', 'near'],
+  ['大阪旅行', '新幹線', 'near'],
+  ['猫', '犬', 'near'],
+  ['LoL のランク戦', 'ゲームの練習', 'near'],
+  ['ラーメン', '大阪旅行', 'other'],
+  ['猫', 'LoL のランク戦', 'other'],
+  ['天気', 'プログラミング', 'other'],
+  ['仕事の締め切り', 'ラーメン', 'other'],
+  ['映画', '猫', 'other'],
+]
+const labels = [...new Set(labelPairs.flatMap(([left, right]) => [left, right]))]
+const vectors = new Map((await model.embed(labels, 'query')).map((vector, index) => [labels[index], vector]))
+for (const kind of ['same', 'near', 'other'] as const) {
+  const scores = labelPairs.filter(pair => pair[2] === kind).map(([left, right]) => vectors.get(left)!.reduce((sum, value, at) => sum + value * vectors.get(right)![at], 0))
+  process.stdout.write(`${kind}: ${scores.map(score => score.toFixed(3)).join(', ')} (min ${Math.min(...scores).toFixed(3)}, max ${Math.max(...scores).toFixed(3)})\n`)
+}

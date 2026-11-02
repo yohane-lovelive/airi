@@ -159,7 +159,7 @@ describe('memoryRoutes', () => {
 
     const embedded = await jsonOf<{ records: unknown[] }>(await requestAs(app, 'owner', '/embed', 'POST', { texts: ['ラーメン', '旅行'] }))
     expect(embedded.records).toHaveLength(2)
-    expect(embedder.embed).toHaveBeenCalledWith(['ラーメン', '旅行'], 'similarity')
+    expect(embedder.embed).toHaveBeenCalledWith(['ラーメン', '旅行'], 'query')
     expect((await requestAs(app, 'owner', '/search', 'POST', { query: '', personaId: 'airi' })).status).toBe(400)
     expect((await requestAs(app, 'owner', '/search', 'POST', { query: 'x', personaId: 'airi', limit: 50 })).status).toBe(400)
   })

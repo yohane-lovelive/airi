@@ -43,9 +43,9 @@ export function initiativeTopicLines(messages: readonly ChatHistoryItem[], since
 
 /**
  * Seeds from the memory index of a card: the description line of each listed entry.
- * The index already holds what matters most now, so the seeds follow the same 50 entries.
+ * The index already holds what matters most now, so the seeds follow the same entries, `limit` at most.
  */
-export function memoryTopicSeeds(entries: readonly MemoryEntry[], personaId: string): TopicSeed[] {
-  const { own, general } = memoryIndexEntries(entries, personaId)
+export function memoryTopicSeeds(entries: readonly MemoryEntry[], personaId: string, limit?: number): TopicSeed[] {
+  const { own, general } = memoryIndexEntries(entries, personaId, limit)
   return [...own, ...general].map(entry => ({ text: entry.description, source: 'memory' }))
 }

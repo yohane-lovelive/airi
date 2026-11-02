@@ -1,5 +1,7 @@
 import type { InitiativeReadout, InitiativeRhythm, TopicThread, TopicVariety } from '@proj-airi/core-agent'
 
+import type { TopicSimilarityMode } from '../libs/initiative/topic-vectors'
+
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
@@ -19,6 +21,10 @@ export interface InitiativeInspectorTopics {
   thread?: TopicThread
   seeds: string[]
   variety: TopicVariety
+  /** How the last turn compared topics. */
+  similarity: TopicSimilarityMode
+  /** The id of the memory that the last `recall` turn offered. */
+  recalledMemory?: string
 }
 
 /** One readout of the policy and its time. */

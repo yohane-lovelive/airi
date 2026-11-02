@@ -52,12 +52,8 @@ export function characterBigrams(text: string): Set<string> {
 /**
  * The share of character pairs that two topics have in common (the Dice coefficient).
  *
- * NOTICE:
- * The ADR compares topic labels by their embeddings. The client has no text embeddings yet.
- * Character pairs find shared words, but not a paraphrase, for example "ラーメン" and "麺類".
- * Source: docs/ai/adr/2026-10-28-autonomous-character-perception-and-missions.md, section "Small talk".
- * Removal condition: the memory ADR adds text embeddings. Then the host passes an embedding similarity, and this
- * function stays only as the fallback without embeddings.
+ * It finds shared words, but not a paraphrase, for example "ラーメン" and "麺類". A host with label vectors compares
+ * them with {@link scaledCosine} instead. A device without a server keeps this similarity, as the memory ADR decides.
  *
  * @example
  * bigramSimilarity('ラーメン屋', 'ラーメン')
@@ -74,6 +70,26 @@ export function bigramSimilarity(left: string, right: string): number {
       shared += 1
   }
   return (2 * shared) / (leftPairs.size + rightPairs.size)
+}
+
+/**
+ * The cosines of short topic labels from EmbeddingGemma 2 sit between about 0.64 and 0.98, also for unrelated labels.
+ * {@link scaledCosine} maps this range to the scale of {@link bigramSimilarity}, so one set of thresholds fits both.
+ *
+ * A check with Japanese label pairs and the query prefix gave cosines of 0.80 to 0.92 for one topic, 0.69 to 0.86 for
+ * near topics, and 0.64 to 0.79 for other topics. With this range, the thread threshold of 0.5 falls at a cosine of
+ * 0.80, and the stale seed threshold of 0.6 at 0.82.
+ * Source: `pnpm -F @proj-airi/embedder-server check:model`.
+ */
+export const LABEL_COSINE_RANGE = { floor: 0.7, ceiling: 0.9 } as const
+
+/** The cosine of two normalized label vectors on the scale of {@link bigramSimilarity}, from 0 to 1. */
+export function scaledCosine(left: readonly number[], right: readonly number[]): number {
+  let dot = 0
+  for (let index = 0; index < Math.min(left.length, right.length); index++)
+    dot += left[index] * right[index]
+  const scaled = (dot - LABEL_COSINE_RANGE.floor) / (LABEL_COSINE_RANGE.ceiling - LABEL_COSINE_RANGE.floor)
+  return Math.min(1, Math.max(0, scaled))
 }
 
 const TOPIC_MARKER = /^<\|TOPIC\s([\s\S]*)\|>$/

@@ -180,6 +180,10 @@ devtools:
         thread-cold: 'Current topic: {topic} ({count} lines, heat {heat}). It is cold, so the next turn asks for a new topic.'
         no-thread: No autonomous lines in the recent days.
         seeds: 'Ideas of the last turn: {seeds}'
+        compared-by:
+          vectors: Topics compared by meaning on the server
+          characters: Topics compared by shared words on this device
+        recalled-memory: 'Memory offered to the last recall turn: {id}'
         variety: 'Variety of today ({count} lines)'
         distinct: 'Distinct phrases (distinct-2): {value}'
         entropy: 'Speech type spread (entropy): {value}'

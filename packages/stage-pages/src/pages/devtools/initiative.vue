@@ -201,6 +201,10 @@ function timeLabel(epochMs: number) {
           {{ t(`${KEY}.topics.no-thread`) }}
         </li>
         <li>{{ t(`${KEY}.topics.seeds`, { seeds: topics.seeds.join(' / ') || '-' }) }}</li>
+        <li>{{ t(`${KEY}.topics.compared-by.${topics.similarity}`) }}</li>
+        <li v-if="topics.recalledMemory">
+          {{ t(`${KEY}.topics.recalled-memory`, { id: topics.recalledMemory }) }}
+        </li>
       </ul>
       <h3 :class="['mt-1', 'text-xs font-medium', 'text-neutral-500 dark:text-neutral-400']">
         {{ t(`${KEY}.topics.variety`, { count: topics.variety.lines }) }}

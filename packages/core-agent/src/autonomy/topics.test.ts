@@ -7,7 +7,9 @@ import {
   calendarTopicSeeds,
   currentTopicThread,
   distinctN,
+  LABEL_COSINE_RANGE,
   pickTopicSeeds,
+  scaledCosine,
   speechTypeEntropy,
   TOPIC_LIMITS,
   topicFromMarker,
@@ -137,5 +139,17 @@ describe('variety measures', () => {
   it('measures the similarity of consecutive topics', () => {
     expect(topicVariety([line('ラーメン'), line('ラーメン'), line('週末')], ['ask']).topicSimilarity).toBeCloseTo(0.5)
     expect(topicVariety([line('ラーメン')], []).topicSimilarity).toBeUndefined()
+  })
+})
+
+describe('scaledCosine', () => {
+  it('maps the cosine range of labels to the scale of character pairs, and clamps it', () => {
+    const at = (cos: number) => scaledCosine([cos, Math.sqrt(1 - cos ** 2)], [1, 0])
+
+    expect(at(LABEL_COSINE_RANGE.floor)).toBeCloseTo(0)
+    expect(at(0.8)).toBeCloseTo(TOPIC_LIMITS.threadSimilarity)
+    expect(at(0.82)).toBeCloseTo(TOPIC_LIMITS.staleSeedSimilarity)
+    expect(at(0.5)).toBe(0)
+    expect(at(1)).toBe(1)
   })
 })

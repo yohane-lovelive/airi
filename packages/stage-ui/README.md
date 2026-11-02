@@ -52,6 +52,7 @@ The character can start to talk without an owner message. It is step 2 of [the a
 - `libs/initiative/conversation.ts` reads the situation facts and the policy events from the stored messages.
 - Small talk: the mission tools start a `small-talk` mission when the owner asks, only while autonomous speech is on. While it runs, `settingsAt` of the initiative store gives the faster pace of small talk. The mission runner ends it at its time limit. The initiative runner ends it when the owner leaves, and the talk level tool ends it on a request for quiet.
 - `libs/initiative/topics.ts` reads the autonomous lines of recent days with their topic labels, and makes topic seeds from the memory index. The runner gives the current thread and the seeds to each drive turn.
+- `TopicVectors` (`libs/initiative/topic-vectors.ts`) compares topics by label vectors from the server while the memory sync is active, and by character pairs otherwise. A warm thread adds the memories that fit its topic to the seeds, and a `recall` turn gets one memory in its notice.
 - `useIntentionsStore()` in `stores/intentions.ts` keeps the intentions in IndexedDB. The intention tools in `tools/initiative.ts` add, list, and finish them.
 - The talk level tool applies the owner's words through `applyTalkRequest` of the initiative store. It refuses in a turn that does not answer an owner message.
 

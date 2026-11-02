@@ -93,6 +93,15 @@ Step M2b built the recall as follows.
 - The topic similarity of step 2b-2a compares topic labels by their vectors. It calls `POST /api/v1/memories/embed`. The client keeps the vectors of recent labels, so a label is embedded once.
 - Without the server, each reader uses character pairs, as today.
 
+Step M3 built the autonomous readers as follows.
+
+- `TopicVectors` in `libs/initiative/topic-vectors.ts` embeds the labels and seeds of a turn that have no vector yet, in one request, and keeps about 500 of them. The policy still compares with a synchronous function. A pair without two vectors compares by character pairs.
+- Cosines of short labels sit high: a check with Japanese pairs gave 0.80 to 0.92 for one topic, 0.69 to 0.86 for near topics, and 0.64 to 0.79 for other topics. `scaledCosine` maps 0.70 to 0.90 onto 0 to 1, so the thresholds of character pairs fit vectors too. The thread threshold of 0.5 falls at a cosine of 0.80. The ADR did not say how vectors meet the thresholds, so this is an addition. The check had 14 pairs. Labels from real turns can move the range.
+- The embed route uses the query prefix. It separated the groups better than the prefix for sentence similarity, which put same and other topics between 0.79 and 0.96.
+- While a thread is warm, the seeds add the five memories that fit its topic. A cold thread asks for a new topic, so it adds none.
+- A `recall` turn recalls with the current topic, else the scene, else the last line. It offers the best memory that did not come up in the last 6 hours, in one line of the situation block.
+- The inspector shows whether the topics compared by vectors, and the memory of the last `recall` turn.
+
 ### Floor between devices
 
 - The server keeps one presence record for each account: the device id, the time it connected, and the last heartbeat.
@@ -118,7 +127,7 @@ Step M5 adds two background tasks with the usage purpose `memory`:
 | M1 | Server: the `embedder` service, the memory feature of the field store, vectors on write, and the search and embed routes. | Done |
 | M2a | Client: the memory sync. | Done |
 | M2b | Client: `recallMemories`, recalled memories in the prompt, and `builtIn_searchMemory` by meaning. | Done |
-| M3 | Autonomous readers: the `recall` speech type, the seeds, and the topic similarity by vectors. It finishes the recall of ADR 2026-10-28 step 5. | To do |
+| M3 | Autonomous readers: the `recall` speech type, the seeds, and the topic similarity by vectors. It finishes the recall of ADR 2026-10-28 step 5. | Done |
 | M4 | The floor between devices, and the sync of missions and intentions. | To do |
 | M5 | The owner profile and the memory work. | To do |
 

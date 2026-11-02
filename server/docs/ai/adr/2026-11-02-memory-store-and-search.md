@@ -52,7 +52,7 @@ Add a `memories` feature to the resource API, and a separate `embedder` service 
 - Routes under `/api/v1/memories`:
   - `GET /`, `PUT /:id`, and `DELETE /:id`, as the field store defines them.
   - `POST /search` with `{ query, personaId, limit }`. It returns `{ records: [{ id, score }] }`. `query` has 1 to 500 characters, and `limit` is 1 to 20, 5 by default.
-  - `POST /embed` with `{ texts }` for the similarity of topic labels. It returns `{ records: [{ embedding }] }`. It takes 1 to 32 texts of 200 characters at most.
+  - `POST /embed` with `{ texts }` for the similarity of topic labels. It returns `{ records: [{ embedding }] }`. It takes 1 to 32 texts of 200 characters at most. It embeds them with the `query` task, which separated short Japanese labels better than the `similarity` task in step M3.
 - The `embedder` app, its Dockerfile, and its service in `server/docker-compose.yaml`.
 - Account deletion removes the memories and their vectors.
 

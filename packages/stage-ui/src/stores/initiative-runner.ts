@@ -30,8 +30,10 @@ import { computed, onScopeDispose, readonly, shallowRef, watch } from 'vue'
 import { extractMessageText } from '../libs/chat-sync/wire-message'
 import { INITIATIVE_SOURCE, initiativeConversationFacts, initiativeEventOf } from '../libs/initiative/conversation'
 import { markAway, observePresence, OWNER_PRESENCE_LIMITS, shouldGreet } from '../libs/initiative/presence'
+import { TopicVectors } from '../libs/initiative/topic-vectors'
 import { initiativeTopicLines, memoryTopicSeeds } from '../libs/initiative/topics'
 import { isOwnerTyping } from '../libs/initiative/typing'
+import { MEMORY_INDEX_LIMIT, MEMORY_INDEX_LIMIT_WITH_RECALL } from '../libs/memory-index'
 import { eventPressureFactor, IMAGE_BUDGET_LIMITS } from '../libs/perception/image-budget'
 import { buildScreenTurn } from '../libs/perception/screen-turn'
 import { Ticker } from '../workers/ticker'
@@ -42,6 +44,8 @@ import { useInitiativeStore } from './initiative'
 import { useInitiativeInspectorStore } from './initiative-inspector'
 import { useIntentionsStore } from './intentions'
 import { useMemoryStore } from './memory'
+import { useMemoryRecallStore } from './memory-recall'
+import { useMemorySyncStore } from './memory-sync'
 import { useMissionsStore } from './missions'
 import { useOwnerTypingStore } from './owner-typing'
 import { usePerceptionStore } from './perception'
@@ -128,6 +132,10 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
   const ownerTyping = useOwnerTypingStore()
   const inspector = useInitiativeInspectorStore()
   const memory = useMemoryStore()
+  const memorySync = useMemorySyncStore()
+  const memoryRecall = useMemoryRecallStore()
+  // Topic labels and seeds compare by meaning while the memory sync is active, and by character pairs otherwise.
+  const topicVectors = new TopicVectors({ embed: (texts, signal) => memoryRecall.embedTexts(texts, signal) })
   const missions = useMissionsStore()
   const perception = usePerceptionStore()
   const perceptionRunner = usePerceptionRunnerStore()
@@ -165,6 +173,10 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
   let lastSeeds: TopicSeed[] = []
   /** When a spoken turn last offered each seed. A seed rests for a while after that. It is runtime state only. */
   const seedOfferedAt = new Map<string, number>()
+  /** The memories that `recall` turns brought up, by id. They rest as long as seeds, so one memory does not come back each turn. */
+  const recalledMemoryAt = new Map<string, number>()
+  /** The memory of the last `recall` turn, for the inspector. */
+  let lastRecalledMemory: string | undefined
   /** When the last turn with the screen started. Later frames and events are news to the model. */
   let lastScreenTurnAt: number | undefined
   /** The anchor frame of the current scene. The runner keeps it, because the ring drops frames after a minute. */
@@ -224,20 +236,49 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
     return initiativeTopicLines(chatSession.getSessionMessages(sessionId), now - TOPIC_LIMITS.recentDays * DAY_MS)
   }
 
-  /** The current thread and a few seeds far from the recent topics. */
-  function topicsOf(sessionId: string, time: InitiativeTime) {
+  /**
+   * The current thread and a few seeds far from the recent topics. While a thread is warm, the memories that fit its
+   * topic join the seeds, not only the newest memories.
+   */
+  async function topicsOf(sessionId: string, time: InitiativeTime) {
+    const persona = chat.personaOf(sessionId)
     const lines = recentTopicLines(sessionId, time.now)
-    const thread = currentTopicThread(lines)
-    const pool = [
-      ...(memory.enabled ? memoryTopicSeeds(memory.entries, chat.personaOf(sessionId)) : []),
-      ...calendarTopicSeeds(time.localDay),
-    ]
+    const recentTopics = lines.map(topicOf)
+    const indexSeeds = memory.enabled ? memoryTopicSeeds(memory.entries, persona, memorySync.active ? MEMORY_INDEX_LIMIT_WITH_RECALL : MEMORY_INDEX_LIMIT) : []
+    const calendarSeeds = calendarTopicSeeds(time.localDay)
+    await topicVectors.prepare([...recentTopics, ...indexSeeds.map(seed => seed.text), ...calendarSeeds.map(seed => seed.text)])
+    const thread = currentTopicThread(lines, topicVectors.similarity)
+    const recalled = memory.enabled && thread && !thread.cold ? await memoryRecall.recall(thread.topic, persona) : undefined
+    const recalledSeeds = (recalled?.entries ?? []).map(entry => ({ text: entry.description || entry.body, source: 'memory' as const }))
+    if (recalledSeeds.length)
+      await topicVectors.prepare(recalledSeeds.map(seed => seed.text))
     for (const [text, at] of seedOfferedAt) {
       if (time.now - at >= TOPIC_LIMITS.seedRestMs)
         seedOfferedAt.delete(text)
     }
-    const seeds = pickTopicSeeds({ seeds: pool, recentTopics: lines.map(topicOf), resting: [...seedOfferedAt.keys()], random: Math.random })
+    const seeds = pickTopicSeeds({
+      seeds: [...recalledSeeds, ...indexSeeds, ...calendarSeeds],
+      recentTopics,
+      resting: [...seedOfferedAt.keys()],
+      random: Math.random,
+      similarity: topicVectors.similarity,
+    })
     return { thread, seeds }
+  }
+
+  /**
+   * The memory that a `recall` turn can bring up: the best one for the current topic, the scene, or the last line,
+   * that did not come up in the rest time.
+   */
+  async function recallMemoryOf(sessionId: string, query: string | undefined, now: number) {
+    if (!memory.enabled || !query)
+      return undefined
+    for (const [id, at] of recalledMemoryAt) {
+      if (now - at >= TOPIC_LIMITS.seedRestMs)
+        recalledMemoryAt.delete(id)
+    }
+    const { entries } = await memoryRecall.recall(query, chat.personaOf(sessionId))
+    return entries.find(entry => !recalledMemoryAt.has(entry.id))
   }
 
   /**
@@ -289,11 +330,15 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
     const facts = initiativeConversationFacts(chatSession.getSessionMessages(sessionId))
     // A greeting and a welcome back have their own reason. Topic ideas would pull them away from it.
     const rhythm = decision.trigger === 'greeting' || decision.trigger === 'welcome-back'
-    const topics = rhythm ? undefined : topicsOf(sessionId, time)
+    const topics = rhythm ? undefined : await topicsOf(sessionId, time)
     const smallTalk = rhythm ? undefined : smallTalkAt(time.now)
     lastSeeds = topics?.seeds ?? []
     const screen = rhythm ? undefined : await screenOf(time.now)
     const screenTimeline = screen ? await timeline.load(sessionId).catch(() => timeline.timelineOf(sessionId)) : undefined
+    const recallMemory = decision.speechType === 'recall'
+      ? await recallMemoryOf(sessionId, topics?.thread?.topic ?? screenTimeline?.scene?.text ?? facts.recentLines.at(-1), time.now)
+      : undefined
+    lastRecalledMemory = recallMemory?.id
     const text = initiativeNoticeText({
       mode: state.value?.mode ?? 'idle',
       trigger: decision.trigger,
@@ -308,6 +353,7 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
       ...(screenTimeline ? { timeline: screenTimeline } : {}),
       ...(topics?.thread ? { thread: topics.thread } : {}),
       ...(topics?.seeds.length ? { seeds: topics.seeds } : {}),
+      ...(recallMemory ? { recallMemory: recallMemory.body } : {}),
     })
     const turn = { sessionId, turnId: nanoid(), dropped: false }
     running = turn
@@ -329,6 +375,8 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
     if (outcome === 'spoke') {
       for (const seed of topics?.seeds ?? [])
         seedOfferedAt.set(seed.text, time.now)
+      if (recallMemory)
+        recalledMemoryAt.set(recallMemory.id, time.now)
     }
     if (outcome === 'spoke' && decision.speechType) {
       const day = initiativeTimeFrom(new Date()).localDay
@@ -378,11 +426,13 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
   function topicReadout(sessionId: string, time: InitiativeTime) {
     const lines = recentTopicLines(sessionId, time.now)
     const midnight = new Date(time.now).setHours(0, 0, 0, 0)
-    const thread = currentTopicThread(lines)
+    const thread = currentTopicThread(lines, topicVectors.similarity)
     return {
       ...(thread ? { thread } : {}),
       seeds: lastSeeds.map(seed => seed.text),
-      variety: topicVariety(lines.filter(line => line.at >= midnight), spokenTypes.day === time.localDay ? spokenTypes.types : []),
+      variety: topicVariety(lines.filter(line => line.at >= midnight), spokenTypes.day === time.localDay ? spokenTypes.types : [], topicVectors.similarity),
+      similarity: topicVectors.lastMode,
+      ...(lastRecalledMemory ? { recalledMemory: lastRecalledMemory } : {}),
     }
   }
 

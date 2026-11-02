@@ -16,6 +16,8 @@ export const SCENE_ANCHOR_TEXT = 'The anchor frame of the current scene on the o
 
 /** Each recent line is cut to this length, so the situation block stays near its budget of about 300 tokens. */
 const RECENT_LINE_MAX_LENGTH = 120
+/** The memory of a `recall` turn is cut to this length, like a recent line. */
+const RECALL_MEMORY_LENGTH = 120
 
 const MINUTE_MS = 60_000
 
@@ -74,6 +76,8 @@ export interface InitiativeNoticeContext {
   readonly timeline?: Timeline
   /** Topics that the character can take up. The host draws them with `pickTopicSeeds`. */
   readonly seeds?: readonly TopicSeed[]
+  /** A memory that fits the current topic, for the `recall` speech type. The host recalls it. */
+  readonly recallMemory?: string
 }
 
 const TRIGGER_REASONS: Record<InitiativeTrigger, string> = {
@@ -120,6 +124,8 @@ export function initiativeNoticeText(context: InitiativeNoticeContext): string {
     lines.push(`- Mode: small talk. The owner asked you to keep them company for ${durationSince(context.now, context.smallTalkEndsAt)} more. Talk freely, and keep the talk going.`)
   if (context.speechType)
     lines.push(`- Idea, only if it fits: ${SPEECH_TYPE_HINTS[context.speechType]}.`)
+  if (context.speechType === 'recall' && context.recallMemory)
+    lines.push(`- A memory you can bring up: "${truncate(context.recallMemory, RECALL_MEMORY_LENGTH)}"`)
 
   if (context.intentions?.length) {
     lines.push('- What you wanted to do later. Use one only if it fits now. After you do it, finish it with its id:')
