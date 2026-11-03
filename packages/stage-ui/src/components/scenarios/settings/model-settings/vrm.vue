@@ -2,7 +2,7 @@
 import type { ModelSettingsRuntimeSnapshot } from './runtime'
 
 import { useModelStore } from '@proj-airi/stage-ui-three'
-import { Button, Callout, GhostButton, SelectTab } from '@proj-airi/ui'
+import { Button, Callout, FieldCheckbox, GhostButton, SelectTab } from '@proj-airi/ui'
 import { storeToRefs } from 'pinia'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -33,6 +33,7 @@ const {
   modelRotationY,
   cameraDistance,
   trackingMode,
+  bodyMotionEnabled,
 
   directionalLightRotation,
   directionalLightIntensity,
@@ -95,6 +96,13 @@ const envOptions = computed(() => [
       {{ t('settings.vrm.fps.description') }}
     </p>
     <SelectTab v-model="maxFps" :options="fpsOptions" size="sm" :class="['shrink-0']" />
+  </Container>
+  <Container :title="t('settings.vrm.body-movement.title')" icon="i-solar:running-round-bold-duotone">
+    <FieldCheckbox
+      v-model="bodyMotionEnabled"
+      :label="t('settings.vrm.body-movement.label')"
+      :description="t('settings.vrm.body-movement.description')"
+    />
   </Container>
   <Container
     :title="t('settings.pages.models.sections.section.scene')"

@@ -201,6 +201,7 @@ const {
 
   lookAtTarget,
   trackingMode,
+  bodyMotionEnabled,
   eyeHeight,
   envSelect,
   skyBoxSrc,
@@ -1090,6 +1091,8 @@ defineExpose({
         :model-offset="modelOffset"
         :model-rotation-y="modelRotationY"
         :tracking-mode="trackingMode"
+        :body-motion="bodyMotionEnabled"
+        :thinking="props.presence.thinking"
         :eye-height="eyeHeight"
         :camera-position="cameraPosition"
         :camera="camera"

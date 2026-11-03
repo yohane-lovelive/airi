@@ -39,6 +39,7 @@ const {
   grantEnabled,
   physicsGravity,
   gazeMode,
+  bodyMotionEnabled,
   idleMotionName,
   availableMotions,
   availableMorphs,
@@ -529,6 +530,12 @@ function removeMotion(id: string) {
     <p :class="['mb-2', 'text-xs', 'text-neutral-500', 'dark:text-neutral-400']">
       {{ t('settings.mmd.animation.description') }}
     </p>
+    <FieldCheckbox
+      v-model="bodyMotionEnabled"
+      :class="['mb-2']"
+      :label="t('settings.mmd.animation.body-movement')"
+      :description="t('settings.mmd.animation.body-movement-description')"
+    />
     <Button :class="['mb-2']" @click="vmdDialog.open()">
       {{ t('settings.mmd.animation.import-motion') }}
     </Button>

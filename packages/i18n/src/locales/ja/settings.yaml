@@ -2334,6 +2334,10 @@ theme:
 title: 設定
 voices: 音声
 vrm:
+  body-movement:
+    title: 自然な体の動き
+    label: 体を自然に動かす
+    description: 呼吸し、少し揺れ、視線を追って頭を向け、考えている間は目をそらし、話しながらうなずきます。
   fps:
     title: フレームレート上限
     description: ステージとモデルのプレビューで VRM の描画を制限します。上限を下げるとアニメーション速度を変えずに GPU の使用量を減らせます。
@@ -2485,6 +2489,8 @@ mmd:
       camera: カメラ
       none: 無効
   animation:
+    body-movement: 体を自然に動かす
+    body-movement-description: 呼吸し、少し揺れ、視線を追って頭を向け、考えている間は目をそらし、話しながらうなずきます。
     title: アニメーション
     idle-motion: アイドルモーション
     default-idle: AIRI 標準（VRM と同じ待機）

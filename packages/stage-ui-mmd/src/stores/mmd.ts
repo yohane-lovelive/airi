@@ -128,6 +128,8 @@ export const useMMD = defineStore('mmd', () => {
    * - `none`   — no tracking; idle saccades only
    */
   const gazeMode = useLocalStorageManualReset<MMDGazeMode>('settings/mmd/gaze-mode', 'mouse')
+  /** Breath, sway, a neck that follows the gaze, and nods, over the idle motion. Off by default. */
+  const bodyMotionEnabled = useLocalStorageManualReset<boolean>('settings/mmd/body-motion', false)
 
   // === Scene: camera ===
   /** Vertical field of view in degrees. */
@@ -288,6 +290,7 @@ export const useMMD = defineStore('mmd', () => {
     grantEnabled.reset()
     physicsGravity.reset()
     gazeMode.reset()
+    bodyMotionEnabled.reset()
     cameraFov.reset()
     ambientColor.reset()
     ambientIntensity.reset()
@@ -321,6 +324,7 @@ export const useMMD = defineStore('mmd', () => {
     grantEnabled,
     physicsGravity,
     gazeMode,
+    bodyMotionEnabled,
 
     cameraFov,
     ambientColor,

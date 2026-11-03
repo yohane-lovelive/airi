@@ -508,6 +508,18 @@ Three layers stack. The team builds them in this order.
 2. **Library.** The model writes the existing `<|ACT|>` marker with an expression and a free-text motion, for example `<|ACT {"expression":"shy","motion":"scratch head shyly"}|>`. Code plays the nearest clip from the library.
 3. **Generated motion.** Generation adds clips to the library over time.
 
+Step 4-1 built the procedural layer as follows.
+
+- `@proj-airi/stage-shared/body-motion` holds the layer without a three.js dependency, so the VRM and MMD renderers share it. `ProceduralBodyMotion` returns rotation offsets for the spine, the chest, the neck, and the head, and an eye offset.
+- `BodyPoseApplier` takes the offsets of the last frame away before the clip runs, and adds the new offsets after it. A clip writes only the bones that it has tracks for, so the offsets never add up.
+- Breath turns the chest and the spine on a period of 4.5 seconds. A slow sway turns the spine and rolls the head.
+- The neck turns 30% and the head 35% of the way to the gaze. The head follows in about 0.3 seconds, and the neck in about 0.6 seconds, so the motion starts at the head. The eyes turn the rest.
+- While a model turn runs, the head and the eyes look away to one side and up. The renderers read this from the thinking state of the presence bubble.
+- An `AnalyserNode` on the speech source measures the loudness. A nod starts when the level rises above 0.45 after it fell below 0.2, at least 1.5 seconds after the last nod. 40% of these peaks get no nod, so the nods do not keep time.
+- The VRM renderer moves the normalized bones before the humanoid copies them, and moves the eyes through the look-at applier. The MMD renderer moves `上半身`, `上半身2`, `首`, and `頭`. While the layer is on, the MMD gaze controller leaves the head to it.
+- Each renderer has the setting "Natural movement", off by default. The VRM setting syncs in the VRM group of the settings sync. MMD settings do not sync, as before.
+- The ADR puts a capability check at load. In step 4-1, the layer checks only its own bones, and a missing bone skips its part. The list of bones and expressions for the prompt comes with step 4-3, which reads it.
+
 The library:
 
 - IndexedDB keeps one record for each clip. The record holds the `.vrma` data, a description, tags, and the body part (upper body or full body).
@@ -671,7 +683,7 @@ The order follows dependencies. Each step uses the parts of the earlier steps. E
 | 2 | Autonomous talk without the screen: connect the policy core to `notifyConversation`. Add the prompt budget, intentions, owner control, usage by purpose, and the inspector. | Done |
 | 2b | Daily rhythm and small talk: templates as recipes, the `greeting`, `welcome-back`, and `small-talk` templates, topic seeds, and the time of day. Measure variety. | Done. Templates as recipes still wait. |
 | 3 | Perception: the adapters, ring buffer, detectors, frame policies, image budget, recorder, replay, timeline, scene state, `commentary` with interruptions, and `watch`. | Done. |
-| 4 | Motion: the model capability check, the procedural layer, the library with `ACT` markers, expression sync, and the upper-body layer. | To do |
+| 4 | Motion: the model capability check, the procedural layer, the library with `ACT` markers, expression sync, and the upper-body layer. | In progress: 4-1 is done. |
 | 5 | Generated motion, game audio, recall from memory, and polish. Recall needs the memory ADR. | In progress: recall from memory is done with step M3 of ADR 2026-11-02. |
 
 Step 2 has four parts. Each part is one change.
@@ -696,6 +708,14 @@ Step 3 has nine parts. Each part is one change. Detector events reach the pressu
 | 3-6a | The screen recorder of the desktop app. | Done |
 | 3-6b | The replay evaluation suite. | Done |
 | 3-6c | The `contact-sheet` and `scene-anchor` frame policies, and a developer setting to choose the policy. | Done |
+
+Step 4 has three parts. Each part is one change.
+
+| Part | Content | State |
+| --- | --- | --- |
+| 4-1 | The procedural layer for VRM and MMD models, with the check of its bones. | Done |
+| 4-2 | The library, the match of the `motion` of `ACT` markers, and playback on an upper-body layer. | To do |
+| 4-3 | Expression sync, the list of expressions and motions in the prompt, and the settings page of the library. | To do |
 
 Step 4 does not depend on steps 0 to 3. It comes after them so that the speech output format changes only once.
 The memory ADR has its own steps. They can run beside steps 1 to 4.

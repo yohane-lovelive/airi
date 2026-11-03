@@ -2872,6 +2872,10 @@ theme:
 title: Settings
 voices: Voice
 vrm:
+  body-movement:
+    title: Natural movement
+    label: Move the body naturally
+    description: The character breathes, sways a little, turns the head after the gaze, looks away while it thinks, and nods while it speaks.
   fps:
     title: Frame rate limit
     description: Limit VRM rendering in the stage and model preview. Lower limits reduce GPU use without changing animation speed.
@@ -3029,6 +3033,8 @@ mmd:
       camera: Camera
       none: Disabled
   animation:
+    body-movement: Move the body naturally
+    body-movement-description: The character breathes, sways a little, turns the head after the gaze, looks away while it thinks, and nods while it speaks.
     title: Animation
     idle-motion: Idle Motion
     default-idle: AIRI default (the VRM idle)

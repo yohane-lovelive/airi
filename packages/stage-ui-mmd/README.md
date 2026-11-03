@@ -62,6 +62,9 @@ reaching feature parity with the Live2D and VRM renderers:
 - **Emotion expressions** via morph cross-fades.
 - **Looking-at modes** (camera / cursor / disabled) with idle saccades, plus
   procedural blink.
+- **Natural movement** (off by default): breath, sway, a neck and a head that
+  follow the gaze, a gaze that moves away while the model thinks, and nods on
+  speech, from `@proj-airi/stage-shared/body-motion`.
 - **Scene settings**: model transform, camera FOV, ambient + directional
   lights, albedo glow, render scale, physics gravity, and per-material opacity
   — all live, persisted, and synced across windows.

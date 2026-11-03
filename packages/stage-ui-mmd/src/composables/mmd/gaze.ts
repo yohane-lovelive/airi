@@ -40,8 +40,12 @@ interface GazeBone {
 }
 
 export interface GazeController {
-  /** Drives gaze toward a normalized offset; pass `undefined` to idle-saccade. */
-  update: (offset: GazeOffset | undefined, delta: number) => void
+  /**
+   * Drives gaze toward a normalized offset; pass `undefined` to idle-saccade.
+   *
+   * With `aimHead` false, the head keeps the rotation of its motion, because the procedural body layer turns it.
+   */
+  update: (offset: GazeOffset | undefined, delta: number, aimHead?: boolean) => void
 }
 
 /**
@@ -107,7 +111,7 @@ export function createGazeController(mesh: SkinnedMesh): GazeController {
   }
 
   return {
-    update(offset, delta) {
+    update(offset, delta, aimHead = true) {
       let desired = offset
       if (!desired) {
         nextSaccadeIn -= delta * 1000
@@ -131,7 +135,7 @@ export function createGazeController(mesh: SkinnedMesh): GazeController {
       for (const eye of eyeBones)
         applyBone(eye, current.x * EYE_YAW_LIMIT, current.y * EYE_PITCH_LIMIT)
 
-      if (headBone)
+      if (headBone && aimHead)
         applyBone(headBone, current.x * HEAD_YAW_LIMIT, current.y * HEAD_PITCH_LIMIT)
     },
   }

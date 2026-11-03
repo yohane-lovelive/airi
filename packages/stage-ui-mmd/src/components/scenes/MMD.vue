@@ -16,6 +16,7 @@ import type { ResolvedMMDModel } from '../../utils/mmd-loader'
 
 import { errorMessageFrom } from '@moeru/std'
 import { coverRect } from '@proj-airi/stage-shared'
+import { BodyPoseApplier, ProceduralBodyMotion, SpeechLevelMeter } from '@proj-airi/stage-shared/body-motion'
 import { Screen } from '@proj-airi/ui'
 import { storeToRefs } from 'pinia'
 import {
@@ -87,9 +88,12 @@ const props = withDefaults(defineProps<{
    * not stand in its rest pose.
    */
   defaultIdleAnimationUrl?: string
+  /** A model turn is running, so the gaze moves away while the body motion is on. */
+  thinking?: boolean
 }>(), {
   paused: false,
   enableOrbitControls: false,
+  thinking: false,
 })
 
 const emit = defineEmits<{
@@ -105,6 +109,7 @@ const {
   grantEnabled,
   physicsGravity,
   gazeMode,
+  bodyMotionEnabled,
   position,
   scale,
   rotationY,
@@ -161,6 +166,40 @@ const lipSync = useMMDLipSync(
 )
 const blink = useMMDBlink()
 let gaze: ReturnType<typeof createGazeController> | undefined
+
+// Body motion. The applier belongs to the current model, and the meter to the current audio context.
+const bodyMotion = new ProceduralBodyMotion()
+let bodyPose: BodyPoseApplier | undefined
+let speechLevel: SpeechLevelMeter | undefined
+watch(() => props.audioContext, (context, _, onCleanup) => {
+  if (!context)
+    return
+  const meter = new SpeechLevelMeter(context)
+  speechLevel = meter
+  onCleanup(() => {
+    meter.dispose()
+    if (speechLevel === meter)
+      speechLevel = undefined
+  })
+}, { immediate: true })
+watch(() => [props.currentAudioSource, props.audioContext] as const, ([source]) => speechLevel?.listen(source), { immediate: true })
+
+/** The standard MMD bones of the body parts that the procedural layer moves. A model without one skips that part. */
+function createBodyPose(skinned: SkinnedMesh) {
+  const bone = (name: string) => skinned.skeleton.bones.find(candidate => candidate.name === name)
+  return new BodyPoseApplier({ spine: bone('上半身'), chest: bone('上半身2'), neck: bone('首'), head: bone('頭') })
+}
+
+/** Moves the eyes away while the model thinks. A tiny offset keeps the idle saccades of an untracked gaze. */
+function withThinkingEyes(offset: GazeOffset | undefined, eyes: { yaw: number, pitch: number }): GazeOffset | undefined {
+  if (Math.abs(eyes.yaw) < 0.01 && Math.abs(eyes.pitch) < 0.01)
+    return offset
+  const base = offset ?? { x: 0, y: 0 }
+  return {
+    x: Math.max(-1, Math.min(1, base.x + eyes.yaw / EYE_YAW_LIMIT)),
+    y: Math.max(-1, Math.min(1, base.y + eyes.pitch / EYE_PITCH_LIMIT)),
+  }
+}
 /** The bone that depth of field keeps sharp. Models without `頭` keep the middle of their bounds sharp. */
 let focusBone: Bone | undefined
 const focusPoint = new Vector3()
@@ -424,6 +463,8 @@ function renderLoop() {
     return
 
   if (animation) {
+    // A motion writes only the bones that it has tracks for, so the offsets of the last frame leave first.
+    bodyPose?.undo()
     // three-mmd preserves the required mixer → IK → grant → physics order.
     animation.update(delta)
     // Apply AIRI-owned morphs after the runtime so lip-sync/expression win
@@ -431,8 +472,18 @@ function renderLoop() {
     emote?.update(delta)
     blink.update(morphs, delta)
     lipSync.update(morphs, delta)
-    // Gaze rotates eye/head bones, also after the helper.
-    gaze?.update(resolveGazeOffset(), delta)
+    const gazeOffset = resolveGazeOffset()
+    const bodyMotionPose = bodyMotionEnabled.value
+      ? bodyMotion.update(delta, {
+          gaze: gazeOffset && { yaw: gazeOffset.x * EYE_YAW_LIMIT, pitch: gazeOffset.y * EYE_PITCH_LIMIT },
+          thinking: props.thinking,
+          speechLevel: speechLevel?.read() ?? 0,
+        })
+      : undefined
+    // Gaze rotates eye/head bones, also after the helper. The body layer turns the head while it is on.
+    gaze?.update(bodyMotionPose ? withThinkingEyes(gazeOffset, bodyMotionPose.eyes) : gazeOffset, delta, !bodyMotionPose)
+    if (bodyMotionPose)
+      bodyPose?.apply(bodyMotionPose.bones)
   }
 
   controls?.update()
@@ -508,6 +559,7 @@ function disposeModel() {
   morphs = undefined
   emote = undefined
   gaze = undefined
+  bodyPose = undefined
   resolved = undefined
   mmdStore.isModelLoaded = false
 }
@@ -643,6 +695,7 @@ async function loadModel(src: string) {
 
     emote = useMMDEmote(morphs)
     gaze = createGazeController(mesh)
+    bodyPose = createBodyPose(mesh)
 
     animation = createMMDAnimationManager(resolved.mmd, { physicsEnabled: physicsEnabled.value })
     await animation.init()

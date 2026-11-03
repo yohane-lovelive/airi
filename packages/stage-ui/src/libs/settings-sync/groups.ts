@@ -81,6 +81,7 @@ export const SETTINGS_SYNC_GROUPS = {
     'settings/stage-ui-three/envEnabled',
     'settings/stage-ui-three/skyBoxIntensity',
     'settings/stage-ui-three/trackingMode',
+    'settings/stage-ui-three/body-motion',
     'settings/stage-ui-three/scenes/scene/ambient-light/color',
     'settings/stage-ui-three/scenes/scene/ambient-light/intensity',
     'settings/stage-ui-three/scenes/scene/directional-light/color',

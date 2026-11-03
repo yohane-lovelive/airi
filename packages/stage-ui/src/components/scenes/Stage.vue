@@ -801,6 +801,7 @@ defineExpose({
         :audio-context="audioContext"
         :current-audio-source="currentAudioSource"
         :default-idle-animation-url="animations.idleLoop.toString()"
+        :thinking="presenceBubble.thinking"
         @error="reportStageRenderError"
       />
       <div

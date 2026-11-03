@@ -35,6 +35,16 @@ const events = detector.observe({ at: Date.now(), thumbnail, app: 'Code' })
 
 The frame policies pick the frames of one decision turn. `FRAME_POLICY_NAMES` lists them. `pickFreshKeyframes` picks the newest frame and key frames, `pickContactSheet` picks up to six tiles, `contactSheetLayout` places them, and `sceneAnchorAt` finds the anchor frame of the current scene. The app and `evals/autonomy-replay` use the same functions, so a replay picks the frames that the app picks.
 
+The `body-motion` entrypoint owns the procedural layer of 3D models. `ProceduralBodyMotion` gives breath, a small sway, a neck and a head that follow the gaze late, a gaze that moves away while the model thinks, and nods on speech peaks. `BodyPoseApplier` adds its offsets to the bones of a model, and `SpeechLevelMeter` measures the speech loudness. The VRM and MMD renderers share them:
+
+```ts
+import { BodyPoseApplier, ProceduralBodyMotion } from '@proj-airi/stage-shared/body-motion'
+
+const motion = new ProceduralBodyMotion()
+const pose = new BodyPoseApplier({ spine, chest, neck, head })
+// Each frame: pose.undo() before the clip runs, then pose.apply(motion.update(delta, input).bones) after it.
+```
+
 ## Do not use this package
 
 Keep Electron IPC definitions in the Electron application. Keep UI state and actions in `@proj-airi/stage-ui`. Keep Extension runtime and manifest behavior in `@proj-airi/plugin-sdk`.

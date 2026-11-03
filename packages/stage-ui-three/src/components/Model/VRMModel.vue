@@ -31,6 +31,7 @@ import type { VrmLifecycleReason } from '../../trace'
 import type { ManagedVrmInstance } from './vrm-instance-cache'
 
 import { VRMUtils } from '@pixiv/three-vrm'
+import { BodyPoseApplier, ProceduralBodyMotion, SpeechLevelMeter } from '@proj-airi/stage-shared/body-motion'
 import { useLoop, useTresContext } from '@tresjs/core'
 import { until } from '@vueuse/core'
 import {
@@ -129,6 +130,10 @@ const props = withDefaults(defineProps<{
   modelOffset: Vec3
   modelRotationY: number
   trackingMode: TrackingMode
+  /** Adds breath, sway, a neck that follows the gaze, and nods over the idle clip. */
+  bodyMotion?: boolean
+  /** A model turn is running, so the gaze moves away. */
+  thinking?: boolean
   eyeHeight: number
   screenBoundingBox: () => { top: number, left: number, width: number, height: number }
   cameraPosition: Vec3
@@ -136,6 +141,8 @@ const props = withDefaults(defineProps<{
   camera: PerspectiveCamera
 }>(), {
   paused: false,
+  bodyMotion: false,
+  thinking: false,
 })
 /*
   * Emits:
@@ -212,6 +219,50 @@ const idleEyeSaccades = useIdleEyeSaccades()
 // like vrmEmote.value.isEmoteActive.value in the render loop.
 const vrmEmote = shallowRef<ReturnType<typeof useVRMEmote>>()
 const vrmLipSync = useVRMLipSync(audioContext, currentAudioSource)
+
+// Body motion. The applier belongs to the current model, and the meter to the current audio context.
+const bodyMotion = new ProceduralBodyMotion()
+let bodyPose: BodyPoseApplier | undefined
+let speechLevel: SpeechLevelMeter | undefined
+const gazeHead = new Vector3()
+const gazeTarget = new Vector3()
+watch(audioContext, (context, _, onCleanup) => {
+  if (!context)
+    return
+  const meter = new SpeechLevelMeter(context)
+  speechLevel = meter
+  onCleanup(() => {
+    meter.dispose()
+    if (speechLevel === meter)
+      speechLevel = undefined
+  })
+}, { immediate: true })
+watch([currentAudioSource, audioContext], ([source]) => speechLevel?.listen(source), { immediate: true })
+
+/** A VRM 0.x model faces -Z, and a VRM 1.0 model faces +Z. */
+function facingOf(activeVrm: VRM): 1 | -1 {
+  return activeVrm.meta?.metaVersion === '0' ? -1 : 1
+}
+
+function createBodyPose(activeVrm: VRM) {
+  const bone = (name: 'spine' | 'chest' | 'neck' | 'head') => activeVrm.humanoid.getNormalizedBoneNode(name) ?? undefined
+  return new BodyPoseApplier({ spine: bone('spine'), chest: bone('chest'), neck: bone('neck'), head: bone('head') }, facingOf(activeVrm))
+}
+
+/** The direction from the head to the eye target, as yaw and pitch in the frame that faces +Z. */
+function gazeOf(activeVrm: VRM) {
+  const target = activeVrm.lookAt?.target
+  const head = activeVrm.humanoid.getNormalizedBoneNode('head')
+  if (!target || !head)
+    return undefined
+  activeVrm.scene.worldToLocal(head.getWorldPosition(gazeHead))
+  activeVrm.scene.worldToLocal(target.getWorldPosition(gazeTarget))
+  gazeTarget.sub(gazeHead)
+  const facing = facingOf(activeVrm)
+  const x = gazeTarget.x * facing
+  const z = gazeTarget.z * facing
+  return { yaw: Math.atan2(x, z), pitch: Math.atan2(-gazeTarget.y, Math.hypot(x, z)) }
+}
 
 // For sky box update
 const nprProgramVersion = ref(0)
@@ -341,6 +392,7 @@ function applyManagedVrmInstance(instance: ManagedVrmInstance) {
   vrmAnimationMixer.value = instance.mixer
   vrmEmote.value = instance.emote
   interactionColliders.value = instance.interactionColliders
+  bodyPose = createBodyPose(instance.vrm)
 }
 
 function destroyManagedVrmInstance(instance?: ManagedVrmInstance) {
@@ -459,6 +511,8 @@ function bindManagedVrmInstanceRenderLoop() {
     const traceStart = isStageThreeRuntimeTraceEnabled() ? performance.now() : 0
     const tracingEnabled = traceStart > 0
 
+    // The clip writes only the bones that it has tracks for, so the offsets of the last frame leave first.
+    bodyPose?.undo()
     const animationMixerMs = measureFrameStep(tracingEnabled, () => {
       vrmAnimationMixer.value?.update(delta)
     })
@@ -479,11 +533,24 @@ function bindManagedVrmInstanceRenderLoop() {
       if (activeVrm)
         runVrmFrameRuntimeHook(activeVrm, delta)
     })
+    // The procedural layer moves the normalized bones, so it runs before the humanoid copies them to the model.
+    const bodyMotionPose = activeVrm && props.bodyMotion
+      ? bodyMotion.update(delta, { gaze: gazeOf(activeVrm), thinking: props.thinking, speechLevel: speechLevel?.read() ?? 0 })
+      : undefined
+    if (bodyMotionPose)
+      bodyPose?.apply(bodyMotionPose.bones)
     const humanoidMs = measureFrameStep(tracingEnabled, () => {
       activeVrm?.humanoid.update()
     })
     const lookAtMs = measureFrameStep(tracingEnabled, () => {
       activeVrm?.lookAt?.update?.(delta)
+      // The eyes look away while the model thinks. Yaw and pitch of `lookAt` are degrees, and a positive pitch looks up.
+      if (activeVrm?.lookAt && bodyMotionPose && (bodyMotionPose.eyes.yaw || bodyMotionPose.eyes.pitch)) {
+        activeVrm.lookAt.applier.applyYawPitch(
+          activeVrm.lookAt.yaw + MathUtils.radToDeg(bodyMotionPose.eyes.yaw),
+          activeVrm.lookAt.pitch - MathUtils.radToDeg(bodyMotionPose.eyes.pitch),
+        )
+      }
     })
     const isEmoteActive = vrmEmote.value?.isEmoteActive?.value ?? false
 
@@ -588,6 +655,9 @@ function componentCleanUp(
 
   disposeBeforeRenderLoop?.()
   disposeBeforeRenderLoop = undefined
+  // A stashed instance can come back, so its bones must not keep the offsets of the last frame.
+  bodyPose?.undo()
+  bodyPose = undefined
 
   if (activeInstance)
     detachVrmGroup(activeInstance.group)

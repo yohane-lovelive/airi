@@ -85,6 +85,8 @@ const { cameraDistance, cameraFOV, cameraPosition } = useThreeCamera()
 
 const modelRotationY = useLocalStorage('settings/stage-ui-three/modelRotationY', 0)
 const trackingMode = useLocalStorage<TrackingMode>('settings/stage-ui-three/trackingMode', 'none')
+/** Breath, sway, a neck that follows the gaze, and nods, over the idle clip. Off by default. */
+const bodyMotionEnabled = useLocalStorage('settings/stage-ui-three/body-motion', false)
 const maxFps = useLocalStorage('settings/stage-ui-three/max-fps', 0)
 
 export const useModelStore = defineStore('modelStore', () => {
@@ -186,6 +188,7 @@ export const useModelStore = defineStore('modelStore', () => {
 
     lookAtTarget.value = { x: 0, y: 0, z: 0 }
     trackingMode.value = 'none'
+    bodyMotionEnabled.value = false
     eyeHeight.value = 0
   }
 
@@ -256,6 +259,7 @@ export const useModelStore = defineStore('modelStore', () => {
 
     lookAtTarget,
     trackingMode,
+    bodyMotionEnabled,
     maxFps,
     eyeHeight,
     renderScale,

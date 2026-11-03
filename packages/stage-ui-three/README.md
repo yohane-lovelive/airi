@@ -7,6 +7,7 @@ Three.js runtime components, stores, composables, and diagnostics used by AIRI s
 - Hosts the shared Three scene root used by stage pages.
 - Loads, mounts, reuses, and disposes VRM models.
 - Exposes a package-local model store for camera, light, environment, and model view state.
+- Adds natural movement over the idle clip when its setting is on: breath, sway, a neck that follows the gaze, and nods, from `@proj-airi/stage-shared/body-motion`.
 - Provides Three-specific hit testing, render-target helpers, and VRM preview generation.
 - Exposes a local `trace` submodule for Three/VRM runtime diagnostics.
 
