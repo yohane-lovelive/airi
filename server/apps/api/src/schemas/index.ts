@@ -1,3 +1,4 @@
+export * from './autonomy-records'
 export * from './character-cards'
 export * from './characters'
 export * from './chats'

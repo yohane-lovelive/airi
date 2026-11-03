@@ -36,7 +36,7 @@ Server, in `server/apps/api`:
 Client, in `packages/stage-ui`:
 
 1. Write a function that splits a document into fields, and a function that joins the fields. Keep values that must change together in one field.
-2. Call `synchronize` with a client for the route, the stored sync state, and the functions that read and write the local documents.
+2. Call `synchronize` with a client for the route, the stored sync state, and the functions that read and write the local documents. A store that syncs from the renderer leader can use `useLeaderDocumentSync` (`composables/use-leader-document-sync.ts`), which runs the loop, the debounce, and the leader checks.
 3. Call `history` and `snapshot` on the client of `createDocumentSyncClient` to read past revisions. Both return `null` when the document, or that revision of it, is gone.
 
 `server/apps/api/src/services/domain/character-cards.ts`, `stores/modules/airi-card.ts`, and `libs/character-card-sync/card-fields.ts` are the reference use.

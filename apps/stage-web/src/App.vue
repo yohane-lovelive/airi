@@ -5,6 +5,7 @@ import { useStartupResourceTimeout } from '@proj-airi/stage-ui/composables/use-s
 import { usePiniaSynced } from '@proj-airi/stage-ui/libs/pinia'
 import { initializeAnalytics, isAnalyticsAvailableInBuild } from '@proj-airi/stage-ui/libs/product-signals'
 import { useAuthStore } from '@proj-airi/stage-ui/stores/auth'
+import { useAutonomySyncStore } from '@proj-airi/stage-ui/stores/autonomy-sync'
 import { useCharacterOrchestratorStore } from '@proj-airi/stage-ui/stores/character'
 import { useChatStore } from '@proj-airi/stage-ui/stores/chat'
 import { useDeviceFloorStore } from '@proj-airi/stage-ui/stores/device-floor'
@@ -64,6 +65,7 @@ const watchRunnerStore = useWatchRunnerStore()
 const settingsSyncStore = useSettingsSyncStore()
 const memorySyncStore = useMemorySyncStore()
 const deviceFloorStore = useDeviceFloorStore()
+const autonomySyncStore = useAutonomySyncStore()
 const settingsAudioDeviceStore = useSettingsAudioDevice()
 const { showingSetup } = storeToRefs(onboardingStore)
 const { isDark } = useTheme()
@@ -174,6 +176,7 @@ async function loadStartup() {
       settingsSyncStore.initialize(syncedPinia)
       memorySyncStore.initialize(syncedPinia)
       deviceFloorStore.initialize(syncedPinia)
+      autonomySyncStore.initialize(syncedPinia)
     })
     await startup.run('modelData', () => displayModelsStore.loadDisplayModelsFromIndexedDB())
     await startup.run('modelSelection', () => settingsStore.initializeStageModel())

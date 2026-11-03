@@ -1,4 +1,4 @@
-import type { CommentaryRequest, MissionEndReason, ReminderRequest, SmallTalkRequest, WatchRequest } from '@proj-airi/core-agent'
+import type { CommentaryRequest, MissionEndReason, ReminderMission, ReminderRequest, SmallTalkRequest, WatchRequest } from '@proj-airi/core-agent'
 
 import type { MissionRecord } from '../database/repos/missions.repo'
 
@@ -41,6 +41,10 @@ export const useMissionsStore = defineStore('missions', () => {
   const supported = ref(false)
   const { data: changed, post } = useBroadcastChannel<string[], string[]>({ name: 'airi:missions' })
   let pendingLoad: Promise<void> = Promise.resolve()
+  /** Counts the changes of the missions in any window. A sync of other devices does not count. */
+  const changeCount = ref(0)
+  /** Counts the sync rounds that wrote `records` before their save. A read that started before one does not replace them. */
+  let syncEdits = 0
 
   const missions = computed(() => records.value.map(record => record.mission))
   const active = computed(() => missions.value.filter(isMissionActive))
@@ -48,7 +52,10 @@ export const useMissionsStore = defineStore('missions', () => {
   /** Reads the missions again, after the reads that started before. */
   function load() {
     pendingLoad = pendingLoad.catch(() => {}).then(async () => {
-      records.value = await missionsRepo.list()
+      const startedAt = syncEdits
+      const stored = await missionsRepo.list()
+      if (startedAt === syncEdits)
+        records.value = stored
     })
     return pendingLoad
   }
@@ -59,8 +66,27 @@ export const useMissionsStore = defineStore('missions', () => {
   }
 
   async function publish(ids: string[]) {
+    changeCount.value += 1
     await load()
     post(ids)
+  }
+
+  /**
+   * Applies the reminders of one sync round. It writes the missions at once, before it awaits anything, as the sync
+   * needs. Other missions stay on this device and do not change.
+   */
+  function applySyncReminders(saved: ReminderMission[], removed: string[]) {
+    const byId = new Map(records.value.map(record => [record.id, record]))
+    for (const mission of saved)
+      byId.set(mission.id, { id: mission.id, mission, updatedAt: mission.updatedAt })
+    for (const id of removed)
+      byId.delete(id)
+    syncEdits += 1
+    records.value = [...byId.values()].sort((left, right) => left.mission.createdAt - right.mission.createdAt)
+    pendingLoad = pendingLoad.catch(() => {}).then(() => missionsRepo.applySync(saved, removed, Date.now()))
+    const stored = pendingLoad
+    void load()
+    return stored.then(() => post([...saved.map(mission => mission.id), ...removed]))
   }
 
   /** Creates a reminder in an owner conversation. On a refusal, `reason` tells the model what to change. */
@@ -185,11 +211,15 @@ export const useMissionsStore = defineStore('missions', () => {
   function reload() {
     void load().catch(error => console.warn('[missions] Failed to read the missions:', errorMessageFrom(error)))
   }
-  watch(changed, reload)
+  watch(changed, () => {
+    changeCount.value += 1
+    reload()
+  })
   reload()
 
   return {
     missions,
+    changeCount: computed(() => changeCount.value),
     active,
     supported,
     enabled,
@@ -207,6 +237,7 @@ export const useMissionsStore = defineStore('missions', () => {
     endForeground,
     settle,
     removeEnded,
+    applySyncReminders,
     resetState,
   }
 })

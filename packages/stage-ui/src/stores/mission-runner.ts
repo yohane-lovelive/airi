@@ -11,6 +11,7 @@ import { useI18n } from 'vue-i18n'
 import { Ticker } from '../workers/ticker'
 import { useChatStore } from './chat'
 import { useChatSessionStore } from './chat/session-store'
+import { useDeviceFloorStore } from './device-floor'
 import { useMissionsStore } from './missions'
 import { useSpeechStore } from './modules/speech'
 
@@ -37,6 +38,7 @@ export const useMissionRunnerStore = defineStore('mission-runner', () => {
   const chat = useChatStore()
   const chatSession = useChatSessionStore()
   const speech = useSpeechStore()
+  const deviceFloor = useDeviceFloorStore()
   const { activeSessionId } = storeToRefs(chatSession)
   const { t } = useI18n()
 
@@ -98,7 +100,8 @@ export const useMissionRunnerStore = defineStore('mission-runner', () => {
   }
 
   async function tick() {
-    if (!leadership?.isLeader() || !missions.enabled)
+    // Reminders sync between devices, so only the device that holds the floor delivers them.
+    if (!leadership?.isLeader() || !missions.enabled || !deviceFloor.holdsFloor)
       return
     await missions.ready()
     const now = Date.now()

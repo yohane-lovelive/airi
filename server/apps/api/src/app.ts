@@ -7,6 +7,7 @@ import type { AccountEventPublisher } from './services/adapters/account-events'
 import type { ConfigKVService } from './services/adapters/config-kv'
 import type { RevenuecatSubscriberClient } from './services/adapters/revenuecat-subscriber'
 import type { RevenuecatSubscriptionSync } from './services/adapters/revenuecat-subscriptions'
+import type { AutonomyRecordService } from './services/domain/autonomy-records'
 import type { BillingService } from './services/domain/billing/billing-service'
 import type { LlmBillingService } from './services/domain/billing/llm-billing'
 import type { CharacterCardService } from './services/domain/character-cards'
@@ -60,6 +61,7 @@ import { createAppleIapRoutes } from './routes/apple-iap'
 import { createVerifier as createAppleIapVerifier } from './routes/apple-iap/verifier'
 import { createAudioSpeechWsHandlers } from './routes/audio-speech-ws'
 import { createAudioTranscriptionStreamHandler } from './routes/audio-transcription-stream/route'
+import { createAutonomyRecordRoutes } from './routes/autonomy-records'
 import { createCharacterCardRoutes } from './routes/character-cards'
 import { createCharacterRoutes } from './routes/characters'
 import { createChatWsRuntime } from './routes/chat-ws/runtime'
@@ -87,6 +89,7 @@ import { createS3ObjectStore } from './services/adapters/object-store'
 import { createOpenpanelSink } from './services/adapters/openpanel'
 import { createRevenuecatSubscriberClient } from './services/adapters/revenuecat-subscriber'
 import { createRevenuecatSubscriptionSync } from './services/adapters/revenuecat-subscriptions'
+import { createAutonomyRecordService } from './services/domain/autonomy-records'
 import { createBillingService } from './services/domain/billing/billing-service'
 import { createLlmBillingService } from './services/domain/billing/llm-billing'
 import { SpeechBilling } from './services/domain/billing/speech-billing'
@@ -118,6 +121,7 @@ interface AppDeps {
   settingsSyncService: SettingsSyncService
   memoryService: MemoryService
   deviceFloorService: DeviceFloorService
+  autonomyRecordService: AutonomyRecordService
   characterService: CharacterService
   chatService: ChatService
   providerService: ProviderService
@@ -429,6 +433,11 @@ export async function buildApp(deps: AppDeps) {
     .route('/api/v1/device-floor', createDeviceFloorRoutes(deps.deviceFloorService))
 
     /**
+     * Autonomy record routes synchronize the reminders and intentions of a user between devices.
+     */
+    .route('/api/v1/autonomy-records', createAutonomyRecordRoutes(deps.autonomyRecordService))
+
+    /**
      * Display model routes sync imported Live2D and VRM originals through private object storage.
      */
     .route('/api/v1/display-models', createDisplayModelRoutes(deps.displayModelService))
@@ -671,6 +680,11 @@ export async function createApp() {
     build: ({ dependsOn }) => createSettingsSyncService(dependsOn.db),
   })
 
+  const autonomyRecordService = injeca.provide('services:autonomyRecords', {
+    dependsOn: { db },
+    build: ({ dependsOn }) => createAutonomyRecordService(dependsOn.db),
+  })
+
   const deviceFloorService = injeca.provide('services:deviceFloor', {
     dependsOn: { db },
     build: ({ dependsOn }) => createDeviceFloorService(dependsOn.db),
@@ -813,7 +827,7 @@ export async function createApp() {
   // Domain knowledge stays inside each service instead of being copied into
   // a parallel handler file.
   const userDeletionService = injeca.provide('services:userDeletion', {
-    dependsOn: { paymentService, fluxService, providerService, characterService, characterCardService, settingsSyncService, memoryService, deviceFloorService, chatService, accountEvents },
+    dependsOn: { paymentService, fluxService, providerService, characterService, characterCardService, settingsSyncService, memoryService, deviceFloorService, autonomyRecordService, chatService, accountEvents },
     build: ({ dependsOn }) => {
       const service = createUserDeletionService()
       // priority: 20 = financial / cache state (Flux balance + Redis),
@@ -827,6 +841,7 @@ export async function createApp() {
       service.register({ name: 'settings', priority: 30, softDelete: ({ userId }) => dependsOn.settingsSyncService.deleteAllForUser(userId) })
       service.register({ name: 'memories', priority: 30, softDelete: ({ userId }) => dependsOn.memoryService.deleteAllForUser(userId) })
       service.register({ name: 'deviceFloor', priority: 30, softDelete: ({ userId }) => dependsOn.deviceFloorService.deleteAllForUser(userId) })
+      service.register({ name: 'autonomyRecords', priority: 30, softDelete: ({ userId }) => dependsOn.autonomyRecordService.deleteAllForUser(userId) })
       service.register({ name: 'chats', priority: 30, softDelete: ({ userId }) => dependsOn.chatService.deleteAllForUser(userId) })
       service.register(createUserDeletedEventHandler(dependsOn.accountEvents))
       return service
@@ -863,6 +878,7 @@ export async function createApp() {
     settingsSyncService,
     memoryService,
     deviceFloorService,
+    autonomyRecordService,
     characterService,
     chatService,
     providerService,
@@ -902,6 +918,7 @@ export async function createApp() {
     settingsSyncService: resolved.settingsSyncService,
     memoryService: resolved.memoryService,
     deviceFloorService: resolved.deviceFloorService,
+    autonomyRecordService: resolved.autonomyRecordService,
     characterService: resolved.characterService,
     chatService: resolved.chatService,
     providerService: resolved.providerService,

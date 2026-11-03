@@ -40,6 +40,27 @@ describe('missions store', () => {
     expect(second.active.map(mission => mission.template === 'reminder' && mission.values.text)).toEqual(['medicine time'])
   })
 
+  it('applies the reminders of a sync round at once, keeps other missions, and tells the other windows', async () => {
+    const leader = createStore()
+    const other = createStore()
+    const local = await leader.addReminder({ text: 'medicine time', start: IN_ONE_HOUR, repeat: { kind: 'once' } }, 'session-1')
+    await leader.addSmallTalk({ minutes: 30 }, 'session-1')
+    if (!local.ok)
+      throw new Error(local.reason)
+    await other.ready()
+    const changesBefore = leader.changeCount
+    const remote = { ...local.mission, id: 'remote', values: { ...local.mission.values, text: 'call mom' } }
+
+    const applied = leader.applySyncReminders([remote], [local.mission.id])
+    expect(leader.missions.map(mission => mission.template === 'reminder' ? mission.values.text : mission.template).sort()).toEqual(['call mom', 'small-talk'])
+
+    await applied
+    await other.ready()
+    await expect.poll(() => other.missions.map(mission => mission.id)).toContain('remote')
+    expect(other.missions.some(mission => mission.id === local.mission.id)).toBe(false)
+    expect(leader.changeCount).toBe(changesBefore)
+  })
+
   // A stop from Settings and a run on the leader can overlap. The run must not start the stopped reminder again.
   it('keeps a stopped reminder stopped when a run settles after the stop', async () => {
     const missions = createStore()

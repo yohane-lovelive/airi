@@ -26,6 +26,12 @@ export const missionsRepo = {
     for (const id of ids)
       records.delete(id)
   },
+  async applySync(saved: MissionInstance[], removed: string[]) {
+    for (const mission of saved)
+      records.set(mission.id, { id: mission.id, mission, updatedAt: mission.updatedAt })
+    for (const id of removed)
+      records.delete(id)
+  },
   async clear() {
     records.clear()
   },

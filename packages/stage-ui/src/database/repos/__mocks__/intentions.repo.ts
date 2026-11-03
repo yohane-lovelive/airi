@@ -15,6 +15,12 @@ export const intentionsRepo = {
   async remove(ids: string[]) {
     return ids.filter(id => records.delete(id))
   },
+  async applySync(saved: Intention[], removed: string[], updatedAt: number) {
+    for (const intention of saved)
+      records.set(intention.id, { id: intention.id, intention, updatedAt })
+    for (const id of removed)
+      records.delete(id)
+  },
   async clear() {
     records.clear()
   },

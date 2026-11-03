@@ -1,4 +1,4 @@
-import type { IntentionRequest } from '@proj-airi/core-agent'
+import type { Intention, IntentionRequest } from '@proj-airi/core-agent'
 
 import { errorMessageFrom } from '@moeru/std'
 import { createIntention, openIntentions } from '@proj-airi/core-agent'
@@ -27,20 +27,49 @@ export const useIntentionsStore = defineStore('intentions', () => {
   const records = ref<Awaited<ReturnType<typeof intentionsRepo.list>>>([])
   const { data: changed, post } = useBroadcastChannel<string[], string[]>({ name: 'airi:intentions' })
   let pendingLoad: Promise<void> = Promise.resolve()
+  /** Counts the changes of the intentions in any window. A sync of other devices does not count. */
+  const changeCount = ref(0)
+  /** Counts the sync rounds that wrote `records` before their save. A read that started before one does not replace them. */
+  let syncEdits = 0
 
   const intentions = computed(() => records.value.map(record => record.intention))
 
   /** Reads the intentions again, after the reads that started before. */
   function load() {
     pendingLoad = pendingLoad.catch(() => {}).then(async () => {
-      records.value = await intentionsRepo.list()
+      const startedAt = syncEdits
+      const stored = await intentionsRepo.list()
+      if (startedAt === syncEdits)
+        records.value = stored
     })
     return pendingLoad
   }
 
+  /** Resolves after every read that started before the call. */
+  function ready() {
+    return pendingLoad.catch(() => {})
+  }
+
   async function publish(ids: string[]) {
+    changeCount.value += 1
     await load()
     post(ids)
+  }
+
+  /** Applies the intentions of one sync round. It writes them at once, before it awaits anything, as the sync needs. */
+  function applySyncIntentions(saved: Intention[], removed: string[]) {
+    const now = Date.now()
+    const byId = new Map(records.value.map(record => [record.id, record]))
+    for (const intention of saved)
+      byId.set(intention.id, { id: intention.id, intention, updatedAt: now })
+    for (const id of removed)
+      byId.delete(id)
+    syncEdits += 1
+    records.value = [...byId.values()].sort((left, right) => left.intention.createdAt - right.intention.createdAt)
+    pendingLoad = pendingLoad.catch(() => {}).then(() => intentionsRepo.applySync(saved, removed, now))
+    const stored = pendingLoad
+    void load()
+    return stored.then(() => post([...saved.map(intention => intention.id), ...removed]))
   }
 
   /** The intentions that are open at `now`, oldest first. */
@@ -86,11 +115,17 @@ export const useIntentionsStore = defineStore('intentions', () => {
   function reload() {
     void load().catch(error => console.warn('[intentions] Failed to read the intentions:', errorMessageFrom(error)))
   }
-  watch(changed, reload)
+  watch(changed, () => {
+    changeCount.value += 1
+    reload()
+  })
   reload()
 
   return {
     intentions,
+    changeCount: computed(() => changeCount.value),
+    ready,
+    applySyncIntentions,
     openAt,
     add,
     finish,

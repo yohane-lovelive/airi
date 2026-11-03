@@ -68,6 +68,13 @@ export const missionsRepo = {
   async remove(ids: string[], updatedAt: number) {
     await write(() => Promise.all(ids.map(id => records.setItem<MissionTombstone>(id, { id, updatedAt, deleted: true }))))
   },
+  /** Saves the missions of a sync round as they are, and replaces the removed ones with tombstones. */
+  async applySync(saved: MissionInstance[], removed: string[], updatedAt: number) {
+    await write(() => Promise.all([
+      ...saved.map(mission => records.setItem<MissionRecord>(mission.id, plain({ id: mission.id, mission, updatedAt: mission.updatedAt }))),
+      ...removed.map(id => records.setItem<MissionTombstone>(id, { id, updatedAt, deleted: true })),
+    ]))
+  },
   /** Deletes every record, tombstones too. Only deleting all data uses it. */
   async clear() {
     await write(() => records.clear())

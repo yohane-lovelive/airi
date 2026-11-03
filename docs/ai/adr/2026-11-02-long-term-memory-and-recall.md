@@ -115,12 +115,20 @@ Step M4a built the floor as follows.
 - The device id is a random UUID in `localStorage`. It is not in the allow list of the settings sync, so it stays on the device.
 - `useDeviceFloorStore()` sends a heartbeat every 10 seconds from the leader, and gives the floor up on `pagehide`. The initiative runner and the watch runner run only on the device that holds the floor.
 - The floor is in use while the memory sync is active. Without an answer of the server for 30 seconds, the device acts as the holder. The ADR did not say what a device does without the server. The owner uses one device at a time, so a server outage must not keep the character quiet.
-- Reminders still run on every device until step M4b syncs them. Before that, a reminder exists on one device only.
+- Reminders ran on every device until step M4b synced them.
 - The inspector shows whether this device holds the floor.
 
 ### Records beyond memories
 
 Recipes, missions, intentions, and timeline notes stay on the device until step M4. Missions and intentions then sync like memories. Only the device with the floor runs them. Timeline notes stay on the device, because they describe one screen.
+
+Step M4b built the sync as follows. [Server ADR 2026-11-03](../../../server/docs/ai/adr/2026-11-03-autonomy-records.md) has the route.
+
+- Only reminders and intentions sync, under `/api/v1/autonomy-records`. Small talk, commentary, and watches stay on their device, because they belong to its screen and to the moment. The ADR said missions, so this narrows it.
+- A document has a `kind` and a `record`. The server checks only the kind and the size. The client checks each record with a Valibot schema, and refuses one whose id does not match its document.
+- A lost conflict drops the local side. A copy of a reminder would remind the owner twice. Only the device with the floor changes a running reminder, so a conflict needs two edits in Settings at the same time.
+- The mission runner delivers reminders only on the device that holds the floor. The memory sync turns this sync and the floor on together, so two devices never deliver one reminder.
+- `useLeaderDocumentSync` runs the sync loop of memories and of these records on the leader, so the two stores share one loop.
 
 ### Owner profile and memory work
 
@@ -138,7 +146,7 @@ Step M5 adds two background tasks with the usage purpose `memory`:
 | M2b | Client: `recallMemories`, recalled memories in the prompt, and `builtIn_searchMemory` by meaning. | Done |
 | M3 | Autonomous readers: the `recall` speech type, the seeds, and the topic similarity by vectors. It finishes the recall of ADR 2026-10-28 step 5. | Done |
 | M4a | The floor between devices. | Done |
-| M4b | The sync of reminders and intentions. | To do |
+| M4b | The sync of reminders and intentions. | Done |
 | M5 | The owner profile and the memory work. | To do |
 
 ## Relation to other ADRs

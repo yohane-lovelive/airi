@@ -36,6 +36,21 @@ describe('intentions store', () => {
     expect(result.ok).toBe(true)
   })
 
+  it('applies the intentions of a sync round at once, and tells the other windows', async () => {
+    const leader = createStore()
+    const other = createStore()
+    const added = await leader.add({ text: 'Ask about the trip', hours: 24 })
+    if (!added.ok)
+      throw new Error(added.reason)
+    const remote = { id: 'remote', text: 'Ask about the cat', createdAt: Date.now(), expiresAt: Date.now() + 60_000 }
+
+    const applied = leader.applySyncIntentions([remote], [added.intention.id])
+    expect(leader.intentions.map(intention => intention.text)).toEqual(['Ask about the cat'])
+
+    await applied
+    await vi.waitFor(() => expect(other.intentions.map(intention => intention.id)).toEqual(['remote']))
+  })
+
   it('finishes an open intention once', async () => {
     const intentions = createStore()
     const result = await intentions.add({ text: 'Recall the cat', hours: 1 })

@@ -55,6 +55,13 @@ export const intentionsRepo = {
       return removed
     })
   },
+  /** Saves the intentions of a sync round as they are, and replaces the removed ones with tombstones. */
+  async applySync(saved: Intention[], removed: string[], updatedAt: number) {
+    await write(() => Promise.all([
+      ...saved.map(intention => records.setItem<IntentionRecord>(intention.id, { id: intention.id, intention: { ...intention }, updatedAt })),
+      ...removed.map(id => records.setItem<IntentionTombstone>(id, { id, updatedAt, deleted: true })),
+    ]))
+  },
   /** Deletes every record, tombstones too. Only deleting all data uses it. */
   async clear() {
     await write(() => records.clear())

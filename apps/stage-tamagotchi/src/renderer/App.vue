@@ -11,6 +11,7 @@ import { usePiniaSynced } from '@proj-airi/stage-ui/libs/pinia'
 import { initializeAnalytics } from '@proj-airi/stage-ui/libs/product-signals'
 import { isSherpawModelBundled, setSherpawModelAssetHost } from '@proj-airi/stage-ui/libs/providers/providers/sherpaw/model-assets'
 import { useAuthStore } from '@proj-airi/stage-ui/stores/auth'
+import { useAutonomySyncStore } from '@proj-airi/stage-ui/stores/autonomy-sync'
 import { useCharacterOrchestratorStore } from '@proj-airi/stage-ui/stores/character'
 import { useChatStore } from '@proj-airi/stage-ui/stores/chat'
 import { useDeviceFloorStore } from '@proj-airi/stage-ui/stores/device-floor'
@@ -179,6 +180,7 @@ function createFullStageRuntime() {
   const settingsSyncStore = useSettingsSyncStore()
   const memorySyncStore = useMemorySyncStore()
   const deviceFloorStore = useDeviceFloorStore()
+  const autonomySyncStore = useAutonomySyncStore()
   const inferencePreload = useInferencePreload()
   const pluginHostInspectorStore = usePluginHostInspectorStore()
   const stageWindowLifecycleStore = useStageWindowLifecycleStore()
@@ -354,6 +356,7 @@ function createFullStageRuntime() {
         settingsSyncStore.initialize(syncedPinia)
         memorySyncStore.initialize(syncedPinia)
         deviceFloorStore.initialize(syncedPinia)
+        autonomySyncStore.initialize(syncedPinia)
       }
 
       defineInvokeHandler(context.value, pluginProtocolListProviders, async () => listProvidersForPluginHost())

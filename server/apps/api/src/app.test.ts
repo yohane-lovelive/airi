@@ -19,6 +19,7 @@ function createTestDeps(webAppUrl = 'https://airi.moeru.ai') {
     settingsSyncService: {} as never,
     memoryService: {} as never,
     deviceFloorService: {} as never,
+    autonomyRecordService: {} as never,
     characterService: {} as never,
     chatService: {} as never,
     providerService: {} as never,
