@@ -627,6 +627,7 @@ pages:
       tool-card: Tool cards
       artistry: Artistry
       history-summary: History summaries
+      memory: Memory work
       timeline: Screen timeline summaries
       other: Other
   memory:
@@ -1188,6 +1189,19 @@ pages:
       description: Long-term memory specific settings and management
       enable: Use long-term memory
       enable-description: The character remembers what you talk about. When this is off, it remembers nothing.
+      work:
+        enable: Write memories from finished conversations
+        enable-description: After 20 quiet minutes, the chat model of the character reads the last part of the conversation and saves the lasting facts. Each pass is a model call. Off by default.
+        last: 'The last pass saved {count} memories.'
+        last-failed: The last pass failed. It tries again in 30 minutes.
+      profile:
+        enable: Use an owner profile
+        enable-description: A short summary of what the character remembers about you goes with each message in your own conversations. A pass that saves memories writes it again. Off by default.
+        text: Owner profile
+        empty: No profile yet.
+        save: Save
+        write-now: Write from memories now
+        clear: Clear
       memories:
         title: Memories
         description: Each character keeps its own secrets, and the others cannot see them. After you share a secret, every character knows it, and you cannot take it back. You can delete any secret, but you cannot rewrite one.

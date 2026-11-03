@@ -15,7 +15,8 @@ Status: proposed
 Add an `autonomy-records` feature to the resource API. It uses `createFieldSyncStore`, like character cards, settings, and memories.
 
 - A document is one reminder or one intention. Its id is the id of the record, which the client made.
-- The fields are `kind`, which is `reminder` or `intention`, and `record`, a JSON object of 16 KiB at most.
+- The fields are `kind`, which is `reminder`, `intention`, or `profile`, and `record`, a JSON object of 16 KiB at most.
+- Step M5a adds the kind `profile`: one document with the id `owner-profile` holds the owner profile summary, so every device sends the same profile.
 - The validator checks only the keys, the kind, and the size. The client checks the record with a Valibot schema when it receives it, because the server does not know the shape.
 - One feature holds both kinds, so the client syncs them in one run.
 

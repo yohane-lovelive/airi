@@ -158,7 +158,7 @@ Step 2-4 built the prompt budget as follows. It covers every chat request, not o
 - Settings > Modules > Short-Term Memory turns the summary on or off, and shows and removes the summary of the open conversation. It is on by default.
 - Memory: the index lists 50 entries at most, the card's own entries first, newest first. `builtIn_searchMemory` finds the others by shared character pairs, which also works for Japanese. Recall of the top 5 memories by meaning needs embeddings, so the memory ADR builds it.
 - IO traces record the characters of the system prompt, the memory index, the summary, and the history, and the count of summarized messages.
-- No owner profile exists yet, so it has no part. The timeline and the mission instruction come with their steps.
+- Step M5a of [ADR 2026-11-02](./2026-11-02-long-term-memory-and-recall.md) adds the owner profile to the system prompt of the owner's own conversations, while its setting is on. The timeline and the mission instruction come with their steps.
 
 ### Perception
 

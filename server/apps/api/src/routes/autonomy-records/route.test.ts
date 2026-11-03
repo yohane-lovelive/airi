@@ -62,6 +62,12 @@ describe('autonomyRecordRoutes', () => {
     expect((await pushAs('owner', 'd', [{ key: 'record', baseRevision: 0, value: { text: 'a'.repeat(17_000) } }])).status).toBe(413)
   })
 
+  it('stores the owner profile as its own kind', async () => {
+    const pushed = await pushAs('owner', 'owner-profile', [{ key: 'kind', baseRevision: 0, value: 'profile' }, { key: 'record', baseRevision: 0, value: { text: 'ラーメンが好き', updatedAt: 1 } }])
+
+    expect(pushed.status).toBe(200)
+  })
+
   it('removes the records of a deleted account', async () => {
     const service = createAutonomyRecordService(db)
     await service.push('owner', 'i1', [{ key: 'kind', baseRevision: 0, value: 'intention' }, { key: 'record', baseRevision: 0, value: { id: 'i1', text: 'ask about the trip' } }])

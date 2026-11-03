@@ -31,6 +31,11 @@ const ReminderSchema = object({
   }),
 })
 
+const ProfileSchema = object({
+  text: pipe(string(), minLength(1), maxLength(4_000)),
+  updatedAt: number(),
+})
+
 const IntentionSchema = object({
   id: pipe(string(), minLength(1), maxLength(64)),
   text: pipe(string(), minLength(1), maxLength(2_000)),
@@ -39,7 +44,10 @@ const IntentionSchema = object({
 })
 
 /** The kinds of synced records. Small talk, commentary, and watches belong to the screen of one device. */
-export type AutonomyRecordKind = 'reminder' | 'intention'
+export type AutonomyRecordKind = 'reminder' | 'intention' | 'profile'
+
+/** The id of the one document of the owner profile. */
+export const PROFILE_DOCUMENT_ID = 'owner-profile'
 
 /** A reminder or an intention as the fields of one document. JSON drops reactive proxies and `undefined`. */
 export function reminderToFields(reminder: ReminderMission): DocumentFields {
@@ -50,10 +58,16 @@ export function intentionToFields(intention: Intention): DocumentFields {
   return { kind: 'intention', record: JSON.parse(JSON.stringify(intention)) }
 }
 
+export function profileToFields(profile: { text: string, updatedAt: number }): DocumentFields {
+  return { kind: 'profile', record: { text: profile.text, updatedAt: profile.updatedAt } }
+}
+
 /** The changes of one sync round, for each kind of record. */
 export interface AutonomyChanges {
   reminders: { saved: ReminderMission[], removed: string[] }
   intentions: { saved: Intention[], removed: string[] }
+  /** The owner profile of another device, `null` when another device cleared it, or undefined without a change. */
+  profile?: { text: string, updatedAt: number } | null
   /** The ids of upserts with invalid fields. Their local records stay as they are. */
   rejected: string[]
 }
@@ -83,10 +97,19 @@ export function splitAutonomyChanges(changes: LocalDocumentChanges, local: { rem
         continue
       }
     }
+    else if (fields.kind === 'profile' && id === PROFILE_DOCUMENT_ID) {
+      const parsed = safeParse(ProfileSchema, fields.record)
+      if (parsed.success) {
+        result.profile = parsed.output
+        continue
+      }
+    }
     result.rejected.push(id)
   }
   for (const id of changes.removals) {
-    if (local.reminderIds.has(id))
+    if (id === PROFILE_DOCUMENT_ID)
+      result.profile = null
+    else if (local.reminderIds.has(id))
       result.reminders.removed.push(id)
     else if (local.intentionIds.has(id))
       result.intentions.removed.push(id)

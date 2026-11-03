@@ -2,7 +2,7 @@ import type { Intention, ReminderMission } from '@proj-airi/core-agent'
 
 import { describe, expect, it } from 'vitest'
 
-import { intentionToFields, reminderToFields, splitAutonomyChanges } from '.'
+import { intentionToFields, PROFILE_DOCUMENT_ID, profileToFields, reminderToFields, splitAutonomyChanges } from '.'
 
 const REMINDER: ReminderMission = {
   id: 'r1',
@@ -53,5 +53,14 @@ describe('splitAutonomyChanges', () => {
     }, { reminderIds: new Set(['r1']), intentionIds: new Set(['i1']) })
 
     expect(split).toEqual({ reminders: { saved: [], removed: ['r1'] }, intentions: { saved: [], removed: ['i1'] }, rejected: [] })
+  })
+
+  it('takes the owner profile of its own document, and clears it on a removal', () => {
+    const profile = { text: 'ラーメンが好き', updatedAt: 5 }
+
+    expect(splitAutonomyChanges({ upserts: { [PROFILE_DOCUMENT_ID]: profileToFields(profile) }, removals: [], conflictCopies: [] }, NONE).profile).toEqual(profile)
+    expect(splitAutonomyChanges({ upserts: { other: profileToFields(profile) }, removals: [], conflictCopies: [] }, NONE).rejected).toEqual(['other'])
+    expect(splitAutonomyChanges({ upserts: {}, removals: [PROFILE_DOCUMENT_ID], conflictCopies: [] }, NONE).profile).toBeNull()
+    expect(splitAutonomyChanges({ upserts: {}, removals: [], conflictCopies: [] }, NONE).profile).toBeUndefined()
   })
 })

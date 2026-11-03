@@ -19,6 +19,7 @@ import { usePluginHostInspectorStore } from '@proj-airi/stage-ui/stores/devtools
 import { useDisplayModelsStore } from '@proj-airi/stage-ui/stores/display-models'
 import { useInitiativeRunnerStore } from '@proj-airi/stage-ui/stores/initiative-runner'
 import { useMemorySyncStore } from '@proj-airi/stage-ui/stores/memory-sync'
+import { useMemoryWorkStore } from '@proj-airi/stage-ui/stores/memory-work'
 import { useMissionRunnerStore } from '@proj-airi/stage-ui/stores/mission-runner'
 import { useModsServerChannelStore } from '@proj-airi/stage-ui/stores/mods/api/channel-server'
 import { useContextBridgeStore } from '@proj-airi/stage-ui/stores/mods/api/context-bridge'
@@ -181,6 +182,7 @@ function createFullStageRuntime() {
   const memorySyncStore = useMemorySyncStore()
   const deviceFloorStore = useDeviceFloorStore()
   const autonomySyncStore = useAutonomySyncStore()
+  const memoryWorkStore = useMemoryWorkStore()
   const inferencePreload = useInferencePreload()
   const pluginHostInspectorStore = usePluginHostInspectorStore()
   const stageWindowLifecycleStore = useStageWindowLifecycleStore()
@@ -357,6 +359,7 @@ function createFullStageRuntime() {
         memorySyncStore.initialize(syncedPinia)
         deviceFloorStore.initialize(syncedPinia)
         autonomySyncStore.initialize(syncedPinia)
+        memoryWorkStore.initialize(syncedPinia)
       }
 
       defineInvokeHandler(context.value, pluginProtocolListProviders, async () => listProvidersForPluginHost())

@@ -91,7 +91,8 @@ Each chat request has parts with limits. It is step 2-4 of [the autonomy ADR](..
 - The memory index lists 50 entries at most, 20 while the memory sync is active (`libs/memory-index.ts`).
 - `useMemoryRecallStore().recall` finds the memories that fit a text: by meaning on the server while the memory sync is active, by shared character pairs otherwise. The chat sends five of them with each owner message, and `builtIn_searchMemory` uses the same recall.
 - `useDeviceFloorStore()` tells whether this device holds the floor, while the memory sync is active. The initiative, watch, and mission runners run only on the holder.
-- `useAutonomySyncStore()` syncs reminders and intentions with the account. `useLeaderDocumentSync` (`composables/use-leader-document-sync.ts`) runs the sync loop of memories and of these records on the leader.
+- `useMemoryWorkStore()` writes lasting facts from finished conversations, and `useOwnerProfileStore()` keeps the owner profile that the system prompt of the owner's conversations holds. Both are settings of long-term memory, off by default.
+- `useAutonomySyncStore()` syncs reminders, intentions, and the owner profile with the account. `useLeaderDocumentSync` (`composables/use-leader-document-sync.ts`) runs the sync loop of memories and of these records on the leader.
 - `useMemorySyncStore()` syncs the memories with the account on the leader, while the `memory-sync` experiment is on. `libs/memory-sync` maps an entry to its synced fields, and `applySyncChanges` of the memory store writes a round.
 - `libs/prompt-parts.ts` measures each part of a request for IO traces.
 

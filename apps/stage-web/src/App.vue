@@ -12,6 +12,7 @@ import { useDeviceFloorStore } from '@proj-airi/stage-ui/stores/device-floor'
 import { useDisplayModelsStore } from '@proj-airi/stage-ui/stores/display-models'
 import { useInitiativeRunnerStore } from '@proj-airi/stage-ui/stores/initiative-runner'
 import { useMemorySyncStore } from '@proj-airi/stage-ui/stores/memory-sync'
+import { useMemoryWorkStore } from '@proj-airi/stage-ui/stores/memory-work'
 import { useMissionRunnerStore } from '@proj-airi/stage-ui/stores/mission-runner'
 import { useModsServerChannelStore } from '@proj-airi/stage-ui/stores/mods/api/channel-server'
 import { useContextBridgeStore } from '@proj-airi/stage-ui/stores/mods/api/context-bridge'
@@ -66,6 +67,7 @@ const settingsSyncStore = useSettingsSyncStore()
 const memorySyncStore = useMemorySyncStore()
 const deviceFloorStore = useDeviceFloorStore()
 const autonomySyncStore = useAutonomySyncStore()
+const memoryWorkStore = useMemoryWorkStore()
 const settingsAudioDeviceStore = useSettingsAudioDevice()
 const { showingSetup } = storeToRefs(onboardingStore)
 const { isDark } = useTheme()
@@ -177,6 +179,7 @@ async function loadStartup() {
       memorySyncStore.initialize(syncedPinia)
       deviceFloorStore.initialize(syncedPinia)
       autonomySyncStore.initialize(syncedPinia)
+      memoryWorkStore.initialize(syncedPinia)
     })
     await startup.run('modelData', () => displayModelsStore.loadDisplayModelsFromIndexedDB())
     await startup.run('modelSelection', () => settingsStore.initializeStageModel())

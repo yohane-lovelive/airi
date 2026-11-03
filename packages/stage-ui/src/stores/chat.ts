@@ -32,6 +32,7 @@ import { extractMessageText, isCloudSyncableMessage } from '../libs/chat-sync'
 import { INITIATIVE_SOURCE } from '../libs/initiative/conversation'
 import { MEMORY_INDEX_LIMIT, MEMORY_INDEX_LIMIT_WITH_RECALL } from '../libs/memory-index'
 import { composeRecalledMemories, newestUserText, withRecalledMemories } from '../libs/memory-recall'
+import { composeOwnerProfilePrompt } from '../libs/memory-work'
 import { syncedRoles } from '../libs/pinia/synced-context'
 import { createChatAnalyticsHooks, getProviderMode } from '../libs/product-signals/events/chat'
 import {
@@ -77,6 +78,7 @@ import { useHearingStore } from './modules/hearing'
 import { useStickersStore } from './modules/stickers'
 import { useVisionStore } from './modules/vision'
 import { useWebSearchStore } from './modules/web-search'
+import { useOwnerProfileStore } from './owner-profile'
 import { usePerceptionStore } from './perception'
 import { usePerceptionRunnerStore } from './perception-runner'
 import { useRecipesStore } from './recipes'
@@ -301,6 +303,7 @@ export const useChatStore = defineStore('chat', () => {
   const memory = useMemoryStore()
   const memorySync = useMemorySyncStore()
   const memoryRecall = useMemoryRecallStore()
+  const ownerProfile = useOwnerProfileStore()
   const missions = useMissionsStore()
   const initiative = useInitiativeStore()
   const intentions = useIntentionsStore()
@@ -328,6 +331,8 @@ export const useChatStore = defineStore('chat', () => {
     const persona = personaOf(sessionId)
     const identity = composeSystemPrompt(cardStore.getSystemPrompt(persona))
       + (memory.enabled ? composeMemoryPrompt(memoryIndexOf(persona)) : '')
+      // The profile is about the owner, so only the owner's own conversations hold it. It changes only after memory work.
+      + (memory.enabled && ownerProfile.enabled && isOwnerSession(sessionId) ? composeOwnerProfilePrompt(ownerProfile.profile?.text ?? '') : '')
       + (drawsCards(sessionId) ? composeDrawCardPrompt() : '')
     const recipeId = chatSession.sessionMetas[sessionId]?.recipeId
     const recipe = recipeId ? recipes.recipes.find(entry => entry.id === recipeId) : undefined

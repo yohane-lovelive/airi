@@ -137,6 +137,17 @@ Step M5 adds two background tasks with the usage purpose `memory`:
 - An owner profile summary of about 300 tokens, which the prompt budget of ADR 2026-10-28 reserves.
 - A pass over finished conversations that writes the facts the model did not save, and merges entries that say the same thing.
 
+Step M5a built the memory work and the profile as follows. Step M5b, the merge of entries that say the same thing, waits until the passes show how many copies appear.
+
+- A conversation counts as finished after 20 quiet minutes. A pass reads the owner's open conversation after the last pass, 60 messages or 20,000 characters at most. Notices count as context, not as owner words, and a part without owner words is skipped.
+- The pass gives the chat model of the card the transcript and the 8 memories nearest to the owner's words. The model answers with the `report_memories` tool: at most 5 entries, each new or the update of a related memory by its id, so it does not add copies. The call stops after the answer.
+- The entries go through `memory.write`, so the sync and the rules of the memory tools apply.
+- Only the leader of the device that holds the floor runs a pass. A failed pass waits 30 minutes, so a broken provider costs little.
+- After a pass that saved facts, the model writes the owner profile again from the memories of the card and the general ones, 1,200 characters at most. Settings shows it, and the owner can edit it, clear it, or write it now.
+- The profile is one record of the kind `profile` in the autonomy records, so every device sends the same one. The ADR did not say where the profile lives.
+- The system prompt of the owner's own conversations holds the profile. It changes only after a pass, so the cached prefix rarely changes.
+- Both the memory work and the profile are settings of long-term memory, off by default. Their calls count as the usage purpose `memory`.
+
 ## Steps
 
 | Step | Content | State |
@@ -147,7 +158,8 @@ Step M5 adds two background tasks with the usage purpose `memory`:
 | M3 | Autonomous readers: the `recall` speech type, the seeds, and the topic similarity by vectors. It finishes the recall of ADR 2026-10-28 step 5. | Done |
 | M4a | The floor between devices. | Done |
 | M4b | The sync of reminders and intentions. | Done |
-| M5 | The owner profile and the memory work. | To do |
+| M5a | The memory work of finished conversations, and the owner profile. | Done |
+| M5b | The merge of entries that say the same thing. | To do |
 
 ## Relation to other ADRs
 

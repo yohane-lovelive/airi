@@ -9,7 +9,7 @@ import { autonomyRecordFields, autonomyRecords } from '../../schemas/autonomy-re
 import { createFieldSyncStore } from './field-sync'
 
 /** The kinds of records. The client checks the content of each kind, because the server does not know its shape. */
-const RECORD_KINDS = new Set(['reminder', 'intention'])
+const RECORD_KINDS = new Set(['reminder', 'intention', 'profile'])
 
 /** A reminder or an intention is a short JSON object. A larger value is more likely an error. */
 const MAX_RECORD_BYTES = 16 * 1024
@@ -58,13 +58,13 @@ const RECORD_HISTORY = {
 }
 
 /**
- * Stores the reminders and intentions that a user syncs between devices.
+ * Stores the reminders, intentions, and owner profile that a user syncs between devices.
  *
  * Use when:
  * - A device syncs its reminders and intentions, so the device that holds the floor runs them.
  *
  * Expects:
- * - Each document has a `kind` of `reminder` or `intention`, and a `record` object. The client checks the record.
+ * - Each document has a `kind` of `reminder`, `intention`, or `profile`, and a `record` object. The client checks the record.
  */
 export function createAutonomyRecordService(db: Database) {
   return createFieldSyncStore(db, { documents: autonomyRecords, fields: autonomyRecordFields }, {
