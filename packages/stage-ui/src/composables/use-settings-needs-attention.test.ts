@@ -37,6 +37,7 @@ vi.mock('vue-router', async (importOriginal) => {
 // The LLM store records usage in IndexedDB, which this mocked localforage lacks.
 vi.mock('../database/repos/usage.repo')
 vi.mock('../database/repos/timeline.repo')
+vi.mock('../database/repos/motions.repo')
 vi.mock('localforage', () => ({
   default: {
     getItem: vi.fn(async () => undefined),

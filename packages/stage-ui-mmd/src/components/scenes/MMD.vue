@@ -755,11 +755,15 @@ function applyRenderMode() {
 
 /**
  * Shows an emotion, and plays the gesture motion mapped to it, if the model has one. With `withMotion` false, only the
- * expression changes, because a gesture of the motion library already plays.
+ * expression changes, because a gesture of the motion library already plays. With `holdMs`, the expression lasts as
+ * long as that gesture and then returns to neutral.
  */
-function setEmotion(emotion: string, intensity = 1, withMotion = true) {
+function setEmotion(emotion: string, intensity = 1, withMotion = true, holdMs?: number) {
   const value = EMOTION_VALUES.includes(emotion as Emotion) ? emotion as Emotion : Emotion.Neutral
-  emote?.setEmotion(value, intensity)
+  if (holdMs)
+    emote?.setEmotionWithResetAfter(value, holdMs, intensity)
+  else
+    emote?.setEmotion(value, intensity)
 
   const actionName = emotionActionMap.value[value]
   if (actionName && withMotion)

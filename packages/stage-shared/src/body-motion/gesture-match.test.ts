@@ -27,6 +27,13 @@ describe('matchGesture', () => {
     expect(matchGesture('this', [{ id: 'hi', tags: ['hi'], description: '' }])).toBeUndefined()
   })
 
+  it('chooses a gesture by the name that the prompt lists', () => {
+    const candidates = BUILT_IN_GESTURES.map(gesture => ({ ...gesture, name: gesture.id }))
+
+    expect(matchGesture('tilt-head', candidates)).toBe('tilt-head')
+    expect(matchGesture('hand-on-chest', candidates)).toBe('hand-on-chest')
+  })
+
   it('counts description words when no tag fits', () => {
     const candidates = [{ id: 'spin', tags: [], description: 'Spins around once, playful.' }]
 

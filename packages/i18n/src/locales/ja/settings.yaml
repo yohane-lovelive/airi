@@ -960,6 +960,29 @@ pages:
       quiet-until: '{time} まで静か'
       interval-until: '{time} まで話す間隔 ×{factor}'
       reset-talk-changes: リセット
+    motions:
+      title: モーション
+      description: VRM と MMD のモデルで、キャラクターが言葉に合わせて再生するジェスチャー
+      intro: キャラクターは、ACT トークンの motion ごとにジェスチャーを選びます。オフにしたジェスチャーは、プロンプトに載らず、再生もされません。
+      clips: ジェスチャー
+      source:
+        built-in: 最初から
+        imported: 取り込み
+      seconds: '{count} 秒'
+      uses: '{count} 回使用'
+      preview: '{name} をステージで再生'
+      preview-note: プレビューは、メインウィンドウのステージで再生します。
+      remove: '{name} を削除'
+      import:
+        title: .vrma ファイルを取り込む
+        file: ファイル
+        file-description: VRM Animation のファイルです。脚を動かすクリップは、再生中は idle 全体と入れ替わります。
+        description: 説明
+        description-hint: どんな動きかを 1 文で書きます。プロンプトに載ります。
+        tags: タグ
+        tags-hint: 動きを表す言葉を、カンマで区切って書きます。例：dance, 踊る
+        submit: 取り込む
+        no-animation: このファイルには VRM のアニメーションがありません。
     missions:
       title: ミッション
       description: リマインドなど、キャラクターがあなたのために行うタスク

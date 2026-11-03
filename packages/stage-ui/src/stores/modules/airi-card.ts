@@ -6,6 +6,7 @@ import type {
 } from '@proj-airi/stage-ui-live2d/controls/manifest'
 import type { Live2DControlPolicy } from '@proj-airi/stage-ui-live2d/types/avatar-model'
 
+import type { GesturePromptEntry } from '../../constants/prompts/gesture-act'
 import type { DocumentFields, DocumentSnapshot, DocumentSyncClient, LocalDocumentChanges } from '../../libs/document-sync'
 import type { CardModuleDefaults } from '../../services/airi-card-modules'
 import type { AiriCard, AiriExtension } from '../../types/airiCard'
@@ -27,6 +28,7 @@ import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 
 import { DEFAULT_ARTISTRY_WIDGET_SPAWNING_PROMPT } from '../../constants/prompts/character-defaults'
+import { formatGestureActPrompt } from '../../constants/prompts/gesture-act'
 import { formatLive2DActPrompt } from '../../constants/prompts/live2d-act'
 import { documentSyncRepo } from '../../database/repos/document-sync.repo'
 import { authedFetch } from '../../libs/auth-fetch'
@@ -41,6 +43,7 @@ import { createAvatarModelReference } from '../../services/avatar-model'
 import { useAuthStore } from '../auth'
 import { useDisplayModelsStore } from '../display-models'
 import { useFeatureFlagsStore } from '../feature-flags'
+import { useMotionLibraryStore } from '../motion-library'
 import { useProviderConfigStore } from '../providers/config'
 import { useProviderStore } from '../providers/provider'
 import { useSettingsStageModel } from '../settings/stage-model'
@@ -87,6 +90,7 @@ const ACTIVE_CARD_ID_STORAGE_KEY = 'airi-card-active-id'
 const emptyAvatarModels: readonly CharacterAvatarModelReference[] = Object.freeze([])
 const emptyLive2DExpressions: readonly Live2DExpressionControl[] = Object.freeze([])
 const emptyLive2DMotions: readonly Live2DMotionControl[] = Object.freeze([])
+const emptyGestures: readonly GesturePromptEntry[] = Object.freeze([])
 const emptyLive2DModelControls: Live2DModelControls = { expressions: [], motions: [] }
 const emptyCharacterModules: ReadonlyMap<string, CardModuleDefaults> = new Map()
 
@@ -109,6 +113,7 @@ function resolveSystemPrompt(
   card: AiriCard | undefined,
   expressions: readonly Live2DExpressionControl[],
   motions: readonly Live2DMotionControl[],
+  gestures: readonly GesturePromptEntry[] = [],
 ): string {
   if (!card)
     return ''
@@ -122,6 +127,7 @@ function resolveSystemPrompt(
     card.scenario,
     card.extensions.airi.modules.artistry?.widgetInstruction,
     formatLive2DActPrompt(expressions, motions),
+    formatGestureActPrompt(gestures),
   ].filter((part): part is string => typeof part === 'string' && part.trim().length > 0)
 
   return systemPromptParts.join('\n\n')
@@ -163,6 +169,7 @@ export const useAiriCardStore = defineStore('airi-card', () => {
   const { t } = useI18n()
   const { userId } = storeToRefs(useAuthStore())
   const featureFlagsStore = useFeatureFlagsStore()
+  const motionLibrary = useMotionLibraryStore()
   /** Cloud sync is a device choice, off by default. Settings > System > Experimental Features owns it. */
   const cloudSyncEnabled = computed(() => featureFlagsStore.isEnabled(CHARACTER_CARD_SYNC_FLAG.key))
   const displayModels = useDisplayModelsStore()
@@ -202,6 +209,11 @@ export const useAiriCardStore = defineStore('airi-card', () => {
       avatarModel.config.controls,
       { kind: 'expression', id: expression.name },
     ))
+  })
+  // A VRM or MMD model plays the gestures of the motion library, so the prompt lists them by name.
+  const enabledGestures = computed<readonly GesturePromptEntry[]>(() => {
+    const type = selectedAvatarModel.value?.type
+    return type === 'vrm' || type === 'mmd' ? motionLibrary.entries : emptyGestures
   })
   const enabledLive2DMotions = computed<readonly Live2DMotionControl[]>(() => {
     const avatarModel = selectedAvatarModel.value
@@ -1413,7 +1425,7 @@ export const useAiriCardStore = defineStore('airi-card', () => {
     // Live2D controls are inspected only for the active Avatar Model. Another
     // Character gets its prompt without ACT controls until it becomes active.
     if (characterId === activeCardId.value)
-      return resolveSystemPrompt(cards.value.get(characterId), enabledLive2DExpressions.value, enabledLive2DMotions.value)
+      return resolveSystemPrompt(cards.value.get(characterId), enabledLive2DExpressions.value, enabledLive2DMotions.value, enabledGestures.value)
 
     return resolveSystemPrompt(cards.value.get(characterId), emptyLive2DExpressions, emptyLive2DMotions)
   }
@@ -1541,6 +1553,7 @@ export const useAiriCardStore = defineStore('airi-card', () => {
       activeCard.value,
       enabledLive2DExpressions.value,
       enabledLive2DMotions.value,
+      enabledGestures.value,
     )),
   }
 }, {

@@ -2,11 +2,12 @@ import type { GestureClipSource, GestureDefinition } from '@proj-airi/stage-shar
 
 import type { ImportedMotionRecord, MotionRecord } from '../database/repos/motions.repo'
 
+import { errorMessageFrom } from '@moeru/std'
 import { BUILT_IN_GESTURES, gestureGroupOfHumanBone, matchGesture } from '@proj-airi/stage-shared/body-motion'
-import { loadVRMAnimation } from '@proj-airi/stage-ui-three/composables/vrm'
+import { useBroadcastChannel } from '@vueuse/core'
 import { nanoid } from 'nanoid'
 import { defineStore } from 'pinia'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 import { motionsRepo } from '../database/repos/motions.repo'
 
@@ -23,6 +24,12 @@ export interface MotionEntry {
   bones: readonly string[]
   useCount: number
   enabled: boolean
+}
+
+/** A request of Settings to play a clip on the stage. `at` tells two requests for the same clip apart. */
+export interface MotionPreviewRequest {
+  id: string
+  at: number
 }
 
 function builtInEntry(gesture: GestureDefinition, record: MotionRecord | undefined): MotionEntry {
@@ -58,6 +65,13 @@ function importedEntry(record: ImportedMotionRecord): MotionEntry {
 export const useMotionLibraryStore = defineStore('motion-library', () => {
   const records = ref<MotionRecord[]>([])
   let pendingLoad: Promise<void> | undefined
+  // Settings changes the library in its own window, so each change tells the other windows to read it again.
+  const { data: changed, post: postChange } = useBroadcastChannel<number, number>({ name: 'airi:motions' })
+  // The preview of Settings plays on the stage, which is another window on the desktop.
+  const { data: previewRequest, post: postPreview } = useBroadcastChannel<MotionPreviewRequest, MotionPreviewRequest>({ name: 'airi:motion-preview' })
+  watch(changed, () => void load())
+  // The system prompt lists the clips that the owner left on, so the library reads its records at once.
+  void load().catch(error => console.warn('[motion-library] Failed to read the library:', errorMessageFrom(error)))
 
   function load() {
     pendingLoad = (async () => {
@@ -100,6 +114,12 @@ export const useMotionLibraryStore = defineStore('motion-library', () => {
     const record = await motionsRepo.change(id, next)
     if (record)
       records.value = [...records.value.filter(stored => stored.id !== id), record]
+    postChange(Date.now())
+  }
+
+  /** Asks the stage of another window to play a clip, for the preview of Settings. */
+  function requestPreview(id: string) {
+    postPreview({ id, at: Date.now() })
   }
 
   /** Counts one play of a clip. */
@@ -123,6 +143,8 @@ export const useMotionLibraryStore = defineStore('motion-library', () => {
    * @returns the new entry, or undefined when the file holds no VRM animation.
    */
   async function importVrma(file: { name: string, vrma: ArrayBuffer }, about: { description: string, tags: string[] }) {
+    // The loader brings three.js, so it loads only for an import.
+    const { loadVRMAnimation } = await import('@proj-airi/stage-ui-three/composables/vrm')
     const url = URL.createObjectURL(new Blob([file.vrma]))
     const animation = await loadVRMAnimation(url).finally(() => URL.revokeObjectURL(url))
     if (!animation)
@@ -146,6 +168,7 @@ export const useMotionLibraryStore = defineStore('motion-library', () => {
     }
     await motionsRepo.put(record)
     records.value = [...records.value, record]
+    postChange(Date.now())
     return importedEntry(record)
   }
 
@@ -156,11 +179,13 @@ export const useMotionLibraryStore = defineStore('motion-library', () => {
       return
     await motionsRepo.remove(id)
     records.value = records.value.filter(stored => stored.id !== id)
+    postChange(Date.now())
   }
 
   async function resetState() {
     await motionsRepo.clear()
     records.value = []
+    postChange(Date.now())
   }
 
   return {
@@ -174,5 +199,8 @@ export const useMotionLibraryStore = defineStore('motion-library', () => {
     importVrma,
     remove,
     resetState,
+    requestPreview,
+    /** The last preview that another window asked for. */
+    previewRequest,
   }
 })

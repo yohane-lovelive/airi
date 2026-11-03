@@ -1094,6 +1094,29 @@ pages:
       quiet-until: Quiet until {time}
       interval-until: Talk interval ×{factor} until {time}
       reset-talk-changes: Reset
+    motions:
+      title: Motions
+      description: Gestures that the character plays with its words on VRM and MMD models
+      intro: The character chooses a gesture for the motion of each ACT token. A gesture that you turn off leaves the prompt and does not play.
+      clips: Gestures
+      source:
+        built-in: Built-in
+        imported: Imported
+      seconds: '{count} s'
+      uses: Used {count} times
+      preview: Play {name} on the stage
+      preview-note: The preview plays on the stage of the main window.
+      remove: Remove {name}
+      import:
+        title: Import a .vrma file
+        file: File
+        file-description: A VRM Animation file. A clip that moves the legs replaces the whole idle while it plays.
+        description: Description
+        description-hint: What the motion shows, in one sentence. The prompt lists it.
+        tags: Tags
+        tags-hint: Words for the motion, separated by commas, for example "dance, 踊る".
+        submit: Import
+        no-animation: The file holds no VRM animation.
     missions:
       title: Missions
       description: Reminders and other tasks that the character does for you

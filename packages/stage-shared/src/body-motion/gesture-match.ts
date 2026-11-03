@@ -1,6 +1,8 @@
 /** A gesture that a marker can choose: its id, tags, and description. */
 export interface GestureCandidate {
   id: string
+  /** The name that the prompt lists, for example `tilt-head`. It counts as one more tag. */
+  name?: string
   tags: readonly string[]
   description: string
 }
@@ -27,7 +29,7 @@ function matchesWord(words: readonly string[], tag: string) {
 
 function scoreOf(candidate: GestureCandidate, text: string, words: readonly string[]) {
   let score = 0
-  for (const tag of candidate.tags) {
+  for (const tag of candidate.name ? [candidate.name, ...candidate.tags] : candidate.tags) {
     const lower = tag.toLowerCase()
     // An English tag matches words. A Japanese tag is a stem, so it matches as a part of the text.
     const hit = /^[a-z]+$/.test(lower) ? matchesWord(words, lower) : text.includes(lower)

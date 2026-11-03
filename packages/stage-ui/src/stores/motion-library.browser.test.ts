@@ -65,4 +65,23 @@ describe('motion library store', () => {
     await library.remove(entry!.id)
     expect(library.entries.some(stored => stored.id === entry!.id)).toBe(false)
   })
+
+  it('tells the other windows about a change, so the stage reads what Settings changed', async () => {
+    const settings = useMotionLibraryStore()
+    const stage = useMotionLibraryStore(createPinia())
+    await Promise.all([settings.ready(), stage.ready()])
+
+    await settings.setEnabled('bow', false)
+
+    await expect.poll(() => stage.entries.find(entry => entry.id === 'bow')?.enabled).toBe(false)
+  })
+
+  it('passes a preview request to the stage of another window', async () => {
+    const settings = useMotionLibraryStore()
+    const stage = useMotionLibraryStore(createPinia())
+
+    settings.requestPreview('nod')
+
+    await expect.poll(() => stage.previewRequest?.id).toBe('nod')
+  })
 })

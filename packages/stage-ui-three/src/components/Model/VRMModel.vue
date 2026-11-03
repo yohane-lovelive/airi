@@ -19,6 +19,7 @@ import type {
   WebGLRenderer,
 } from 'three'
 
+import type { VrmGestureOptions } from '../../composables/vrm/gesture-layer'
 import type {
   VrmDisposeHookContext,
   VrmFrameHookContext,
@@ -1179,14 +1180,15 @@ function headAnchor() {
 defineExpose({
   headAnchor,
   getInteractionColliders: () => interactionColliders.value?.colliders ?? [],
-  setExpression(expression: string, intensity = 1) {
-    vrmEmote.value?.setEmotionWithResetAfter(expression, 3000, intensity)
+  /** Shows an expression for `durationMs`, for example as long as a gesture, and returns to the neutral face. */
+  setExpression(expression: string, intensity = 1, durationMs = 3000) {
+    vrmEmote.value?.setEmotionWithResetAfter(expression, durationMs, intensity)
   },
   /** Plays a gesture of the motion library. Resolves to false when the model cannot play it. */
-  async playGesture(source: GestureClipSource) {
+  async playGesture(source: GestureClipSource, options?: VrmGestureOptions) {
     const activeVrm = vrm.value
     const mixer = vrmAnimationMixer.value
-    return !!activeVrm && !!mixer && await playVrmGesture(activeVrm, mixer, source)
+    return !!activeVrm && !!mixer && await playVrmGesture(activeVrm, mixer, source, options)
   },
   // NOTICE: This runtime frame hook is intentionally separate from internal VRM model hooks.
   // External callers use it for live pose/tracking input; internal hooks remain reserved for

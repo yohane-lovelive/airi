@@ -93,7 +93,7 @@ Each chat request has parts with limits. It is step 2-4 of [the autonomy ADR](..
 - `useDeviceFloorStore()` tells whether this device holds the floor, while the memory sync is active. The initiative, watch, and mission runners run only on the holder.
 - `useMemoryWorkStore()` writes lasting facts from finished conversations, and `useOwnerProfileStore()` keeps the owner profile that the system prompt of the owner's conversations holds. Both are settings of long-term memory, off by default.
 - `useAutonomySyncStore()` syncs reminders, intentions, and the owner profile with the account. `useLeaderDocumentSync` (`composables/use-leader-document-sync.ts`) runs the sync loop of memories and of these records on the leader.
-- `useMotionLibraryStore()` keeps the motion library: the built-in gestures and the imported `.vrma` clips. The stage plays the clip that fits the `motion` of an `ACT` marker on VRM and MMD models.
+- `useMotionLibraryStore()` keeps the motion library: the built-in gestures and the imported `.vrma` clips. The stage plays the clip that fits the `motion` of an `ACT` marker on VRM and MMD models, and the system prompt lists the enabled clips by name (`constants/prompts/gesture-act.ts`). A change and a preview reach the other windows through a `BroadcastChannel`.
 - `useMemorySyncStore()` syncs the memories with the account on the leader, while the `memory-sync` experiment is on. `libs/memory-sync` maps an entry to its synced fields, and `applySyncChanges` of the memory store writes a round.
 - `libs/prompt-parts.ts` measures each part of a request for IO traces.
 

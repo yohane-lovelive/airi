@@ -147,6 +147,16 @@ export function useModulesList() {
       category: 'essential',
     },
     {
+      id: 'motions',
+      name: t('settings.pages.modules.motions.title'),
+      description: t('settings.pages.modules.motions.description'),
+      icon: 'i-solar:running-round-bold-duotone',
+      to: '/settings/modules/motions',
+      // Built-in gestures are always there, so the module needs no setup.
+      configured: true,
+      category: 'essential',
+    },
+    {
       id: 'missions',
       name: t('settings.pages.modules.missions.title'),
       description: t('settings.pages.modules.missions.description'),

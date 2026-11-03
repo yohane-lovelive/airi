@@ -530,6 +530,16 @@ Step 4-2 built the library and its playback as follows.
 - A motion of the whole body still replaces the whole idle, and a gesture waits for none: it is skipped while one plays. An imported clip that moves the legs plays as a motion of the whole body.
 - When a gesture plays on MMD, the motion that the owner mapped to the emotion does not play. The expression still changes. This is how Live2D treats a marker with a motion.
 
+Step 4-3 built the expression sync, the prompt list, and the settings page as follows.
+
+- When a marker plays a gesture and has an emotion, the expression of the emotion lasts as long as the gesture and then returns to neutral. Before, VRM reset an expression after 3 seconds, and MMD kept it.
+- On VRM, an imported clip plays its expression tracks when the marker has no emotion. MMD does not play them, because the retarget does not carry expressions.
+- While the model is VRM or MMD, the system prompt lists the gestures by name, with a short description and an ACT example, like the list of Live2D controls. The prompt asks for the name as the `motion`, and the match accepts the name as one more tag.
+- The list holds 15 enabled clips at most. With more clips, the most used ones are listed, in the order of the library. The ADR did not say how to choose them. A use changes the prompt only when a clip joins or leaves the list, so the cached prefix stays.
+- The page Settings > Modules > Motions lists the clips, turns them on and off, plays a preview, imports a `.vrma` file, and removes an imported clip. A built-in gesture can only be turned off.
+- The library tells the other windows about each change, and the preview goes to the stage of the main window, both through a `BroadcastChannel`.
+- The step 4 plan put the setting of the procedural layer on this page. It stays with the model settings, because the VRM and MMD renderers each keep it there.
+
 The library:
 
 - IndexedDB keeps one record for each clip. The record holds the `.vrma` data, a description, tags, and the body part (upper body or full body).
@@ -693,7 +703,7 @@ The order follows dependencies. Each step uses the parts of the earlier steps. E
 | 2 | Autonomous talk without the screen: connect the policy core to `notifyConversation`. Add the prompt budget, intentions, owner control, usage by purpose, and the inspector. | Done |
 | 2b | Daily rhythm and small talk: templates as recipes, the `greeting`, `welcome-back`, and `small-talk` templates, topic seeds, and the time of day. Measure variety. | Done. Templates as recipes still wait. |
 | 3 | Perception: the adapters, ring buffer, detectors, frame policies, image budget, recorder, replay, timeline, scene state, `commentary` with interruptions, and `watch`. | Done. |
-| 4 | Motion: the model capability check, the procedural layer, the library with `ACT` markers, expression sync, and the upper-body layer. | In progress: 4-1 and 4-2 are done. |
+| 4 | Motion: the model capability check, the procedural layer, the library with `ACT` markers, expression sync, and the upper-body layer. | Done |
 | 5 | Generated motion, game audio, recall from memory, and polish. Recall needs the memory ADR. | In progress: recall from memory is done with step M3 of ADR 2026-11-02. |
 
 Step 2 has four parts. Each part is one change.
@@ -725,7 +735,7 @@ Step 4 has three parts. Each part is one change.
 | --- | --- | --- |
 | 4-1 | The procedural layer for VRM and MMD models, with the check of its bones. | Done |
 | 4-2 | The library, the match of the `motion` of `ACT` markers, and playback on an upper-body layer. | Done |
-| 4-3 | Expression sync, the list of expressions and motions in the prompt, and the settings page of the library. | To do |
+| 4-3 | Expression sync, the list of expressions and motions in the prompt, and the settings page of the library. | Done |
 
 Step 4 does not depend on steps 0 to 3. It comes after them so that the speech output format changes only once.
 The memory ADR has its own steps. They can run beside steps 1 to 4.

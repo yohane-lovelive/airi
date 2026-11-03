@@ -23,6 +23,7 @@ const { resetArtistryToGlobal } = vi.hoisted(() => ({
 // display-model store to resolve IDs, so provide the storage boundary with a
 // deterministic no-op instead of allowing rejected driver initialization to
 // escape as an unrelated test error.
+vi.mock('../../database/repos/motions.repo')
 vi.mock('localforage', () => ({
   default: {
     getItem: vi.fn(async () => undefined),

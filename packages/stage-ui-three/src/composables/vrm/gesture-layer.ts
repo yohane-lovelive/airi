@@ -82,19 +82,31 @@ async function loadVRMAnimationData(vrma: ArrayBuffer) {
   }
 }
 
+/** How a gesture plays on a VRM model. */
+export interface VrmGestureOptions {
+  /**
+   * Plays the expression tracks of an imported clip. A marker with an emotion turns this off, so the emotion of the
+   * marker shows instead of the expression of the clip.
+   *
+   * @default false
+   */
+  withExpressions?: boolean
+}
+
 /**
  * Builds the clip of a gesture for a VRM model, and keeps it for the next play.
  *
  * A built-in gesture faces +Z. A VRM 0.x model faces -Z, so its keys turn half a turn about Y. An upper-body clip keeps
- * only the rotations of the bones that a gesture can take.
+ * only the rotations of the bones that a gesture can take, and its expression tracks when `withExpressions` is on.
  */
-export async function vrmGestureClip(vrm: VRMCore, source: GestureClipSource): Promise<AnimationClip | undefined> {
+export async function vrmGestureClip(vrm: VRMCore, source: GestureClipSource, options: VrmGestureOptions = {}): Promise<AnimationClip | undefined> {
   let cache = clips.get(vrm)
   if (!cache) {
     cache = new Map()
     clips.set(vrm, cache)
   }
-  const cached = cache.get(source.id)
+  const key = `${source.id}:${options.withExpressions ? 'face' : 'body'}`
+  const cached = cache.get(key)
   if (cached)
     return cached
 
@@ -114,11 +126,12 @@ export async function vrmGestureClip(vrm: VRMCore, source: GestureClipSource): P
     clip = await clipFromVRMAnimation(vrm, await loadVRMAnimationData(source.vrma))
     if (clip && source.part === 'upper') {
       const byNode = humanBonesByNode(vrm)
-      clip.tracks = clip.tracks.filter(track => groupOfTrack(byNode, track.name) !== undefined)
+      // Expression tracks drive the weights of the VRM expressions, which no gesture group holds.
+      clip.tracks = clip.tracks.filter(track => groupOfTrack(byNode, track.name) !== undefined || (!!options.withExpressions && track.name.endsWith('.weight')))
     }
   }
   if (clip)
-    cache.set(source.id, clip)
+    cache.set(key, clip)
   return clip
 }
 
@@ -128,8 +141,8 @@ export async function vrmGestureClip(vrm: VRMCore, source: GestureClipSource): P
  *
  * @returns false when the model cannot play the clip, for example without the bones.
  */
-export async function playVrmGesture(vrm: VRMCore, mixer: AnimationMixer, source: GestureClipSource): Promise<boolean> {
-  const clip = await vrmGestureClip(vrm, source)
+export async function playVrmGesture(vrm: VRMCore, mixer: AnimationMixer, source: GestureClipSource, options: VrmGestureOptions = {}): Promise<boolean> {
+  const clip = await vrmGestureClip(vrm, source, options)
   if (!clip || clip.tracks.length === 0)
     return false
   const layer = vrmGestureLayer(vrm, mixer)
