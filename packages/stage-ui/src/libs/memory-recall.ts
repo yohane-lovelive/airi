@@ -2,6 +2,8 @@ import type { Conversation } from '@proj-airi/core-agent'
 
 import type { MemoryEntry } from '../types/memory'
 
+import { withoutTimePrefix } from '@proj-airi/core-agent'
+
 import { searchMemories } from './memory-index'
 
 /** How a recall found its entries: by the vectors of the server, or by shared character pairs on the device. */
@@ -91,12 +93,12 @@ export function composeRecalledMemories(result: MemoryRecallResult) {
 /** The source name of the recalled memories in the context of a request. */
 export const RECALLED_MEMORIES_SOURCE = 'memory:recall'
 
-/** The text of the newest user turn, which is the owner message of a reply. */
+/** The text of the newest user turn, which is the owner message of a reply. The time prefix of the turn is left out. */
 export function newestUserText(conversation: Conversation) {
   const turn = conversation.turns.findLast(item => item.type === 'user')
   if (turn?.type !== 'user')
     return ''
-  return turn.content.flatMap(part => part.type === 'text' ? [part.text] : []).join('\n').trim()
+  return withoutTimePrefix(turn.content.flatMap(part => part.type === 'text' ? [part.text] : []).join('\n').trim())
 }
 
 /**

@@ -11,7 +11,7 @@ export {
 } from './messages/context-prompt'
 export type { ContextSnapshot } from './messages/context-prompt'
 
-export { formatTimePrefix } from './messages/datetime-prefix'
+export { formatTimePrefix, withoutTimePrefix } from './messages/datetime-prefix'
 export { renderConversationPreview } from './messages/preview'
 export type { AssistantTurn, Citation, ContentSegment, Conversation, GenerationRound, ProviderContinuation, SystemTurn, ToolExecution, ToolInvocation, Turn, UserTurn } from './messages/types'
 export { createChatHooks } from './runtime/agent-hooks'

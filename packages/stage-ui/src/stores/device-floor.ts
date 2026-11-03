@@ -60,6 +60,8 @@ export const useDeviceFloorStore = defineStore('device-floor', () => {
   })
 
   let leadership: Pick<SyncedPiniaRuntime, 'isLeader' | 'onLeadershipChange'> | undefined
+  /** The last leadership that the runtime reported. It outlives the runtime, which ends first on `pagehide`. */
+  let leading = false
 
   async function heartbeat() {
     now.value = Date.now()
@@ -82,9 +84,14 @@ export const useDeviceFloorStore = defineStore('device-floor', () => {
     }
   }
 
-  /** Gives the floor up, so the next device takes it at once. The request outlives the page. */
+  /**
+   * Gives the floor up, so the next device takes it at once. The request outlives the page.
+   *
+   * The synced runtime ends on `pagehide` before this listener runs, so `isLeader()` already answers false here. The
+   * store keeps the last leadership that the runtime reported instead.
+   */
   function release() {
-    if (!leadership?.isLeader() || !memorySync.active || !answer.value?.held)
+    if (!leading || !memorySync.active || !answer.value?.held)
       return
     void authedFetch(floorUrl(`/${id}`), { method: 'DELETE', keepalive: true }).catch(() => {})
   }
@@ -105,6 +112,7 @@ export const useDeviceFloorStore = defineStore('device-floor', () => {
       return
     leadership = syncedPinia
     stopLeadershipListener = syncedPinia.onLeadershipChange((isLeader) => {
+      leading = isLeader
       if (isLeader) {
         ticker.start()
         void heartbeat()
@@ -120,6 +128,7 @@ export const useDeviceFloorStore = defineStore('device-floor', () => {
     stopLeadershipListener = undefined
     ticker.stop()
     leadership = undefined
+    leading = false
   }
 
   onScopeDispose(dispose)

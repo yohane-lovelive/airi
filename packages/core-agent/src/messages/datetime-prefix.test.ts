@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { formatTimePrefix } from './datetime-prefix'
+import { formatTimePrefix, withoutTimePrefix } from './datetime-prefix'
 
 /**
  * @example
@@ -33,5 +33,12 @@ describe('formatTimePrefix', () => {
     const a = new Date(2026, 3, 25, 18, 47, 12).getTime()
     const b = new Date(2026, 3, 25, 18, 47, 58).getTime()
     expect(formatTimePrefix(a)).toBe(formatTimePrefix(b))
+  })
+})
+
+describe('withoutTimePrefix', () => {
+  it('removes the time prefix at the start, and keeps other brackets', () => {
+    expect(withoutTimePrefix(`${formatTimePrefix(new Date(2026, 10, 3, 14, 49).getTime())}好きな食べ物は？`)).toBe('好きな食べ物は？')
+    expect(withoutTimePrefix('[メモ] [2026-11-03 14:49] そのまま')).toBe('[メモ] [2026-11-03 14:49] そのまま')
   })
 })

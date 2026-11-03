@@ -83,8 +83,11 @@ describe('withRecalledMemories', () => {
     }
   }
 
-  it('reads the text of the newest user turn', () => {
+  it('reads the text of the newest user turn without its time prefix', () => {
     expect(newestUserText(conversation())).toBe('好きな食べ物は？')
+    const stamped = conversation()
+    stamped.turns[2] = { id: 'new', type: 'user', content: [{ type: 'text', text: '[2026-11-03 14:49] 好きな食べ物は？' }] }
+    expect(newestUserText(stamped)).toBe('好きな食べ物は？')
   })
 
   it('adds the memories to the context of the newest user turn in a copy, and leaves the input as it was', () => {

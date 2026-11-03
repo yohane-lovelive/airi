@@ -252,7 +252,7 @@ Each model call records its purpose. Settings and the inspector show the usage o
 
 Step 2-3a built the usage records as follows.
 
-- The LLM store records each finished stream. A stream with tool rounds counts one call for each round. A failed or cancelled stream counts as one call without tokens.
+- The LLM store records each finished stream. A stream with tool rounds counts one call for each round. A failed or cancelled stream counts as one call without tokens. A call that a report tool stops, for example the memory work or a watch check, still records the tokens of its finished steps.
 - The purposes are `owner-reply`, `initiative`, `mission`, `task`, `scene`, `vision`, `voice-assist`, `tool-card`, `artistry`, and `other`. The chat store reads the purpose of a turn from its notice source. Commentary, watch checks, topic seeds, memory work, and motion generation get a purpose in their own steps.
 - IndexedDB keeps one record for each day, purpose, and model, for 30 days. The records stay on the device and never sync.
 - Settings > Usage shows the tokens of each purpose for today and for the last 30 days.

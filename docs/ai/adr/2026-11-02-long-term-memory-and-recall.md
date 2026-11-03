@@ -80,7 +80,7 @@ Step M2b built the recall as follows.
 
 - `recallMemories` in `libs/memory-recall.ts` merges the server results with the local entries that changed after the last sync. `useMemoryRecallStore()` calls the server and keeps the last recall for the inspector, without memory text.
 - Only the leader runs the sync, so only the leader knows the time of the last sync. A recall in another window takes the server results alone.
-- The chat recalls for a turn with the purpose `owner-reply`, before the LLM span starts. The recalled part joins the runtime context of the newest user turn in a copy of the request, under the source `memory:recall`.
+- The chat recalls for a turn with the purpose `owner-reply`, before the LLM span starts. The recalled part joins the runtime context of the newest user turn in a copy of the request, under the source `memory:recall`. The query is the owner message without the time prefix of the turn.
 - The index limit follows the setting, not each answer of the server: 20 entries while the memory sync is active, 50 otherwise. A change of the limit with each answer would change the cached system prompt.
 - `builtIn_searchMemory` uses the same recall, so its results are the same as the recalled part.
 - The inspector shows the mode, the count, the query characters, and the time of the last recall.
@@ -114,6 +114,7 @@ Step M4a built the floor as follows.
 - A row in PostgreSQL keeps the holder of each account. One conditional upsert gives the floor to the first device, keeps it for the holder, and moves it after 30 seconds without a heartbeat.
 - The device id is a random UUID in `localStorage`. It is not in the allow list of the settings sync, so it stays on the device.
 - `useDeviceFloorStore()` sends a heartbeat every 10 seconds from the leader, and gives the floor up on `pagehide`. The initiative runner and the watch runner run only on the device that holds the floor.
+- The synced runtime ends on `pagehide` before the store hears it, so the store keeps the last leadership that the runtime reported.
 - The floor is in use while the memory sync is active. Without an answer of the server for 30 seconds, the device acts as the holder. The ADR did not say what a device does without the server. The owner uses one device at a time, so a server outage must not keep the character quiet.
 - Reminders ran on every device until step M4b synced them.
 - The inspector shows whether this device holds the floor.
@@ -190,6 +191,11 @@ Step M5a built the memory work and the profile as follows. Step M5b, the merge o
 - Client unit tests: the field mapping of entries, the merge of server results with local changes, the fallback by time and by error, and the prompt part.
 - Client browser test: a recalled part reaches the newest user turn and does not reach the history.
 - A recall check by hand with the owner's Japanese memories: questions that share no words with the entry, for example 「好きな食べ物は？」 for an entry about ramen.
+- A live check on 2026-11-03 ran steps M1 to M5a with the Docker stack, the desktop app, and two web origins. It found four bugs, and a later change fixed them.
+  - The user of the embedder image had no home, so corepack failed at start.
+  - A call that a report tool stops recorded no tokens.
+  - The floor release on `pagehide` never ran.
+  - The recall query held the time prefix of the turn.
 
 ## Open work
 

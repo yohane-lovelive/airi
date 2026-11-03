@@ -32,3 +32,21 @@ export function formatTimePrefix(createdAt: number): string {
 
   return `[${year}-${month}-${day} ${hour}:${minute}] `
 }
+
+const TIME_PREFIX = /^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}\] /
+
+/**
+ * Removes the {@link formatTimePrefix} prefix from the start of a user text.
+ *
+ * Use when:
+ * - A reader of the request text needs only the owner's words, for example a search of memories by meaning.
+ *
+ * Before:
+ * - "[2026-04-25 18:47] 好きな食べ物は？"
+ *
+ * After:
+ * - "好きな食べ物は？"
+ */
+export function withoutTimePrefix(text: string): string {
+  return text.replace(TIME_PREFIX, '')
+}

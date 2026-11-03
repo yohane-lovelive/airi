@@ -89,10 +89,15 @@ describe('device floor store', () => {
     expect(floor.holdsFloor).toBe(true)
   })
 
-  it('gives the floor up when the page closes', async () => {
+  it('gives the floor up when the page closes, after the synced runtime has ended', async () => {
     signInWithMemorySync()
+    // `setupSynced` ends the runtime on `pagehide` before the stores hear the event, so `isLeader()` then answers false.
+    let ended = false
+    window.addEventListener('pagehide', () => {
+      ended = true
+    }, { once: true })
     const floor = useDeviceFloorStore()
-    floor.initialize(leaderRuntime())
+    floor.initialize({ ...leaderRuntime(), isLeader: () => !ended })
     await floor.heartbeat()
     expect(floor.holdsFloor).toBe(true)
 

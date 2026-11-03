@@ -151,28 +151,7 @@ async function streamOnce({
       // Await it and consume other SDK promises to prevent stalled evals and unhandled rejections.
       // Source: @xsai/stream-text 0.5 steps and AIRI eval runners.
       // Remove this path when xsAI emits one terminal event after all tool rounds.
-      void streamResult.steps.then(async () => {
-        if (settled)
-          return
-        // Ignore any late provider error event emitted after xsAI has already
-        // resolved the authoritative full-step lifecycle.
-        stepsSettled = true
-        try {
-          const generatedTurn = await streamResult.generatedTurn
-          await options?.onStreamEvent?.({ type: 'finish' })
-          if (options?.abortSignal?.aborted)
-            throw options.abortSignal.reason
-          await options?.onGeneratedTurn?.(generatedTurn)
-        }
-        catch (error) {
-          // Terminal consumers and generated turn persistence belong to generation
-          // completion. Their failures are not ignorable late provider events.
-          if (!settled) {
-            settled = true
-            reject(error)
-          }
-          return
-        }
+      const reportUsage = async () => {
         let usage: Usage | undefined
         try {
           usage = await streamResult.totalUsage
@@ -192,6 +171,35 @@ async function streamOnce({
           // provider response into a failed user message.
           console.error('Stream usage callback error:', error)
         }
+      }
+
+      void streamResult.steps.then(async () => {
+        if (settled)
+          return
+        // Ignore any late provider error event emitted after xsAI has already
+        // resolved the authoritative full-step lifecycle.
+        stepsSettled = true
+        try {
+          const generatedTurn = await streamResult.generatedTurn
+          await options?.onStreamEvent?.({ type: 'finish' })
+          if (options?.abortSignal?.aborted) {
+            // A caller can stop a call after a tool gave the answer, for example a report tool. The provider billed
+            // the finished steps, so their usage is still reported.
+            await reportUsage()
+            throw options.abortSignal.reason
+          }
+          await options?.onGeneratedTurn?.(generatedTurn)
+        }
+        catch (error) {
+          // Terminal consumers and generated turn persistence belong to generation
+          // completion. Their failures are not ignorable late provider events.
+          if (!settled) {
+            settled = true
+            reject(error)
+          }
+          return
+        }
+        await reportUsage()
         resolveOnce()
       }).catch((error) => {
         // A failure after `steps` resolved belongs to optional usage

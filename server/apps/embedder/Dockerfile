@@ -7,7 +7,8 @@ FROM node:24.22.1-bookworm-slim
 
 WORKDIR /app
 
-RUN groupadd --system airi && useradd --system --gid airi airi
+# corepack writes its cache under the home of the user that runs pnpm, and a system user of Debian has no home.
+RUN groupadd --system airi && useradd --system --create-home --gid airi airi
 
 RUN corepack enable
 
