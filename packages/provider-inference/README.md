@@ -78,4 +78,6 @@ Reported search abilities do not select a native tool implementation.
 
 OpenAI reasoning controls use the exact model entry and effort levels from the pinned catalog.
 Unsupported effort values are omitted. In particular, models without a `none` effort keep their server default when reasoning is disabled.
+A request can carry an effort (`low`, `medium`, or `high`) with `enabled`. Providers with only on and off treat every effort as on.
+The OpenAI-compatible provider sends a reasoning field only when its `reasoningControl` asks for one: the DeepSeek-style `thinking` switch or the OpenAI-style `reasoning_effort`.
 Generation validation uses the configured model before consulting the endpoint model list.

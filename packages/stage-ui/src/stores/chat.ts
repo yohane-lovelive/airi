@@ -483,6 +483,9 @@ export const useChatStore = defineStore('chat', () => {
     return Boolean(chatSession.sessionMetas[sessionId]?.recipeId)
   }
 
+  /** The purposes of turns that the character starts on its own: idle speech, small talk, commentary, and missions. */
+  const AUTONOMOUS_PURPOSES: readonly UsagePurpose[] = ['initiative', 'commentary', 'mission']
+
   /** Why a send runs, for the usage records. A notice tells its purpose by its source. */
   function usagePurposeOf(sessionId: string, notice?: { source: string }): UsagePurpose {
     if (isTaskSession(sessionId))
@@ -1389,6 +1392,8 @@ export const useChatStore = defineStore('chat', () => {
       throw new Error('The target session has no character')
 
     const { provider: providerId, model: modelId } = cardStore.getModules(characterId).consciousness
+    // Autonomous speech can reason less than a reply, so its turns ask for the level of autonomous speech.
+    const reasoningUse = AUTONOMOUS_PURPOSES.includes(usagePurposeOf(payload.sessionId, extra.notice)) ? 'autonomous' : 'reply'
 
     const temperature = payload.temperature ?? consciousnessStore.activeTemperature
     const topP = payload.topP ?? consciousnessStore.activeTopP
@@ -1410,7 +1415,7 @@ export const useChatStore = defineStore('chat', () => {
     const stickers = await stickersStore.selectCatalogForReply()
     signal.throwIfAborted()
 
-    const chatProvider = await consciousnessStore.getChatProviderInstance(providerId)
+    const chatProvider = await consciousnessStore.getChatProviderInstance(providerId, reasoningUse)
     signal.throwIfAborted()
 
     if (!chatProvider)
@@ -1427,7 +1432,7 @@ export const useChatStore = defineStore('chat', () => {
       if (!isChatSelectionReady(selection.provider, selection.model))
         throw new Error('No chat provider or model configured for this character')
 
-      const stepProvider = await consciousnessStore.getChatProviderInstance(selection.provider)
+      const stepProvider = await consciousnessStore.getChatProviderInstance(selection.provider, reasoningUse)
       if (!stepProvider)
         throw new Error(`Failed to resolve chat provider "${selection.provider}"`)
 

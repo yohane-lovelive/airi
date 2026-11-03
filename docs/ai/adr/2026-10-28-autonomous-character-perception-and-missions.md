@@ -83,7 +83,7 @@ The owner usually uses one device at a time. When two devices are open, one devi
 
 - The speaking model is a chat model that accepts image input and returns text.
 - The default is `deepseek-v4.1-flash` from OpenCode Go. Its public model list declared image input and tool calls on 2026-10-30.
-- Commentary uses the `low` reasoning effort, because reasoning adds delay.
+- Reasoning adds delay. The ADR first put commentary at the `low` effort. Step 5-0 lets the owner choose the reasoning level of replies and of autonomous speech instead.
 - The owner can change the model at any time. Memory is text, so a change of model keeps all memories.
 - A model without image input uses the vision module as a fallback. In that case the quality of commentary is lower.
 - A model without tool calls cannot create missions, write timeline notes, or answer watch checks.
@@ -704,7 +704,7 @@ The order follows dependencies. Each step uses the parts of the earlier steps. E
 | 2b | Daily rhythm and small talk: templates as recipes, the `greeting`, `welcome-back`, and `small-talk` templates, topic seeds, and the time of day. Measure variety. | Done. Templates as recipes still wait. |
 | 3 | Perception: the adapters, ring buffer, detectors, frame policies, image budget, recorder, replay, timeline, scene state, `commentary` with interruptions, and `watch`. | Done. |
 | 4 | Motion: the model capability check, the procedural layer, the library with `ACT` markers, expression sync, and the upper-body layer. | Done |
-| 5 | Generated motion, game audio, recall from memory, and polish. Recall needs the memory ADR. | In progress: recall from memory is done with step M3 of ADR 2026-11-02. |
+| 5 | Generated motion, game audio, recall from memory, and polish. Recall needs the memory ADR. | In progress: recall from memory is done with step M3 of ADR 2026-11-02, and 5-0 is done. The owner held game audio. |
 
 Step 2 has four parts. Each part is one change.
 
@@ -738,6 +738,25 @@ Step 4 has three parts. Each part is one change.
 | 4-3 | Expression sync, the list of expressions and motions in the prompt, and the settings page of the library. | Done |
 
 Step 4 does not depend on steps 0 to 3. It comes after them so that the speech output format changes only once.
+
+Step 5 has these parts. The owner added the length and tempo of talk after using the app, and held game audio on 2026-11-03.
+
+| Part | Content | State |
+| --- | --- | --- |
+| 5-0 | The reasoning level of replies and of autonomous speech, set by the owner. | Done |
+| 5-1 | Game audio: the capture of one process, the loud sound detector, and a local transcript in the timeline. | Held |
+| 5-2 | Generated motion. | To do |
+| 5-3 | Polish: the defaults of the open work. | To do |
+| 5-4a | The length of a line: a length target for each turn, and a turn budget that counts only idle speech. | To do |
+| 5-4b | The flow of talk: a `NEXT` marker of the model, and the pause after the speech ends. | To do |
+
+Step 5-0 built the reasoning level as follows.
+
+- A live check on 2026-11-03 sent a commentary-like request to `deepseek-v4.1-flash` of OpenCode Go. Without a field, the model reasoned about 72 tokens, and the first text came after about 2.0 seconds. `thinking: { type: 'disabled' }` stopped the reasoning, and the first text came after about 1.3 seconds. `reasoning_effort: 'low'` reasoned about 53 tokens, and the first text came after about 1.7 seconds. The server accepted both fields.
+- The owner chooses a reasoning level: the provider default, off, low, medium, or high. Replies to the owner and autonomous speech have a level each, and autonomous speech follows the replies by default. The ADR fixed commentary at `low`, and the owner asked for a setting instead.
+- A request carries an effort with `enabled`. A provider with effort levels sends it, and a provider with only on and off treats every effort as on, so the definitions of the other providers did not change.
+- The OpenAI-compatible provider has a field for the form of the request: nothing, the `thinking` switch, or `reasoning_effort`. Compatible servers differ, and an unknown field can fail a request, so the default sends nothing.
+- The old switch of the settings read on as `medium` and off as `off`, which send the same requests. A notice in the code removes this read later.
 The memory ADR has its own steps. They can run beside steps 1 to 4.
 
 ## Work outside the steps

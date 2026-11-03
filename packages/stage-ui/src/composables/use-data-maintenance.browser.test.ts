@@ -86,7 +86,7 @@ it.each(['resetSettings', 'resetState'])('continues independent module resets wh
   const follower = mountMaintenance(namespace, 'follower-only')
   await vi.waitFor(() => expect(follower.runtime.getLeaderId()).toBe(leader.runtime.participantId))
   const { pinia } = follower
-  await useConsciousnessSettingsStore(pinia).setReasoning(true)
+  await useConsciousnessSettingsStore(pinia).setReasoningLevel('high')
   useMinecraftStore(pinia).latestRuntimeContextText = 'previous context'
   // A policy that a module reset must clear, so the picker cannot restore it.
   const homeAssistant = useHomeAssistantStore(pinia)
@@ -121,7 +121,7 @@ it.each(['resetSettings', 'resetState'])('continues independent module resets wh
   expect(useMinecraftStore(pinia).latestRuntimeContextText).toBe('')
   expect(homeAssistant.exposureMode).toBe('all')
   expect(homeAssistant.deniedEntities).toEqual([])
-  expect(useConsciousnessSettingsStore(leader.pinia).reasoning).toBe(action === 'resetState')
+  expect(useConsciousnessSettingsStore(leader.pinia).reasoningLevel).toBe(action === 'resetState' ? 'high' : 'off')
 })
 
 // ROOT CAUSE:

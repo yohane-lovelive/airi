@@ -790,6 +790,16 @@ pages:
             title: モデルオプション
             thinking:
               label: 思考 (Thinking)
+              description: 返事の前にモデルがどれだけ推論するかです。推論が多いほど時間がかかります。
+              autonomous-label: 自律的な発話の思考
+              autonomous-description: 雑談、実況、放置中の発話の推論です。少なくすると、画面への反応が早くなります。
+              levels:
+                same: 返事と同じ
+                default: プロバイダーの既定
+                'off': オフ
+                low: 低
+                medium: 中
+                high: 高
               required-description: このモデルでは思考機能が必須です。
               provider-default-description: AIRI にはこのモデルの推論設定がありません。OpenRouter の初期設定が適用されます。
       title: 意識
@@ -2044,6 +2054,15 @@ pages:
       openai-compatible:
         description: OpenAI互換
         title: OpenAI互換
+        fields:
+          field:
+            reasoning-control:
+              label: 推論の指定
+              description: AIRI がこのサーバーに推論の強さを伝える方法です。サーバーによって違うので、使っているサーバーが受け付ける形を選んでください。
+              options:
+                none: 送らない（サーバーの既定）
+                thinking: 思考のオン・オフ（DeepSeek 式）
+                reasoning-effort: reasoning effort（OpenAI 式）
       n1n:
         description: n1n.ai - 高性能 AI API を提供。
       volcengine:

@@ -407,10 +407,18 @@ export interface ProviderDefinition<TConfig = Record<string, unknown>, TId exten
 /** Reasoning modes that AIRI can request from a chat provider. */
 export type ChatReasoningMode = 'disabled' | 'enabled'
 
+/** How much a model reasons while `reasoning` is `enabled`. */
+export type ChatReasoningEffort = 'low' | 'medium' | 'high'
+
 /** User-selected options that a provider applies to one chat request. */
 export interface ChatRequestOptions {
   /** Requested reasoning mode. */
   reasoning: ChatReasoningMode
+  /**
+   * The strength of an enabled reasoning. A provider with effort levels sends it, and a provider with only on and off
+   * treats every effort as on. Without it, a provider uses its own effort for `enabled`.
+   */
+  effort?: ChatReasoningEffort
 }
 
 /** Describes the reasoning controls that AIRI implements for a provider. */

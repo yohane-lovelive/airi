@@ -867,6 +867,16 @@ pages:
             title: Model options
             thinking:
               label: Thinking
+              description: How much the model reasons before a reply. More reasoning takes longer.
+              autonomous-label: Thinking of autonomous speech
+              autonomous-description: The reasoning of small talk, commentary, and idle speech. Less reasoning makes the character answer the screen sooner.
+              levels:
+                same: Same as replies
+                default: Provider default
+                'off': 'Off'
+                low: Low
+                medium: Medium
+                high: High
               required-description: This model requires Thinking.
               provider-default-description: AIRI has no reasoning settings for this model. OpenRouter applies its default.
       title: Consciousness
@@ -2404,6 +2414,15 @@ pages:
       openai-compatible:
         description: OpenAI Compatible
         title: OpenAI Compatible
+        fields:
+          field:
+            reasoning-control:
+              label: Reasoning request
+              description: How AIRI asks this server for a reasoning strength. Servers differ, so choose a form that your server accepts.
+              options:
+                none: Send nothing (server default)
+                thinking: Thinking on or off (DeepSeek style)
+                reasoning-effort: Reasoning effort (OpenAI style)
       nvidia:
         description: build.nvidia.com
         title: NVIDIA NIM

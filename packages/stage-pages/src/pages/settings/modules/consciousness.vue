@@ -1,14 +1,16 @@
 <script setup lang="ts">
+import type { AutonomousReasoningLevel, ReasoningLevel } from '@proj-airi/stage-ui/stores/modules/consciousness-settings'
+
 import { RadioCardManySelect, RadioCardSimple } from '@proj-airi/stage-ui/components'
 import { useAnalytics } from '@proj-airi/stage-ui/composables'
 import { useAiriCardStore } from '@proj-airi/stage-ui/stores/modules/airi-card'
 import { useConsciousnessStore } from '@proj-airi/stage-ui/stores/modules/consciousness'
-import { useConsciousnessSettingsStore } from '@proj-airi/stage-ui/stores/modules/consciousness-settings'
+import { REASONING_LEVELS, useConsciousnessSettingsStore } from '@proj-airi/stage-ui/stores/modules/consciousness-settings'
 import { useProviderConfigStore } from '@proj-airi/stage-ui/stores/providers/config'
 import { useProviderStore } from '@proj-airi/stage-ui/stores/providers/provider'
-import { Alert, FieldCheckbox, FieldRange, SettingsCard } from '@proj-airi/ui'
+import { Alert, FieldCheckbox, FieldRange, FieldSelect, SettingsCard } from '@proj-airi/ui'
 import { storeToRefs } from 'pinia'
-import { watch } from 'vue'
+import { computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
 
@@ -21,7 +23,7 @@ const consciousnessStore = useConsciousnessStore()
 const consciousnessSettingsStore = useConsciousnessSettingsStore()
 const { configuredProviders } = storeToRefs(providerStore)
 const { moduleChatProvidersMetadata } = storeToRefs(providersStore)
-const { reasoning, temperatureEnabled, topPEnabled } = storeToRefs(consciousnessSettingsStore)
+const { reasoningLevel, autonomousReasoningLevel, temperatureEnabled, topPEnabled } = storeToRefs(consciousnessSettingsStore)
 const {
   activeProvider,
   activeModel,
@@ -68,8 +70,22 @@ async function handleDeleteProvider(providerId: string) {
   await providersStore.deleteProvider(providerId)
 }
 
-async function updateReasoning(value: boolean) {
-  await consciousnessSettingsStore.setReasoning(value)
+const THINKING_KEY = 'settings.pages.modules.consciousness.sections.section.model-options.thinking'
+
+const reasoningOptions = computed(() => REASONING_LEVELS.map(level => ({ label: t(`${THINKING_KEY}.levels.${level}`), value: level })))
+const autonomousReasoningOptions = computed(() => [
+  { label: t(`${THINKING_KEY}.levels.same`), value: 'same' as const },
+  ...reasoningOptions.value,
+])
+
+async function updateReasoningLevel(value: ReasoningLevel | undefined) {
+  if (value)
+    await consciousnessSettingsStore.setReasoningLevel(value)
+}
+
+async function updateAutonomousReasoningLevel(value: AutonomousReasoningLevel | undefined) {
+  if (value)
+    await consciousnessSettingsStore.setAutonomousReasoningLevel(value)
 }
 
 async function updateTemperatureEnabled(value: boolean) {
@@ -310,14 +326,22 @@ async function updateTopPEnabled(value: boolean) {
           {{ t('settings.pages.modules.consciousness.sections.section.model-options.thinking.provider-default-description') }}
         </span>
       </div>
-      <FieldCheckbox
-        v-else
-        :model-value="reasoning || activeModelRequiresReasoning"
-        :label="t('settings.pages.modules.consciousness.sections.section.model-options.thinking.label')"
-        :description="activeModelRequiresReasoning ? t('settings.pages.modules.consciousness.sections.section.model-options.thinking.required-description') : undefined"
-        :disabled="activeModelRequiresReasoning"
-        @update:model-value="updateReasoning"
-      />
+      <template v-else>
+        <FieldSelect
+          :model-value="reasoningLevel"
+          :options="reasoningOptions"
+          :label="t(`${THINKING_KEY}.label`)"
+          :description="activeModelRequiresReasoning ? t(`${THINKING_KEY}.required-description`) : t(`${THINKING_KEY}.description`)"
+          @update:model-value="updateReasoningLevel"
+        />
+        <FieldSelect
+          :model-value="autonomousReasoningLevel"
+          :options="autonomousReasoningOptions"
+          :label="t(`${THINKING_KEY}.autonomous-label`)"
+          :description="t(`${THINKING_KEY}.autonomous-description`)"
+          @update:model-value="updateAutonomousReasoningLevel"
+        />
+      </template>
     </section>
   </SettingsCard>
 

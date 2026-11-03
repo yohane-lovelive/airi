@@ -29,7 +29,7 @@ import { useChatStore } from './chat'
 import { CHAT_FORMAT_RULES } from './chat/prompt-recipe'
 import { useContextObservabilityStore } from './devtools/context-observability'
 import { useMemoryStore } from './memory'
-import { useConsciousnessSettingsStore } from './modules/consciousness-settings'
+import { chatRequestOptionsOf, useConsciousnessSettingsStore } from './modules/consciousness-settings'
 import { useRecipesStore } from './recipes'
 
 const ioTracerMocks = vi.hoisted(() => {
@@ -260,9 +260,10 @@ vi.mock('./modules/consciousness', () => ({
     chatReady: chatReadyRef,
     providerModels: consciousnessModels.value,
     getModelsForProvider: async () => consciousnessModels.value,
-    getChatProviderInstance: (providerId: string) => getChatProviderInstanceMock(providerId, {
-      reasoning: useConsciousnessSettingsStore().reasoning ? 'enabled' : 'disabled',
-    }),
+    getChatProviderInstance: (providerId: string, use: 'reply' | 'autonomous' = 'reply') => getChatProviderInstanceMock(
+      providerId,
+      chatRequestOptionsOf(useConsciousnessSettingsStore().levelFor(use)),
+    ),
   })),
 }))
 
@@ -1238,7 +1239,7 @@ describe('chat store contract', () => {
 
   it('passes the current consciousness reasoning option to the chat provider', async () => {
     const settings = useConsciousnessSettingsStore()
-    await settings.setReasoning(true)
+    await settings.setReasoningLevel('medium')
     llmStreamMock.mockImplementationOnce(async (_model: string, _chatProvider: GenerationProvider, _messages: Conversation, options: StreamOptions) => {
       await options.onStreamEvent?.({ type: 'finish' })
     })
@@ -1246,8 +1247,25 @@ describe('chat store contract', () => {
     const store = useChatStore()
     await store.send({ sessionId: 'session-1', text: 'reply without changing provider defaults' })
 
-    expect(getChatProviderInstanceMock).toHaveBeenCalledWith('mock-provider', { reasoning: 'enabled' })
-    await settings.setReasoning(false)
+    expect(getChatProviderInstanceMock).toHaveBeenCalledWith('mock-provider', { reasoning: 'enabled', effort: 'medium' })
+    await settings.setReasoningLevel('off')
+  })
+
+  it('passes the level of autonomous speech for an autonomous turn', async () => {
+    const settings = useConsciousnessSettingsStore()
+    await settings.setReasoningLevel('high')
+    await settings.setAutonomousReasoningLevel('off')
+    llmStreamMock.mockImplementation(async (_model: string, _chatProvider: GenerationProvider, _messages: Conversation, options: StreamOptions) => {
+      await options.onStreamEvent?.({ type: 'finish' })
+    })
+
+    const store = useChatStore()
+    await store.notifyConversation('session-1', { source: 'initiative', text: 'Autonomous turn', transient: true })
+    expect(getChatProviderInstanceMock).toHaveBeenLastCalledWith('mock-provider', { reasoning: 'disabled' })
+
+    await store.send({ sessionId: 'session-1', text: 'a reply to the owner' })
+    expect(getChatProviderInstanceMock).toHaveBeenLastCalledWith('mock-provider', { reasoning: 'enabled', effort: 'high' })
+    await settings.resetState()
   })
 
   it('passes a native reply relation to the chat runtime', async () => {
