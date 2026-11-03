@@ -212,6 +212,18 @@ describe('gates', () => {
     expect(decideInitiative(spent, IDLE, at(5_000), middle, limited).decision).toEqual({ kind: 'wait', reason: 'daily-budget' })
     expect(decideInitiative(spent, IDLE, at(5_000, '2026-10-30'), middle, limited).decision.kind).toBe('turn')
   })
+
+  // The owner started small talk or commentary, so a long talk must not stop at the budget of idle speech.
+  it('neither counts nor stops the turns of a mission that the owner started', () => {
+    const limited = resolveInitiativeOptions({ dailyTurnBudget: 1 })
+    const mission = { ...limited, missionRunning: true }
+    const spent = observeInitiative(withTurn(limited), { type: 'turn-finished', outcome: 'silent' }, at(901), limited)
+
+    const { state, decision } = decideInitiative(spent, IDLE, at(5_000), middle, mission)
+
+    expect(decision.kind).toBe('turn')
+    expect(state.budget.turns).toBe(spent.budget.turns)
+  })
 })
 
 describe('turn results', () => {

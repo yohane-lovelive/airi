@@ -34,6 +34,8 @@ export { INITIATIVE_RECENT_LINE_COUNT, initiativeNoticeText, SCENE_ANCHOR_TEXT }
 export type { InitiativeNoticeContext, InitiativeScreenContext } from './initiative-notice'
 export { createIntention, INTENTION_LIMITS, openIntentions } from './intentions'
 export type { Intention, IntentionRequest } from './intentions'
+export { drawLineLength, LINE_LENGTH_LIMITS, LINE_LENGTH_TEXT } from './line-length'
+export type { LineLength, LineLengthContext } from './line-length'
 export {
   activeCommentary,
   activeForegroundMission,

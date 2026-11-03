@@ -1,10 +1,12 @@
 import type { InitiativeMode, InitiativeTrigger } from './initiative'
 import type { Intention } from './intentions'
+import type { LineLength } from './line-length'
 import type { SpeechType } from './speech-types'
 import type { Timeline } from './timeline'
 import type { TopicSeed, TopicThread } from './topics'
 
 import { dayPartOf } from './initiative'
+import { LINE_LENGTH_TEXT } from './line-length'
 import { TIMELINE_LIMITS } from './timeline'
 import { TOPIC_LIMITS } from './topics'
 
@@ -78,6 +80,8 @@ export interface InitiativeNoticeContext {
   readonly seeds?: readonly TopicSeed[]
   /** A memory that fits the current topic, for the `recall` speech type. The host recalls it. */
   readonly recallMemory?: string
+  /** How long the line is. The host draws it with `drawLineLength`. */
+  readonly lineLength: LineLength
 }
 
 const TRIGGER_REASONS: Record<InitiativeTrigger, string> = {
@@ -119,7 +123,7 @@ export function initiativeNoticeText(context: InitiativeNoticeContext): string {
   if (context.awayMs !== undefined)
     lines.push(`- The owner was away for: ${durationSince(context.now - context.awayMs, context.now)}.`)
   if (context.mode === 'commentary')
-    lines.push('- Mode: commentary. Keep it to one short sentence.')
+    lines.push('- Mode: commentary of the owner\'s screen.')
   if (context.smallTalkEndsAt !== undefined)
     lines.push(`- Mode: small talk. The owner asked you to keep them company for ${durationSince(context.now, context.smallTalkEndsAt)} more. Talk freely, and keep the talk going.`)
   if (context.speechType)
@@ -155,7 +159,7 @@ export function initiativeNoticeText(context: InitiativeNoticeContext): string {
     lines.push('- Your last lines that you started. Do not repeat their opening or structure:')
     lines.push(...recent.map(line => `  - "${truncate(line, RECENT_LINE_MAX_LENGTH)}"`))
   }
-  lines.push('Keep it short and natural, one or two sentences.')
+  lines.push(`${LINE_LENGTH_TEXT[context.lineLength]} Keep it natural.`)
   lines.push('If you speak, end with <|TOPIC a few words|> that name your topic, in the language of your line. Nobody sees or hears it.')
   return lines.join('\n')
 }

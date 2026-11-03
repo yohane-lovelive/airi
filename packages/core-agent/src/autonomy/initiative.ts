@@ -69,9 +69,16 @@ export interface InitiativeOptions {
   quietUntil?: number
   /**
    * The maximum count of decision turns in one local day. Each turn is one model call, also when the model stays silent.
+   * Only idle speech counts. A mission that the owner started, for example small talk or commentary, has its own limits.
    * @default 200
    */
   dailyTurnBudget: number
+  /**
+   * The owner started a mission that talks, for example small talk or commentary. Its turns do not count toward the
+   * daily budget, and the budget does not hold them.
+   * @default false
+   */
+  missionRunning: boolean
   /**
    * After the model chooses silence, pressure and boredom keep this share.
    * Silence lowers the drive only in part, so the character tries again sooner than after speech.
@@ -117,6 +124,7 @@ const DEFAULT_OPTIONS: InitiativeOptions = {
   thresholdJitter: 0.3,
   ownerGraceMs: 30_000,
   dailyTurnBudget: 200,
+  missionRunning: false,
   silentRetain: 0.5,
   staleSalience: 0.6,
   hintlessShare: 0.25,
@@ -420,7 +428,7 @@ export function decideInitiative(
       ...current,
       inner: { ...current.inner, mood },
       turn,
-      budget: { day: current.budget.day, turns: current.budget.turns + 1 },
+      budget: countTurn(current.budget, options),
     },
     decision: { kind: 'turn', trigger, drive, threshold, ...(speechType ? { speechType } : {}) },
   }
@@ -448,7 +456,7 @@ export function requestRhythmTurn(
     return { state: current, decision: { kind: 'wait', reason } }
 
   return {
-    state: { ...current, turn: { startedAt: time.now, trigger: rhythm }, budget: { day: current.budget.day, turns: current.budget.turns + 1 } },
+    state: { ...current, turn: { startedAt: time.now, trigger: rhythm }, budget: countTurn(current.budget, options) },
     decision: { kind: 'turn', trigger: rhythm, drive: driveOf(current, host).total, threshold: thresholdOf(current.inner, current.jitter ?? 1, time) },
   }
 }
@@ -529,11 +537,16 @@ function waitReason(state: InitiativeState, host: InitiativeHost, time: Initiati
     return 'quiet-hours'
   if (options.quietUntil !== undefined && time.now < options.quietUntil)
     return 'owner-quiet'
-  if (state.budget.turns >= options.dailyTurnBudget)
+  if (!options.missionRunning && state.budget.turns >= options.dailyTurnBudget)
     return 'daily-budget'
   if (time.now < state.refractoryUntil)
     return 'refractory'
   return undefined
+}
+
+/** The budget after one more turn. A turn of a mission does not count. */
+function countTurn(budget: InitiativeState['budget'], options: InitiativeOptions): InitiativeState['budget'] {
+  return options.missionRunning ? budget : { day: budget.day, turns: budget.turns + 1 }
 }
 
 function inQuietHours(minutes: number, range: { startMinutes: number, endMinutes: number }) {

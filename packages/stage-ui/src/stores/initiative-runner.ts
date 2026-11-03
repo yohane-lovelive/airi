@@ -11,6 +11,7 @@ import {
   currentTopicThread,
   decideInitiative,
   decideInterruption,
+  drawLineLength,
   initiativeNoticeText,
   initiativeReadout,
   initiativeTimeFrom,
@@ -341,8 +342,19 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
       ? await recallMemoryOf(sessionId, topics?.thread?.topic ?? screenTimeline?.scene?.text ?? facts.recentLines.at(-1), time.now)
       : undefined
     lastRecalledMemory = recallMemory?.id
+    const mode = state.value?.mode ?? 'idle'
+    // A greeting is a few words. Other lines draw a length, so small talk and calm commentary can talk longer.
+    const lineLength = rhythm
+      ? 'short'
+      : drawLineLength({
+          mode,
+          smallTalk: Boolean(smallTalk),
+          ...(mode === 'commentary' ? { activity: perceptionRunner.activity() } : {}),
+          hasNotes: Boolean(screenTimeline?.notes.length),
+        }, Math.random)
     const text = initiativeNoticeText({
-      mode: state.value?.mode ?? 'idle',
+      mode,
+      lineLength,
       trigger: decision.trigger,
       ...(decision.speechType ? { speechType: decision.speechType } : {}),
       now: time.now,

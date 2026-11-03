@@ -8,6 +8,7 @@ import {
   commentaryIntervalFactor,
   createInitiativeState,
   decideInitiative,
+  drawLineLength,
   EMPTY_TIMELINE,
   initiativeNoticeText,
   initiativeTimeFrom,
@@ -190,6 +191,7 @@ export async function replayRecording(recording: Recording, options: ReplayOptio
     }
     const notice = initiativeNoticeText({
       mode: options.mode,
+      lineLength: drawLineLength({ mode: options.mode, smallTalk: false, activity: detector.activity, hasNotes: timeline.notes.length > 0 }, random),
       trigger: decision.trigger,
       ...(decision.speechType ? { speechType: decision.speechType } : {}),
       now: frame.at,

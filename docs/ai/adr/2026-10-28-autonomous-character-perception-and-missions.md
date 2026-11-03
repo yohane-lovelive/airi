@@ -747,7 +747,7 @@ Step 5 has these parts. The owner added the length and tempo of talk after using
 | 5-1 | Game audio: the capture of one process, the loud sound detector, and a local transcript in the timeline. | Held |
 | 5-2 | Generated motion. | To do |
 | 5-3 | Polish: the defaults of the open work. | To do |
-| 5-4a | The length of a line: a length target for each turn, and a turn budget that counts only idle speech. | To do |
+| 5-4a | The length of a line: a length target for each turn, and a turn budget that counts only idle speech. | Done |
 | 5-4b | The flow of talk: a `NEXT` marker of the model, and the pause after the speech ends. | To do |
 
 Step 5-0 built the reasoning level as follows.
@@ -757,6 +757,14 @@ Step 5-0 built the reasoning level as follows.
 - A request carries an effort with `enabled`. A provider with effort levels sends it, and a provider with only on and off treats every effort as on, so the definitions of the other providers did not change.
 - The OpenAI-compatible provider has a field for the form of the request: nothing, the `thinking` switch, or `reasoning_effort`. Compatible servers differ, and an unknown field can fail a request, so the default sends nothing.
 - The old switch of the settings read on as `medium` and off as `off`, which send the same requests. A notice in the code removes this read later.
+
+Step 5-4a built the length of a line as follows.
+
+- The owner found that every autonomous line closed its topic in about 100 characters, so small talk and commentary stayed shallow. The notice of each turn asked for one or two sentences, and commentary for one short sentence.
+- `drawLineLength` in `core-agent` now draws a length for each turn: short is one sentence, normal is two to four sentences, and long is five to eight sentences, with `<|DELAY 1|>` allowed between thoughts. The notice states the drawn length.
+- Idle speech is short 70% and normal 30% of the time. Small talk is short 20%, normal 50%, and long 30%. Commentary on a busy screen, with an activity of 0.5 or more, is short 80% and normal 20%. In a calm moment it is short 40%, normal 40%, and long 20%, and the long share goes to normal while the timeline holds no notes.
+- A greeting and a welcome back stay short. The replay draws the length with its seeded random source, like the app.
+- The daily turn budget counts only idle speech. Turns of small talk and commentary, which the owner started, neither count nor stop at it. Their own limits hold them: the time limit of the mission and the image budget of commentary.
 The memory ADR has its own steps. They can run beside steps 1 to 4.
 
 ## Work outside the steps

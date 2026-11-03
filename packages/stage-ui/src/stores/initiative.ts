@@ -86,6 +86,8 @@ export const useInitiativeStore = defineStore('initiative', () => {
     const { quietUntil, idleIntervalFactor } = talkControlEffect(talkControl.value, now)
     return {
       dailyTurnBudget: Math.round(clamp(dailyTurnBudget.value, minDailyTurnBudget, maxDailyTurnBudget)),
+      // The owner started small talk or commentary, so its turns stay out of the daily budget of idle speech.
+      missionRunning: smallTalk || foreground.commentaryActivity !== undefined,
       modes: {
         idle: smallTalk
           ? { boredomIntervalMs: SMALL_TALK_LIMITS.boredomIntervalMs * idleIntervalFactor, refractoryMs: SMALL_TALK_LIMITS.refractoryMs }

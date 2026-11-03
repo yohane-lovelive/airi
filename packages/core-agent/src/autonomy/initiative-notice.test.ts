@@ -7,7 +7,7 @@ import { initiativeNoticeText } from './initiative-notice'
 const NOW = Date.UTC(2026, 10, 1, 12, 0)
 
 function context(overrides: Partial<InitiativeNoticeContext> = {}): InitiativeNoticeContext {
-  return { mode: 'idle', trigger: 'boredom', now: NOW, localMinutes: 20 * 60, recentLines: [], ...overrides }
+  return { mode: 'idle', trigger: 'boredom', now: NOW, localMinutes: 20 * 60, recentLines: [], lineLength: 'short', ...overrides }
 }
 
 describe('initiativeNoticeText', () => {
@@ -128,8 +128,13 @@ describe('initiativeNoticeText', () => {
     expect(initiativeNoticeText(context({ mode: 'commentary', speechType: 'recall', recentLines: [long, long, long] })).length).toBeLessThan(1200)
   })
 
-  it('asks for one short sentence in commentary', () => {
-    expect(initiativeNoticeText(context({ mode: 'commentary', trigger: 'event' }))).toContain('Mode: commentary. Keep it to one short sentence.')
+  it('names commentary, and asks for the drawn length instead of a fixed one', () => {
+    const commentary = initiativeNoticeText(context({ mode: 'commentary', trigger: 'event' }))
+    expect(commentary).toContain('Mode: commentary of the owner\'s screen.')
+    expect(commentary).toContain('Length: one short sentence. Keep it natural.')
+    expect(commentary).not.toContain('one or two sentences')
+
+    expect(initiativeNoticeText(context({ lineLength: 'long' }))).toContain('Length: five to eight sentences, a fuller story or thought. You can put <|DELAY 1|> between thoughts.')
   })
 
   it('asks for a greeting that fits the time, and tells how long the owner was away for a welcome back', () => {
