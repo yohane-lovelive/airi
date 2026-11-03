@@ -1,3 +1,6 @@
+export * from './gesture-layer'
+export * from './gesture-match'
+export * from './gestures'
 export * from './pose-applier'
 export * from './procedural'
 export * from './speech-level'

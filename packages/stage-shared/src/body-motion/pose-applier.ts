@@ -18,7 +18,8 @@ export interface PoseBone {
 
 type Quat = readonly [x: number, y: number, z: number, w: number]
 
-function fromEuler({ x, y, z }: BodyRotation): Quat {
+/** A quaternion `[x, y, z, w]` of Euler angles in radians, in the order XYZ, as three.js computes it. */
+export function quaternionFromEuler({ x, y, z }: BodyRotation): Quat {
   const [c1, c2, c3] = [Math.cos(x / 2), Math.cos(y / 2), Math.cos(z / 2)]
   const [s1, s2, s3] = [Math.sin(x / 2), Math.sin(y / 2), Math.sin(z / 2)]
   return [
@@ -77,7 +78,7 @@ export class BodyPoseApplier {
       if (!bone)
         continue
       const rotation = rotations[name]
-      const offset = fromEuler({ x: rotation.x * this.facing, y: rotation.y, z: rotation.z * this.facing })
+      const offset = quaternionFromEuler({ x: rotation.x * this.facing, y: rotation.y, z: rotation.z * this.facing })
       postMultiply(bone, offset)
       this.applied.set(bone, offset)
     }

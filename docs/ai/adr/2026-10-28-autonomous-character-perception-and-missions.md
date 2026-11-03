@@ -520,6 +520,16 @@ Step 4-1 built the procedural layer as follows.
 - Each renderer has the setting "Natural movement", off by default. The VRM setting syncs in the VRM group of the settings sync. MMD settings do not sync, as before.
 - The ADR puts a capability check at load. In step 4-1, the layer checks only its own bones, and a missing bone skips its part. The list of bones and expressions for the prompt comes with step 4-3, which reads it.
 
+Step 4-2 built the library and its playback as follows.
+
+- Eight gestures ship as data in `@proj-airi/stage-shared/body-motion`: nod, tilt the head, wave, shrug, cross the arms, put a hand on the chest, bow, and pump a fist. The keys rotate normalized VRM bones in degrees, and each gesture has English and Japanese tags. The ADR said that the library stores `.vrma` data only. The owner approved data in the code for the built-in gestures, so their license is clear and a review can read them.
+- `useMotionLibraryStore` keeps the library in the IndexedDB store `airi-motions`. A built-in gesture keeps only its use count and whether the owner turned it off. An imported `.vrma` clip keeps its data, its description and tags, its duration, its bones, and whether it moves the legs. Step 4-2 builds the import. Its page in Settings comes with step 4-3.
+- `matchGesture` chooses the clip for the `motion` of a marker. An English tag matches a word and its forms, for example `wave` and `waving`. A Japanese tag is a stem, for example `うなず`, and matches as a part of the text. A tag counts 2 and a description word counts 1, and a clip needs 2. Without a match, only the emotion plays, as before.
+- The ADR says an upper-body layer. A whole upper body sets the arms to their T-pose during a nod, so `GestureLayer` splits the idle into the head, the torso, each arm, and the rest. The parts start together, so they look like one clip. A gesture fades out the idle of only the parts that it moves, for 0.4 seconds, and fades them back when it ends.
+- The layer has no three.js dependency. The VRM renderer and the MMD animation manager give it their mixer. On MMD, a gesture goes through the retarget, and the clip keeps only the rotations of the bones that the gesture keys. The retarget writes every mapped bone, and a bone without a track would take its T-pose.
+- A motion of the whole body still replaces the whole idle, and a gesture waits for none: it is skipped while one plays. An imported clip that moves the legs plays as a motion of the whole body.
+- When a gesture plays on MMD, the motion that the owner mapped to the emotion does not play. The expression still changes. This is how Live2D treats a marker with a motion.
+
 The library:
 
 - IndexedDB keeps one record for each clip. The record holds the `.vrma` data, a description, tags, and the body part (upper body or full body).
@@ -683,7 +693,7 @@ The order follows dependencies. Each step uses the parts of the earlier steps. E
 | 2 | Autonomous talk without the screen: connect the policy core to `notifyConversation`. Add the prompt budget, intentions, owner control, usage by purpose, and the inspector. | Done |
 | 2b | Daily rhythm and small talk: templates as recipes, the `greeting`, `welcome-back`, and `small-talk` templates, topic seeds, and the time of day. Measure variety. | Done. Templates as recipes still wait. |
 | 3 | Perception: the adapters, ring buffer, detectors, frame policies, image budget, recorder, replay, timeline, scene state, `commentary` with interruptions, and `watch`. | Done. |
-| 4 | Motion: the model capability check, the procedural layer, the library with `ACT` markers, expression sync, and the upper-body layer. | In progress: 4-1 is done. |
+| 4 | Motion: the model capability check, the procedural layer, the library with `ACT` markers, expression sync, and the upper-body layer. | In progress: 4-1 and 4-2 are done. |
 | 5 | Generated motion, game audio, recall from memory, and polish. Recall needs the memory ADR. | In progress: recall from memory is done with step M3 of ADR 2026-11-02. |
 
 Step 2 has four parts. Each part is one change.
@@ -714,7 +724,7 @@ Step 4 has three parts. Each part is one change.
 | Part | Content | State |
 | --- | --- | --- |
 | 4-1 | The procedural layer for VRM and MMD models, with the check of its bones. | Done |
-| 4-2 | The library, the match of the `motion` of `ACT` markers, and playback on an upper-body layer. | To do |
+| 4-2 | The library, the match of the `motion` of `ACT` markers, and playback on an upper-body layer. | Done |
 | 4-3 | Expression sync, the list of expressions and motions in the prompt, and the settings page of the library. | To do |
 
 Step 4 does not depend on steps 0 to 3. It comes after them so that the speech output format changes only once.

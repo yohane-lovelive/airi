@@ -45,6 +45,8 @@ const pose = new BodyPoseApplier({ spine, chest, neck, head })
 // Each frame: pose.undo() before the clip runs, then pose.apply(motion.update(delta, input).bones) after it.
 ```
 
+The same entrypoint owns the gestures. `BUILT_IN_GESTURES` holds eight gestures as data, `matchGesture` chooses one for the free-text `motion` of an `ACT` marker, and `GestureLayer` plays a gesture over the parts of the idle that it moves. The layer takes an adapter for the mixer of a renderer, so it needs no three.js dependency.
+
 ## Do not use this package
 
 Keep Electron IPC definitions in the Electron application. Keep UI state and actions in `@proj-airi/stage-ui`. Keep Extension runtime and manifest behavior in `@proj-airi/plugin-sdk`.

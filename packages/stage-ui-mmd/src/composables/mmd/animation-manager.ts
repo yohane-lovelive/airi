@@ -1,9 +1,11 @@
 import type { MMD } from '@moeru/three-mmd'
 import type { AnimationAction, AnimationClip } from 'three'
 
-import { AnimationMixer, LoopOnce, LoopRepeat, Vector3 } from 'three'
+import { GestureLayer } from '@proj-airi/stage-shared/body-motion'
+import { AnimationMixer, AnimationClip as Clip, LoopOnce, LoopRepeat, Vector3 } from 'three'
 
 import { ensureAmmo } from '../../utils/ammo'
+import { mmdGestureGroupOfTrack } from '../../utils/mmd-gestures'
 
 const DEFAULT_CROSSFADE = 0.4
 
@@ -44,9 +46,38 @@ export function createMMDAnimationManager(mmd: MMD, options: MMDAnimationManager
   const mixer = new AnimationMixer(mmd.mesh)
   const registry = new Map<string, AnimationClip>()
   const finishListeners = new Map<AnimationAction, (event: { action: AnimationAction }) => void>()
+  /** The parts of each split clip, so a clip that comes back reuses its actions. */
+  const subclips = new WeakMap<AnimationClip, Map<string, AnimationClip>>()
 
-  let idleAction: AnimationAction | undefined
-  let currentAction: AnimationAction | undefined
+  // The idle plays in parts, so a gesture can take the head or an arm while the rest keeps the idle.
+  const layer = new GestureLayer<AnimationClip, AnimationAction>({
+    trackNames: clip => clip.tracks.map(track => track.name),
+    duration: clip => clip.duration,
+    subclip: (clip, name, keep) => {
+      let parts = subclips.get(clip)
+      if (!parts) {
+        parts = new Map()
+        subclips.set(clip, parts)
+      }
+      let part = parts.get(name)
+      if (!part) {
+        part = new Clip(`${clip.name}:${name}`, clip.duration, clip.tracks.filter(track => keep(track.name)))
+        parts.set(name, part)
+      }
+      return part
+    },
+    groupOfTrack: mmdGestureGroupOfTrack,
+    action: (clip, loop) => {
+      const action = mixer.clipAction(clip)
+      action.setLoop(loop === 'repeat' ? LoopRepeat : LoopOnce, loop === 'repeat' ? Number.POSITIVE_INFINITY : 1)
+      action.clampWhenFinished = loop === 'once'
+      return action
+    },
+  })
+
+  let idleClip: AnimationClip | undefined
+  /** A motion of the whole body that plays instead of the idle. */
+  let oneShot: AnimationAction | undefined
   let initialized = false
   let disposed = false
   let initialization: Promise<void> | undefined
@@ -96,10 +127,9 @@ export function createMMDAnimationManager(mmd: MMD, options: MMDAnimationManager
         mmd.physics?.setGravity?.(new Vector3(0, -gravity, 0))
 
       if (idle) {
-        idleAction = mixer.clipAction(idle)
-        idleAction.setLoop(LoopRepeat, Number.POSITIVE_INFINITY).play()
+        idleClip = idle
+        layer.setIdle(idle, 0)
       }
-      currentAction = idleAction
       initialized = true
     })()
 
@@ -118,22 +148,15 @@ export function createMMDAnimationManager(mmd: MMD, options: MMDAnimationManager
 
   /** Cross-fades back to the persistent idle loop. */
   function playIdle(crossfade = DEFAULT_CROSSFADE): void {
-    if (currentAction)
-      removeFinishListener(currentAction)
-
     // With no configured idle, fade the active motion out so the skeleton
     // returns to its rest pose instead of clamping on the final keyframe.
-    if (!idleAction) {
-      currentAction?.fadeOut(crossfade)
-      currentAction = undefined
-      return
+    if (oneShot) {
+      removeFinishListener(oneShot)
+      oneShot.fadeOut(crossfade)
+      oneShot = undefined
     }
-
-    if (currentAction && currentAction !== idleAction)
-      currentAction.fadeOut(crossfade)
-    // A one-shot may reuse the same action, so restore its looping contract.
-    idleAction.reset().setLoop(LoopRepeat, Number.POSITIVE_INFINITY).setEffectiveWeight(1).fadeIn(crossfade).play()
-    currentAction = idleAction
+    if (idleClip)
+      layer.fadeIdleIn(crossfade)
   }
 
   /**
@@ -148,7 +171,12 @@ export function createMMDAnimationManager(mmd: MMD, options: MMDAnimationManager
       console.warn(`[mmd] playAction skipped: "${name}" is not registered`)
       return false
     }
+    playClip(clip, actionOptions)
+    return true
+  }
 
+  /** Plays a motion of the whole body that the owner did not register, for example an imported `.vrma` clip. */
+  function playClip(clip: AnimationClip, actionOptions: PlayActionOptions = {}): void {
     const loop = actionOptions.loop ?? false
     const crossfade = actionOptions.crossfade ?? DEFAULT_CROSSFADE
     const action = mixer.clipAction(clip)
@@ -158,18 +186,19 @@ export function createMMDAnimationManager(mmd: MMD, options: MMDAnimationManager
     action.setEffectiveWeight(1)
     action.fadeIn(crossfade).play()
 
-    if (currentAction && currentAction !== action) {
-      removeFinishListener(currentAction)
-      currentAction.fadeOut(crossfade)
+    if (oneShot && oneShot !== action) {
+      removeFinishListener(oneShot)
+      oneShot.fadeOut(crossfade)
     }
-    currentAction = action
+    else if (!oneShot) {
+      layer.fadeIdleOut(crossfade)
+    }
+    oneShot = action
 
     if (loop)
       removeFinishListener(action)
     else
       revertToIdleOnFinish(action)
-
-    return true
   }
 
   /**
@@ -184,24 +213,26 @@ export function createMMDAnimationManager(mmd: MMD, options: MMDAnimationManager
       return false
     }
 
-    const action = mixer.clipAction(clip)
-    action.reset()
-    action.setLoop(LoopRepeat, Number.POSITIVE_INFINITY)
-    action.clampWhenFinished = false
-    action.setEffectiveWeight(1)
-    action.fadeIn(crossfade).play()
-
-    const previousIdle = idleAction
-    idleAction = action
-    if (currentAction && currentAction !== action) {
-      removeFinishListener(currentAction)
-      currentAction.fadeOut(crossfade)
+    if (oneShot) {
+      removeFinishListener(oneShot)
+      oneShot.fadeOut(crossfade)
+      oneShot = undefined
     }
-    else if (previousIdle && previousIdle !== action) {
-      previousIdle.fadeOut(crossfade)
-    }
-    currentAction = action
+    idleClip = clip
+    layer.setIdle(clip, crossfade)
     return true
+  }
+
+  /**
+   * Plays a gesture once over the parts of the body that it moves, while the idle keeps the rest. A motion of the
+   * whole body wins, so a gesture waits for none and is skipped while one plays.
+   *
+   * @returns `false` when a motion of the whole body plays, or when the clip moves no part that a gesture can take.
+   */
+  function playGesture(clip: AnimationClip, crossfade = DEFAULT_CROSSFADE): boolean {
+    if (oneShot)
+      return false
+    return layer.playGesture(clip, crossfade)
   }
 
   function setPhysicsEnabled(enabled: boolean): void {
@@ -225,6 +256,7 @@ export function createMMDAnimationManager(mmd: MMD, options: MMDAnimationManager
   function update(delta: number): void {
     if (!initialized || disposed)
       return
+    layer.update(delta)
     mmd.updateWithMixer(delta, mixer, {
       grant: grantEnabled,
       ik: ikEnabled,
@@ -240,12 +272,13 @@ export function createMMDAnimationManager(mmd: MMD, options: MMDAnimationManager
     for (const listener of finishListeners.values())
       mixer.removeEventListener('finished', listener)
     finishListeners.clear()
+    layer.dispose()
     mixer.stopAllAction()
     mixer.uncacheRoot(mmd.mesh)
     mmd.dispose()
     registry.clear()
-    idleAction = undefined
-    currentAction = undefined
+    idleClip = undefined
+    oneShot = undefined
     initialized = false
   }
 
@@ -255,6 +288,8 @@ export function createMMDAnimationManager(mmd: MMD, options: MMDAnimationManager
     availableClips,
     playIdle,
     playAction,
+    playClip,
+    playGesture,
     setIdleMotion,
     setPhysicsEnabled,
     setGravity,

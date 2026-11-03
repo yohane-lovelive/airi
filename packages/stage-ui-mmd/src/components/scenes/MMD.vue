@@ -9,10 +9,12 @@
   * contract Stage.vue expects from every renderer.
 */
 
-import type { Bone, SkinnedMesh, Texture } from 'three'
+import type { GestureClipSource } from '@proj-airi/stage-shared/body-motion'
+import type { AnimationClip, Bone, SkinnedMesh, Texture } from 'three'
 
 import type { GazeOffset, MMDAnimationManager, MorphController } from '../../composables/mmd'
 import type { ResolvedMMDModel } from '../../utils/mmd-loader'
+import type { MMDRig } from '../../utils/vrma-retarget'
 
 import { errorMessageFrom } from '@moeru/std'
 import { coverRect } from '@proj-airi/stage-shared'
@@ -56,6 +58,7 @@ import {
 import { DEFAULT_IDLE_MOTION } from '../../constants/actions'
 import { Emotion, EMOTION_VALUES } from '../../constants/emotions'
 import { useMMD } from '../../stores/mmd'
+import { mmdGestureClip, vrmAnimationOfGesture } from '../../utils/mmd-gestures'
 import { resolveMMDGraphics, resolveMMDLighting } from '../../utils/mmd-graphics'
 import { loadMMDModelFromSource } from '../../utils/mmd-loader'
 import {
@@ -148,6 +151,10 @@ let directionalLight: DirectionalLight | undefined
 let physicalLighting: MMDPhysicalLighting | undefined
 let modelGroup: Group | undefined
 let resolved: ResolvedMMDModel | undefined
+/** The rest pose of the current model, read at load, for the retarget of `.vrma` motions and gestures. */
+let rig: MMDRig | undefined
+/** Gesture clips retargeted to the current model, by gesture id. */
+const gestureClips = new Map<string, AnimationClip>()
 let mesh: SkinnedMesh | undefined
 let morphs: MorphController | undefined
 let animation: MMDAnimationManager | undefined
@@ -553,6 +560,8 @@ function disposeModel() {
   }
   resolved?.dispose()
   registeredMotions.clear()
+  gestureClips.clear()
+  rig = undefined
   modelGroup = undefined
   focusBone = undefined
   mesh = undefined
@@ -675,7 +684,8 @@ async function loadModel(src: string) {
     const iks = resolved.mmd.pmx.bones.flatMap((bone, index) => bone.ik
       ? [{ bone: index, effector: bone.ik.target, links: bone.ik.links.map(link => link.target) }]
       : [])
-    const rig = mmdRigFromMesh(mesh, iks)
+    const restRig = mmdRigFromMesh(mesh, iks)
+    rig = restRig
 
     modelGroup = new Group()
     modelGroup.add(mesh)
@@ -703,7 +713,7 @@ async function loadModel(src: string) {
     if (generation !== loadGeneration)
       return
     // No idle VMD ships, so the VRM idle loop plays until the owner chooses one.
-    void registerDefaultIdle(rig)
+    void registerDefaultIdle(restRig)
     animation.setIKEnabled(ikEnabled.value)
     animation.setGrantEnabled(grantEnabled.value)
     animation.setGravity(physicsGravity.value)
@@ -743,14 +753,57 @@ function applyRenderMode() {
   applyMMDMaterialOpacity(modelGroup, materialOpacity.value)
 }
 
-/** Plays the gesture motion mapped to an emotion, if the model has one. */
-function setEmotion(emotion: string, intensity = 1) {
+/**
+ * Shows an emotion, and plays the gesture motion mapped to it, if the model has one. With `withMotion` false, only the
+ * expression changes, because a gesture of the motion library already plays.
+ */
+function setEmotion(emotion: string, intensity = 1, withMotion = true) {
   const value = EMOTION_VALUES.includes(emotion as Emotion) ? emotion as Emotion : Emotion.Neutral
   emote?.setEmotion(value, intensity)
 
   const actionName = emotionActionMap.value[value]
-  if (actionName)
+  if (actionName && withMotion)
     animation?.playAction(actionName, { loop: false })
+}
+
+async function loadVRMAnimationData(vrma: ArrayBuffer) {
+  const url = URL.createObjectURL(new Blob([vrma]))
+  try {
+    return await loadVRMAnimationFile(url)
+  }
+  finally {
+    URL.revokeObjectURL(url)
+  }
+}
+
+/**
+ * Plays a gesture of the motion library. A gesture of the upper body takes only the parts that it moves, and a `full`
+ * clip plays instead of the idle.
+ *
+ * @returns false when the model cannot play it, for example without the bones, or while a motion of the whole body plays.
+ */
+async function playGesture(source: GestureClipSource): Promise<boolean> {
+  const owner = resolved
+  if (!animation || !rig)
+    return false
+  let clip = gestureClips.get(source.id)
+  if (!clip) {
+    const vrmAnimation = source.kind === 'built-in' ? vrmAnimationOfGesture(source.gesture) : await loadVRMAnimationData(source.vrma)
+    // The model can change while the file loads, and the clip belongs to the earlier model then.
+    if (!vrmAnimation || owner !== resolved || !rig)
+      return false
+    clip = source.part === 'full'
+      ? retargetVRMAnimationToMMD(vrmAnimation, rig, { name: source.id })
+      : mmdGestureClip(vrmAnimation, rig, source.id)
+    gestureClips.set(source.id, clip)
+  }
+  if (!animation)
+    return false
+  if (source.part === 'full') {
+    animation.playClip(clip, { loop: false })
+    return true
+  }
+  return animation.playGesture(clip)
 }
 
 let resizeObserver: ResizeObserver | undefined
@@ -892,6 +945,7 @@ defineExpose({
   canvasElement,
   captureFrame,
   setEmotion,
+  playGesture,
   listMorphs: () => morphs?.availableMorphs ?? [],
   listMotions: () => animation?.availableClips() ?? [],
 })

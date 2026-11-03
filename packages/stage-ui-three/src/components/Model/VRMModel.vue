@@ -7,6 +7,7 @@
 */
 
 import type { VRM } from '@pixiv/three-vrm'
+import type { GestureClipSource } from '@proj-airi/stage-shared/body-motion'
 import type {
   Group,
   Material,
@@ -76,6 +77,7 @@ import {
 } from '../../composables/vrm/animation'
 import { loadVrm } from '../../composables/vrm/core'
 import { useVRMEmote } from '../../composables/vrm/expression'
+import { existingVrmGestureLayer, playVrmGesture, vrmGestureLayer } from '../../composables/vrm/gesture-layer'
 import { createVrmInteractionColliders } from '../../composables/vrm/interaction'
 import { resolveInternalVrmHooks } from '../../composables/vrm/internal-hooks'
 import { useVRMLipSync } from '../../composables/vrm/lip-sync'
@@ -514,6 +516,8 @@ function bindManagedVrmInstanceRenderLoop() {
     // The clip writes only the bones that it has tracks for, so the offsets of the last frame leave first.
     bodyPose?.undo()
     const animationMixerMs = measureFrameStep(tracingEnabled, () => {
+      if (vrmAnimationMixer.value)
+        existingVrmGestureLayer(vrmAnimationMixer.value)?.update(delta)
       vrmAnimationMixer.value?.update(delta)
     })
     const activeVrm = vrm.value
@@ -909,7 +913,8 @@ async function loadModel() {
 
     // play animation
     nextVrmAnimationMixer = new AnimationMixer(_vrm.scene)
-    nextVrmAnimationMixer.clipAction(clip).play()
+    // The idle plays in parts, so a gesture can take the head or an arm while the rest keeps the idle.
+    vrmGestureLayer(_vrm, nextVrmAnimationMixer).setIdle(clip, 0)
 
     nextVrmEmote = useVRMEmote(_vrm)
 
@@ -1176,6 +1181,12 @@ defineExpose({
   getInteractionColliders: () => interactionColliders.value?.colliders ?? [],
   setExpression(expression: string, intensity = 1) {
     vrmEmote.value?.setEmotionWithResetAfter(expression, 3000, intensity)
+  },
+  /** Plays a gesture of the motion library. Resolves to false when the model cannot play it. */
+  async playGesture(source: GestureClipSource) {
+    const activeVrm = vrm.value
+    const mixer = vrmAnimationMixer.value
+    return !!activeVrm && !!mixer && await playVrmGesture(activeVrm, mixer, source)
   },
   // NOTICE: This runtime frame hook is intentionally separate from internal VRM model hooks.
   // External callers use it for live pose/tracking input; internal hooks remain reserved for

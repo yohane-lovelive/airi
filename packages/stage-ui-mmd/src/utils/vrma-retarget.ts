@@ -108,6 +108,18 @@ function buildHumanBones(): Map<VRMHumanBoneName, HumanBoneSpec> {
 
 const HUMAN_BONES = buildHumanBones()
 
+const HUMAN_BONE_OF_MMD = new Map([...HUMAN_BONES].flatMap(([human, spec]) => spec.mmd.map(name => [name, human] as const)))
+
+/** The VRM humanoid bone that a standard MMD bone stands for, for example `head` for `頭`. */
+export function humanBoneOfMMDBone(name: string): VRMHumanBoneName | undefined {
+  return HUMAN_BONE_OF_MMD.get(name)
+}
+
+/** The standard MMD bones that a VRM humanoid bone can retarget to, for example `左腕` for `leftUpperArm`. */
+export function mmdBoneNamesOfHumanBone(name: VRMHumanBoneName): readonly string[] {
+  return HUMAN_BONES.get(name)?.mmd ?? []
+}
+
 /** VRM bones in parent-first order. */
 const HUMAN_BONE_ORDER: VRMHumanBoneName[] = (() => {
   const order: VRMHumanBoneName[] = []

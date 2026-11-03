@@ -44,6 +44,7 @@ import { useChatSessionStore } from '../../stores/chat/session-store'
 import { useSharedLive2DExpressionPreview } from '../../stores/live2d'
 import { useAiriCardStore } from '../../stores/modules/airi-card'
 import { useSpeechStore } from '../../stores/modules/speech'
+import { useMotionLibraryStore } from '../../stores/motion-library'
 import { useSettingsPresenceBubble } from '../../stores/presence-bubble'
 import { useSettings } from '../../stores/settings'
 import { useSettingsStageModel } from '../../stores/settings/stage-model'
@@ -299,7 +300,8 @@ const live2d = createLive2D({
 })
 useSharedLive2DExpressionPreview(live2d, selectedCharacterId, () => selectedAvatarModel.value?.id)
 
-const emotionsQueue = createQueue<EmotionPayload>({
+/** `gesturePlayed`: a gesture of the motion library already plays for the same marker. */
+const emotionsQueue = createQueue<EmotionPayload & { gesturePlayed?: boolean }>({
   handlers: [
     async (ctx) => {
       if (stageModelRenderer.value === 'vrm') {
@@ -320,13 +322,33 @@ const emotionsQueue = createQueue<EmotionPayload>({
         tachieSceneRef.value?.setEmotion(ctx.data.name, ctx.data.intensity)
       }
       else if (stageModelRenderer.value === 'mmd') {
-        mmdSceneRef.value?.setEmotion(ctx.data.name, ctx.data.intensity)
+        mmdSceneRef.value?.setEmotion(ctx.data.name, ctx.data.intensity, !ctx.data.gesturePlayed)
       }
     },
   ],
 })
 
 const streamingControl = useLlmStreamingControlStore()
+const motionLibrary = useMotionLibraryStore()
+
+/**
+ * Plays the gesture of the motion library that fits the free-text `motion` of an `ACT` marker, on a VRM or MMD model.
+ *
+ * @returns whether a gesture plays.
+ */
+async function playLibraryGesture(motion: string) {
+  await motionLibrary.ready()
+  const entry = motionLibrary.choose(motion)
+  const source = entry && await motionLibrary.sourceOf(entry)
+  if (!entry || !source)
+    return false
+  const played = stageModelRenderer.value === 'vrm'
+    ? await vrmViewerRef.value?.playGesture(source)
+    : await mmdSceneRef.value?.playGesture(source)
+  if (played)
+    void motionLibrary.recordUse(entry.id)
+  return !!played
+}
 
 function toStageEmotionPayload(payload: { name: string, intensity: number }): EmotionPayload | undefined {
   switch (payload.name) {
@@ -357,6 +379,10 @@ chatHookCleanups.push(streamingControl.onSignal(async (signal) => {
   if (signal.type === 'act') {
     const act = normalizeActPayload(signal.payload)
     let explicitLive2DMotion = false
+    let gesturePlayed = false
+
+    if (act.motion && (stageModelRenderer.value === 'vrm' || stageModelRenderer.value === 'mmd'))
+      gesturePlayed = await playLibraryGesture(act.motion)
 
     if (stageModelRenderer.value === 'live2d') {
       if (act.motion) {
@@ -379,7 +405,7 @@ chatHookCleanups.push(streamingControl.onSignal(async (signal) => {
 
       // eslint-disable-next-line no-console
       console.debug('emotion detected', emotion)
-      emotionsQueue.enqueue(emotion)
+      emotionsQueue.enqueue({ ...emotion, gesturePlayed })
     }
     return
   }
