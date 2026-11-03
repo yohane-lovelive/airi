@@ -74,6 +74,7 @@ import { useMissionsStore } from './missions'
 import { useAiriCardStore } from './modules/airi-card'
 import { useAutonomousArtistryStore } from './modules/artistry-autonomous'
 import { useConsciousnessStore } from './modules/consciousness'
+import { useConsciousnessSettingsStore } from './modules/consciousness-settings'
 import { useHearingStore } from './modules/hearing'
 import { useStickersStore } from './modules/stickers'
 import { useVisionStore } from './modules/vision'
@@ -1449,7 +1450,8 @@ export const useChatStore = defineStore('chat', () => {
     return {
       providerId,
       supportsAudioInput: await supportsAudioInput(providerId, modelId, chatProvider.generation(modelId)),
-      supportsVisionInput: selectedModel?.metadata?.abilities?.vision === true,
+      // The vision module decides with the same choice, so a model that reads images gets them and no description.
+      supportsVisionInput: useConsciousnessSettingsStore().readsImages(providerId, modelId, selectedModel?.metadata?.abilities?.vision),
       resolveStep,
       signal,
       model: modelId,

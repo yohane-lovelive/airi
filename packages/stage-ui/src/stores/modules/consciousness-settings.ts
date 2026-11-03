@@ -1,7 +1,9 @@
 import type { ChatRequestOptions } from '@proj-airi/provider-inference'
 import type {} from 'pinia-plugin-synced'
+import type { InferOutput } from 'valibot'
 
 import { defineStore } from 'pinia'
+import { picklist, record, safeParse, string } from 'valibot'
 import { shallowRef } from 'vue'
 
 /**
@@ -17,6 +19,32 @@ export type AutonomousReasoningLevel = ReasoningLevel | 'same'
 
 /** Which turns a request is for. Autonomous turns are small talk, commentary, and idle speech. */
 export type ReasoningUse = 'reply' | 'autonomous'
+
+/**
+ * Whether a chat model reads images, as the owner set it. `catalog` follows the model list of the provider. Many lists
+ * leave image input out, for example OpenAI-compatible servers, so the owner can say it.
+ */
+export type ImageInputChoice = 'catalog' | 'reads' | 'no-images'
+
+/** The key of a model in the image input settings. */
+function imageInputKey(provider: string, model: string) {
+  return `${provider}/${model}`
+}
+
+const ImageInputSchema = record(string(), picklist(['reads', 'no-images']))
+
+function loadImageInput(): InferOutput<typeof ImageInputSchema> {
+  if (typeof localStorage === 'undefined')
+    return {}
+  try {
+    const parsed = safeParse(ImageInputSchema, JSON.parse(localStorage.getItem('settings/consciousness/image-input') ?? '{}'))
+    return parsed.success ? parsed.output : {}
+  }
+  catch {
+    // A broken value of an earlier version reads as no choices.
+    return {}
+  }
+}
 
 function loadEnabled(key: string) {
   // Non-renderer runtimes have no durable settings owner. They use the product
@@ -81,6 +109,7 @@ export const useConsciousnessSettingsStore = defineStore('consciousness-settings
   // durable value, so a follower cannot persist an uncommitted proposal.
   const reasoningLevel = shallowRef<ReasoningLevel>(loadReplyLevel())
   const autonomousReasoningLevel = shallowRef<AutonomousReasoningLevel>(loadLevel('autonomous-reasoning-level', [...REASONING_LEVELS, 'same'] as const) ?? 'same')
+  const imageInput = shallowRef(loadImageInput())
   const temperatureEnabled = shallowRef(loadEnabled('temperature-enabled'))
   const topPEnabled = shallowRef(loadEnabled('top-p-enabled'))
 
@@ -92,6 +121,31 @@ export const useConsciousnessSettingsStore = defineStore('consciousness-settings
   async function setAutonomousReasoningLevel(value: AutonomousReasoningLevel) {
     autonomousReasoningLevel.value = value
     persistLevel('autonomous-reasoning-level', value)
+  }
+
+  /** Sets whether a model reads images. `catalog` removes the choice of the owner. */
+  async function setImageInput(provider: string, model: string, choice: ImageInputChoice) {
+    const { [imageInputKey(provider, model)]: _old, ...rest } = imageInput.value
+    imageInput.value = choice === 'catalog' ? rest : { ...rest, [imageInputKey(provider, model)]: choice }
+    if (typeof localStorage !== 'undefined')
+      localStorage.setItem('settings/consciousness/image-input', JSON.stringify(imageInput.value))
+  }
+
+  /** The choice of the owner for a model, or `catalog` without one. */
+  function imageInputChoiceOf(provider: string, model: string): ImageInputChoice {
+    return imageInput.value[imageInputKey(provider, model)] ?? 'catalog'
+  }
+
+  /**
+   * Whether a model reads images: the choice of the owner, or else the model list of the provider.
+   *
+   * @param provider The chat provider of the model.
+   * @param model The id of the model.
+   * @param catalogVision What the model list says, or undefined when it says nothing.
+   */
+  function readsImages(provider: string, model: string, catalogVision: boolean | undefined) {
+    const choice = imageInputChoiceOf(provider, model)
+    return choice === 'catalog' ? catalogVision === true : choice === 'reads'
   }
 
   async function setTemperatureEnabled(value: boolean) {
@@ -112,6 +166,9 @@ export const useConsciousnessSettingsStore = defineStore('consciousness-settings
   async function resetState() {
     await setReasoningLevel('off')
     await setAutonomousReasoningLevel('same')
+    imageInput.value = {}
+    if (typeof localStorage !== 'undefined')
+      localStorage.setItem('settings/consciousness/image-input', '{}')
     await setTemperatureEnabled(false)
     await setTopPEnabled(false)
   }
@@ -119,10 +176,14 @@ export const useConsciousnessSettingsStore = defineStore('consciousness-settings
   return {
     reasoningLevel,
     autonomousReasoningLevel,
+    imageInput,
     temperatureEnabled,
     topPEnabled,
     setReasoningLevel,
     setAutonomousReasoningLevel,
+    setImageInput,
+    imageInputChoiceOf,
+    readsImages,
     setTemperatureEnabled,
     setTopPEnabled,
     levelFor,
@@ -130,7 +191,7 @@ export const useConsciousnessSettingsStore = defineStore('consciousness-settings
   }
 }, {
   synced: {
-    actions: ['resetState', 'setReasoningLevel', 'setAutonomousReasoningLevel', 'setTemperatureEnabled', 'setTopPEnabled'],
+    actions: ['resetState', 'setReasoningLevel', 'setAutonomousReasoningLevel', 'setImageInput', 'setTemperatureEnabled', 'setTopPEnabled'],
     state: true,
   },
 })

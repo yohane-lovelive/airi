@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { AutonomousReasoningLevel, ReasoningLevel } from '@proj-airi/stage-ui/stores/modules/consciousness-settings'
+import type { AutonomousReasoningLevel, ImageInputChoice, ReasoningLevel } from '@proj-airi/stage-ui/stores/modules/consciousness-settings'
 
 import { RadioCardManySelect, RadioCardSimple } from '@proj-airi/stage-ui/components'
 import { useAnalytics } from '@proj-airi/stage-ui/composables'
@@ -86,6 +86,29 @@ async function updateReasoningLevel(value: ReasoningLevel | undefined) {
 async function updateAutonomousReasoningLevel(value: AutonomousReasoningLevel | undefined) {
   if (value)
     await consciousnessSettingsStore.setAutonomousReasoningLevel(value)
+}
+
+const IMAGE_INPUT_KEY = 'settings.pages.modules.consciousness.sections.section.model-options.image-input'
+
+/** What the model list of the provider says about image input, for the label of the default choice. */
+const catalogImageInput = computed(() => {
+  const vision = providerModels.value.find(model => model.id === activeModel.value)?.metadata?.abilities?.vision
+  return vision === true ? 'reads' : vision === false ? 'no-images' : 'unknown'
+})
+
+const imageInputOptions = computed(() => [
+  { label: t(`${IMAGE_INPUT_KEY}.options.catalog`, { catalog: t(`${IMAGE_INPUT_KEY}.catalog.${catalogImageInput.value}`) }), value: 'catalog' as const },
+  { label: t(`${IMAGE_INPUT_KEY}.options.reads`), value: 'reads' as const },
+  { label: t(`${IMAGE_INPUT_KEY}.options.no-images`), value: 'no-images' as const },
+])
+
+const imageInputChoice = computed(() => activeProvider.value && activeModel.value
+  ? consciousnessSettingsStore.imageInputChoiceOf(activeProvider.value, activeModel.value)
+  : 'catalog')
+
+async function updateImageInput(value: ImageInputChoice | undefined) {
+  if (value && activeProvider.value && activeModel.value)
+    await consciousnessSettingsStore.setImageInput(activeProvider.value, activeModel.value, value)
 }
 
 async function updateTemperatureEnabled(value: boolean) {
@@ -342,6 +365,13 @@ async function updateTopPEnabled(value: boolean) {
           @update:model-value="updateAutonomousReasoningLevel"
         />
       </template>
+      <FieldSelect
+        :model-value="imageInputChoice"
+        :options="imageInputOptions"
+        :label="t(`${IMAGE_INPUT_KEY}.label`)"
+        :description="t(`${IMAGE_INPUT_KEY}.description`)"
+        @update:model-value="updateImageInput"
+      />
     </section>
   </SettingsCard>
 

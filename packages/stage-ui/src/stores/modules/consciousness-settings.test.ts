@@ -57,4 +57,30 @@ describe('consciousness settings store', () => {
     expect(chatRequestOptionsOf('off')).toEqual({ reasoning: 'disabled' })
     expect(chatRequestOptionsOf('low')).toEqual({ reasoning: 'enabled', effort: 'low' })
   })
+
+  it('follows the model list until the owner says whether a model reads images', async () => {
+    const store = useConsciousnessSettingsStore()
+
+    expect(store.readsImages('openai-compatible', 'deepseek-v4.1-flash', undefined)).toBe(false)
+    expect(store.readsImages('openai', 'gpt-5.1', true)).toBe(true)
+
+    await store.setImageInput('openai-compatible', 'deepseek-v4.1-flash', 'reads')
+    await store.setImageInput('openai', 'gpt-5.1', 'no-images')
+    expect(store.readsImages('openai-compatible', 'deepseek-v4.1-flash', undefined)).toBe(true)
+    expect(store.readsImages('openai', 'gpt-5.1', true)).toBe(false)
+    expect(JSON.parse(localStorage.getItem('settings/consciousness/image-input')!)).toEqual({ 'openai-compatible/deepseek-v4.1-flash': 'reads', 'openai/gpt-5.1': 'no-images' })
+
+    await store.setImageInput('openai', 'gpt-5.1', 'catalog')
+    expect(store.imageInputChoiceOf('openai', 'gpt-5.1')).toBe('catalog')
+    expect(store.readsImages('openai', 'gpt-5.1', true)).toBe(true)
+  })
+
+  it('reads the stored choices, and ignores a broken value', () => {
+    localStorage.setItem('settings/consciousness/image-input', JSON.stringify({ 'a/b': 'reads', 'c/d': 'maybe' }))
+    expect(useConsciousnessSettingsStore().imageInputChoiceOf('a', 'b')).toBe('catalog')
+
+    setActivePinia(createPinia())
+    localStorage.setItem('settings/consciousness/image-input', JSON.stringify({ 'a/b': 'reads' }))
+    expect(useConsciousnessSettingsStore().imageInputChoiceOf('a', 'b')).toBe('reads')
+  })
 })

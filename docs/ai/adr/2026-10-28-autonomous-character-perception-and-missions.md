@@ -86,6 +86,7 @@ The owner usually uses one device at a time. When two devices are open, one devi
 - Reasoning adds delay. The ADR first put commentary at the `low` effort. Step 5-0 lets the owner choose the reasoning level of replies and of autonomous speech instead.
 - The owner can change the model at any time. Memory is text, so a change of model keeps all memories.
 - A model without image input uses the vision module as a fallback. In that case the quality of commentary is lower.
+- A model list can leave image input out, for example the one of an OpenAI-compatible server. A live check on 2026-11-04 found that every frame of an autonomous turn then went through the vision module first, which took 12 to 31 seconds while the reply took about 3. The owner can now set image input for each model in the consciousness settings: the model list, reads images, or no images. The chat store and the vision module read the same choice. The choice stays on the device, like the reasoning levels.
 - A model without tool calls cannot create missions, write timeline notes, or answer watch checks.
 - The web app needs a proxy for OpenCode Go, because of CORS. The dev server has one. A production build needs its own solution.
 - A realtime model that answers with audio, such as Gemini Live, is out of scope.

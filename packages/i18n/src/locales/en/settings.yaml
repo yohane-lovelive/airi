@@ -878,6 +878,17 @@ pages:
                 medium: Medium
                 high: High
               required-description: This model requires Thinking.
+            image-input:
+              label: Image input
+              description: Whether this model reads images itself. When it does not, the vision module describes each image first, which takes several seconds. Many model lists leave this out, for example on OpenAI-compatible servers.
+              catalog:
+                reads: reads images
+                no-images: no images
+                unknown: not listed
+              options:
+                catalog: 'Model list ({catalog})'
+                reads: Reads images
+                no-images: No images
               provider-default-description: AIRI has no reasoning settings for this model. OpenRouter applies its default.
       title: Consciousness
     description: Thinking, vision, speech synthesis, gaming, etc.

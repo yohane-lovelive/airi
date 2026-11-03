@@ -801,6 +801,17 @@ pages:
                 medium: 中
                 high: 高
               required-description: このモデルでは思考機能が必須です。
+            image-input:
+              label: 画像の入力
+              description: このモデルが画像を自分で読めるかどうかです。読めないときは、視覚モジュールが先に各画像を説明するので、数秒かかります。OpenAI 互換のサーバーなど、多くのモデル一覧はこれを載せていません。
+              catalog:
+                reads: 画像を読める
+                no-images: 画像なし
+                unknown: 記載なし
+              options:
+                catalog: 'モデル一覧に従う（{catalog}）'
+                reads: 画像を読める
+                no-images: 画像を読めない
               provider-default-description: AIRI にはこのモデルの推論設定がありません。OpenRouter の初期設定が適用されます。
       title: 意識
     description: 思考、視覚、音声合成、ゲームなど。

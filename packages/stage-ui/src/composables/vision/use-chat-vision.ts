@@ -1,6 +1,7 @@
 import type { DescribeToolImage } from '../../stores/ai/chat-llm/tool-images'
 
 import { useConsciousnessStore } from '../../stores/modules/consciousness'
+import { useConsciousnessSettingsStore } from '../../stores/modules/consciousness-settings'
 import { useVisionStore } from '../../stores/modules/vision'
 import { useVisionInference } from './use-vision-inference'
 
@@ -16,12 +17,17 @@ import { useVisionInference } from './use-vision-inference'
  */
 export function useChatVision() {
   const consciousnessStore = useConsciousnessStore()
+  const consciousnessSettings = useConsciousnessSettingsStore()
   const visionStore = useVisionStore()
   const { runVisionInference } = useVisionInference()
 
-  /** Whether the catalog of the chat provider declares image input for the model. Most catalogs omit it. */
+  /**
+   * Whether the chat model reads images: the choice of the owner, or else the catalog of the chat provider. Most
+   * catalogs omit image input, so a model of an OpenAI-compatible server needs the choice of the owner.
+   */
   function declaresImageInput(model: string) {
-    return consciousnessStore.providerModels.find(candidate => candidate.id === model)?.metadata?.abilities?.vision === true
+    const catalogVision = consciousnessStore.providerModels.find(candidate => candidate.id === model)?.metadata?.abilities?.vision
+    return consciousnessSettings.readsImages(consciousnessStore.activeProvider, model, catalogVision)
   }
 
   function needsVisionModel(model: string) {
