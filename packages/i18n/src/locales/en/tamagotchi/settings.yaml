@@ -137,6 +137,7 @@ devtools:
         budget: 'Tries today: {turns} of {limit}'
         refractory: 'Rest left: {seconds} s'
         recent-types: 'Recent speech types: {types}'
+        follow-up: 'Next: {kind} in {seconds} s (continuations: {count})'
       intentions: Open intentions
       missions: Active missions
       until: until {time}

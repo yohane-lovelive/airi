@@ -88,6 +88,8 @@ export const useInitiativeStore = defineStore('initiative', () => {
       dailyTurnBudget: Math.round(clamp(dailyTurnBudget.value, minDailyTurnBudget, maxDailyTurnBudget)),
       // The owner started small talk or commentary, so its turns stay out of the daily budget of idle speech.
       missionRunning: smallTalk || foreground.commentaryActivity !== undefined,
+      // How many lines can go on without an owner message: small talk talks the longest, idle speech the least.
+      maxContinuations: smallTalk ? 3 : foreground.commentaryActivity !== undefined ? 2 : 1,
       modes: {
         idle: smallTalk
           ? { boredomIntervalMs: SMALL_TALK_LIMITS.boredomIntervalMs * idleIntervalFactor, refractoryMs: SMALL_TALK_LIMITS.refractoryMs }

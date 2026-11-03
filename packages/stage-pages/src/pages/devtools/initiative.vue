@@ -183,6 +183,9 @@ function timeLabel(epochMs: number) {
           {{ t(`${KEY}.pace.refractory`, { seconds: Math.ceil(readout.refractoryLeftMs / 1_000) }) }}
         </li>
         <li>{{ t(`${KEY}.pace.recent-types`, { types: readout.recentTypes.join(', ') || '-' }) }}</li>
+        <li v-if="readout.followUp">
+          {{ t(`${KEY}.pace.follow-up`, { kind: readout.followUp.kind, seconds: Math.ceil(readout.followUp.dueInMs / 1_000), count: readout.continuations }) }}
+        </li>
         <li v-if="rhythm?.awaySince">
           {{ t(`${KEY}.rhythm.away`, { time: timeLabel(rhythm.awaySince) }) }}
         </li>

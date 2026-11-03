@@ -4,6 +4,7 @@ export {
   createInitiativeState,
   dayPartOf,
   decideInitiative,
+  FOLLOW_UP_LIMITS,
   initiativeReadout,
   initiativeTimeFrom,
   isSpeechStale,
@@ -14,6 +15,8 @@ export {
 } from './initiative'
 export type {
   DayPart,
+  FollowUp,
+  FollowUpKind,
   InitiativeDecision,
   InitiativeEvent,
   InitiativeHost,
@@ -29,6 +32,7 @@ export type {
   InitiativeWaitReason,
   InnerState,
   PendingTurn,
+  TurnNext,
 } from './initiative'
 export { INITIATIVE_RECENT_LINE_COUNT, initiativeNoticeText, SCENE_ANCHOR_TEXT } from './initiative-notice'
 export type { InitiativeNoticeContext, InitiativeScreenContext } from './initiative-notice'
@@ -87,6 +91,7 @@ export type {
   WatchRequest,
   WatchValues,
 } from './missions'
+export { nextFromMarker } from './next-marker'
 export { SPEECH_TYPES } from './speech-types'
 export type { SpeechType } from './speech-types'
 export { activeTalkControl, applyTalkLevel, TALK_CONTROL_LIMITS, talkControlEffect } from './talk-control'

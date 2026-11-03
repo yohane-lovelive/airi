@@ -88,6 +88,8 @@ const TRIGGER_REASONS: Record<InitiativeTrigger, string> = {
   'event': 'something happened',
   'boredom': 'it has been quiet for a while',
   'intention': 'you wanted to do something later',
+  'continuation': 'you said that you had more to say. Go on with the next point of what you were saying, without repeating it',
+  'follow-up': 'you asked the owner something or waited for a reaction, and the owner did not answer. Nudge lightly once, or move on to another topic',
   'greeting': 'the owner just opened the app. Greet the owner in a way that fits the time of day and how long ago you last talked',
   'welcome-back': 'the owner just came back to the computer after time away. Welcome the owner back in a few words',
 }
@@ -161,6 +163,7 @@ export function initiativeNoticeText(context: InitiativeNoticeContext): string {
   }
   lines.push(`${LINE_LENGTH_TEXT[context.lineLength]} Keep it natural.`)
   lines.push('If you speak, end with <|TOPIC a few words|> that name your topic, in the language of your line. Nobody sees or hears it.')
+  lines.push('Then add <|NEXT continue|> if you have more to say, <|NEXT wait|> if you want the owner\'s answer, or <|NEXT done|> if the topic is closed.')
   return lines.join('\n')
 }
 

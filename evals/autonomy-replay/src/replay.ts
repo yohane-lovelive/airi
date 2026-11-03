@@ -12,6 +12,7 @@ import {
   EMPTY_TIMELINE,
   initiativeNoticeText,
   initiativeTimeFrom,
+  nextFromMarker,
   observeInitiative,
   resolveInitiativeOptions,
   setTimelineScene,
@@ -137,6 +138,8 @@ export async function replayRecording(recording: Recording, options: ReplayOptio
   let silent = 0
   let images = 0
   let speakingUntil = 0
+  /** The end of the last spoken line, until the policy hears of it. */
+  let speechEnd: number | undefined
   let lastTurnAt: number | undefined
   let lastOwnerAt: number | undefined
   let ownerIndex = 0
@@ -158,6 +161,12 @@ export async function replayRecording(recording: Recording, options: ReplayOptio
     for (const event of found) {
       events.push(event)
       state = observeInitiative(state, { type: 'perceived', salience: event.salience }, time, policyOptions)
+    }
+
+    // The pause after a line and its follow-up count from the end of its speech, as in the app.
+    if (speechEnd !== undefined && frame.at >= speechEnd) {
+      state = observeInitiative(state, { type: 'speech-ended' }, initiativeTimeFrom(new Date(speechEnd)), policyOptions, random)
+      speechEnd = undefined
     }
 
     const host = { ownerActive: false, speechPlaying: frame.at < speakingUntil, turnRunning: false, intentions: 0 }
@@ -228,11 +237,13 @@ export async function replayRecording(recording: Recording, options: ReplayOptio
     if (spoken) {
       lines.push({ at: frame.at, text: spoken, trigger: decision.trigger, ...(decision.speechType ? { speechType: decision.speechType } : {}), frames: sheet?.length ? sheet : picked })
       speakingUntil = frame.at + spoken.length * SPEECH_MS_PER_CHARACTER
+      speechEnd = speakingUntil
     }
     else {
       silent += 1
     }
-    state = observeInitiative(state, { type: 'turn-finished', outcome: spoken ? 'spoke' : 'silent' }, time, policyOptions)
+    const turnNext = [...reply.text.matchAll(MARKER)].map(match => nextFromMarker(match[0])).filter(value => value !== undefined).at(-1)
+    state = observeInitiative(state, { type: 'turn-finished', outcome: spoken ? 'spoke' : 'silent', ...(spoken && turnNext ? { next: turnNext } : {}) }, time, policyOptions, random)
   }
 
   return {

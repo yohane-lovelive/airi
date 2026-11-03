@@ -748,7 +748,7 @@ Step 5 has these parts. The owner added the length and tempo of talk after using
 | 5-2 | Generated motion. | To do |
 | 5-3 | Polish: the defaults of the open work. | To do |
 | 5-4a | The length of a line: a length target for each turn, and a turn budget that counts only idle speech. | Done |
-| 5-4b | The flow of talk: a `NEXT` marker of the model, and the pause after the speech ends. | To do |
+| 5-4b | The flow of talk: a `NEXT` marker of the model, and the pause after the speech ends. | Done |
 
 Step 5-0 built the reasoning level as follows.
 
@@ -765,6 +765,17 @@ Step 5-4a built the length of a line as follows.
 - Idle speech is short 70% and normal 30% of the time. Small talk is short 20%, normal 50%, and long 30%. Commentary on a busy screen, with an activity of 0.5 or more, is short 80% and normal 20%. In a calm moment it is short 40%, normal 40%, and long 20%, and the long share goes to normal while the timeline holds no notes.
 - A greeting and a welcome back stay short. The replay draws the length with its seeded random source, like the app.
 - The daily turn budget counts only idle speech. Turns of small talk and commentary, which the owner started, neither count nor stop at it. Their own limits hold them: the time limit of the mission and the image budget of commentary.
+
+Step 5-4b built the flow of talk as follows.
+
+- The owner asked whether timing in code keeps talk from feeling human. Code still decides when a turn starts. The model now signals what it wants after each autonomous line, and code reads the signal inside its gates. This keeps the principle that code owns the time and the model owns the words.
+- Each autonomous notice asks for `<|NEXT continue|>`, `<|NEXT wait|>`, or `<|NEXT done|>` after the topic label. The orchestrator stores the last one on the reply as `next`, like the topic label, and keeps it out of speech and plugins. It costs no extra call.
+- `continue` starts a continuation turn 3 to 8 seconds after the speech ends. At most 1 continuation follows in idle speech, 3 in small talk, and 2 in commentary, until the owner writes or a line closes its topic.
+- `wait` waits 20 to 40 seconds for the owner. Without an answer, one follow-up turn nudges lightly or changes the topic. Another wait gets no second nudge until the owner writes. Every wait starts the count of continuations again, because it hands the talk to the owner.
+- `done` and a line without a marker get no follow-up, and the timers decide as before.
+- A follow-up skips the drive and the refractory time, because the line asked for it. Every other gate holds: owner input, a reply in progress, speech that plays, quiet hours, a quiet request, and the daily budget. An owner message drops the follow-up.
+- The refractory time now counts from the end of the speech, which the speaking state reports, so a long line does not shorten the pause.
+- The inspector shows the next follow-up and the count of continuations. The replay reads the marker and the estimated end of speech, like the app.
 The memory ADR has its own steps. They can run beside steps 1 to 4.
 
 ## Work outside the steps

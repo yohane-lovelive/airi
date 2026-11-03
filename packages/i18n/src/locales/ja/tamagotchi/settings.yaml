@@ -131,6 +131,7 @@ devtools:
         budget: '今日の回数: {turns} / {limit}'
         refractory: '休みの残り: {seconds} 秒'
         recent-types: '最近の発話タイプ: {types}'
+        follow-up: '次: {seconds} 秒後に {kind}（続き: {count} 回）'
       intentions: 開いている意図
       missions: 実行中のミッション
       until: '{time} まで'

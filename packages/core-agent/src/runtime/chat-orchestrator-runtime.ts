@@ -10,6 +10,7 @@ import type { LlmUsage, StreamEvent, StreamOptions } from '../types/llm'
 
 import { createQueue } from '@proj-airi/stream-kit'
 
+import { nextFromMarker } from '../autonomy/next-marker'
 import { TIMELINE_LIMITS, timelineMarkerFrom } from '../autonomy/timeline'
 import { topicFromMarker } from '../autonomy/topics'
 import { chatMessagesToTurns } from '../messages/chat-completions'
@@ -970,6 +971,14 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
             return
           }
 
+          if (/^<\|NEXT\b/.test(special)) {
+            // What the model wants after the reply is data for code, like a topic label. The last marker counts.
+            const next = categorizer.filterToSpeech(special, streamPosition) ? nextFromMarker(special) : undefined
+            if (next)
+              buildingMessage.next = next
+            return
+          }
+
           if (/^<\|TOPIC\b/.test(special)) {
             // A topic label is data for code, like a sticker. Only the first label of visible speech counts.
             const topic = categorizer.filterToSpeech(special, streamPosition) ? topicFromMarker(special) : undefined
@@ -984,8 +993,8 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
           if (shouldAbort())
             return
 
-          // Strip only sticker, topic, and timeline markers, including the escaped form accepted by the parser.
-          const speechText = fullText.replace(/<(?:\||\{'\|'\})(?:STICKER|TOPIC|NOTE|SCENE)\b[\s\S]*?(?:(?:\||\{'\|'\})>|$)/g, '')
+          // Strip only sticker, topic, next, and timeline markers, including the escaped form accepted by the parser.
+          const speechText = fullText.replace(/<(?:\||\{'\|'\})(?:STICKER|TOPIC|NEXT|NOTE|SCENE)\b[\s\S]*?(?:(?:\||\{'\|'\})>|$)/g, '')
           const finalCategorization = categorizeResponse(speechText, activeProvider)
 
           const reasoningContentField = buildingMessage.categorization?.reasoning?.trim()

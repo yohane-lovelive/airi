@@ -80,6 +80,12 @@ export interface InitiativeOptions {
    */
   missionRunning: boolean
   /**
+   * How many continuation turns can follow one another without an owner message. A line that ends with `continue`
+   * after this count gets no continuation, and the timers take over.
+   * @default 1
+   */
+  maxContinuations: number
+  /**
    * After the model chooses silence, pressure and boredom keep this share.
    * Silence lowers the drive only in part, so the character tries again sooner than after speech.
    * @default 0.5
@@ -125,6 +131,7 @@ const DEFAULT_OPTIONS: InitiativeOptions = {
   ownerGraceMs: 30_000,
   dailyTurnBudget: 200,
   missionRunning: false,
+  maxContinuations: 1,
   silentRetain: 0.5,
   staleSalience: 0.6,
   hintlessShare: 0.25,
@@ -211,7 +218,39 @@ export interface InnerState {
 export type InitiativeRhythm = 'greeting' | 'welcome-back'
 
 /** Why a turn started: the largest part of the drive, or a turn of the daily rhythm. */
-export type InitiativeTrigger = 'event' | 'boredom' | 'intention' | InitiativeRhythm
+export type InitiativeTrigger = 'event' | 'boredom' | 'intention' | FollowUpKind | InitiativeRhythm
+
+/**
+ * What the model wants after its line, from a `<|NEXT ...|>` marker.
+ *
+ * - `continue`: it has more to say on the topic.
+ * - `wait`: it asked the owner something or wants a reaction.
+ * - `done`: the topic is complete.
+ */
+export type TurnNext = 'continue' | 'wait' | 'done'
+
+/**
+ * A turn that follows the last line.
+ *
+ * - `continuation`: the line said it had more, so the next point comes after a short pause.
+ * - `follow-up`: the line waited for the owner, who did not answer, so one light nudge comes.
+ */
+export type FollowUpKind = 'continuation' | 'follow-up'
+
+/** A follow-up turn that waits for its time. */
+export interface FollowUp {
+  readonly kind: FollowUpKind
+  /** The pause after the speech of the last line ends, in milliseconds. */
+  readonly delayMs: number
+  /** Epoch milliseconds. A speech end moves it to the end plus `delayMs`. */
+  readonly dueAt: number
+}
+
+/** The pauses of follow-up turns, in milliseconds from the end of the speech. */
+export const FOLLOW_UP_LIMITS = {
+  continuationPauseMs: { min: 3_000, max: 8_000 },
+  ownerAnswerWaitMs: { min: 20_000, max: 40_000 },
+} as const
 
 /** A decided turn that waits for its result. */
 export interface PendingTurn {
@@ -247,6 +286,12 @@ export interface InitiativeState {
    */
   readonly unanswered: number
   readonly budget: { readonly day: string, readonly turns: number }
+  /** The turn that follows the last line, when the line asked for one. */
+  readonly followUp?: FollowUp
+  /** Continuation turns since the owner last wrote or since a line closed its topic. */
+  readonly continuations: number
+  /** A follow-up after a wait came since the last owner message, so another wait gets none. */
+  readonly nudged: boolean
 }
 
 /**
@@ -262,8 +307,9 @@ export type InitiativeEvent
   = | { readonly type: 'perceived', readonly salience: number }
     | { readonly type: 'owner-message' }
     | { readonly type: 'character-spoke' }
-    | { readonly type: 'turn-finished', readonly outcome: 'spoke' | 'silent' | 'dropped' | 'failed' }
+    | { readonly type: 'turn-finished', readonly outcome: 'spoke' | 'silent' | 'dropped' | 'failed', readonly next?: TurnNext }
     | { readonly type: 'mode-changed', readonly mode: InitiativeMode }
+    | { readonly type: 'speech-ended' }
 
 /** What the host reports at each decision. These values come from other parts of the app and change at any time. */
 export interface InitiativeHost {
@@ -350,11 +396,19 @@ export function createInitiativeState(time: InitiativeTime, mode: InitiativeMode
     recentTypes: [],
     unanswered: 0,
     budget: { day: time.localDay, turns: 0 },
+    continuations: 0,
+    nudged: false,
   }
 }
 
 /** Applies one event. It changes no time-based value other than the advance to `time`. */
-export function observeInitiative(state: InitiativeState, event: InitiativeEvent, time: InitiativeTime, options: InitiativeOptions): InitiativeState {
+export function observeInitiative(
+  state: InitiativeState,
+  event: InitiativeEvent,
+  time: InitiativeTime,
+  options: InitiativeOptions,
+  random: () => number = () => 0.5,
+): InitiativeState {
   const current = advance(state, time.now, options)
 
   switch (event.type) {
@@ -369,19 +423,24 @@ export function observeInitiative(state: InitiativeState, event: InitiativeEvent
     }
     case 'owner-message':
       // The owner gets a normal reply. Pressure from earlier events is old now, and the conversation is not quiet.
+      // The owner answered, so no follow-up of the last line comes, and a later wait can nudge again.
       return {
-        ...current,
+        ...withoutFollowUp(current),
         pressure: 0,
         inner: { ...current.inner, boredom: 0, mood: clamp(current.inner.mood + INNER_DYNAMICS.moodPerOwnerMessage, -1, 1) },
         lastOwnerAt: time.now,
         unanswered: 0,
+        continuations: 0,
+        nudged: false,
       }
     case 'character-spoke':
-      return { ...current, inner: { ...current.inner, boredom: 0 } }
+      return { ...withoutFollowUp(current), inner: { ...current.inner, boredom: 0 } }
     case 'mode-changed':
-      return { ...current, mode: event.mode }
+      return { ...withoutFollowUp(current), mode: event.mode }
     case 'turn-finished':
-      return finishTurn(current, event.outcome, time.now, options)
+      return finishTurn(current, event, time.now, options, random)
+    case 'speech-ended':
+      return endSpeech(current, time.now, options)
   }
 }
 
@@ -404,6 +463,20 @@ export function decideInitiative(
     current = { ...current, budget: { day: time.localDay, turns: 0 } }
 
   const reason = waitReason(current, host, time, options)
+  // A follow-up skips the drive and the refractory time, because the last line asked for it. Every other gate holds.
+  const followUp = current.followUp
+  if (followUp && time.now >= followUp.dueAt && (!reason || reason === 'refractory')) {
+    const { followUp: _done, ...rest } = current
+    return {
+      state: {
+        ...rest,
+        turn: { startedAt: time.now, trigger: followUp.kind },
+        budget: countTurn(current.budget, options),
+        ...(followUp.kind === 'follow-up' ? { nudged: true } : {}),
+      },
+      decision: { kind: 'turn', trigger: followUp.kind, drive: driveOf(current, host).total, threshold: thresholdOf(current.inner, current.jitter ?? 1, time) },
+    }
+  }
   if (reason)
     return { state: current, decision: { kind: 'wait', reason } }
 
@@ -482,6 +555,9 @@ export interface InitiativeReadout {
   readonly budget: { readonly turns: number, readonly limit: number }
   readonly recentTypes: readonly SpeechType[]
   readonly turn?: PendingTurn
+  /** The follow-up that the last line asked for, and the milliseconds until it is due. */
+  readonly followUp?: { readonly kind: FollowUpKind, readonly dueInMs: number }
+  readonly continuations: number
 }
 
 /**
@@ -509,6 +585,8 @@ export function initiativeReadout(state: InitiativeState, host: InitiativeHost, 
     budget: { turns: current.budget.turns, limit: options.dailyTurnBudget },
     recentTypes: current.recentTypes,
     ...(current.turn ? { turn: current.turn } : {}),
+    ...(current.followUp ? { followUp: { kind: current.followUp.kind, dueInMs: Math.max(0, current.followUp.dueAt - time.now) } } : {}),
+    continuations: current.continuations,
   }
 }
 
@@ -544,6 +622,40 @@ function waitReason(state: InitiativeState, host: InitiativeHost, time: Initiati
   return undefined
 }
 
+/** The follow-up that a spoken line asks for with its `NEXT` marker, inside the limits. */
+function followUpAfter(state: InitiativeState, next: TurnNext | undefined, now: number, options: InitiativeOptions, random: () => number): Pick<InitiativeState, 'continuations'> & { followUp?: FollowUp } {
+  const pause = (range: { min: number, max: number }) => range.min + (range.max - range.min) * random()
+  if (next === 'continue' && state.continuations < options.maxContinuations) {
+    const delayMs = pause(FOLLOW_UP_LIMITS.continuationPauseMs)
+    return { continuations: state.continuations + 1, followUp: { kind: 'continuation', delayMs, dueAt: now + delayMs } }
+  }
+  // A wait hands the talk to the owner, so it starts the count again, also when the one nudge is used up.
+  if (next === 'wait') {
+    if (state.nudged)
+      return { continuations: 0 }
+    const delayMs = pause(FOLLOW_UP_LIMITS.ownerAnswerWaitMs)
+    return { continuations: 0, followUp: { kind: 'follow-up', delayMs, dueAt: now + delayMs } }
+  }
+  // A closed topic starts the count again. A line without a marker keeps it, so a chain cannot grow by leaving it out.
+  return { continuations: next === 'done' ? 0 : state.continuations }
+}
+
+/**
+ * The speech of a line ended. The pause before the next turn counts from now, because a long line can play for longer
+ * than the refractory time. A follow-up waits its pause from now as well.
+ */
+function endSpeech(state: InitiativeState, now: number, options: InitiativeOptions): InitiativeState {
+  const refractoryUntil = Math.max(state.refractoryUntil, now + options.modes[state.mode].refractoryMs)
+  if (!state.followUp)
+    return { ...state, refractoryUntil }
+  return { ...state, refractoryUntil, followUp: { ...state.followUp, dueAt: now + state.followUp.delayMs } }
+}
+
+function withoutFollowUp(state: InitiativeState): InitiativeState {
+  const { followUp: _dropped, ...rest } = state
+  return rest
+}
+
 /** The budget after one more turn. A turn of a mission does not count. */
 function countTurn(budget: InitiativeState['budget'], options: InitiativeOptions): InitiativeState['budget'] {
   return options.missionRunning ? budget : { day: budget.day, turns: budget.turns + 1 }
@@ -559,17 +671,23 @@ function inQuietHours(minutes: number, range: { startMinutes: number, endMinutes
   return minutes >= startMinutes && minutes < endMinutes
 }
 
-function finishTurn(state: InitiativeState, outcome: 'spoke' | 'silent' | 'dropped' | 'failed', now: number, options: InitiativeOptions): InitiativeState {
+function finishTurn(
+  state: InitiativeState,
+  event: Extract<InitiativeEvent, { type: 'turn-finished' }>,
+  now: number,
+  options: InitiativeOptions,
+  random: () => number,
+): InitiativeState {
   // A result without a pending turn comes from a turn that an earlier state already closed. It changes nothing.
   if (!state.turn)
     return state
 
-  const { turn, ...rest } = state
+  const { turn, followUp: _old, ...rest } = state
   // Each closed turn begins a new cycle, so the next decision draws a new jitter.
   const closed: InitiativeState = { ...rest, jitter: undefined }
   const refractoryUntil = now + options.modes[state.mode].refractoryMs
 
-  switch (outcome) {
+  switch (event.outcome) {
     case 'spoke':
       return {
         ...closed,
@@ -578,6 +696,7 @@ function finishTurn(state: InitiativeState, outcome: 'spoke' | 'silent' | 'dropp
         refractoryUntil,
         recentTypes: turn.speechType ? [...closed.recentTypes, turn.speechType].slice(-RECENT_SPEECH_TYPE_COUNT) : closed.recentTypes,
         unanswered: closed.unanswered + 1,
+        ...followUpAfter(closed, event.next, now, options, random),
       }
     case 'silent':
     case 'failed':

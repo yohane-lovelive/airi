@@ -128,6 +128,12 @@ describe('initiativeNoticeText', () => {
     expect(initiativeNoticeText(context({ mode: 'commentary', speechType: 'recall', recentLines: [long, long, long] })).length).toBeLessThan(1200)
   })
 
+  it('tells why a follow-up turn comes, and asks every line for a NEXT marker', () => {
+    expect(initiativeNoticeText(context({ trigger: 'continuation' }))).toContain('Go on with the next point of what you were saying')
+    expect(initiativeNoticeText(context({ trigger: 'follow-up' }))).toContain('Nudge lightly once, or move on to another topic')
+    expect(initiativeNoticeText(context())).toContain('<|NEXT continue|>')
+  })
+
   it('names commentary, and asks for the drawn length instead of a fixed one', () => {
     const commentary = initiativeNoticeText(context({ mode: 'commentary', trigger: 'event' }))
     expect(commentary).toContain('Mode: commentary of the owner\'s screen.')

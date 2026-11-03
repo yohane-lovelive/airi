@@ -223,7 +223,7 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
     if (!state.value)
       return
     const time = initiativeTimeFrom(new Date())
-    state.value = observeInitiative(state.value, event, time, optionsAt(time.now))
+    state.value = observeInitiative(state.value, event, time, optionsAt(time.now), Math.random)
   }
 
   /** Cancels the turn in flight. Its speech is stale, because the owner comes first. */
@@ -396,7 +396,9 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
       const day = initiativeTimeFrom(new Date()).localDay
       spokenTypes = { day, types: [...(spokenTypes.day === day ? spokenTypes.types : []), decision.speechType] }
     }
-    observe({ type: 'turn-finished', outcome })
+    // The `NEXT` marker of the reply tells whether the character goes on, waits for the owner, or closed the topic.
+    const next = outcome === 'spoke' ? chatSession.getSessionMessages(sessionId).findLast(message => message.role === 'assistant')?.next : undefined
+    observe({ type: 'turn-finished', outcome, ...(next ? { next } : {}) })
   }
 
   function tick() {
@@ -494,6 +496,12 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
       perceptionRunner.recordOwnerMessage(message.createdAt ?? Date.now())
     }
     observe(event)
+  })
+
+  // The pause before the next turn counts from the end of the speech, so a long line does not shorten it.
+  watch(() => speaking.nowSpeaking, (speakingNow, speakingBefore) => {
+    if (speakingBefore && !speakingNow)
+      observe({ type: 'speech-ended' })
   })
 
   // Small talk ends when the owner leaves the device. Only the leader writes the end.

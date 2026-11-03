@@ -2011,4 +2011,22 @@ describe('chat topic markers', () => {
     expect(specials).toEqual([])
     expect(saved?.role === 'assistant' && saved.categorization?.speech).toBe('Ramen tonight? ')
   })
+
+  it('stores the last NEXT marker without speech or special hooks', async () => {
+    const harness = createHarness()
+    const specials: string[] = []
+    harness.runtime.hooks.onTokenSpecial(async (text) => {
+      specials.push(text)
+    })
+    harness.stream.mockImplementationOnce(async (_model, _provider, _context, options) => {
+      for (const text of ['Did you eat? ', '<|NEXT continue|>', '<|NE', 'XT wait|>'])
+        await options?.onStreamEvent?.({ type: 'text-delta', text })
+    })
+    await harness.runtime.ingest('Hello', { model: 'test', chatProvider: provider })
+    const saved = harness.sessionMessages['session-1'].at(-1)
+
+    expect(saved).toMatchObject({ role: 'assistant', content: 'Did you eat? ', next: 'wait' })
+    expect(specials).toEqual([])
+    expect(saved?.role === 'assistant' && saved.categorization?.speech).toBe('Did you eat? ')
+  })
 })
