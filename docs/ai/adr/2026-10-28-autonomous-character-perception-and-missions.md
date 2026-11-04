@@ -832,7 +832,9 @@ The same check found four weaker points of the characters, and a later change ad
 - The system prompt left out the greeting and the example dialogues of a card, because they have a place in a history. They now join the system prompt as reference text, not as messages, so their place does not matter. The card editor has a field for the example dialogues.
 - Two characters drifted to the same night topics, because seeds come from memories and earlier topics. Outside commentary, the notice now says that a new topic can come from what the character likes or does.
 - In the second check, replies got 2 to 4 short paragraphs, and "see you later" got two sentences. Lines used words of the examples, and the small talk of each character stayed on its own interests, for example songs or game plans.
-- The check also found that quiet hours stop small talk and commentary that the owner started. It left them as they are for now.
+- The check also found that quiet hours stopped small talk and commentary that the owner started. They now stop idle talk only. A request for quiet with words still stops a mission.
+- The model sometimes wrote the object of an ACT marker with wrong brackets, for example `{"emotion":"curious"},"motion":"nod"}`. The parser dropped such a marker with its emotion and gesture. The ACT parser now fixes the brackets before it gives up: it drops a bracket that closes the object early or twice, and it adds a missing one.
+- A third check ran a commentary inside the quiet hours, and it spoke 6 times in 5 minutes. Broken ACT markers sent through the app came back with their emotion and gesture, and `<|ACT happy|>` was still refused.
 The memory ADR has its own steps. They can run beside steps 1 to 4.
 
 ## Work outside the steps

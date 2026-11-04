@@ -6,7 +6,7 @@ Shared audio-pipeline orchestration for AIRI. The package owns input sharing, ca
 
 - Sharing one audio source between recording, transcription, and detectors.
 - Building and scheduling speech playback pipelines.
-- Parsing streaming-control events.
+- Parsing streaming-control events. The ACT parser fixes the brackets of an object that a model closed wrongly, and drops a payload that it cannot fix.
 
 ## Do not use it for
 

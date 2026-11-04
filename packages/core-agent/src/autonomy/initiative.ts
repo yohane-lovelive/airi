@@ -615,7 +615,9 @@ function waitReason(state: InitiativeState, host: InitiativeHost, time: Initiati
     return 'speech-playing'
   if (host.turnRunning || state.turn)
     return 'turn-running'
-  if (options.quietHours && inQuietHours(time.localMinutes, options.quietHours))
+  // The owner started small talk or commentary, so the quiet hours stop idle talk only. A live check on 2026-11-05 found
+  // a commentary that stayed silent after 23:00. A request for quiet with words still stops a mission below.
+  if (!options.missionRunning && options.quietHours && inQuietHours(time.localMinutes, options.quietHours))
     return 'quiet-hours'
   if (options.quietUntil !== undefined && time.now < options.quietUntil)
     return 'owner-quiet'

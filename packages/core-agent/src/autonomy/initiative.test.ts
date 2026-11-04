@@ -206,6 +206,18 @@ describe('gates', () => {
     expect(decideInitiative(bored, IDLE, at(2_000, '2026-10-29', 7 * 60), middle, options).decision.kind).toBe('turn')
   })
 
+  // ROOT CAUSE:
+  // The quiet hours also stopped small talk and commentary that the owner started, so a live check after 23:00 heard
+  // nothing. A request for quiet with words still stops a mission.
+  it('lets a mission of the owner talk in quiet hours, but not through a request for quiet', () => {
+    const mission = { ...options, missionRunning: true }
+    const night = at(2_000, '2026-10-29', 23 * 60 + 30)
+
+    expect(decideInitiative(bored, IDLE, night, middle, options).decision).toEqual({ kind: 'wait', reason: 'quiet-hours' })
+    expect(decideInitiative(bored, IDLE, night, middle, mission).decision.kind).toBe('turn')
+    expect(decideInitiative(bored, IDLE, night, middle, { ...mission, quietUntil: night.now + 60_000 }).decision).toEqual({ kind: 'wait', reason: 'owner-quiet' })
+  })
+
   it('waits while the owner asked for quiet, and starts after the quiet time', () => {
     const quiet = resolveInitiativeOptions({ quietUntil: at(3_000).now })
 
