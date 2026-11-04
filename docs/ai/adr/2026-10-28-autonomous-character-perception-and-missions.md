@@ -838,5 +838,4 @@ The owner asked for this work between the steps. It is not in the step table, bu
 ## Open work
 
 - Choose the native module for the capture of one process with the owner. It waits with game audio, step 5-1.
-- Step M5b of [ADR 2026-11-02](./2026-11-02-long-term-memory-and-recall.md) merges duplicate memories. It waits until real passes show copies.
 - [The idea notes](../context/autonomy-ideas.md) keep the features that the owner held for later. On 2026-11-04 the owner held the CORS solution for the production web build there, and chose to leave a realtime API out of a later ADR for now.

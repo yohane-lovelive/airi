@@ -138,7 +138,7 @@ Step M5 adds two background tasks with the usage purpose `memory`:
 - An owner profile summary of about 300 tokens, which the prompt budget of ADR 2026-10-28 reserves.
 - A pass over finished conversations that writes the facts the model did not save, and merges entries that say the same thing.
 
-Step M5a built the memory work and the profile as follows. Step M5b, the merge of entries that say the same thing, waits until the passes show how many copies appear.
+Step M5a built the memory work and the profile as follows. Step M5b, the merge of entries that say the same thing, follows below.
 
 - A conversation counts as finished after 20 quiet minutes. A pass reads the owner's open conversation after the last pass, 60 messages or 20,000 characters at most. Notices count as context, not as owner words, and a part without owner words is skipped.
 - The pass gives the chat model of the card the transcript and the 8 memories nearest to the owner's words. The model answers with the `report_memories` tool: at most 5 entries, each new or the update of a related memory by its id, so it does not add copies. The call stops after the answer.
@@ -148,6 +148,19 @@ Step M5a built the memory work and the profile as follows. Step M5b, the merge o
 - The profile is one record of the kind `profile` in the autonomy records, so every device sends the same one. The ADR did not say where the profile lives.
 - The system prompt of the owner's own conversations holds the profile. It changes only after a pass, so the cached prefix rarely changes.
 - Both the memory work and the profile are settings of long-term memory, off by default. Their calls count as the usage purpose `memory`.
+
+Step M5b built the merge as follows.
+
+- After each pass of the memory work, a merge checks the entries of the card that changed since the last merge, 10 at most, oldest first. The ADR did not say which entries a merge reads.
+- For each checked entry, the merge finds 4 near entries of the card: by the recall by meaning while the memory sync runs, and by a scan of shared characters otherwise. It compares them on one scale from 0 to 1, and a pair from 0.35 is a candidate.
+- A pair is the unit. One merge sends the 5 most similar pairs, and no entry is in two of them. A pair that waits keeps its entries unchecked, so a later merge finds it. Three copies of one fact merge over two merges.
+- Only the card's own entries take part. General entries belong to the owner, and a run cannot forget them. The ADR did not limit the merge.
+- The chat model of the card answers with the `merge_memories` tool: for each pair, one merged entry or null for different facts. A merge writes into the newer entry and forgets the other through the memory store, so the sync carries it. An answer with an id outside its pair is refused.
+- The device keeps the pairs that the model judged as different facts, so it does not ask about them again.
+- Settings shows the count of merged copies of the last pass, and the recent merges with the descriptions before and after. A merge has no undo, so the owner can see what changed.
+- A failed merge keeps the facts of the pass, and the next pass checks the same entries again.
+- This device had no memories on 2026-11-04, so a live check used 18 test memories in Japanese with `deepseek-v4.1-flash`: 6 pairs of one fact in other words, and 3 pairs of near but different facts. Shared characters gave 0.37 to 0.64 for copies, 0.38 to 0.77 for near facts, and 0 to 0.2 for other facts, so the threshold of 0.35 drops only other facts.
+- The check found two faults, and the step fixed both. Groups chained unrelated entries through words like "オーナーは", and one answer then kept real copies apart, so a pair is the unit now. The start of the next merge skipped the groups that one merge could not send. After the fixes, two merges of about 7 seconds each merged all 6 copies and kept the 3 near pairs apart.
 
 ## Steps
 
@@ -160,7 +173,7 @@ Step M5a built the memory work and the profile as follows. Step M5b, the merge o
 | M4a | The floor between devices. | Done |
 | M4b | The sync of reminders and intentions. | Done |
 | M5a | The memory work of finished conversations, and the owner profile. | Done |
-| M5b | The merge of entries that say the same thing. | To do |
+| M5b | The merge of entries that say the same thing. | Done |
 
 ## Relation to other ADRs
 

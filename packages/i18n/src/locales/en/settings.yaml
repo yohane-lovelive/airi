@@ -1263,9 +1263,13 @@ pages:
       enable-description: The character remembers what you talk about. When this is off, it remembers nothing.
       work:
         enable: Write memories from finished conversations
-        enable-description: After 20 quiet minutes, the chat model of the character reads the last part of the conversation and saves the lasting facts. Each pass is a model call. Off by default.
+        enable-description: After 20 quiet minutes, the chat model of the character reads the last part of the conversation and saves the lasting facts. Then it merges memories that say the same thing. Each pass is one or two model calls. Off by default.
         last: 'The last pass saved {count} memories.'
         last-failed: The last pass failed. It tries again in 30 minutes.
+        last-merged: 'It merged {count} copies into other memories.'
+        merges: Recent merges
+        merges-description: After each pass, memories of the character that say the same thing become one memory. The general memories take no part.
+        merge: '{date}: {before} → {after}'
       profile:
         enable: Use an owner profile
         enable-description: A short summary of what the character remembers about you goes with each message in your own conversations. A pass that saves memories writes it again. Off by default.

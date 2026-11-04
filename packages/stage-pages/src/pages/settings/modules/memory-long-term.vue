@@ -12,7 +12,7 @@ const KEY = 'settings.pages.modules.memory-long-term'
 const { t } = useI18n()
 const { enabled } = storeToRefs(useMemoryStore())
 const memoryWork = useMemoryWorkStore()
-const { enabled: workEnabled, lastWork } = storeToRefs(memoryWork)
+const { enabled: workEnabled, lastWork, recentMerges } = storeToRefs(memoryWork)
 const ownerProfile = useOwnerProfileStore()
 const { enabled: profileEnabled, profile } = storeToRefs(ownerProfile)
 
@@ -41,7 +41,21 @@ async function writeProfileNow() {
       <FieldCheckbox v-model="workEnabled" :label="t(`${KEY}.work.enable`)" :description="t(`${KEY}.work.enable-description`)" />
       <p v-if="lastWork" :class="['text-xs', 'text-neutral-500 dark:text-neutral-400']">
         {{ lastWork.failed ? t(`${KEY}.work.last-failed`) : t(`${KEY}.work.last`, { count: lastWork.written }) }}
+        <template v-if="!lastWork.failed && lastWork.merged">
+          {{ t(`${KEY}.work.last-merged`, { count: lastWork.merged }) }}
+        </template>
       </p>
+      <div v-if="workEnabled && recentMerges.length" :class="['flex flex-col', 'gap-1']">
+        <span :class="['text-sm font-medium']">{{ t(`${KEY}.work.merges`) }}</span>
+        <p :class="['text-xs', 'text-neutral-500 dark:text-neutral-400']">
+          {{ t(`${KEY}.work.merges-description`) }}
+        </p>
+        <ul :class="['flex flex-col', 'gap-1']">
+          <li v-for="merge in recentMerges" :key="merge.at" :class="['text-xs', 'text-neutral-600 dark:text-neutral-300', 'break-words']">
+            {{ t(`${KEY}.work.merge`, { before: merge.before.join(' / '), after: merge.after, date: new Date(merge.at).toLocaleString() }) }}
+          </li>
+        </ul>
+      </div>
       <FieldCheckbox v-model="profileEnabled" :label="t(`${KEY}.profile.enable`)" :description="t(`${KEY}.profile.enable-description`)" />
       <template v-if="profileEnabled">
         <FieldTextArea v-model="draft" :rows="6" :required="false" :label="t(`${KEY}.profile.text`)" :placeholder="t(`${KEY}.profile.empty`)" />

@@ -61,6 +61,9 @@ describe('memory work store', () => {
     localStorage.removeItem('memory/work-enabled')
     localStorage.removeItem('memory/work-through')
     localStorage.removeItem('memory/owner-profile-enabled')
+    localStorage.removeItem('memory/merge-checked-at')
+    localStorage.removeItem('memory/merge-distinct')
+    localStorage.removeItem('memory/recent-merges')
     generate.mockReset()
     generate.mockImplementation(async (_request, _signal, tools) => {
       if (tools?.length)
@@ -100,6 +103,87 @@ describe('memory work store', () => {
     expect(work.lastWork).toMatchObject({ written: 1, profileWritten: true })
     // The second tick finds no new owner words after the covered message.
     expect(generate).toHaveBeenCalledTimes(2)
+  })
+
+  it('merges the entries of the card that say the same thing into the newest one', async () => {
+    const memory = useMemoryStore()
+    const older = await memory.write({ description: '好きな食べ物', body: 'オーナーはラーメンが好き' }, 'airi')
+    await new Promise(resolve => setTimeout(resolve, 5))
+    const newer = await memory.write({ description: '好きな食べ物', body: 'オーナーはラーメンが大好き' }, 'airi')
+    const general = await memory.write({ description: '好きな食べ物', body: 'オーナーはラーメンが好き' }, 'other-card')
+    generate.mockImplementation(async (_request, _signal, tools) => {
+      await tools![0].execute({ pairs: [{ ids: [older!.id, newer!.id], merged: { description: '好きな食べ物', body: 'オーナーはラーメンが大好き。' } }] }, { messages: [], toolCallId: 'call-1' })
+      return ''
+    })
+
+    const merged = await useMemoryWorkStore().mergeNow()
+
+    expect(merged).toBe(1)
+    expect(generate).toHaveBeenCalledTimes(1)
+    const left = memory.entries.filter(entry => entry.persona === 'airi')
+    expect(left.map(entry => [entry.id, entry.body])).toEqual([[newer!.id, 'オーナーはラーメンが大好き。']])
+    // The entry of another card takes no part.
+    expect(memory.entries.some(entry => entry.id === general!.id)).toBe(true)
+    expect(useMemoryWorkStore().recentMerges).toEqual([expect.objectContaining({ before: ['好きな食べ物', '好きな食べ物'], after: '好きな食べ物' })])
+  })
+
+  // ROOT CAUSE:
+  // A merge sent 3 groups and moved its start past every checked entry, so a live check left 6 copies unmerged.
+  // The next merge now starts at the first entry of a pair that waits.
+  it('merges every copy over later merges when one merge cannot send all pairs', async () => {
+    const memory = useMemoryStore()
+    const facts = [
+      ['りんご農園', '週末にりんご農園を見学した', '週末、りんご農園を見学した'],
+      ['自転車', '新しいロードバイクを買った', '新品のロードバイクを買った'],
+      ['ピアノ', '子どものころピアノを習っていた', '子供のころにピアノを習っていた'],
+      ['引っ越し', '来月に横浜へ引っ越す', '来月、横浜に引っ越す'],
+      ['資格', '基本情報技術者試験に合格した', '基本情報技術者の試験に合格した'],
+    ]
+    for (const [description, ...bodies] of facts) {
+      for (const body of bodies) {
+        await memory.write({ description, body }, 'airi')
+        await new Promise(resolve => setTimeout(resolve, 2))
+      }
+    }
+    generate.mockImplementation(async (request, _signal, tools) => {
+      // The fake merges every group that the request lists. Each line of a group starts with the id of its entry.
+      const input = request.turns.at(-1) as { content: { text: string }[] }
+      const blocks = input.content[0].text.split('\n\n').map(block => block.split('\n').slice(1))
+      await tools![0].execute({
+        pairs: blocks.map(lines => ({
+          ids: lines.map(line => line.slice(2, line.indexOf(' (', 2))),
+          merged: { description: 'merged', body: lines[0].slice(lines[0].indexOf('): ') + 3) },
+        })),
+      }, { messages: [], toolCallId: 'call-1' })
+      return ''
+    })
+    const work = useMemoryWorkStore()
+
+    let merged = 0
+    for (let round = 0; round < 4; round++)
+      merged += await work.mergeNow()
+
+    expect(merged).toBe(facts.length)
+    expect(memory.entries.filter(entry => entry.persona === 'airi')).toHaveLength(facts.length)
+  })
+
+  it('keeps entries that the model judged as different facts, and does not ask about them again', async () => {
+    const memory = useMemoryStore()
+    const first = await memory.write({ description: '週末の予定', body: '土曜日に大阪へ行く' }, 'airi')
+    const second = await memory.write({ description: '週末の予定', body: '日曜日に大阪へ行く' }, 'airi')
+    generate.mockImplementation(async (_request, _signal, tools) => {
+      await tools![0].execute({ pairs: [{ ids: [first!.id, second!.id], merged: null }] }, { messages: [], toolCallId: 'call-1' })
+      return ''
+    })
+    const work = useMemoryWorkStore()
+
+    expect(await work.mergeNow()).toBe(0)
+    // A later change of the entry makes it a checked entry again, but the pair stays apart.
+    await memory.write({ id: second!.id, description: '週末の予定', body: '日曜日に大阪へ行く予定' }, 'airi')
+    expect(await work.mergeNow()).toBe(0)
+
+    expect(generate).toHaveBeenCalledTimes(1)
+    expect(memory.entries.filter(entry => entry.persona === 'airi')).toHaveLength(2)
   })
 
   it('waits 30 minutes after a failed pass', async () => {
