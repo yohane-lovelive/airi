@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { composeRecipeSpacePrompt, composeSystemPrompt } from './prompt-recipe'
+import { composeRecipeSpacePrompt, composeReplyLengthPrompt, composeSystemPrompt } from './prompt-recipe'
 
 describe('chat prompt recipe', () => {
   // https://github.com/moeru-ai/airi/discussions/2239
@@ -24,5 +24,14 @@ describe('chat prompt recipe', () => {
     // The steps can leave each run to the model, so they come after the recipe's purpose.
     expect(composeRecipeSpacePrompt({ ...recipe, description: 'Checks on the owner late at night.' }))
       .toContain('Purpose: Checks on the owner late at night.\nRecipe steps:\nRead the screen slot.')
+  })
+
+  // ROOT CAUSE:
+  // Replies to the owner had no length, so a live check heard 4 to 6 paragraphs also for "see you later".
+  it('asks for a reply that matches the owner message by default, and leaves the free setting without a word', () => {
+    expect(composeReplyLengthPrompt('auto')).toContain('A greeting, thanks, or a short remark gets one or two sentences.')
+    expect(composeReplyLengthPrompt('short')).toContain('one or two sentences')
+    expect(composeReplyLengthPrompt('auto').startsWith('\n\n')).toBe(true)
+    expect(composeReplyLengthPrompt('free')).toBe('')
   })
 })

@@ -128,6 +128,15 @@ describe('initiativeNoticeText', () => {
     expect(initiativeNoticeText(context({ mode: 'commentary', speechType: 'recall', recentLines: [long, long, long] })).length).toBeLessThan(1200)
   })
 
+  // ROOT CAUSE:
+  // A live check heard two characters drift to the same night topics, and a short line lost the voice of a lively one.
+  it('lets a new topic come from the character, outside commentary, and asks for the voice of the character', () => {
+    expect(initiativeNoticeText(context())).toContain('A new topic can also come from what you like or do')
+    expect(initiativeNoticeText(context({ thread: { topic: 'games', lines: 1, heat: 0.8, cold: false } }))).not.toContain('A new topic can also come')
+    expect(initiativeNoticeText(context({ mode: 'commentary' }))).not.toContain('A new topic can also come')
+    expect(initiativeNoticeText(context())).toContain('in your own voice and habits')
+  })
+
   it('tells why a follow-up turn comes, and asks every line for a NEXT marker', () => {
     expect(initiativeNoticeText(context({ trigger: 'continuation' }))).toContain('Go on with the next point of what you were saying')
     expect(initiativeNoticeText(context({ trigger: 'follow-up' }))).toContain('Nudge lightly once, or move on to another topic')
@@ -137,7 +146,7 @@ describe('initiativeNoticeText', () => {
   it('names commentary, and asks for the drawn length instead of a fixed one', () => {
     const commentary = initiativeNoticeText(context({ mode: 'commentary', trigger: 'event' }))
     expect(commentary).toContain('Mode: commentary of the owner\'s screen.')
-    expect(commentary).toContain('Length: one short sentence. Keep it natural.')
+    expect(commentary).toContain('Length: one short sentence. Keep it natural, in your own voice and habits.')
     expect(commentary).not.toContain('one or two sentences')
 
     expect(initiativeNoticeText(context({ lineLength: 'long' }))).toContain('Length: five to eight sentences, a fuller story or thought. You can put <|DELAY 1|> between thoughts.')

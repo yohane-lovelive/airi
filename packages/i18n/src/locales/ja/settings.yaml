@@ -464,6 +464,7 @@ pages:
       description: 説明
       behavior: 振る舞い
       greetings: 挨拶 (1行に1つ)
+      message_examples: 会話の例
       settings: 設定
       version: バージョン
       create: 作成
@@ -495,6 +496,8 @@ pages:
         scenario: 周囲の状況はどうなっていますか？現在の状況は？
         greetings_field: 挨拶
         greetings: キャラクターはどのように「こんにちは」と言うべきですか？
+        message_examples: "キャラクターの話し方を示す短いやりとりです。各行を {'{{'}char{'}}'}: か {'{{'}user{'}}'}: で始め、やりとりの間には空行を入れます。キャラクターは、過去の会話ではなく例として読みます。"
+        message_examples_placeholder: "{'{{'}user{'}}'}: ゲームしよう！\n{'{{'}char{'}}'}: いいよ、負けないからね！"
         systemprompt: AI LLMに対して、質問された際にどのように回答すべきかをここで説明してください。
         posthistoryinstructions: メッセージ履歴の後にAI LLMに読んでほしい内容をここに配置してください。
         version: >-
@@ -802,6 +805,15 @@ pages:
                 medium: 中
                 high: 高
               required-description: このモデルでは思考機能が必須です。
+            reply-length:
+              label: 返事の長さ
+              description: あなたのメッセージへの返事の長さです。自律的な発話には、別の長さがあります。
+              options:
+                auto: メッセージに合わせる
+                short: 短め（1〜2 文）
+                normal: ふつう（2〜4 文）
+                long: 長め（話題に合わせて）
+                free: 指示しない
             image-input:
               label: 画像の入力
               description: このモデルが画像を自分で読めるかどうかです。読めないときは、視覚モジュールが先に各画像を説明するので、数秒かかります。OpenAI 互換のサーバーなど、多くのモデル一覧はこれを載せていません。

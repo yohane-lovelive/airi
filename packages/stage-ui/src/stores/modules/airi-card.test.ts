@@ -930,7 +930,9 @@ describe('airi-card store', () => {
     })
   })
 
-  it('keeps position-sensitive CCv3 fields separate from the stable system prompt', async () => {
+  // The greeting and the examples join as reference text, so the character keeps its voice. A live check on 2026-11-04
+  // found a generic voice without them. The instructions after the history still stay out.
+  it('keeps position-sensitive CCv3 fields out of the history, and shows the greeting and examples as reference text', async () => {
     const cardStore = useAiriCardStore()
     await cardStore.initialize()
 
@@ -966,11 +968,11 @@ describe('airi-card store', () => {
       'A patient field researcher.',
       'Curious and precise.',
       'The conversation takes place in an observatory.',
+      'Your usual greeting, as an example: "Welcome to the observatory."',
+      'Examples of how you talk. They show your voice and manner, and they are not real history:\nOwner: What did you find?\nRuntime context card: A new comet.',
       'Use the image widget for star charts.',
     ].join('\n\n'))
     expect(cardStore.systemPrompt).not.toContain('Answer the latest observation')
-    expect(cardStore.systemPrompt).not.toContain('Welcome to the observatory')
-    expect(cardStore.systemPrompt).not.toContain('What did you find?')
   })
 
   it('adds only enabled Live2D controls to the ACT prompt', async () => {

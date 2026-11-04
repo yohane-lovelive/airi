@@ -612,6 +612,32 @@ const cardGreetings = computed({
   },
 })
 
+type ExampleLine = `{{char}}: ${string}` | `{{user}}: ${string}`
+
+function isExampleLine(line: string): line is ExampleLine {
+  return /^\{\{(?:char|user)\}\}:/.test(line)
+}
+
+/**
+ * The example dialogues as text: one message on each line, with `{{char}}:` or `{{user}}:`, and an empty line between
+ * examples. A line without a speaker joins the message above it.
+ */
+const cardMessageExamples = computed({
+  get: () => (card.value.messageExample ?? []).map(example => example.join('\n')).join('\n\n'),
+  set: (text: string) => {
+    card.value.messageExample = text
+      .split(/\n\s*\n/)
+      .map(block => block.split('\n').map(line => line.trim()).filter(Boolean).reduce<string[]>((lines, line) => {
+        if (isExampleLine(line) || lines.length === 0)
+          lines.push(line)
+        else
+          lines[lines.length - 1] += ` ${line}`
+        return lines
+      }, []))
+      .filter((example): example is ExampleLine[] => example.length > 0 && example.every(isExampleLine))
+  },
+})
+
 const cardVersion = makeComputed('version')
 const cardSystemPrompt = makeComputed('systemPrompt')
 const cardPostHistoryInstructions = makeComputed('postHistoryInstructions')
@@ -928,6 +954,7 @@ function handleBack() {
                 <FieldInput v-model="cardScenario" :label="t('settings.pages.card.scenario')" :single-line="false" :description="t('settings.pages.card.creation.fields_info.scenario')" :input-class="editorLongTextareaClass" />
               </div>
               <FieldValues v-model="cardGreetings" :label="t('settings.pages.card.creation.greetings')" :description="t('settings.pages.card.creation.fields_info.greetings')" :required="false" />
+              <FieldInput v-model="cardMessageExamples" :label="t('settings.pages.card.creation.message_examples')" :single-line="false" :description="t('settings.pages.card.creation.fields_info.message_examples')" :placeholder="t('settings.pages.card.creation.fields_info.message_examples_placeholder')" :input-class="editorLongTextareaClass" />
             </div>
             <!-- Modules -->
             <div v-else-if="activeSection === 'modules'" :class="['flex flex-col gap-5']">

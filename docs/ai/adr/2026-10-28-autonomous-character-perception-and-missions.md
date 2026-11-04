@@ -824,6 +824,15 @@ A live check with two character cards on 2026-11-04 tried conversation, idle tal
 - A commentary found its window by the app name or the title, but it checked the window in front by the app name only. A commentary of a title then took no frame. One rule in `windowOfApp` now does both.
 - The night and low energy also raised the threshold of commentary, so its lines came 70 to 260 seconds apart with a setting of 45 seconds. They now raise the threshold of idle talk only. The ADR did not say which modes they change. A new commentary also starts with a boredom of 0.8, so its first line comes after about a fifth of the interval instead of a whole one.
 - A second check after these fixes, past midnight, heard the first commentary line after 14 and 22 seconds, and 6 lines in 3 to 5 minutes. Every scene marker closed, and the topics were stored.
+
+The same check found four weaker points of the characters, and a later change addressed them as follows.
+
+- Replies to the owner had no length, so even "see you later" got 4 to 6 paragraphs. The setting "Reply length" now adds one sentence to the system prompt: match the owner's message by default, or short, normal, long, or no instruction. The ADR set lengths only for autonomous lines.
+- A short autonomous line lost the voice of a lively character. The notice now asks for the character's own voice and habits in every length.
+- The system prompt left out the greeting and the example dialogues of a card, because they have a place in a history. They now join the system prompt as reference text, not as messages, so their place does not matter. The card editor has a field for the example dialogues.
+- Two characters drifted to the same night topics, because seeds come from memories and earlier topics. Outside commentary, the notice now says that a new topic can come from what the character likes or does.
+- In the second check, replies got 2 to 4 short paragraphs, and "see you later" got two sentences. Lines used words of the examples, and the small talk of each character stayed on its own interests, for example songs or game plans.
+- The check also found that quiet hours stop small talk and commentary that the owner started. It left them as they are for now.
 The memory ADR has its own steps. They can run beside steps 1 to 4.
 
 ## Work outside the steps

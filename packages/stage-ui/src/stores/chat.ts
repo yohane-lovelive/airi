@@ -60,7 +60,7 @@ import { useAuthStore } from './auth'
 import { createMinecraftContext, createRuntimePromptContext, createUserAccountContext } from './chat/context-providers'
 import { useChatContextStore } from './chat/context-store'
 import { describeChatImages, replaceToolResultImages } from './chat/image-projection'
-import { composeRecipeSpacePrompt, composeSystemPrompt } from './chat/prompt-recipe'
+import { composeRecipeSpacePrompt, composeReplyLengthPrompt, composeSystemPrompt } from './chat/prompt-recipe'
 import { staysLocal } from './chat/session-locality'
 import { useChatSessionStore } from './chat/session-store'
 import { useChatStreamStore } from './chat/stream-store'
@@ -294,6 +294,7 @@ export const useChatStore = defineStore('chat', () => {
   // without its paired prompt-injection defense.
   useWebSearchStore()
   const consciousnessStore = useConsciousnessStore()
+  const consciousnessSettings = useConsciousnessSettingsStore()
   const chatVision = useChatVision()
   const artistryAutonomousStore = useAutonomousArtistryStore()
   const { activeProvider, activeModel } = storeToRefs(consciousnessStore)
@@ -342,6 +343,7 @@ export const useChatStore = defineStore('chat', () => {
       // The profile is about the owner, so only the owner's own conversations hold it. It changes only after memory work.
       + (memory.enabled && ownerProfile.enabled && isOwnerSession(sessionId) ? composeOwnerProfilePrompt(ownerProfile.profile?.text ?? '') : '')
       + (drawsCards(sessionId) ? composeDrawCardPrompt() : '')
+      + composeReplyLengthPrompt(consciousnessSettings.replyLength)
     const recipeId = chatSession.sessionMetas[sessionId]?.recipeId
     const recipe = recipeId ? recipes.recipes.find(entry => entry.id === recipeId) : undefined
     return recipe ? identity + composeRecipeSpacePrompt(recipe) : identity
@@ -1468,7 +1470,7 @@ export const useChatStore = defineStore('chat', () => {
       providerId,
       supportsAudioInput: await supportsAudioInput(providerId, modelId, chatProvider.generation(modelId)),
       // The vision module decides with the same choice, so a model that reads images gets them and no description.
-      supportsVisionInput: useConsciousnessSettingsStore().readsImages(providerId, modelId, selectedModel?.metadata?.abilities?.vision),
+      supportsVisionInput: consciousnessSettings.readsImages(providerId, modelId, selectedModel?.metadata?.abilities?.vision),
       resolveStep,
       signal,
       model: modelId,

@@ -27,6 +27,7 @@ import { computed, getCurrentScope, ref, shallowRef, toRaw, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 
+import { formatCardVoicePrompt } from '../../constants/prompts/card-voice'
 import { DEFAULT_ARTISTRY_WIDGET_SPAWNING_PROMPT } from '../../constants/prompts/character-defaults'
 import { formatGestureActPrompt } from '../../constants/prompts/gesture-act'
 import { formatLive2DActPrompt } from '../../constants/prompts/live2d-act'
@@ -118,13 +119,16 @@ function resolveSystemPrompt(
   if (!card)
     return ''
 
-  // Position-sensitive CCv3 fields are deliberately excluded until provider
-  // message assembly owns their ordering and role semantics.
+  // Position-sensitive CCv3 fields are deliberately excluded as messages until
+  // provider message assembly owns their ordering and role semantics. The
+  // greeting and the example dialogues join as reference text instead, so the
+  // character keeps its voice without a place in the history.
   const systemPromptParts = [
     card.systemPrompt,
     card.description,
     card.personality,
     card.scenario,
+    formatCardVoicePrompt(card),
     card.extensions.airi.modules.artistry?.widgetInstruction,
     formatLive2DActPrompt(expressions, motions),
     formatGestureActPrompt(gestures),

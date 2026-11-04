@@ -17,6 +17,14 @@ export type ReasoningLevel = typeof REASONING_LEVELS[number]
 /** The reasoning of autonomous speech: a level of its own, or `same` as the replies to the owner. */
 export type AutonomousReasoningLevel = ReasoningLevel | 'same'
 
+/**
+ * How long a reply to the owner is. `auto` follows the owner's message, and `free` gives no instruction. A live check on
+ * 2026-11-04 found replies of 4 to 6 paragraphs also to "see you later", because only autonomous lines had a length.
+ */
+export const REPLY_LENGTHS = ['auto', 'short', 'normal', 'long', 'free'] as const
+
+export type ReplyLength = typeof REPLY_LENGTHS[number]
+
 /** Which turns a request is for. Autonomous turns are small talk, commentary, and idle speech. */
 export type ReasoningUse = 'reply' | 'autonomous'
 
@@ -110,6 +118,7 @@ export const useConsciousnessSettingsStore = defineStore('consciousness-settings
   const reasoningLevel = shallowRef<ReasoningLevel>(loadReplyLevel())
   const autonomousReasoningLevel = shallowRef<AutonomousReasoningLevel>(loadLevel('autonomous-reasoning-level', [...REASONING_LEVELS, 'same'] as const) ?? 'same')
   const imageInput = shallowRef(loadImageInput())
+  const replyLength = shallowRef<ReplyLength>(loadLevel('reply-length', REPLY_LENGTHS) ?? 'auto')
   const temperatureEnabled = shallowRef(loadEnabled('temperature-enabled'))
   const topPEnabled = shallowRef(loadEnabled('top-p-enabled'))
 
@@ -121,6 +130,11 @@ export const useConsciousnessSettingsStore = defineStore('consciousness-settings
   async function setAutonomousReasoningLevel(value: AutonomousReasoningLevel) {
     autonomousReasoningLevel.value = value
     persistLevel('autonomous-reasoning-level', value)
+  }
+
+  async function setReplyLength(value: ReplyLength) {
+    replyLength.value = value
+    persistLevel('reply-length', value)
   }
 
   /** Sets whether a model reads images. `catalog` removes the choice of the owner. */
@@ -166,6 +180,7 @@ export const useConsciousnessSettingsStore = defineStore('consciousness-settings
   async function resetState() {
     await setReasoningLevel('off')
     await setAutonomousReasoningLevel('same')
+    await setReplyLength('auto')
     imageInput.value = {}
     if (typeof localStorage !== 'undefined')
       localStorage.setItem('settings/consciousness/image-input', '{}')
@@ -176,11 +191,13 @@ export const useConsciousnessSettingsStore = defineStore('consciousness-settings
   return {
     reasoningLevel,
     autonomousReasoningLevel,
+    replyLength,
     imageInput,
     temperatureEnabled,
     topPEnabled,
     setReasoningLevel,
     setAutonomousReasoningLevel,
+    setReplyLength,
     setImageInput,
     imageInputChoiceOf,
     readsImages,
@@ -191,7 +208,7 @@ export const useConsciousnessSettingsStore = defineStore('consciousness-settings
   }
 }, {
   synced: {
-    actions: ['resetState', 'setReasoningLevel', 'setAutonomousReasoningLevel', 'setImageInput', 'setTemperatureEnabled', 'setTopPEnabled'],
+    actions: ['resetState', 'setReasoningLevel', 'setAutonomousReasoningLevel', 'setReplyLength', 'setImageInput', 'setTemperatureEnabled', 'setTopPEnabled'],
     state: true,
   },
 })

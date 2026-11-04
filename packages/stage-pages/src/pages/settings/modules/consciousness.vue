@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import type { AutonomousReasoningLevel, ImageInputChoice, ReasoningLevel } from '@proj-airi/stage-ui/stores/modules/consciousness-settings'
+import type { AutonomousReasoningLevel, ImageInputChoice, ReasoningLevel, ReplyLength } from '@proj-airi/stage-ui/stores/modules/consciousness-settings'
 
 import { RadioCardManySelect, RadioCardSimple } from '@proj-airi/stage-ui/components'
 import { useAnalytics } from '@proj-airi/stage-ui/composables'
 import { useAiriCardStore } from '@proj-airi/stage-ui/stores/modules/airi-card'
 import { useConsciousnessStore } from '@proj-airi/stage-ui/stores/modules/consciousness'
-import { REASONING_LEVELS, useConsciousnessSettingsStore } from '@proj-airi/stage-ui/stores/modules/consciousness-settings'
+import { REASONING_LEVELS, REPLY_LENGTHS, useConsciousnessSettingsStore } from '@proj-airi/stage-ui/stores/modules/consciousness-settings'
 import { useProviderConfigStore } from '@proj-airi/stage-ui/stores/providers/config'
 import { useProviderStore } from '@proj-airi/stage-ui/stores/providers/provider'
 import { Alert, FieldCheckbox, FieldRange, FieldSelect, SettingsCard } from '@proj-airi/ui'
@@ -23,7 +23,7 @@ const consciousnessStore = useConsciousnessStore()
 const consciousnessSettingsStore = useConsciousnessSettingsStore()
 const { configuredProviders } = storeToRefs(providerStore)
 const { moduleChatProvidersMetadata } = storeToRefs(providersStore)
-const { reasoningLevel, autonomousReasoningLevel, temperatureEnabled, topPEnabled } = storeToRefs(consciousnessSettingsStore)
+const { reasoningLevel, autonomousReasoningLevel, replyLength, temperatureEnabled, topPEnabled } = storeToRefs(consciousnessSettingsStore)
 const {
   activeProvider,
   activeModel,
@@ -77,6 +77,14 @@ const autonomousReasoningOptions = computed(() => [
   { label: t(`${THINKING_KEY}.levels.same`), value: 'same' as const },
   ...reasoningOptions.value,
 ])
+
+const REPLY_LENGTH_KEY = 'settings.pages.modules.consciousness.sections.section.model-options.reply-length'
+const replyLengthOptions = computed(() => REPLY_LENGTHS.map(length => ({ label: t(`${REPLY_LENGTH_KEY}.options.${length}`), value: length })))
+
+async function updateReplyLength(value: ReplyLength | undefined) {
+  if (value)
+    await consciousnessSettingsStore.setReplyLength(value)
+}
 
 async function updateReasoningLevel(value: ReasoningLevel | undefined) {
   if (value)
@@ -365,6 +373,13 @@ async function updateTopPEnabled(value: boolean) {
           @update:model-value="updateAutonomousReasoningLevel"
         />
       </template>
+      <FieldSelect
+        :model-value="replyLength"
+        :options="replyLengthOptions"
+        :label="t(`${REPLY_LENGTH_KEY}.label`)"
+        :description="t(`${REPLY_LENGTH_KEY}.description`)"
+        @update:model-value="updateReplyLength"
+      />
       <FieldSelect
         :model-value="imageInputChoice"
         :options="imageInputOptions"

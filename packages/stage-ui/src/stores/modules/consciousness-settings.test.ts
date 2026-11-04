@@ -52,6 +52,19 @@ describe('consciousness settings store', () => {
     expect(store.reasoningLevel).toBe('off')
   })
 
+  it('keeps the reply length on the device, and resets it to the length that follows the owner message', async () => {
+    const store = useConsciousnessSettingsStore()
+    expect(store.replyLength).toBe('auto')
+
+    await store.setReplyLength('short')
+    expect(localStorage.getItem('settings/consciousness/reply-length')).toBe('short')
+    setActivePinia(createPinia())
+    expect(useConsciousnessSettingsStore().replyLength).toBe('short')
+
+    await useConsciousnessSettingsStore().resetState()
+    expect(useConsciousnessSettingsStore().replyLength).toBe('auto')
+  })
+
   it('turns a level into the request options of a provider', () => {
     expect(chatRequestOptionsOf('default')).toBeUndefined()
     expect(chatRequestOptionsOf('off')).toEqual({ reasoning: 'disabled' })

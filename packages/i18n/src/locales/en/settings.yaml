@@ -508,6 +508,7 @@ pages:
       description: Description
       behavior: Behavior
       greetings: Greetings (one per line)
+      message_examples: Example dialogues
       settings: Settings
       version: Version
       create: Create
@@ -543,6 +544,8 @@ pages:
         scenario: What are the surroundings ? What is the current situation ?
         greetings_field: Greetings
         greetings: How your character should say "hello" ?
+        message_examples: "Short dialogues that show how your character talks. Start each line with {'{{'}char{'}}'}: or {'{{'}user{'}}'}:, and leave an empty line between dialogues. The character reads them as examples, not as past talk."
+        message_examples_placeholder: "{'{{'}user{'}}'}: Let's play a game!\n{'{{'}char{'}}'}: Okay, I won't lose!"
         systemprompt: Explain here to the AI LLM how it should answer when prompted.
         posthistoryinstructions: Place here anything the AI LLM should read after the messages history.
         version: >-
@@ -879,6 +882,15 @@ pages:
                 medium: Medium
                 high: High
               required-description: This model requires Thinking.
+            reply-length:
+              label: Reply length
+              description: How long the replies to your messages are. Autonomous speech has its own length.
+              options:
+                auto: Match my message
+                short: Short, 1 or 2 sentences
+                normal: Normal, 2 to 4 sentences
+                long: Long, as the topic needs
+                free: No instruction
             image-input:
               label: Image input
               description: Whether this model reads images itself. When it does not, the vision module describes each image first, which takes several seconds. Many model lists leave this out, for example on OpenAI-compatible servers.

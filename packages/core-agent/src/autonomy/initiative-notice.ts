@@ -151,6 +151,10 @@ export function initiativeNoticeText(context: InitiativeNoticeContext): string {
       ? `- Your current topic "${topic}" is cold. Move to a new topic.`
       : `- Your current topic: "${topic}". You can continue it or move to a related topic.`)
   }
+  // Seeds come from memories and earlier topics, which every character shares. A live check heard two characters drift
+  // to the same night topics, so a new topic can also come from the character. Commentary follows the screen instead.
+  if (context.mode !== 'commentary' && (!context.thread || context.thread.cold))
+    lines.push('- A new topic can also come from what you like or do, as your profile says.')
   if (context.seeds?.length) {
     lines.push('- Topic ideas, only if one fits:')
     lines.push(...context.seeds.map(seed => `  - ${truncate(seed.text, TOPIC_LIMITS.maxSeedLength)}`))
@@ -161,7 +165,8 @@ export function initiativeNoticeText(context: InitiativeNoticeContext): string {
     lines.push('- Your last lines that you started. Do not repeat their opening or structure:')
     lines.push(...recent.map(line => `  - "${truncate(line, RECENT_LINE_MAX_LENGTH)}"`))
   }
-  lines.push(`${LINE_LENGTH_TEXT[context.lineLength]} Keep it natural.`)
+  // A short line lost the voice of a lively character in a live check, so the notice asks for it in every length.
+  lines.push(`${LINE_LENGTH_TEXT[context.lineLength]} Keep it natural, in your own voice and habits.`)
   lines.push('If you speak, end with <|TOPIC a few words|> that name your topic, in the language of your line. Nobody sees or hears it.')
   lines.push('Then add <|NEXT continue|> if you have more to say, <|NEXT wait|> if you want the owner\'s answer, or <|NEXT done|> if the topic is closed.')
   return lines.join('\n')
