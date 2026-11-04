@@ -2,6 +2,7 @@ import type { SpeechType } from './speech-types'
 
 import { merge } from '@moeru/std'
 
+import { COMMENTARY_LIMITS } from './commentary'
 import { drawSpeechType, RECENT_SPEECH_TYPE_COUNT } from './speech-types'
 
 /**
@@ -436,7 +437,10 @@ export function observeInitiative(
     case 'character-spoke':
       return { ...withoutFollowUp(current), inner: { ...current.inner, boredom: 0 } }
     case 'mode-changed':
-      return { ...withoutFollowUp(current), mode: event.mode }
+      // A new commentary opens soon, so the owner does not wait a whole interval for its first line.
+      return event.mode === 'commentary'
+        ? { ...withoutFollowUp(current), mode: event.mode, inner: { ...current.inner, boredom: Math.max(current.inner.boredom, COMMENTARY_LIMITS.openingBoredom) } }
+        : { ...withoutFollowUp(current), mode: event.mode }
     case 'turn-finished':
       return finishTurn(current, event, time.now, options, random)
     case 'speech-ended':
@@ -474,7 +478,7 @@ export function decideInitiative(
         budget: countTurn(current.budget, options),
         ...(followUp.kind === 'follow-up' ? { nudged: true } : {}),
       },
-      decision: { kind: 'turn', trigger: followUp.kind, drive: driveOf(current, host).total, threshold: thresholdOf(current.inner, current.jitter ?? 1, time) },
+      decision: { kind: 'turn', trigger: followUp.kind, drive: driveOf(current, host).total, threshold: thresholdOf(current.inner, current.jitter ?? 1, time, options) },
     }
   }
   if (reason)
@@ -484,7 +488,7 @@ export function decideInitiative(
   const jitter = current.jitter ?? 1 + (random() * 2 - 1) * options.thresholdJitter
   current = { ...current, jitter }
 
-  const threshold = thresholdOf(current.inner, jitter, time)
+  const threshold = thresholdOf(current.inner, jitter, time, options)
   const { total: drive, intention: intentionDrive } = driveOf(current, host)
   if (drive < threshold)
     return { state: current, decision: { kind: 'wait', reason: 'below-threshold' } }
@@ -530,7 +534,7 @@ export function requestRhythmTurn(
 
   return {
     state: { ...current, turn: { startedAt: time.now, trigger: rhythm }, budget: countTurn(current.budget, options) },
-    decision: { kind: 'turn', trigger: rhythm, drive: driveOf(current, host).total, threshold: thresholdOf(current.inner, current.jitter ?? 1, time) },
+    decision: { kind: 'turn', trigger: rhythm, drive: driveOf(current, host).total, threshold: thresholdOf(current.inner, current.jitter ?? 1, time, options) },
   }
 }
 
@@ -570,7 +574,7 @@ export function initiativeReadout(state: InitiativeState, host: InitiativeHost, 
     current = { ...current, budget: { day: time.localDay, turns: 0 } }
 
   const drive = driveOf(current, host)
-  const threshold = thresholdOf(current.inner, current.jitter ?? 1, time)
+  const threshold = thresholdOf(current.inner, current.jitter ?? 1, time, options)
   const reason = waitReason(current, host, time, options) ?? (drive.total < threshold ? 'below-threshold' : undefined)
   return {
     mode: current.mode,
@@ -751,7 +755,14 @@ export function unansweredIntervalFactor(unanswered: number): number {
 }
 
 /** Low energy and the night raise the threshold. */
-function thresholdOf(inner: InnerState, jitter: number, time: InitiativeTime) {
+/**
+ * The drive that a turn needs. Low energy and the night raise it for idle talk.
+ * The owner started a mission, for example small talk or commentary, so it keeps the pace of its settings. A live check
+ * on 2026-11-04 found commentary lines 70 to 260 seconds apart at night, with a setting of 45 seconds.
+ */
+function thresholdOf(inner: InnerState, jitter: number, time: InitiativeTime, options: Pick<InitiativeOptions, 'missionRunning'>) {
+  if (options.missionRunning)
+    return jitter
   const energyFactor = 1 + (1 - inner.energy) * INNER_DYNAMICS.energyThresholdGain
   const nightFactor = dayPartOf(time.localMinutes) === 'night' ? INNER_DYNAMICS.nightThresholdFactor : 1
   return energyFactor * nightFactor * jitter

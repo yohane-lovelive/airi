@@ -12,6 +12,8 @@ export const COMMENTARY_LIMITS = {
   hardInterruptSalience: 0.95,
   /** No other interruption comes for this time after one. */
   interruptCooldownMs: 15_000,
+  /** A new commentary starts with this boredom, so its first line comes after about a fifth of the interval. */
+  openingBoredom: 0.8,
 } as const
 
 /**

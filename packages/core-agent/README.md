@@ -115,7 +115,7 @@ All functions are pure. The host passes the time, a random source, and the state
 - `applyTalkLevel` and `talkControlEffect` turn the owner's words, for example "be quiet for 30 minutes", into a quiet time and an interval factor.
 
 The drive is event pressure plus boredom plus a small part for each open intention. Pressure decays, and salience counts squared. Boredom grows by 1 per boredom interval of quiet.
-A turn starts when the drive passes a threshold. Low energy raises the threshold, and a random jitter changes it once per cycle.
+A turn starts when the drive passes a threshold. Low energy and the night raise the threshold of idle talk, and a random jitter changes it once per cycle. A mission that the owner started keeps its pace, and a new commentary opens after about a fifth of its interval.
 Each autonomous line without an owner message makes the idle interval longer, up to 3 times. `unansweredIntervalFactor` gives the factor.
 Gates stop a turn in this order: owner input and its grace time, speech playback, a running turn, quiet hours, the owner's quiet time, the daily budget, and the refractory time.
 
@@ -179,7 +179,7 @@ The queue copies the catalog when the request is submitted, alongside its provid
 Concurrent sessions and queued sends retain their own catalog. The runtime adds its marker instructions to that request's system prompt.
 An absent or empty catalog disables sticker output and adds no prompt instructions.
 
-The existing marker parser accepts `<|STICKER id|>` across stream chunks.
+The existing marker parser accepts `<|STICKER id|>` across stream chunks. It also ends a marker that the model closed with `|` or `>` alone at a line break, at the next marker, or at the end of the text.
 The runtime stores at most one known ID as a `ChatSlicesSticker` per reply.
 Unknown IDs are ignored. Sticker markers never reach literal speech or special-token hooks.
 Other special markers retain their existing behavior. A reply can contain text, a sticker, or both.

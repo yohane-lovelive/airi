@@ -4,14 +4,9 @@ import type { ScreenSource } from '@proj-airi/stage-ui/libs/perception/screen-so
 import { defineInvoke } from '@moeru/eventa'
 import { electronEvents } from '@proj-airi/electron-eventa'
 import { useElectronScreenCapture } from '@proj-airi/electron-screen-capture/vue'
+import { windowOfApp } from '@proj-airi/stage-ui/libs/perception/screen-source'
 
 import { electronForegroundWindow, electronOpenWindows } from '../../shared/eventa'
-
-/** Whether a window belongs to the app that the owner named. Names match without case, and a part of the name counts. */
-function windowOfApp(window: { app: string, title: string }, app: string) {
-  const wanted = app.toLowerCase()
-  return window.app.toLowerCase() === wanted || window.app.toLowerCase().includes(wanted) || window.title.toLowerCase().includes(wanted)
-}
 
 /**
  * Lets screen perception capture the screen of the desktop.

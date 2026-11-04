@@ -143,11 +143,20 @@ describe('speech pressure', () => {
 
   // A commentary mission talks often. Its boredom interval is 45 seconds.
   it('uses the settings of the current mode', () => {
-    const state = observeInitiative(createInitiativeState(at(0)), { type: 'mode-changed', mode: 'commentary' }, at(0), options)
-    const turn = firstTurn(state, options, 0, 100)
+    const turn = firstTurn(createInitiativeState(at(0), 'commentary'), options, 0, 100)
 
     expect(turn?.second).toBeGreaterThanOrEqual(45)
     expect(turn?.second).toBeLessThanOrEqual(46)
+  })
+
+  // ROOT CAUSE:
+  // A new commentary started with no boredom, so a live check waited about 140 seconds for its first line.
+  it('opens a new commentary after about a fifth of its interval', () => {
+    const state = observeInitiative(createInitiativeState(at(0)), { type: 'mode-changed', mode: 'commentary' }, at(0), options)
+    const turn = firstTurn(state, options, 0, 100)
+
+    expect(turn?.second).toBeGreaterThanOrEqual(9)
+    expect(turn?.second).toBeLessThanOrEqual(10)
   })
 
   // An owner message gets a normal reply, so the conversation is not quiet and old pressure does not count.
@@ -413,5 +422,16 @@ describe('daily rhythm', () => {
 
     expect(initiativeReadout(state, IDLE, at(1, '2026-10-29', 23 * 60), resolveInitiativeOptions()).threshold).toBeCloseTo(1.5)
     expect(initiativeReadout(state, IDLE, at(1, '2026-10-29', 12 * 60), resolveInitiativeOptions()).threshold).toBeCloseTo(1)
+  })
+
+  // ROOT CAUSE:
+  // The night and low energy also raised the threshold of commentary, so a live check heard lines 70 to 260 seconds
+  // apart with a setting of 45 seconds. The owner started the mission, so it keeps its pace.
+  it('keeps the pace of a mission at night and on low energy', () => {
+    const tired = { ...createInitiativeState(at(0)), inner: { ...createInitiativeState(at(0)).inner, energy: 0.2 } }
+    const night = at(1, '2026-10-29', 23 * 60)
+
+    expect(initiativeReadout(tired, IDLE, night, resolveInitiativeOptions()).threshold).toBeGreaterThan(2)
+    expect(initiativeReadout(tired, IDLE, night, resolveInitiativeOptions({ missionRunning: true })).threshold).toBeCloseTo(1)
   })
 })

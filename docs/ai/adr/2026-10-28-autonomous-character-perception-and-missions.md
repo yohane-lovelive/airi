@@ -399,7 +399,7 @@ Step 2b-1 built the daily rhythm as follows. Step 2b-2 builds topics and small t
 - Greeting: at the first tick of the leader, an open conversation that was quiet for 3 hours or more gets a greeting. The notice gives the time of day and the time since the last message.
 - Welcome back: no input for 10 minutes makes the owner away. A screen lock or sleep makes the owner away at once. A return after 30 minutes or more gets a welcome back, but not within 10 minutes of another rhythm turn. The notice gives the time away.
 - The desktop app reads `powerMonitor.getSystemIdleTime()` every 15 seconds through an eventa invoke. The web app counts input and visibility of the page only, because the Idle Detection API asks for a permission.
-- Night is 22:00 to 05:00. At night, the threshold is 1.5 times higher. Jokes and questions get lower weights, and passing thoughts and quiet remarks get higher ones.
+- Night is 22:00 to 05:00. At night, the threshold is 1.5 times higher. Jokes and questions get lower weights, and passing thoughts and quiet remarks get higher ones. The night and low energy raise the threshold of idle talk only. A mission that the owner started, small talk or commentary, keeps the pace of its settings.
 - Settings > Modules > Autonomous speech turns the greeting and the welcome back on or off. Both are on by default. The inspector shows whether the owner is away and the last rhythm turn.
 
 - Code checks each value that the model gives. The model can only create and stop instances.
@@ -817,6 +817,13 @@ Step 5-3 settled the open defaults with the owner on 2026-11-04 as follows.
 - A live check measured the cache of OpenCode Go with `deepseek-v4.1-flash`. A request with a 1280 by 720 image had 889 prompt tokens, and the same request again read 768 of them from the cache. Another question after the same image also read 768. A text-only request of 310 tokens read none. So the cache applies to images, and it reads whole blocks of the prefix only.
 - A new frame changes the prefix at the image, so a turn reads from the cache only the part before the frame. The usage records already count the tokens of each purpose. The owner checks the cost on the OpenCode Go site.
 - The owner held the CORS solution for the production web build, and left a realtime API out of a later ADR for now. Both are in the idea notes.
+
+A live check with two character cards on 2026-11-04 tried conversation, idle talk, small talk, and commentary of a demo game. It found three faults, and a later change fixed them as follows.
+
+- The model sometimes closed a marker with `|` or `>` alone, for example `<|SCENE a boss fight|`. The open marker then took the next marker, so most lines lost their scene note and topic label. The marker parser now ends a marker with a broken close at a line break, at the next marker, or at the end of the text. A correct marker can still span lines.
+- A commentary found its window by the app name or the title, but it checked the window in front by the app name only. A commentary of a title then took no frame. One rule in `windowOfApp` now does both.
+- The night and low energy also raised the threshold of commentary, so its lines came 70 to 260 seconds apart with a setting of 45 seconds. They now raise the threshold of idle talk only. The ADR did not say which modes they change. A new commentary also starts with a boredom of 0.8, so its first line comes after about a fifth of the interval instead of a whole one.
+- A second check after these fixes, past midnight, heard the first commentary line after 14 and 22 seconds, and 6 lines in 3 to 5 minutes. Every scene marker closed, and the topics were stored.
 The memory ADR has its own steps. They can run beside steps 1 to 4.
 
 ## Work outside the steps

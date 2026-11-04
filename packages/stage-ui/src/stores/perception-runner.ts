@@ -13,6 +13,7 @@ import { onScopeDispose, watch } from 'vue'
 
 import { exclusionMatch } from '../libs/perception/exclusion'
 import { FRAME_LIMITS, FrameRing } from '../libs/perception/frame-ring'
+import { windowOfApp } from '../libs/perception/screen-source'
 import { FrameEncoder } from '../workers/frame-encoder'
 import { Ticker } from '../workers/ticker'
 import { usePerceptionStore } from './perception'
@@ -296,7 +297,7 @@ export const usePerceptionRunnerStore = defineStore('perception-runner', () => {
           return
         }
         // A commentary sees its window only while the owner has it in front, as the ADR asks.
-        targetInFront = Boolean(target && window && window.app.toLowerCase().includes(target.toLowerCase()))
+        targetInFront = Boolean(target && window && windowOfApp(window, target))
         if (target && !targetInFront) {
           detector.skip(at)
           return
