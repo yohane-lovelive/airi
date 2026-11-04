@@ -14,10 +14,16 @@ export const INITIATIVE_LIMITS = {
   maxIdleIntervalMinutes: 240,
   minDailyTurnBudget: 1,
   maxDailyTurnBudget: 1000,
+  minCommentaryIntervalSeconds: 15,
+  maxCommentaryIntervalSeconds: 300,
+  minSmallTalkIntervalMinutes: 1,
+  maxSmallTalkIntervalMinutes: 10,
 } as const
 
-/** The commentary interval of the policy defaults. The screen activity scales it. */
-const COMMENTARY_BASE_INTERVAL_MS = resolveInitiativeOptions().modes.commentary.boredomIntervalMs
+/** The commentary interval of the policy defaults, 45 seconds. The screen activity scales it. */
+const DEFAULT_COMMENTARY_INTERVAL_SECONDS = resolveInitiativeOptions().modes.commentary.boredomIntervalMs / 1000
+/** The small-talk interval of the mission limits, 2 minutes. */
+const DEFAULT_SMALL_TALK_INTERVAL_MINUTES = SMALL_TALK_LIMITS.boredomIntervalMs / 60_000
 
 /** Reads `HH:mm` as minutes since midnight. Resolves to `undefined` for any other text. */
 function minutesOf(time: string) {
@@ -48,6 +54,10 @@ export const useInitiativeStore = defineStore('initiative', () => {
   const idleIntervalMinutes = useLocalStorageManualReset<number>('initiative/idle-interval-minutes', 15)
   /** The maximum count of autonomous turns in one day. A silent turn counts too. */
   const dailyTurnBudget = useLocalStorageManualReset<number>('initiative/daily-turn-budget', 200)
+  /** While commentary runs, the character talks about this often on a calm screen. A busy screen shortens it. */
+  const commentaryIntervalSeconds = useLocalStorageManualReset<number>('initiative/commentary-interval-seconds', DEFAULT_COMMENTARY_INTERVAL_SECONDS)
+  /** While small talk runs, the character talks about this often when the owner is quiet. */
+  const smallTalkIntervalMinutes = useLocalStorageManualReset<number>('initiative/small-talk-interval-minutes', DEFAULT_SMALL_TALK_INTERVAL_MINUTES)
   const quietHoursEnabled = useLocalStorageManualReset<boolean>('initiative/quiet-hours-enabled', false)
   /** The start of the quiet hours, `HH:mm`. A range can pass midnight. */
   const quietHoursStart = useLocalStorageManualReset<string>('initiative/quiet-hours-start', '23:00')
@@ -80,7 +90,9 @@ export const useInitiativeStore = defineStore('initiative', () => {
    */
   function settingsAt(now: number, foreground: { smallTalk?: boolean, commentaryActivity?: number } = {}): InitiativeSettings {
     const smallTalk = Boolean(foreground.smallTalk)
-    const { minDailyTurnBudget, maxDailyTurnBudget } = INITIATIVE_LIMITS
+    const { minDailyTurnBudget, maxDailyTurnBudget, minCommentaryIntervalSeconds, maxCommentaryIntervalSeconds, minSmallTalkIntervalMinutes, maxSmallTalkIntervalMinutes } = INITIATIVE_LIMITS
+    const commentaryIntervalMs = clamp(commentaryIntervalSeconds.value, minCommentaryIntervalSeconds, maxCommentaryIntervalSeconds) * 1000
+    const smallTalkIntervalMs = clamp(smallTalkIntervalMinutes.value, minSmallTalkIntervalMinutes, maxSmallTalkIntervalMinutes) * 60_000
     const startMinutes = minutesOf(quietHoursStart.value)
     const endMinutes = minutesOf(quietHoursEnd.value)
     const { quietUntil, idleIntervalFactor } = talkControlEffect(talkControl.value, now)
@@ -92,10 +104,10 @@ export const useInitiativeStore = defineStore('initiative', () => {
       maxContinuations: smallTalk ? 3 : foreground.commentaryActivity !== undefined ? 2 : 1,
       modes: {
         idle: smallTalk
-          ? { boredomIntervalMs: SMALL_TALK_LIMITS.boredomIntervalMs * idleIntervalFactor, refractoryMs: SMALL_TALK_LIMITS.refractoryMs }
+          ? { boredomIntervalMs: smallTalkIntervalMs * idleIntervalFactor, refractoryMs: SMALL_TALK_LIMITS.refractoryMs }
           : { boredomIntervalMs: clampedIdleIntervalMinutes() * idleIntervalFactor * 60_000 },
         ...(foreground.commentaryActivity !== undefined
-          ? { commentary: { boredomIntervalMs: COMMENTARY_BASE_INTERVAL_MS * commentaryIntervalFactor(foreground.commentaryActivity) * idleIntervalFactor } }
+          ? { commentary: { boredomIntervalMs: commentaryIntervalMs * commentaryIntervalFactor(foreground.commentaryActivity) * idleIntervalFactor } }
           : {}),
       },
       ...(quietHoursEnabled.value && startMinutes !== undefined && endMinutes !== undefined ? { quietHours: { startMinutes, endMinutes } } : {}),
@@ -129,6 +141,8 @@ export const useInitiativeStore = defineStore('initiative', () => {
     enabled.reset()
     idleIntervalMinutes.reset()
     dailyTurnBudget.reset()
+    commentaryIntervalSeconds.reset()
+    smallTalkIntervalMinutes.reset()
     quietHoursEnabled.reset()
     quietHoursStart.reset()
     quietHoursEnd.reset()
@@ -141,6 +155,8 @@ export const useInitiativeStore = defineStore('initiative', () => {
     enabled,
     idleIntervalMinutes,
     dailyTurnBudget,
+    commentaryIntervalSeconds,
+    smallTalkIntervalMinutes,
     quietHoursEnabled,
     quietHoursStart,
     quietHoursEnd,

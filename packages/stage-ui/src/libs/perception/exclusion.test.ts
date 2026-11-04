@@ -18,9 +18,11 @@ describe('exclusionMatch', () => {
     expect(exclusionMatch({ title: '〇〇銀行 ログイン - Vivaldi', app: 'Vivaldi' }, ['銀行'])).toBe('銀行')
   })
 
-  it('skips empty entries, and the default list excludes messengers', () => {
+  it('skips empty entries, and the default list excludes messengers but not Discord', () => {
     expect(exclusionMatch({ title: 'Game', app: 'Game' }, ['', '  '])).toBeUndefined()
-    expect(exclusionMatch({ title: '#general - Discord', app: 'Discord' }, DEFAULT_PERCEPTION_EXCLUSIONS)).toBe('Discord')
+    expect(exclusionMatch({ title: 'general - Slack', app: 'Slack' }, DEFAULT_PERCEPTION_EXCLUSIONS)).toBe('Slack')
+    // The owner chose on 2026-11-04 that the character sees Discord.
+    expect(exclusionMatch({ title: '#general - Discord', app: 'Discord' }, DEFAULT_PERCEPTION_EXCLUSIONS)).toBeUndefined()
     expect(exclusionMatch({ title: 'League of Legends', app: 'League of Legends' }, DEFAULT_PERCEPTION_EXCLUSIONS)).toBeUndefined()
   })
 })

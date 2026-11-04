@@ -42,7 +42,7 @@ Entry points show nothing while the user is signed out. Announcements are a sepa
 ## Autonomous speech
 
 The character can start to talk without an owner message. It is step 2 of [the autonomy ADR](../../docs/ai/adr/2026-10-28-autonomous-character-perception-and-missions.md). It is off by default.
-`useInitiativeStore()` in `stores/initiative.ts` keeps the device settings: the switch, the talk interval, the tries per day, and the quiet hours.
+`useInitiativeStore()` in `stores/initiative.ts` keeps the device settings: the switch, the talk interval, the tries per day, the intervals of small talk and commentary, and the quiet hours.
 `useInitiativeRunnerStore()` runs the policy of `@proj-airi/core-agent` on the renderer leader. Each app calls `initialize` once.
 
 - Each second, the runner asks the policy. On a turn, a transient notice goes to the open conversation. History keeps only the reply.

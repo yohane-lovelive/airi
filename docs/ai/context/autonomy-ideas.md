@@ -93,6 +93,12 @@ The "Known risks" table of the ADR keeps three more items: self-hearing, screen 
 - **Why it waits:** The procedural layer and the clip library come first, and they need no model.
 - **Look again when:** Gestures from the library look too repetitive.
 
+### Model calls from the production web build
+
+- **What:** The production web build calls the chat provider, for example OpenCode Go, without the proxy of the dev server. A route through the self-hosted server can solve CORS.
+- **Why it waits:** The owner uses the desktop app and the web dev server. On 2026-11-04 the owner held it.
+- **Look again when:** The owner wants to use the production web build, for example on a phone.
+
 ### Motion control by the model
 
 - **What:** The model gives gaze targets, head angles, and blend weights of poses, not clip names.

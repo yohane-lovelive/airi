@@ -968,6 +968,11 @@ pages:
       minutes: '{count} 分'
       daily-turn-budget: 1 日の試行回数
       daily-turn-budget-description: 1 日に自律発話でモデルを呼ぶ回数の上限です。
+      small-talk-interval: 雑談の間隔
+      small-talk-interval-description: 雑談の間、あなたが黙っていると、キャラクターはおよそこの間隔で話します。
+      commentary-interval: 実況の間隔
+      commentary-interval-description: 実況の間、落ち着いた画面では、キャラクターはおよそこの間隔で話します。画面の動きが大きいと、間隔は短くなります。
+      seconds: '{count} 秒'
       quiet-hours: 静かな時間帯を使う
       quiet-hours-description: この時間帯は、キャラクターから話し始めません。あなたへの返事はします。
       quiet-hours-start: 開始

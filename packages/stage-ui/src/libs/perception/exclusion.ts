@@ -9,7 +9,7 @@ export interface ForegroundWindow {
 
 /**
  * The default exclusion list: password managers, messengers, and words of banking in window titles.
- * The owner edits it in Settings.
+ * The owner edits it in Settings. Discord is not in the list, because the owner wants the character to see it.
  */
 export const DEFAULT_PERCEPTION_EXCLUSIONS: readonly string[] = [
   '1Password',
@@ -19,7 +19,6 @@ export const DEFAULT_PERCEPTION_EXCLUSIONS: readonly string[] = [
   'LastPass',
   'Dashlane',
   'Enpass',
-  'Discord',
   'LINE',
   'Slack',
   'Microsoft Teams',

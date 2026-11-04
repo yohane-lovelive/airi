@@ -581,7 +581,7 @@ The speaking model is a cloud model. Frames leave the PC, so these rules are man
 
 - Screen perception is opt-in. Settings state that the app sends frames to the selected cloud provider.
 - An indicator shows while perception runs. One click pauses it.
-- An exclusion list names apps and window titles. A match skips the frame. The default list holds password managers, banks, and messengers.
+- An exclusion list names apps and window titles. A match skips the frame. The default list holds password managers, banks, and messengers. Discord is not in it, because the owner wants the character to see it.
 - On the web, the exclusion list cannot work on a full-screen share. Settings state this, and they recommend a share of one window or one tab.
 - Perception pauses on suspend, on lock screen, and when the source disappears.
 - The app stores no frame on disk. The evaluation recorder is the only exception.
@@ -620,7 +620,7 @@ The owner accepts these risks for now. If a fault appears, a later change adds t
 | Risk | Reason to wait | Fix when needed |
 | --- | --- | --- |
 | The microphone hears the speech of the character, so the character stops itself or answers itself. | The owner uses headphones. | Echo cancellation, a match against the audio that plays, or a speaker check with `speaker-tracker`. |
-| Text on the screen acts as an instruction to the model, for example "add a reminder". | No fault seen yet. | Limit tools by turn type. Screen-started turns cannot create missions or write memories. Mark screen text as untrusted data. |
+| Text on the screen acts as an instruction to the model, for example "add a reminder". | No fault seen yet. The default exclusion list leaves Discord out, so messages of friends also reach the model. | Limit tools by turn type. Screen-started turns cannot create missions or write memories. Mark screen text as untrusted data. |
 | The character talks during a call or a meeting. | The owner plans to use AIRI in Discord calls, so a fixed mute rule does not fit. | A do-not-disturb rule that knows whether AIRI takes part in the call. |
 
 ## Implementation boundaries
@@ -705,7 +705,7 @@ The order follows dependencies. Each step uses the parts of the earlier steps. E
 | 2b | Daily rhythm and small talk: templates as recipes, the `greeting`, `welcome-back`, and `small-talk` templates, topic seeds, and the time of day. Measure variety. | Done. Templates as recipes still wait. |
 | 3 | Perception: the adapters, ring buffer, detectors, frame policies, image budget, recorder, replay, timeline, scene state, `commentary` with interruptions, and `watch`. | Done. |
 | 4 | Motion: the model capability check, the procedural layer, the library with `ACT` markers, expression sync, and the upper-body layer. | Done |
-| 5 | Generated motion, game audio, recall from memory, and polish. Recall needs the memory ADR. | In progress: recall from memory is done with step M3 of ADR 2026-11-02, and 5-0, 5-2a, 5-2b, 5-4a, and 5-4b are done. The owner held game audio. |
+| 5 | Generated motion, game audio, recall from memory, and polish. Recall needs the memory ADR. | In progress: recall from memory is done with step M3 of ADR 2026-11-02, and 5-0, 5-2a, 5-2b, 5-3, 5-4a, and 5-4b are done. The owner held game audio. |
 
 Step 2 has four parts. Each part is one change.
 
@@ -748,7 +748,7 @@ Step 5 has these parts. The owner added the length and tempo of talk after using
 | 5-1 | Game audio: the capture of one process, the loud sound detector, and a local transcript in the timeline. | Held |
 | 5-2a | Generated motion: Text-To-VRMA on the same PC makes the clips that the library lacks. | Done |
 | 5-2b | Generated motion on request: the owner asks for a motion, and the clip plays when it is ready. | Done |
-| 5-3 | Polish: the defaults of the open work. | To do |
+| 5-3 | Polish: the defaults of the open work. | Done |
 | 5-4a | The length of a line: a length target for each turn, and a turn budget that counts only idle speech. | Done |
 | 5-4b | The flow of talk: a `NEXT` marker of the model, and the pause after the speech ends. | Done |
 
@@ -803,6 +803,15 @@ Step 5-2b built generated motion on request as follows.
 - Without a generator, the tool gives the reason, for example the web app, generation off, the limit of the day, or a failure earlier in the run. The model tells the owner briefly.
 - The play request reaches the stage of the window that runs the turn. On the desktop this is the main window, and the web app has one window.
 - A live check on 2026-11-04 used `deepseek-v4.1-flash` and the stand-in server of step 5-2a. With the first description of the tool, a casual request, "剣を振るところを見せて", got no tool call: the model wrote gestures of the list instead. The description now asks for the tool first when the owner asks for a movement. Then three requests called it: two new motions were made and played after a short line, and a bow got its marker and played.
+
+Step 5-3 settled the open defaults with the owner on 2026-11-04 as follows.
+
+- The owner asked that each default stays a setting. The idle interval of 15 minutes, the 200 tries each day, and the image budgets of 20 and 120 images each hour were settings already.
+- Settings now also hold the interval of small talk, 2 minutes by default and 1 to 10 minutes, and the interval of commentary on a calm screen, 45 seconds by default and 15 to 300 seconds. The screen activity still scales the commentary interval. Both stay on the device, like the other settings of autonomous speech.
+- The default exclusion list leaves Discord out, because the owner wants the character to see it. A list that a device stored keeps its entries, so the owner removed Discord from the list of this PC in the live check.
+- A live check measured the cache of OpenCode Go with `deepseek-v4.1-flash`. A request with a 1280 by 720 image had 889 prompt tokens, and the same request again read 768 of them from the cache. Another question after the same image also read 768. A text-only request of 310 tokens read none. So the cache applies to images, and it reads whole blocks of the prefix only.
+- A new frame changes the prefix at the image, so a turn reads from the cache only the part before the frame. The usage records already count the tokens of each purpose. The owner checks the cost on the OpenCode Go site.
+- The owner held the CORS solution for the production web build, and left a realtime API out of a later ADR for now. Both are in the idea notes.
 The memory ADR has its own steps. They can run beside steps 1 to 4.
 
 ## Work outside the steps
@@ -823,12 +832,7 @@ The owner asked for this work between the steps. It is not in the step table, bu
 
 ## Open work
 
-- Agree on the step 0 defaults with the owner. They are about 15 minutes for idle talk, 45 seconds for commentary, and 200 turns each day.
-- Set the default image budget.
-- Choose the default exclusion list with the owner.
-- Measure whether the OpenCode Go cache applies to images.
-- Find a CORS solution for the production web build.
-- Build [ADR 2026-11-02](./2026-11-02-long-term-memory-and-recall.md) for long-term memory and sync between devices. It also defines the floor between devices.
-- Choose the native module for the capture of one process with the owner, before step 5.
-- [The idea notes](../context/autonomy-ideas.md) keep the features that the owner held for later.
-- Decide whether a realtime API enters a later ADR.
+- Choose the native module for the capture of one process with the owner. It waits with game audio, step 5-1.
+- Check generated motion with ARDY after the owner installs Text-To-VRMA.
+- Step M5b of [ADR 2026-11-02](./2026-11-02-long-term-memory-and-recall.md) merges duplicate memories. It waits until real passes show copies.
+- [The idea notes](../context/autonomy-ideas.md) keep the features that the owner held for later. On 2026-11-04 the owner held the CORS solution for the production web build there, and chose to leave a realtime API out of a later ADR for now.

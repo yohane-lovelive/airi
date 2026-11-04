@@ -1102,6 +1102,11 @@ pages:
       minutes: '{count} min'
       daily-turn-budget: Tries per day
       daily-turn-budget-description: The most model calls for autonomous speech in one day.
+      small-talk-interval: Small talk interval
+      small-talk-interval-description: While small talk runs and you stay quiet, the character talks about this often.
+      commentary-interval: Commentary interval
+      commentary-interval-description: While commentary runs, the character talks about this often on a calm screen. A busy screen makes the gaps shorter.
+      seconds: '{count} s'
       quiet-hours: Use quiet hours
       quiet-hours-description: In this time, the character does not start to talk. It still answers you.
       quiet-hours-start: Start
