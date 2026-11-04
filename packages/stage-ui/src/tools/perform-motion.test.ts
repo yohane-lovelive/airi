@@ -44,6 +44,14 @@ describe('perform motion tool', () => {
     expect(result).toContain('Tell the owner briefly')
   })
 
+  it('asks for the movement in English, because the generator reads English', async () => {
+    const { tool } = await harness(undefined, { ok: true })
+
+    const motion = (tool.function.parameters as { properties: { motion: { description: string } } }).properties.motion
+    expect(motion.description).toContain('English sentence')
+    expect(motion.description).toContain('Translate the owner\'s words')
+  })
+
   it('refuses an empty motion', async () => {
     const { run, match } = await harness('wave', { ok: true })
 

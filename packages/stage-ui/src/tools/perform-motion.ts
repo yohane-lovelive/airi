@@ -12,7 +12,9 @@ export const PERFORM_MOTION_TOOL_NAME = 'builtIn_performMotion'
 const MAX_MOTION_LENGTH = 120
 
 const performParameters = strictObject({
-  motion: pipe(string(), minLength(1), maxLength(MAX_MOTION_LENGTH), description('The movement that the owner asked for, in a short phrase in English or Japanese, for example "swing a sword" or "踊る".')),
+  // The generator reads English. Its own translation lost meaning, for example "振り下ろす" became "wield", so the chat
+  // model writes the English.
+  motion: pipe(string(), minLength(1), maxLength(MAX_MOTION_LENGTH), description(`The movement in one short English sentence of what the body does: which arm or hand, and which direction. Translate the owner's words when they are not English. For example "raise a sword overhead with both hands and swing it down" for "剣を振り下ろして".`)),
 })
 
 /** What the motion tool reads and starts. */
