@@ -1,9 +1,9 @@
 import type { GestureClipSource, GestureDefinition } from '@proj-airi/stage-shared/body-motion'
 
-import type { ImportedMotionRecord, MotionRecord } from '../database/repos/motions.repo'
+import type { GeneratedMotionRecord, ImportedMotionRecord, MotionRecord } from '../database/repos/motions.repo'
 
 import { errorMessageFrom } from '@moeru/std'
-import { BUILT_IN_GESTURES, gestureGroupOfHumanBone, matchGesture } from '@proj-airi/stage-shared/body-motion'
+import { BUILT_IN_GESTURES, gestureFromGeneratedTracks, gestureGroupOfHumanBone, matchGesture } from '@proj-airi/stage-shared/body-motion'
 import { useBroadcastChannel } from '@vueuse/core'
 import { nanoid } from 'nanoid'
 import { defineStore } from 'pinia'
@@ -14,7 +14,7 @@ import { motionsRepo } from '../database/repos/motions.repo'
 /** One clip of the library, as a renderer and Settings see it. */
 export interface MotionEntry {
   id: string
-  source: 'built-in' | 'imported'
+  source: 'built-in' | 'imported' | 'generated'
   name: string
   description: string
   tags: readonly string[]
@@ -24,7 +24,12 @@ export interface MotionEntry {
   bones: readonly string[]
   useCount: number
   enabled: boolean
+  /** Whether the owner kept a generated clip. Other clips are always kept. */
+  kept: boolean
 }
+
+/** The longest name of a generated clip. Its description keeps the whole motion. */
+const GENERATED_NAME_LENGTH = 40
 
 /** A request of Settings to play a clip on the stage. `at` tells two requests for the same clip apart. */
 export interface MotionPreviewRequest {
@@ -44,19 +49,26 @@ function builtInEntry(gesture: GestureDefinition, record: MotionRecord | undefin
     bones: Object.keys(gesture.tracks),
     useCount: record?.useCount ?? 0,
     enabled: record?.enabled ?? true,
+    kept: true,
   }
 }
 
 function importedEntry(record: ImportedMotionRecord): MotionEntry {
   const { vrma: _vrma, updatedAt: _updatedAt, ...entry } = record
+  return { ...entry, kept: true }
+}
+
+function generatedEntry(record: GeneratedMotionRecord): MotionEntry {
+  const { vrma: _vrma, gesture: _gesture, updatedAt: _updatedAt, ...entry } = record
   return entry
 }
 
 /**
- * The motion library: the built-in gestures and the `.vrma` clips that the owner imported.
+ * The motion library: the built-in gestures, the `.vrma` clips that the owner imported, and the generated clips.
  *
  * - A built-in gesture lives in the code. IndexedDB keeps only its use count and whether the owner turned it off.
  * - An imported clip keeps its `.vrma` data in IndexedDB.
+ * - A generated clip keeps its `.vrma` data and the gesture of the upper body that plays. The owner keeps or removes it.
  * - {@link choose} finds the clip for the free-text `motion` of an `ACT` marker.
  *
  * Use when:
@@ -88,7 +100,8 @@ export const useMotionLibraryStore = defineStore('motion-library', () => {
     const byId = new Map(records.value.map(record => [record.id, record]))
     const builtIn = BUILT_IN_GESTURES.map(gesture => builtInEntry(gesture, byId.get(gesture.id)))
     const imported = records.value.filter((record): record is ImportedMotionRecord => record.source === 'imported').map(importedEntry)
-    return [...builtIn, ...imported]
+    const generated = records.value.filter((record): record is GeneratedMotionRecord => record.source === 'generated').map(generatedEntry)
+    return [...builtIn, ...imported, ...generated]
   })
 
   /**
@@ -104,9 +117,11 @@ export const useMotionLibraryStore = defineStore('motion-library', () => {
   async function sourceOf(entry: MotionEntry): Promise<GestureClipSource | undefined> {
     if (entry.source === 'built-in') {
       const gesture = BUILT_IN_GESTURES.find(candidate => candidate.id === entry.id)
-      return gesture && { kind: 'built-in', id: entry.id, part: 'upper', gesture }
+      return gesture && { kind: 'keys', id: entry.id, part: 'upper', gesture }
     }
     const record = await motionsRepo.get(entry.id)
+    if (record?.source === 'generated')
+      return { kind: 'keys', id: entry.id, part: 'upper', gesture: record.gesture }
     return record?.source === 'imported' ? { kind: 'vrma', id: entry.id, part: record.part, vrma: record.vrma } : undefined
   }
 
@@ -172,10 +187,60 @@ export const useMotionLibraryStore = defineStore('motion-library', () => {
     return importedEntry(record)
   }
 
-  /** Removes an imported clip. A built-in gesture stays, and Settings turns it off instead. */
+  /**
+   * Adds a clip of the motion generator. The upper body of the clip plays, so the hips and the legs stay with the idle.
+   *
+   * @param motion The text that the clip shows, for example the `motion` of a marker. It becomes the description, and
+   * the whole text becomes a tag, so the same motion chooses the clip again.
+   * @param vrma The `.vrma` data of the generator.
+   * @returns the new entry, or undefined when the file holds no motion of the upper body.
+   */
+  async function addGenerated(motion: string, vrma: ArrayBuffer) {
+    const { loadVRMAnimation } = await import('@proj-airi/stage-ui-three/composables/vrm')
+    const url = URL.createObjectURL(new Blob([vrma]))
+    const animation = await loadVRMAnimation(url).finally(() => URL.revokeObjectURL(url))
+    if (!animation)
+      return undefined
+
+    const text = motion.trim()
+    const about = { id: nanoid(), description: text, tags: [text.toLowerCase()] }
+    const tracks = [...animation.humanoidTracks.rotation].map(([bone, track]) => ({ bone, times: [...track.times], values: [...track.values] }))
+    const gesture = gestureFromGeneratedTracks(about, tracks, animation.duration)
+    if (!gesture)
+      return undefined
+
+    const record: GeneratedMotionRecord = {
+      id: about.id,
+      source: 'generated',
+      name: text.length > GENERATED_NAME_LENGTH ? `${text.slice(0, GENERATED_NAME_LENGTH - 1)}…` : text,
+      description: text,
+      tags: about.tags,
+      part: 'upper',
+      duration: gesture.duration,
+      bones: Object.keys(gesture.tracks),
+      gesture,
+      vrma,
+      kept: false,
+      useCount: 0,
+      enabled: true,
+      updatedAt: Date.now(),
+    }
+    await motionsRepo.put(record)
+    records.value = [...records.value, record]
+    postChange(Date.now())
+    return generatedEntry(record)
+  }
+
+  /** Keeps a generated clip, so Settings no longer asks the owner about it. */
+  async function keep(id: string) {
+    await ready()
+    await change(id, stored => stored?.source === 'generated' ? { ...stored, kept: true, updatedAt: Date.now() } : undefined)
+  }
+
+  /** Removes an imported or generated clip. A built-in gesture stays, and Settings turns it off instead. */
   async function remove(id: string) {
     const record = records.value.find(stored => stored.id === id)
-    if (record?.source !== 'imported')
+    if (record?.source !== 'imported' && record?.source !== 'generated')
       return
     await motionsRepo.remove(id)
     records.value = records.value.filter(stored => stored.id !== id)
@@ -197,6 +262,8 @@ export const useMotionLibraryStore = defineStore('motion-library', () => {
     recordUse,
     setEnabled,
     importVrma,
+    addGenerated,
+    keep,
     remove,
     resetState,
     requestPreview,

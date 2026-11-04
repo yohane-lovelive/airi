@@ -1,12 +1,15 @@
+import type { GestureDefinition } from '@proj-airi/stage-shared/body-motion'
+
 import localforage from 'localforage'
 
 /**
  * The record of one clip of the motion library.
  *
  * A built-in gesture keeps only the choices of the owner and its use count. Its keys stay in the code of
- * `@proj-airi/stage-shared/body-motion`. An imported clip keeps its `.vrma` data and the facts about it.
+ * `@proj-airi/stage-shared/body-motion`. An imported clip keeps its `.vrma` data and the facts about it. A generated clip
+ * keeps the `.vrma` data of the generator and the gesture of the upper body that plays.
  */
-export type MotionRecord = BuiltInMotionRecord | ImportedMotionRecord
+export type MotionRecord = BuiltInMotionRecord | ImportedMotionRecord | GeneratedMotionRecord
 
 interface MotionRecordBase {
   id: string
@@ -31,6 +34,22 @@ export interface ImportedMotionRecord extends MotionRecordBase {
   /** The VRM humanoid bones that the clip rotates. */
   bones: string[]
   vrma: ArrayBuffer
+}
+
+export interface GeneratedMotionRecord extends MotionRecordBase {
+  source: 'generated'
+  name: string
+  description: string
+  tags: string[]
+  part: 'upper'
+  duration: number
+  bones: string[]
+  /** The keys that play: the upper body of the clip, smoothed, with relaxed fingers. */
+  gesture: GestureDefinition
+  /** The clip as the generator gave it. */
+  vrma: ArrayBuffer
+  /** Whether the owner kept the clip in Settings. A clip plays before the owner decides. */
+  kept: boolean
 }
 
 const records = localforage.createInstance({ name: 'airi-motions', storeName: 'motions' })

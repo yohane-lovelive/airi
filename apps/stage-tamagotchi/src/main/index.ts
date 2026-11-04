@@ -47,6 +47,7 @@ import { IOTraceHub } from './services/airi/io-trace-hub'
 import { registerIOTraceHub } from './services/airi/io-trace-hub/register'
 import { IOTraceRecordingService } from './services/airi/io-trace-recording'
 import { setupMcpManager } from './services/airi/mcp-servers'
+import { setupMotionGenerator } from './services/airi/motion-generator'
 import { PerceptionRecorderService } from './services/airi/perception-recorder'
 import { setupExtensionHost } from './services/airi/plugins'
 import { setupArtistryBridge } from './services/airi/widgets/artistry-bridge'
@@ -532,6 +533,7 @@ app.whenReady().then(async () => {
       const { context } = createContext(ipcMain)
       setupComputerUse(context)
       setupHomeAssistant(context)
+      setupMotionGenerator(context)
       await setupArtistryBridge({
         widgetsManager: deps.widgetsWindow,
         context,

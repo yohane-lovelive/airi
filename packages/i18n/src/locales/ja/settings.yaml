@@ -566,6 +566,7 @@ pages:
       history-summary: 履歴の要約
       memory: 記憶の整理
       timeline: 画面のタイムラインの要約
+      motion: モーションの生成
       other: その他
   memory:
     description: 記憶が保存され、整理される場所
@@ -989,6 +990,9 @@ pages:
       source:
         built-in: 最初から
         imported: 取り込み
+        generated: 生成
+      not-kept: 未確認
+      keep: '{name} を残す'
       seconds: '{count} 秒'
       uses: '{count} 回使用'
       preview: '{name} をステージで再生'
@@ -1004,6 +1008,25 @@ pages:
         tags-hint: 動きを表す言葉を、カンマで区切って書きます。例：dance, 踊る
         submit: 取り込む
         no-animation: このファイルには VRM のアニメーションがありません。
+      generator:
+        title: 足りないモーションの生成
+        intro: ACT トークンの motion に合うジェスチャーがないとき、この PC の Text-To-VRMA がクリップを作ります。最初は表情だけが出て、クリップは次の回から再生されます。脚と腰は動きません。
+        desktop-only: モーションの生成は、デスクトップ版で使えます。同じ PC の Text-To-VRMA を呼び出します。
+        enable: 足りないモーションを生成する
+        enable-description: 生成は返答が終わってから、1 つずつ行います。新しいクリップは、上の一覧で残すか削除するかを選びます。
+        address: アドレス
+        address-description: Text-To-VRMA のローカル HTTP API のアドレスです。この PC のアドレスだけが使えます。
+        token: アクセストークン
+        token-description: Text-To-VRMA のローカル HTTP API の設定に出るトークンです。この PC に残り、同期しません。
+        token-saved: トークンは保存済みです。そのままにするには、欄を空のままにします。
+        save: 保存
+        check: 接続を確認
+        check-ok: Text-To-VRMA が応答しました。
+        failed: リクエストに失敗しました。
+        daily-limit: 1 日のクリップ数
+        daily-limit-description: 1 日に作るクリップの上限です。生成には、この PC の GPU を使います。
+        used-today: '今日 {count} / {limit}'
+        last-error: '前回の失敗：{message}'
     missions:
       title: ミッション
       description: リマインドなど、キャラクターがあなたのために行うタスク

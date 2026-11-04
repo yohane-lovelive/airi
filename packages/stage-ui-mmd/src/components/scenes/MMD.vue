@@ -792,7 +792,7 @@ async function playGesture(source: GestureClipSource): Promise<boolean> {
     return false
   let clip = gestureClips.get(source.id)
   if (!clip) {
-    const vrmAnimation = source.kind === 'built-in' ? vrmAnimationOfGesture(source.gesture) : await loadVRMAnimationData(source.vrma)
+    const vrmAnimation = source.kind === 'keys' ? vrmAnimationOfGesture(source.gesture) : await loadVRMAnimationData(source.vrma)
     // The model can change while the file loads, and the clip belongs to the earlier model then.
     if (!vrmAnimation || owner !== resolved || !rig)
       return false

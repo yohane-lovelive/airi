@@ -45,6 +45,7 @@ import { useChatSessionStore } from '../../stores/chat/session-store'
 import { useSharedLive2DExpressionPreview } from '../../stores/live2d'
 import { useAiriCardStore } from '../../stores/modules/airi-card'
 import { useSpeechStore } from '../../stores/modules/speech'
+import { useMotionGenerationStore } from '../../stores/motion-generation'
 import { useMotionLibraryStore } from '../../stores/motion-library'
 import { useSettingsPresenceBubble } from '../../stores/presence-bubble'
 import { useSettings } from '../../stores/settings'
@@ -336,6 +337,9 @@ const emotionsQueue = createQueue<EmotionPayload & { gestureSeconds?: number }>(
 
 const streamingControl = useLlmStreamingControlStore()
 const motionLibrary = useMotionLibraryStore()
+const motionGeneration = useMotionGenerationStore()
+// A generation waits for the end of a chat turn, so it does not slow the reply.
+watch(chatSending, sending => motionGeneration.setBusy(sending), { immediate: true })
 
 /**
  * Plays a clip of the motion library on a VRM or MMD model. Without an emotion in the marker, a VRM model also plays
@@ -361,7 +365,12 @@ async function playLibraryEntry(entry: MotionEntry, withExpressions: boolean) {
 async function playLibraryGesture(motion: string, withExpressions: boolean) {
   await motionLibrary.ready()
   const entry = motionLibrary.choose(motion)
-  if (!entry || !await playLibraryEntry(entry, withExpressions))
+  if (!entry) {
+    // Only the emotion plays now. The generated clip plays the next time that a marker asks for the motion.
+    motionGeneration.request(motion)
+    return undefined
+  }
+  if (!await playLibraryEntry(entry, withExpressions))
     return undefined
   void motionLibrary.recordUse(entry.id)
   return entry.duration

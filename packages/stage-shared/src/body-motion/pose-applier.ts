@@ -30,6 +30,21 @@ export function quaternionFromEuler({ x, y, z }: BodyRotation): Quat {
   ]
 }
 
+/** The Euler angles in radians, in the order XYZ, of a quaternion `[x, y, z, w]`. It undoes {@link quaternionFromEuler}. */
+export function eulerFromQuaternion([x, y, z, w]: Quat): BodyRotation {
+  const m11 = 1 - 2 * (y * y + z * z)
+  const m12 = 2 * (x * y - w * z)
+  const m13 = Math.min(1, Math.max(-1, 2 * (x * z + w * y)))
+  const m22 = 1 - 2 * (x * x + z * z)
+  const m23 = 2 * (y * z - w * x)
+  const m32 = 2 * (y * z + w * x)
+  const m33 = 1 - 2 * (x * x + y * y)
+  // At a Y of 90 degrees, X and Z turn about the same axis, so Z takes none of the turn.
+  if (Math.abs(m13) < 0.9999999)
+    return { x: Math.atan2(-m23, m33), y: Math.asin(m13), z: Math.atan2(-m12, m11) }
+  return { x: Math.atan2(m32, m22), y: Math.asin(m13), z: 0 }
+}
+
 /** Sets `bone` to its rotation followed by `offset` in the bone's own frame. */
 function postMultiply(bone: PoseBone, [bx, by, bz, bw]: Quat) {
   const { x: ax, y: ay, z: az, w: aw } = bone.quaternion

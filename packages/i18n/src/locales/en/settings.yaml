@@ -629,6 +629,7 @@ pages:
       history-summary: History summaries
       memory: Memory work
       timeline: Screen timeline summaries
+      motion: Motion generation
       other: Other
   memory:
     description: Where memories got stored, and organized
@@ -1123,6 +1124,9 @@ pages:
       source:
         built-in: Built-in
         imported: Imported
+        generated: Generated
+      not-kept: Not kept yet
+      keep: Keep {name}
       seconds: '{count} s'
       uses: Used {count} times
       preview: Play {name} on the stage
@@ -1138,6 +1142,25 @@ pages:
         tags-hint: Words for the motion, separated by commas, for example "dance, 踊る".
         submit: Import
         no-animation: The file holds no VRM animation.
+      generator:
+        title: Generate missing motions
+        intro: When the motion of an ACT token matches no gesture, Text-To-VRMA on this PC makes a clip. Only the emotion plays at first, and the clip plays the next time. The legs and the hips stay still.
+        desktop-only: Motion generation works in the desktop app. It calls Text-To-VRMA on the same PC.
+        enable: Generate missing motions
+        enable-description: A generation runs after the reply ends, one at a time. Keep or remove each new clip in the list above.
+        address: Address
+        address-description: The address of the local HTTP API of Text-To-VRMA. Only an address of this PC works.
+        token: Access token
+        token-description: The token that Text-To-VRMA shows under its local HTTP API settings. It stays on this PC and does not sync.
+        token-saved: A token is stored. Leave the field empty to keep it.
+        save: Save
+        check: Test connection
+        check-ok: Text-To-VRMA answered.
+        failed: The request failed.
+        daily-limit: Clips per day
+        daily-limit-description: The most clips in one day. A generation uses the GPU of this PC.
+        used-today: '{count} of {limit} today'
+        last-error: 'Last failure: {message}'
     missions:
       title: Missions
       description: Reminders and other tasks that the character does for you

@@ -37,7 +37,7 @@ The character card page shows an alert while a shared pronunciation has no chara
 
 ## Motion settings
 
-`/settings/modules/motions` lists the gestures of the motion library. The owner turns each gesture on or off, plays a preview on the stage of the main window, imports a `.vrma` file, and removes an imported clip.
+`/settings/modules/motions` lists the gestures of the motion library. The owner turns each gesture on or off, plays a preview on the stage of the main window, imports a `.vrma` file, and removes an imported clip. The owner also keeps or removes each generated clip. In the desktop app, the page sets the address and the token of Text-To-VRMA, the switch of generation, and the clips for each day.
 
 ## Settings search
 

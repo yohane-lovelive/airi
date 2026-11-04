@@ -705,7 +705,7 @@ The order follows dependencies. Each step uses the parts of the earlier steps. E
 | 2b | Daily rhythm and small talk: templates as recipes, the `greeting`, `welcome-back`, and `small-talk` templates, topic seeds, and the time of day. Measure variety. | Done. Templates as recipes still wait. |
 | 3 | Perception: the adapters, ring buffer, detectors, frame policies, image budget, recorder, replay, timeline, scene state, `commentary` with interruptions, and `watch`. | Done. |
 | 4 | Motion: the model capability check, the procedural layer, the library with `ACT` markers, expression sync, and the upper-body layer. | Done |
-| 5 | Generated motion, game audio, recall from memory, and polish. Recall needs the memory ADR. | In progress: recall from memory is done with step M3 of ADR 2026-11-02, and 5-0 is done. The owner held game audio. |
+| 5 | Generated motion, game audio, recall from memory, and polish. Recall needs the memory ADR. | In progress: recall from memory is done with step M3 of ADR 2026-11-02, and 5-0, 5-2a, 5-4a, and 5-4b are done. The owner held game audio. |
 
 Step 2 has four parts. Each part is one change.
 
@@ -746,7 +746,8 @@ Step 5 has these parts. The owner added the length and tempo of talk after using
 | --- | --- | --- |
 | 5-0 | The reasoning level of replies and of autonomous speech, set by the owner. | Done |
 | 5-1 | Game audio: the capture of one process, the loud sound detector, and a local transcript in the timeline. | Held |
-| 5-2 | Generated motion. | To do |
+| 5-2a | Generated motion: Text-To-VRMA on the same PC makes the clips that the library lacks. | Done |
+| 5-2b | Generated motion on request: the owner asks for a motion, and the clip plays when it is ready. | To do |
 | 5-3 | Polish: the defaults of the open work. | To do |
 | 5-4a | The length of a line: a length target for each turn, and a turn budget that counts only idle speech. | Done |
 | 5-4b | The flow of talk: a `NEXT` marker of the model, and the pause after the speech ends. | Done |
@@ -777,6 +778,21 @@ Step 5-4b built the flow of talk as follows.
 - A follow-up skips the drive and the refractory time, because the line asked for it. Every other gate holds: owner input, a reply in progress, speech that plays, quiet hours, a quiet request, and the daily budget. An owner message drops the follow-up.
 - The refractory time now counts from the end of the speech, which the speaking state reports, so a long line does not shorten the pause.
 - The inspector shows the next follow-up and the count of continuations. The replay reads the marker and the estimated end of speech, like the app.
+
+Step 5-2a built generated motion as follows.
+
+- The owner chose Text-To-VRMA on 2026-11-04. It is a desktop app under the MIT License with a local HTTP API. Its ARDY engine runs NVIDIA ARDY on this PC, and the planner `none` needs no key of another service.
+- The ARDY weights use the NVIDIA Open Model Agreement, and the text encoder uses the Meta Llama 3 Community License. This ADR did not verify the license of the training data.
+- The ADR said that the desktop app and the web app use the same service. Text-To-VRMA serves only 127.0.0.1, so only the desktop app generates. The web app says that the feature needs the desktop app.
+- The main process owns the address, the token, the switch, the limit of each day, and the count of the day, like the Home Assistant service. The token never reaches a renderer and does not sync. The address must be on this PC.
+- A marker motion that matches no clip joins a queue of at most 3. One generation runs at a time, after the chat turn ends. Each motion is tried once in each run of the app. The switch is off by default, and the limit is 5 clips each day.
+- The ADR said that the nearest clip plays. Step 4-2 plays only the emotion without a match, and generation keeps this. The new clip plays the next time that a marker asks for the motion.
+- The playback rules apply once, when the clip arrives. The hips, the legs, and the eyes lose their tracks, and the clip keeps no translation. The keys are smoothed and kept at 10 each second. A hand without finger tracks gets relaxed fingers.
+- The ADR said that the travel of the hips is limited. Generation removes it, so a walk becomes a motion of the upper body.
+- The ADR said that the library stores `.vrma` data only. A generated clip keeps the `.vrma` data of the generator and the keys that play, and both renderers play the keys like a built-in gesture.
+- The motion text becomes the description and one tag, so the same motion chooses the clip again. Settings marks a new clip as not kept yet, and the owner keeps or removes it.
+- Usage records each clip under the purpose `motion` with no tokens, because ARDY without a planner calls no chat model.
+- A live check on 2026-11-04 used a stand-in server with the same API, which returned the idle loop. The clip reached the library about 1.8 seconds after the marker, and the next marker played it on an MMD model. A wrong token showed its reason in Settings, did not count for the day, and was not tried again. A check with ARDY waits until the owner installs Text-To-VRMA.
 The memory ADR has its own steps. They can run beside steps 1 to 4.
 
 ## Work outside the steps

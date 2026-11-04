@@ -111,7 +111,7 @@ export async function vrmGestureClip(vrm: VRMCore, source: GestureClipSource, op
     return cached
 
   let clip: AnimationClip | undefined
-  if (source.kind === 'built-in') {
+  if (source.kind === 'keys') {
     const mirror = vrm.meta?.metaVersion === '0' ? -1 : 1
     const tracks = gestureRotationTracks(source.gesture).flatMap(({ bone, times, values }) => {
       const node = vrm.humanoid.getNormalizedBoneNode(bone as VRMHumanBoneName)

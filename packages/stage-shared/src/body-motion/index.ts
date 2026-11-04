@@ -1,3 +1,4 @@
+export * from './generated'
 export * from './gesture-layer'
 export * from './gesture-match'
 export * from './gestures'

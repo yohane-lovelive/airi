@@ -29,6 +29,7 @@ import { useConsciousnessStore } from '@proj-airi/stage-ui/stores/modules/consci
 import { useHearingStore } from '@proj-airi/stage-ui/stores/modules/hearing'
 import { useSpeechStore } from '@proj-airi/stage-ui/stores/modules/speech'
 import { useVisionStore } from '@proj-airi/stage-ui/stores/modules/vision'
+import { useMotionGenerationStore } from '@proj-airi/stage-ui/stores/motion-generation'
 import { useOnboardingStore } from '@proj-airi/stage-ui/stores/onboarding'
 import { usePerceptionRunnerStore } from '@proj-airi/stage-ui/stores/perception-runner'
 import { usePerfTracerBridgeStore } from '@proj-airi/stage-ui/stores/perf-tracer-bridge'
@@ -55,6 +56,7 @@ import {
   i18nSetLocale,
 } from '../shared/eventa'
 import { electronModelAssetCancel, electronModelAssetEnsure, electronModelAssetRemove, electronModelAssetsClear, electronModelAssetsList, electronModelAssetStatusChanged } from '../shared/eventa/model-assets'
+import { motionGeneratorCheck, motionGeneratorGenerate, motionGeneratorGetConfig, motionGeneratorSetConfig } from '../shared/eventa/motion-generator'
 import {
   electronPluginUpdateCapability,
   pluginProtocolListProviders,
@@ -116,6 +118,13 @@ setSherpawModelAssetHost({
   cancel: cancelModelAsset,
   remove: removeModelAsset,
   clear: clearModelAssets,
+})
+// The main process calls Text-To-VRMA, and every window reads its settings through it.
+useMotionGenerationStore().connect({
+  getConfig: useElectronEventaInvoke(motionGeneratorGetConfig),
+  setConfig: useElectronEventaInvoke(motionGeneratorSetConfig),
+  check: useElectronEventaInvoke(motionGeneratorCheck),
+  generate: useElectronEventaInvoke(motionGeneratorGenerate),
 })
 const getMainLocale = useElectronEventaInvoke(i18nGetLocale)
 const setLocale = useElectronEventaInvoke(i18nSetLocale)

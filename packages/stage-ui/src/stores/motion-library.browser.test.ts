@@ -46,7 +46,7 @@ describe('motion library store', () => {
     expect(library.choose('waves hello')).toBeUndefined()
 
     const source = await library.sourceOf(library.entries.find(entry => entry.id === 'nod')!)
-    expect(source).toMatchObject({ kind: 'built-in', id: 'nod', part: 'upper' })
+    expect(source).toMatchObject({ kind: 'keys', id: 'nod', part: 'upper' })
   })
 
   it('imports a .vrma file with its duration and bones, chooses it by its tags, and removes it', async () => {
@@ -61,6 +61,29 @@ describe('motion library store', () => {
     expect(entry!.bones).toContain('hips')
     expect(library.choose('しばらく待機する')?.id).toBe(entry!.id)
     expect(await library.sourceOf(entry!)).toMatchObject({ kind: 'vrma', part: 'full' })
+
+    await library.remove(entry!.id)
+    expect(library.entries.some(stored => stored.id === entry!.id)).toBe(false)
+  })
+
+  it('adds a generated clip as a gesture of the upper body, chooses it by its motion, and lets the owner keep it', async () => {
+    const library = useMotionLibraryStore()
+    await library.ready()
+    // The idle loop moves the hips and the legs, like a clip of a text-to-motion model.
+    const vrma = await (await fetch(animations.idleLoop.toString())).arrayBuffer()
+
+    const entry = await library.addGenerated('swing a sword', vrma)
+
+    expect(entry).toMatchObject({ source: 'generated', name: 'swing a sword', part: 'upper', kept: false })
+    expect(entry!.bones).not.toContain('hips')
+    expect(entry!.bones.some(bone => /UpperLeg|LowerLeg|Foot/.test(bone))).toBe(false)
+    expect(entry!.bones).toContain('rightIndexProximal')
+    expect(library.choose('swing a sword')?.id).toBe(entry!.id)
+    const source = await library.sourceOf(entry!)
+    expect(source).toMatchObject({ kind: 'keys', part: 'upper' })
+
+    await library.keep(entry!.id)
+    expect(library.entries.find(stored => stored.id === entry!.id)?.kept).toBe(true)
 
     await library.remove(entry!.id)
     expect(library.entries.some(stored => stored.id === entry!.id)).toBe(false)

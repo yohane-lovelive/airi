@@ -23,7 +23,8 @@ export interface GestureDefinition {
 const LEFT_ARM_DOWN = -72
 const RIGHT_ARM_DOWN = 72
 
-function fingerCurl(side: 'left' | 'right', curl: readonly (readonly [time: number, degrees: number])[]) {
+/** Curls the index, middle, ring, and little fingers of one hand. Each key is a time in seconds and the curl in degrees. */
+export function fingerCurl(side: 'left' | 'right', curl: readonly (readonly [time: number, degrees: number])[]) {
   const sign = side === 'left' ? -1 : 1
   const tracks: Record<string, GestureKey[]> = {}
   for (const finger of ['Index', 'Middle', 'Ring', 'Little']) {
@@ -130,11 +131,11 @@ export const BUILT_IN_GESTURES: readonly GestureDefinition[] = [
 ]
 
 /**
- * What a renderer plays: the keys of a built-in gesture, or the data of an imported `.vrma` file. A `full` clip moves
- * the hips or the legs, so it replaces the whole idle for its duration.
+ * What a renderer plays: the keys of a built-in or generated gesture, or the data of an imported `.vrma` file. A `full`
+ * clip moves the hips or the legs, so it replaces the whole idle for its duration.
  */
 export type GestureClipSource
-  = | { kind: 'built-in', id: string, part: 'upper', gesture: GestureDefinition }
+  = | { kind: 'keys', id: string, part: 'upper', gesture: GestureDefinition }
     | { kind: 'vrma', id: string, part: 'upper' | 'full', vrma: ArrayBuffer }
 
 /** The rotation keys of one bone, as quaternions `[x, y, z, w]` in a flat list, like a three.js `QuaternionKeyframeTrack`. */
