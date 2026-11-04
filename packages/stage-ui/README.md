@@ -95,6 +95,7 @@ Each chat request has parts with limits. It is step 2-4 of [the autonomy ADR](..
 - `useAutonomySyncStore()` syncs reminders, intentions, and the owner profile with the account. `useLeaderDocumentSync` (`composables/use-leader-document-sync.ts`) runs the sync loop of memories and of these records on the leader.
 - `useMotionLibraryStore()` keeps the motion library: the built-in gestures, the imported `.vrma` clips, and the generated clips. The stage plays the clip that fits the `motion` of an `ACT` marker on VRM and MMD models, and the system prompt lists the enabled clips by name (`constants/prompts/gesture-act.ts`). A change and a preview reach the other windows through a `BroadcastChannel`.
 - `useMotionGenerationStore()` generates the clips that the library lacks. A marker motion without a clip joins a queue, and one generation runs after each chat turn. The desktop app connects Text-To-VRMA through its main process. The web app connects nothing, so it generates nothing.
+- `builtIn_performMotion` does a movement that the owner asks for, while the model is VRM or MMD. A clip that fits plays through an `ACT` marker of the reply. Without one, `requestForOwner` puts the generation first, and the stage plays the clip when it is ready within a minute.
 - `useMemorySyncStore()` syncs the memories with the account on the leader, while the `memory-sync` experiment is on. `libs/memory-sync` maps an entry to its synced fields, and `applySyncChanges` of the memory store writes a round.
 - `libs/prompt-parts.ts` measures each part of a request for IO traces.
 

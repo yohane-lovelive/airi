@@ -47,6 +47,7 @@ import { createIntentionTools, createTalkLevelTool } from '../tools/initiative'
 import { createJudgeRecipeTool, judgmentSkillText } from '../tools/judge-recipe'
 import { composeMemoryPrompt, createMemoryTools } from '../tools/memory'
 import { createMissionTools } from '../tools/missions'
+import { createPerformMotionTool } from '../tools/perform-motion'
 import { createProposeRecipeTool } from '../tools/propose-recipe'
 import { createSearchIconsTool } from '../tools/search-icons'
 import { createUseRecipeTool } from '../tools/use-recipe'
@@ -79,10 +80,13 @@ import { useHearingStore } from './modules/hearing'
 import { useStickersStore } from './modules/stickers'
 import { useVisionStore } from './modules/vision'
 import { useWebSearchStore } from './modules/web-search'
+import { useMotionGenerationStore } from './motion-generation'
+import { useMotionLibraryStore } from './motion-library'
 import { useOwnerProfileStore } from './owner-profile'
 import { usePerceptionStore } from './perception'
 import { usePerceptionRunnerStore } from './perception-runner'
 import { useRecipesStore } from './recipes'
+import { useSettingsStageModel } from './settings/stage-model'
 import { useTimelineStore } from './timeline'
 import { executeToolCallRerun } from './tool-call-rerun'
 import { useToolCardsStore } from './tool-cards'
@@ -306,6 +310,9 @@ export const useChatStore = defineStore('chat', () => {
   const memoryRecall = useMemoryRecallStore()
   const ownerProfile = useOwnerProfileStore()
   const missions = useMissionsStore()
+  const motionLibrary = useMotionLibraryStore()
+  const motionGeneration = useMotionGenerationStore()
+  const stageModel = useSettingsStageModel()
   const initiative = useInitiativeStore()
   const intentions = useIntentionsStore()
   const timeline = useTimelineStore()
@@ -770,6 +777,16 @@ export const useChatStore = defineStore('chat', () => {
               },
             }),
           ]
+        : []),
+      // Only a VRM or MMD model plays the gestures of the motion library.
+      ...(ownerOnly && (stageModel.stageModelRenderer === 'vrm' || stageModel.stageModelRenderer === 'mmd')
+        ? await createPerformMotionTool({
+            match: (motion) => {
+              const entry = motionLibrary.choose(motion)
+              return entry && entry.name
+            },
+            generate: motion => motionGeneration.requestForOwner(motion),
+          })
         : []),
       // Cards show in the owner's own chat only. A scene, such as a Discord channel, gets text. A card names its icons
       // from a search, so the model never guesses an icon name.

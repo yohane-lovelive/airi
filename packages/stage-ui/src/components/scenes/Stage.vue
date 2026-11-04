@@ -376,6 +376,14 @@ async function playLibraryGesture(motion: string, withExpressions: boolean) {
   return entry.duration
 }
 
+// A clip that the owner asked for plays when the generator gives it.
+watch(() => motionGeneration.playRequest, async (request) => {
+  await motionLibrary.ready()
+  const entry = request && motionLibrary.entries.find(candidate => candidate.id === request.id)
+  if (entry && (stageModelRenderer.value === 'vrm' || stageModelRenderer.value === 'mmd') && await playLibraryEntry(entry, true))
+    void motionLibrary.recordUse(entry.id)
+})
+
 // The preview of Settings plays here. It counts no use, because the owner, not the model, chose it.
 watch(() => motionLibrary.previewRequest, (request) => {
   const entry = request && motionLibrary.entries.find(candidate => candidate.id === request.id)

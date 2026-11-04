@@ -705,7 +705,7 @@ The order follows dependencies. Each step uses the parts of the earlier steps. E
 | 2b | Daily rhythm and small talk: templates as recipes, the `greeting`, `welcome-back`, and `small-talk` templates, topic seeds, and the time of day. Measure variety. | Done. Templates as recipes still wait. |
 | 3 | Perception: the adapters, ring buffer, detectors, frame policies, image budget, recorder, replay, timeline, scene state, `commentary` with interruptions, and `watch`. | Done. |
 | 4 | Motion: the model capability check, the procedural layer, the library with `ACT` markers, expression sync, and the upper-body layer. | Done |
-| 5 | Generated motion, game audio, recall from memory, and polish. Recall needs the memory ADR. | In progress: recall from memory is done with step M3 of ADR 2026-11-02, and 5-0, 5-2a, 5-4a, and 5-4b are done. The owner held game audio. |
+| 5 | Generated motion, game audio, recall from memory, and polish. Recall needs the memory ADR. | In progress: recall from memory is done with step M3 of ADR 2026-11-02, and 5-0, 5-2a, 5-2b, 5-4a, and 5-4b are done. The owner held game audio. |
 
 Step 2 has four parts. Each part is one change.
 
@@ -747,7 +747,7 @@ Step 5 has these parts. The owner added the length and tempo of talk after using
 | 5-0 | The reasoning level of replies and of autonomous speech, set by the owner. | Done |
 | 5-1 | Game audio: the capture of one process, the loud sound detector, and a local transcript in the timeline. | Held |
 | 5-2a | Generated motion: Text-To-VRMA on the same PC makes the clips that the library lacks. | Done |
-| 5-2b | Generated motion on request: the owner asks for a motion, and the clip plays when it is ready. | To do |
+| 5-2b | Generated motion on request: the owner asks for a motion, and the clip plays when it is ready. | Done |
 | 5-3 | Polish: the defaults of the open work. | To do |
 | 5-4a | The length of a line: a length target for each turn, and a turn budget that counts only idle speech. | Done |
 | 5-4b | The flow of talk: a `NEXT` marker of the model, and the pause after the speech ends. | Done |
@@ -793,6 +793,16 @@ Step 5-2a built generated motion as follows.
 - The motion text becomes the description and one tag, so the same motion chooses the clip again. Settings marks a new clip as not kept yet, and the owner keeps or removes it.
 - Usage records each clip under the purpose `motion` with no tokens, because ARDY without a planner calls no chat model.
 - A live check on 2026-11-04 used a stand-in server with the same API, which returned the idle loop. The clip reached the library about 1.8 seconds after the marker, and the next marker played it on an MMD model. A wrong token showed its reason in Settings, did not count for the day, and was not tried again. A check with ARDY waits until the owner installs Text-To-VRMA.
+
+Step 5-2b built generated motion on request as follows.
+
+- The tool `builtIn_performMotion` takes the movement that the owner asks for. The owner's own conversation offers it while the model is VRM or MMD.
+- The ADR did not say how a clip of the library plays on request. The tool plays none. It tells the model to write an `ACT` marker with the name of the clip, so the clip starts with the speech and the expression.
+- Without a clip, the generation goes first in the queue and starts after the reply. The tool tells the model to say a short line and to write no motion for it. This is the short line first of the ADR.
+- The clip plays when it is ready within a minute of the request. The ADR set no limit. A later clip only joins the library, so a late motion does not surprise the owner.
+- Without a generator, the tool gives the reason, for example the web app, generation off, the limit of the day, or a failure earlier in the run. The model tells the owner briefly.
+- The play request reaches the stage of the window that runs the turn. On the desktop this is the main window, and the web app has one window.
+- A live check on 2026-11-04 used `deepseek-v4.1-flash` and the stand-in server of step 5-2a. With the first description of the tool, a casual request, "剣を振るところを見せて", got no tool call: the model wrote gestures of the list instead. The description now asks for the tool first when the owner asks for a movement. Then three requests called it: two new motions were made and played after a short line, and a bow got its marker and played.
 The memory ADR has its own steps. They can run beside steps 1 to 4.
 
 ## Work outside the steps

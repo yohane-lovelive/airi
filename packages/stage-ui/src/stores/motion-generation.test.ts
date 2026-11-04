@@ -110,6 +110,70 @@ describe('motion generation store', () => {
     expect(generator.generate).toHaveBeenCalledTimes(1)
   })
 
+  it('puts a motion that the owner asked for first, and asks the stage to play its clip', async () => {
+    const store = useMotionGenerationStore()
+    const generator = fakeGenerator()
+    store.connect(generator)
+    store.setBusy(true)
+    store.request('jump')
+
+    expect(await store.requestForOwner('swing a sword')).toEqual({ ok: true })
+    expect(store.queue).toEqual(['swing a sword', 'jump'])
+
+    store.setBusy(false)
+    await vi.waitFor(() => expect(store.playRequest).toMatchObject({ id: 'g1' }))
+    expect(generator.generate).toHaveBeenNthCalledWith(1, { prompt: 'swing a sword' })
+  })
+
+  it('only adds a clip that is ready more than a minute after the owner asked', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      const store = useMotionGenerationStore()
+      const generator = fakeGenerator({
+        generate: vi.fn(async () => {
+          vi.setSystemTime(Date.now() + 61_000)
+          return new Uint8Array(4)
+        }),
+      })
+      store.connect(generator)
+
+      await store.requestForOwner('swing a sword')
+      await vi.waitFor(() => expect(addGenerated).toHaveBeenCalled())
+      await settle()
+
+      expect(store.playRequest).toBeUndefined()
+    }
+    finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('tells the owner why no motion can be made', async () => {
+    const store = useMotionGenerationStore()
+    expect(await store.requestForOwner('a')).toMatchObject({ ok: false, reason: expect.stringContaining('desktop app') })
+
+    store.connect(fakeGenerator({ getConfig: vi.fn(async () => ({ ...status, enabled: false })) }))
+    expect(await store.requestForOwner('a')).toMatchObject({ ok: false, reason: expect.stringContaining('Motion generation is off') })
+
+    store.connect(fakeGenerator({ getConfig: vi.fn(async () => ({ ...status, usedToday: 5 })) }))
+    expect(await store.requestForOwner('a')).toMatchObject({ ok: false, reason: expect.stringContaining('limit of 5') })
+
+    store.connect(fakeGenerator({ getConfig: vi.fn(async () => ({ ...status, hasToken: false })) }))
+    expect(await store.requestForOwner('a')).toMatchObject({ ok: false, reason: expect.stringContaining('no token') })
+  })
+
+  it('does not try again a motion that failed earlier', async () => {
+    const store = useMotionGenerationStore()
+    store.connect(fakeGenerator({ generate: vi.fn(async () => Promise.reject(new Error('ARDY is not ready'))) }))
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    store.request('swing a sword')
+    await vi.waitFor(() => expect(store.running).toBeUndefined())
+    await settle()
+
+    expect(await store.requestForOwner('Swing a sword')).toMatchObject({ ok: false, reason: expect.stringContaining('failed earlier') })
+  })
+
   it('drops the queue when the owner turned generation off or the day reached its limit', async () => {
     for (const config of [{ ...status, enabled: false }, { ...status, usedToday: 5 }]) {
       setActivePinia(createPinia())
