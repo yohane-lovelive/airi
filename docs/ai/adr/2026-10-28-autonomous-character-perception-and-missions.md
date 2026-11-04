@@ -793,6 +793,9 @@ Step 5-2a built generated motion as follows.
 - The motion text becomes the description and one tag, so the same motion chooses the clip again. Settings marks a new clip as not kept yet, and the owner keeps or removes it.
 - Usage records each clip under the purpose `motion` with no tokens, because ARDY without a planner calls no chat model.
 - A live check on 2026-11-04 used a stand-in server with the same API, which returned the idle loop. The clip reached the library about 1.8 seconds after the marker, and the next marker played it on an MMD model. A wrong token showed its reason in Settings, did not count for the day, and was not tried again. A check with ARDY waits until the owner installs Text-To-VRMA.
+- On 2026-11-04 the owner installed Text-To-VRMA v1.1.10 from its repository, with `npm run api` and the ARDY server. The text encoder runs on the CPU, and ARDY takes about 1 GB of VRAM. On an RTX 5080, a clip took 0.6 to 0.9 seconds.
+- In a live check, `deepseek-v4.1-flash` called the motion tool, and the clip played about 1 second after the reply ended. The translator of ARDY turned "両手を上げて大きく伸びをする" into "lift one's arms up to a large stretch", and the clip raised both arms by 80 to 100 degrees. It turned "剣を大きく振り下ろす" into "wield a sword", and that clip held a pose and moved no bone more than 5 degrees. The quality of a clip follows the English text that ARDY reads.
+- The day limit of 5 stopped a request in the same check, and the model told the owner that no new motion could be made today.
 
 Step 5-2b built generated motion on request as follows.
 
@@ -833,6 +836,5 @@ The owner asked for this work between the steps. It is not in the step table, bu
 ## Open work
 
 - Choose the native module for the capture of one process with the owner. It waits with game audio, step 5-1.
-- Check generated motion with ARDY after the owner installs Text-To-VRMA.
 - Step M5b of [ADR 2026-11-02](./2026-11-02-long-term-memory-and-recall.md) merges duplicate memories. It waits until real passes show copies.
 - [The idea notes](../context/autonomy-ideas.md) keep the features that the owner held for later. On 2026-11-04 the owner held the CORS solution for the production web build there, and chose to leave a realtime API out of a later ADR for now.
