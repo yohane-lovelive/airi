@@ -39,6 +39,14 @@ export function composeReplyLengthPrompt(length: ReplyLength) {
 }
 
 /**
+ * The rule against made-up shared history. A live check on 2026-11-05 heard a character tell of a night with the owner
+ * that never happened. The character's own lore stays free. The text is fixed, so the cached prefix stays.
+ */
+export function composeSharedPastPrompt() {
+  return '\n\nTell of what happened between you and the owner, or on this computer, only from your memories, this conversation, or the screen. Do not make up other past events with the owner. Your own lore and stories as a character are fine.'
+}
+
+/**
  * Prompt part of a session that is a recipe's own space. It follows the identity and stays the same for every run there, so the prefix stays cacheable.
  * The recipe reports a result to the conversation.
  */

@@ -835,6 +835,7 @@ The same check found four weaker points of the characters, and a later change ad
 - The check also found that quiet hours stopped small talk and commentary that the owner started. They now stop idle talk only. A request for quiet with words still stops a mission.
 - The model sometimes wrote the object of an ACT marker with wrong brackets, for example `{"emotion":"curious"},"motion":"nod"}`. The parser dropped such a marker with its emotion and gesture. The ACT parser now fixes the brackets before it gives up: it drops a bracket that closes the object early or twice, and it adds a missing one.
 - A third check ran a commentary inside the quiet hours, and it spoke 6 times in 5 minutes. Broken ACT markers sent through the app came back with their emotion and gesture, and `<|ACT happy|>` was still refused.
+- The characters sometimes told of past events with the owner that never happened, for example "the other night, I said good night to you". A fixed sentence of the system prompt now asks them to tell of the shared past only from memories, the conversation, or the screen. Their own lore stays free. In a check of 5 small-talk lines, the character spoke only of the screen and the present, and told of no past with the owner.
 The memory ADR has its own steps. They can run beside steps 1 to 4.
 
 ## Work outside the steps

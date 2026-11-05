@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { composeRecipeSpacePrompt, composeReplyLengthPrompt, composeSystemPrompt } from './prompt-recipe'
+import { composeRecipeSpacePrompt, composeReplyLengthPrompt, composeSharedPastPrompt, composeSystemPrompt } from './prompt-recipe'
 
 describe('chat prompt recipe', () => {
   // https://github.com/moeru-ai/airi/discussions/2239
@@ -24,6 +24,15 @@ describe('chat prompt recipe', () => {
     // The steps can leave each run to the model, so they come after the recipe's purpose.
     expect(composeRecipeSpacePrompt({ ...recipe, description: 'Checks on the owner late at night.' }))
       .toContain('Purpose: Checks on the owner late at night.\nRecipe steps:\nRead the screen slot.')
+  })
+
+  // ROOT CAUSE:
+  // A character told of a night with the owner that never happened. Its own lore stays free.
+  it('asks to tell of the shared past only from memories, the conversation, or the screen', () => {
+    const text = composeSharedPastPrompt()
+
+    expect(text).toContain('Do not make up other past events with the owner.')
+    expect(text).toContain('Your own lore and stories as a character are fine.')
   })
 
   // ROOT CAUSE:

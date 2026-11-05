@@ -60,7 +60,7 @@ import { useAuthStore } from './auth'
 import { createMinecraftContext, createRuntimePromptContext, createUserAccountContext } from './chat/context-providers'
 import { useChatContextStore } from './chat/context-store'
 import { describeChatImages, replaceToolResultImages } from './chat/image-projection'
-import { composeRecipeSpacePrompt, composeReplyLengthPrompt, composeSystemPrompt } from './chat/prompt-recipe'
+import { composeRecipeSpacePrompt, composeReplyLengthPrompt, composeSharedPastPrompt, composeSystemPrompt } from './chat/prompt-recipe'
 import { staysLocal } from './chat/session-locality'
 import { useChatSessionStore } from './chat/session-store'
 import { useChatStreamStore } from './chat/stream-store'
@@ -344,6 +344,7 @@ export const useChatStore = defineStore('chat', () => {
       + (memory.enabled && ownerProfile.enabled && isOwnerSession(sessionId) ? composeOwnerProfilePrompt(ownerProfile.profile?.text ?? '') : '')
       + (drawsCards(sessionId) ? composeDrawCardPrompt() : '')
       + composeReplyLengthPrompt(consciousnessSettings.replyLength)
+      + composeSharedPastPrompt()
     const recipeId = chatSession.sessionMetas[sessionId]?.recipeId
     const recipe = recipeId ? recipes.recipes.find(entry => entry.id === recipeId) : undefined
     return recipe ? identity + composeRecipeSpacePrompt(recipe) : identity

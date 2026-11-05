@@ -26,7 +26,7 @@ import {
 import { composeDrawCardPrompt } from '../tools/draw-card'
 import { composeMemoryPrompt } from '../tools/memory'
 import { useChatStore } from './chat'
-import { CHAT_FORMAT_RULES, composeReplyLengthPrompt } from './chat/prompt-recipe'
+import { CHAT_FORMAT_RULES, composeReplyLengthPrompt, composeSharedPastPrompt } from './chat/prompt-recipe'
 import { useContextObservabilityStore } from './devtools/context-observability'
 import { useMemoryStore } from './memory'
 import { chatRequestOptionsOf, useConsciousnessSettingsStore } from './modules/consciousness-settings'
@@ -1560,7 +1560,7 @@ describe('chat store contract', () => {
     await store.ingest('second', { model: 'gpt-test', chatProvider: provider })
 
     // The owner's run reads the memory index and, with reply cards on by default, when to draw a card after the identity.
-    const after = `${composeMemoryPrompt('')}${composeDrawCardPrompt()}${composeReplyLengthPrompt('auto')}`
+    const after = `${composeMemoryPrompt('')}${composeDrawCardPrompt()}${composeReplyLengthPrompt('auto')}${composeSharedPastPrompt()}`
     expect(systemTexts).toEqual([`${CHAT_FORMAT_RULES}system prompt${after}`, `${CHAT_FORMAT_RULES}edited prompt${after}`])
   })
 
@@ -1667,7 +1667,7 @@ describe('chat store contract', () => {
     if (composedMessages[0].type !== 'system' || composedMessages[1].type !== 'user')
       throw new Error('Expected system and user turns')
     expect(composedMessages[0].content).toEqual([
-      { type: 'text', text: `${CHAT_FORMAT_RULES}system prompt${composeMemoryPrompt('')}${composeDrawCardPrompt()}${composeReplyLengthPrompt('auto')}` },
+      { type: 'text', text: `${CHAT_FORMAT_RULES}system prompt${composeMemoryPrompt('')}${composeDrawCardPrompt()}${composeReplyLengthPrompt('auto')}${composeSharedPastPrompt()}` },
       { type: 'text', text: '\n\nPlugin toolset guidance.' },
     ])
     expect(composedMessages[1].content[0]).toMatchObject({
