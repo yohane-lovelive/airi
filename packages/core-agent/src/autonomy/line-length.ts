@@ -8,6 +8,8 @@ export interface LineLengthContext {
   readonly mode: InitiativeMode
   /** The owner asked for small talk, so the character talks more. */
   readonly smallTalk: boolean
+  /** The owner only listens, so the character talks the longest. */
+  readonly solo?: boolean
   /** The screen activity of commentary, from 0 to 1. */
   readonly activity?: number
   /** The timeline holds notes, so a calm moment of commentary has something to look back on. */
@@ -23,6 +25,7 @@ export const LINE_LENGTH_LIMITS = {
   weights: {
     idle: [0.7, 0.3, 0],
     smallTalk: [0.2, 0.5, 0.3],
+    soloTalk: [0.1, 0.4, 0.5],
     activeCommentary: [0.8, 0.2, 0],
     calmCommentary: [0.4, 0.4, 0.2],
   } satisfies Record<string, LengthWeights>,
@@ -39,6 +42,8 @@ function weightsOf(context: LineLengthContext): LengthWeights {
     const [short, normal, long] = weights.calmCommentary
     return context.hasNotes ? weights.calmCommentary : [short, normal + long, 0]
   }
+  if (context.solo)
+    return weights.soloTalk
   return context.smallTalk ? weights.smallTalk : weights.idle
 }
 

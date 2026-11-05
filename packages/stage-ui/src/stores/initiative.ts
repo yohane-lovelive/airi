@@ -18,12 +18,15 @@ export const INITIATIVE_LIMITS = {
   maxCommentaryIntervalSeconds: 300,
   minSmallTalkIntervalMinutes: 1,
   maxSmallTalkIntervalMinutes: 10,
+  minSoloPauseSeconds: 3,
+  maxSoloPauseSeconds: 60,
 } as const
 
 /** The commentary interval of the policy defaults, 45 seconds. The screen activity scales it. */
 const DEFAULT_COMMENTARY_INTERVAL_SECONDS = resolveInitiativeOptions().modes.commentary.boredomIntervalMs / 1000
 /** The small-talk interval of the mission limits, 2 minutes. */
 const DEFAULT_SMALL_TALK_INTERVAL_MINUTES = SMALL_TALK_LIMITS.boredomIntervalMs / 60_000
+const DEFAULT_SOLO_PAUSE_SECONDS = SMALL_TALK_LIMITS.soloPauseMs / 1000
 
 /** Reads `HH:mm` as minutes since midnight. Resolves to `undefined` for any other text. */
 function minutesOf(time: string) {
@@ -58,6 +61,8 @@ export const useInitiativeStore = defineStore('initiative', () => {
   const commentaryIntervalSeconds = useLocalStorageManualReset<number>('initiative/commentary-interval-seconds', DEFAULT_COMMENTARY_INTERVAL_SECONDS)
   /** While small talk runs, the character talks about this often when the owner is quiet. */
   const smallTalkIntervalMinutes = useLocalStorageManualReset<number>('initiative/small-talk-interval-minutes', DEFAULT_SMALL_TALK_INTERVAL_MINUTES)
+  /** The pause between lines of solo talk, from the end of the speech. */
+  const soloPauseSeconds = useLocalStorageManualReset<number>('initiative/solo-pause-seconds', DEFAULT_SOLO_PAUSE_SECONDS)
   const quietHoursEnabled = useLocalStorageManualReset<boolean>('initiative/quiet-hours-enabled', false)
   /** The start of the quiet hours, `HH:mm`. A range can pass midnight. */
   const quietHoursStart = useLocalStorageManualReset<string>('initiative/quiet-hours-start', '23:00')
@@ -88,9 +93,11 @@ export const useInitiativeStore = defineStore('initiative', () => {
    * While small talk runs, the idle pace is the pace of small talk. The owner's temporary factor still applies to it.
    * While commentary runs, its interval follows the screen activity, from 0 to 1.
    */
-  function settingsAt(now: number, foreground: { smallTalk?: boolean, commentaryActivity?: number } = {}): InitiativeSettings {
+  function settingsAt(now: number, foreground: { smallTalk?: boolean, solo?: boolean, commentaryActivity?: number } = {}): InitiativeSettings {
     const smallTalk = Boolean(foreground.smallTalk)
-    const { minDailyTurnBudget, maxDailyTurnBudget, minCommentaryIntervalSeconds, maxCommentaryIntervalSeconds, minSmallTalkIntervalMinutes, maxSmallTalkIntervalMinutes } = INITIATIVE_LIMITS
+    const solo = smallTalk && Boolean(foreground.solo)
+    const { minDailyTurnBudget, maxDailyTurnBudget, minCommentaryIntervalSeconds, maxCommentaryIntervalSeconds, minSmallTalkIntervalMinutes, maxSmallTalkIntervalMinutes, minSoloPauseSeconds, maxSoloPauseSeconds } = INITIATIVE_LIMITS
+    const soloPauseMs = clamp(soloPauseSeconds.value, minSoloPauseSeconds, maxSoloPauseSeconds) * 1000
     const commentaryIntervalMs = clamp(commentaryIntervalSeconds.value, minCommentaryIntervalSeconds, maxCommentaryIntervalSeconds) * 1000
     const smallTalkIntervalMs = clamp(smallTalkIntervalMinutes.value, minSmallTalkIntervalMinutes, maxSmallTalkIntervalMinutes) * 60_000
     const startMinutes = minutesOf(quietHoursStart.value)
@@ -102,10 +109,13 @@ export const useInitiativeStore = defineStore('initiative', () => {
       missionRunning: smallTalk || foreground.commentaryActivity !== undefined,
       // How many lines can go on without an owner message: small talk talks the longest, idle speech the least.
       maxContinuations: smallTalk ? 3 : foreground.commentaryActivity !== undefined ? 2 : 1,
+      solo,
       modes: {
-        idle: smallTalk
-          ? { boredomIntervalMs: smallTalkIntervalMs * idleIntervalFactor, refractoryMs: SMALL_TALK_LIMITS.refractoryMs }
-          : { boredomIntervalMs: clampedIdleIntervalMinutes() * idleIntervalFactor * 60_000 },
+        idle: solo
+          ? { boredomIntervalMs: soloPauseMs * idleIntervalFactor, refractoryMs: soloPauseMs * idleIntervalFactor }
+          : smallTalk
+            ? { boredomIntervalMs: smallTalkIntervalMs * idleIntervalFactor, refractoryMs: SMALL_TALK_LIMITS.refractoryMs }
+            : { boredomIntervalMs: clampedIdleIntervalMinutes() * idleIntervalFactor * 60_000 },
         ...(foreground.commentaryActivity !== undefined
           ? { commentary: { boredomIntervalMs: commentaryIntervalMs * commentaryIntervalFactor(foreground.commentaryActivity) * idleIntervalFactor } }
           : {}),
@@ -143,6 +153,7 @@ export const useInitiativeStore = defineStore('initiative', () => {
     dailyTurnBudget.reset()
     commentaryIntervalSeconds.reset()
     smallTalkIntervalMinutes.reset()
+    soloPauseSeconds.reset()
     quietHoursEnabled.reset()
     quietHoursStart.reset()
     quietHoursEnd.reset()
@@ -157,6 +168,7 @@ export const useInitiativeStore = defineStore('initiative', () => {
     dailyTurnBudget,
     commentaryIntervalSeconds,
     smallTalkIntervalMinutes,
+    soloPauseSeconds,
     quietHoursEnabled,
     quietHoursStart,
     quietHoursEnd,

@@ -982,6 +982,8 @@ pages:
       daily-turn-budget-description: 1 日に自律発話でモデルを呼ぶ回数の上限です。
       small-talk-interval: 雑談の間隔
       small-talk-interval-description: 雑談の間、あなたが黙っていると、キャラクターはおよそこの間隔で話します。
+      solo-pause: 一人雑談の間
+      solo-pause-description: 一人雑談では、キャラクターがラジオのように一人で話し続けます。チャットで「一人で喋ってて」のように頼みます。これは、声が終わってから次の発話までの間です。
       commentary-interval: 実況の間隔
       commentary-interval-description: 実況の間、落ち着いた画面では、キャラクターはおよそこの間隔で話します。画面の動きが大きいと、間隔は短くなります。
       seconds: '{count} 秒'
@@ -1073,6 +1075,7 @@ pages:
         missed: 見逃し
       small-talk:
         name: 雑談
+        solo-name: 一人雑談
         minutes: '{count} 分'
         until: '{time} まで'
       commentary:

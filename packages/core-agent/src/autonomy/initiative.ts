@@ -87,6 +87,12 @@ export interface InitiativeOptions {
    */
   maxContinuations: number
   /**
+   * The character talks on its own, and the owner only listens. Lines ask for no answer, so a line without one does
+   * not slow the talk, and a line gets no follow-up turn. The pause between lines keeps the pace.
+   * @default false
+   */
+  solo: boolean
+  /**
    * After the model chooses silence, pressure and boredom keep this share.
    * Silence lowers the drive only in part, so the character tries again sooner than after speech.
    * @default 0.5
@@ -133,6 +139,7 @@ const DEFAULT_OPTIONS: InitiativeOptions = {
   dailyTurnBudget: 200,
   missionRunning: false,
   maxContinuations: 1,
+  solo: false,
   silentRetain: 0.5,
   staleSalience: 0.6,
   hintlessShare: 0.25,
@@ -499,7 +506,7 @@ export function decideInitiative(
   const trigger = triggerOf(current.pressure, current.inner.boredom, intentionDrive)
   const speechType = random() < options.hintlessShare
     ? undefined
-    : drawSpeechType({ ...current.inner, eventShare: current.pressure / drive, recentTypes: current.recentTypes, night: dayPartOf(time.localMinutes) === 'night' }, random)
+    : drawSpeechType({ ...current.inner, eventShare: current.pressure / drive, recentTypes: current.recentTypes, night: dayPartOf(time.localMinutes) === 'night', noQuestions: options.solo }, random)
   const mood = clamp(current.inner.mood + (random() * 2 - 1) * INNER_DYNAMICS.moodDrift, -1, 1)
 
   const turn: PendingTurn = { startedAt: time.now, trigger, ...(speechType ? { speechType } : {}) }
@@ -588,7 +595,7 @@ export function initiativeReadout(state: InitiativeState, host: InitiativeHost, 
     inner: current.inner,
     refractoryLeftMs: Math.max(0, current.refractoryUntil - time.now),
     unanswered: current.unanswered,
-    intervalFactor: current.mode === 'idle' ? unansweredIntervalFactor(current.unanswered) : 1,
+    intervalFactor: current.mode === 'idle' && !options.solo ? unansweredIntervalFactor(current.unanswered) : 1,
     budget: { turns: current.budget.turns, limit: options.dailyTurnBudget },
     recentTypes: current.recentTypes,
     ...(current.turn ? { turn: current.turn } : {}),
@@ -638,6 +645,8 @@ function waitReason(state: InitiativeState, host: InitiativeHost, time: Initiati
 
 /** The follow-up that a spoken line asks for with its `NEXT` marker, inside the limits. */
 function followUpAfter(state: InitiativeState, next: TurnNext | undefined, now: number, options: InitiativeOptions, random: () => number): Pick<InitiativeState, 'continuations'> & { followUp?: FollowUp } {
+  if (options.solo)
+    return { continuations: 0 }
   const pause = (range: { min: number, max: number }) => range.min + (range.max - range.min) * random()
   if (next === 'continue' && state.continuations < options.maxContinuations) {
     const delayMs = pause(FOLLOW_UP_LIMITS.continuationPauseMs)
@@ -709,7 +718,7 @@ function finishTurn(
         inner: { ...closed.inner, boredom: 0, energy: Math.max(0, closed.inner.energy - INNER_DYNAMICS.energyPerSpokenTurn) },
         refractoryUntil,
         recentTypes: turn.speechType ? [...closed.recentTypes, turn.speechType].slice(-RECENT_SPEECH_TYPE_COUNT) : closed.recentTypes,
-        unanswered: closed.unanswered + 1,
+        unanswered: options.solo ? closed.unanswered : closed.unanswered + 1,
         ...followUpAfter(closed, event.next, now, options, random),
       }
     case 'silent':
@@ -736,7 +745,7 @@ function advance(state: InitiativeState, now: number, options: InitiativeOptions
 
   const mode = options.modes[state.mode]
   // Only idle talk slows down for lines without a reaction. The owner starts commentary, so it keeps its pace.
-  const boredomIntervalMs = state.mode === 'idle' ? mode.boredomIntervalMs * unansweredIntervalFactor(state.unanswered) : mode.boredomIntervalMs
+  const boredomIntervalMs = state.mode === 'idle' && !options.solo ? mode.boredomIntervalMs * unansweredIntervalFactor(state.unanswered) : mode.boredomIntervalMs
   const { energy, mood, boredom, curiosity } = state.inner
   return {
     ...state,

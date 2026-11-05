@@ -1116,6 +1116,8 @@ pages:
       daily-turn-budget-description: The most model calls for autonomous speech in one day.
       small-talk-interval: Small talk interval
       small-talk-interval-description: While small talk runs and you stay quiet, the character talks about this often.
+      solo-pause: Pause in solo talk
+      solo-pause-description: In solo talk, the character talks on its own like a radio. Ask for it in the chat, for example "keep talking by yourself". This is the pause between lines, from the end of the voice.
       commentary-interval: Commentary interval
       commentary-interval-description: While commentary runs, the character talks about this often on a calm screen. A busy screen makes the gaps shorter.
       seconds: '{count} s'
@@ -1207,6 +1209,7 @@ pages:
         missed: Missed
       small-talk:
         name: Small talk
+        solo-name: Solo talk
         minutes: '{count} min'
         until: 'Until {time}'
       commentary:

@@ -28,7 +28,9 @@ function nameOf(mission: MissionInstance) {
     return t(`${KEY}.commentary.name`, { app: mission.values.app })
   if (mission.template === 'watch')
     return t(`${KEY}.watch.name`, { condition: mission.values.condition, app: mission.values.app })
-  return mission.template === 'reminder' ? mission.values.text : t(`${KEY}.small-talk.name`)
+  if (mission.template === 'small-talk')
+    return t(`${KEY}.small-talk.${mission.values.solo ? 'solo-name' : 'name'}`)
+  return mission.values.text
 }
 
 function repeatLabel(mission: MissionInstance) {

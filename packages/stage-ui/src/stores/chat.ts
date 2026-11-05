@@ -78,6 +78,7 @@ import { useAutonomousArtistryStore } from './modules/artistry-autonomous'
 import { useConsciousnessStore } from './modules/consciousness'
 import { useConsciousnessSettingsStore } from './modules/consciousness-settings'
 import { useHearingStore } from './modules/hearing'
+import { useSpeechStore } from './modules/speech'
 import { useStickersStore } from './modules/stickers'
 import { useVisionStore } from './modules/vision'
 import { useWebSearchStore } from './modules/web-search'
@@ -748,9 +749,14 @@ export const useChatStore = defineStore('chat', () => {
             missions: () => missions.missions,
             addReminder: request => missions.addReminder(request, sessionId),
             // Small talk speaks through autonomous turns, so it needs them on.
-            addSmallTalk: async request => initiative.enabled && initiative.supported
-              ? missions.addSmallTalk(request, sessionId)
-              : { ok: false, reason: 'Autonomous speech is off. The owner can turn it on in Settings > Modules > Autonomous speech.' },
+            addSmallTalk: async (request) => {
+              if (!initiative.enabled || !initiative.supported)
+                return { ok: false, reason: 'Autonomous speech is off. The owner can turn it on in Settings > Modules > Autonomous speech.' }
+              // Solo talk without a voice only spends tokens on text that nobody listens to.
+              if (request.solo && (!useSpeechStore().enabled || ['', 'speech-noop'].includes(cardStore.getModules(persona).speech.provider)))
+                return { ok: false, reason: 'Solo talk needs a voice, and speech is off. The owner can choose a voice in Settings > Modules > Speech.' }
+              return missions.addSmallTalk(request, sessionId)
+            },
             // Commentary watches the screen and speaks through autonomous turns, so it needs both on.
             addCommentary: async (request) => {
               if (!initiative.enabled || !initiative.supported)

@@ -18,6 +18,8 @@ export const TOPIC_LIMITS = {
   answeredHeatStep: 0.85,
   /** Each line without an owner answer multiplies the heat by this value, so a thread without answers cools fast. */
   unansweredHeatStep: 0.55,
+  /** In solo talk nobody answers, so each line cools the thread less, and a topic lasts about five lines. */
+  soloHeatStep: 0.8,
   /** A thread at this heat or less is cold. The notice asks for a new topic. */
   coldHeat: 0.35,
   /** A seed with this similarity or more to a recent topic is not offered. */
@@ -144,7 +146,7 @@ export interface TopicThread {
  * currentTopicThread([{ text: '…', label: 'ラーメン', at: 0, answered: false }])
  * // => { topic: 'ラーメン', lines: 1, heat: 0.55, cold: false }
  */
-export function currentTopicThread(lines: readonly TopicLine[], similarity: TopicSimilarity = bigramSimilarity): TopicThread | undefined {
+export function currentTopicThread(lines: readonly TopicLine[], similarity: TopicSimilarity = bigramSimilarity, unansweredHeatStep: number = TOPIC_LIMITS.unansweredHeatStep): TopicThread | undefined {
   const newest = lines.at(-1)
   if (!newest)
     return undefined
@@ -155,7 +157,7 @@ export function currentTopicThread(lines: readonly TopicLine[], similarity: Topi
     const next = lines[index + 1]
     if (next && similarity(topicOf(line), topicOf(next)) < TOPIC_LIMITS.threadSimilarity)
       break
-    heat *= line.answered ? TOPIC_LIMITS.answeredHeatStep : TOPIC_LIMITS.unansweredHeatStep
+    heat *= line.answered ? TOPIC_LIMITS.answeredHeatStep : unansweredHeatStep
     count += 1
   }
   return { topic: topicOf(newest), lines: count, heat, cold: heat <= TOPIC_LIMITS.coldHeat }

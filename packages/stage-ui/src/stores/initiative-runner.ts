@@ -208,6 +208,7 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
     const commentary = commentaryAt(now)
     return resolveInitiativeOptions(initiative.settingsAt(now, {
       smallTalk: Boolean(smallTalkAt(now)),
+      solo: Boolean(smallTalkAt(now)?.values.solo),
       ...(commentary ? { commentaryActivity: perceptionRunner.activity() } : {}),
     }))
   }
@@ -253,7 +254,8 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
     const indexSeeds = memory.enabled ? memoryTopicSeeds(memory.entries, persona, memorySync.active ? MEMORY_INDEX_LIMIT_WITH_RECALL : MEMORY_INDEX_LIMIT) : []
     const calendarSeeds = calendarTopicSeeds(time.localDay)
     await topicVectors.prepare([...recentTopics, ...indexSeeds.map(seed => seed.text), ...calendarSeeds.map(seed => seed.text)])
-    const thread = currentTopicThread(lines, topicVectors.similarity)
+    // Nobody answers solo talk, so its topics cool slower.
+    const thread = currentTopicThread(lines, topicVectors.similarity, smallTalkAt(time.now)?.values.solo ? TOPIC_LIMITS.soloHeatStep : TOPIC_LIMITS.unansweredHeatStep)
     const recalled = memory.enabled && thread && !thread.cold ? await memoryRecall.recall(thread.topic, persona) : undefined
     const recalledSeeds = (recalled?.entries ?? []).map(entry => ({ text: entry.description || entry.body, source: 'memory' as const }))
     if (recalledSeeds.length)
@@ -339,7 +341,9 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
     const topics = rhythm ? undefined : await topicsOf(sessionId, time)
     const smallTalk = rhythm ? undefined : smallTalkAt(time.now)
     lastSeeds = topics?.seeds ?? []
-    const screen = rhythm ? undefined : await screenOf(time.now)
+    // Solo talk is not about the screen, so it spends no images and stays fast.
+    const solo = Boolean(smallTalk?.values.solo)
+    const screen = rhythm || solo ? undefined : await screenOf(time.now)
     const screenTimeline = screen ? await timeline.load(sessionId).catch(() => timeline.timelineOf(sessionId)) : undefined
     const recallMemory = decision.speechType === 'recall'
       ? await recallMemoryOf(sessionId, topics?.thread?.topic ?? screenTimeline?.scene?.text ?? facts.recentLines.at(-1), time.now)
@@ -352,6 +356,7 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
       : drawLineLength({
           mode,
           smallTalk: Boolean(smallTalk),
+          solo,
           ...(mode === 'commentary' ? { activity: perceptionRunner.activity() } : {}),
           hasNotes: Boolean(screenTimeline?.notes.length),
         }, Math.random)
@@ -366,6 +371,7 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
       intentions: intentions.openAt(time.now),
       ...(awayMs !== undefined ? { awayMs } : {}),
       ...(smallTalk ? { smallTalkEndsAt: smallTalk.values.endsAt } : {}),
+      ...(solo ? { solo } : {}),
       // A turn with images of the screen cannot search. See `webSearchRefusalOf`.
       ...(!rhythm && !screen && webSearch.configured && webSearch.autonomousSearchesLeft(time.now) > 0 ? { canSearch: true } : {}),
       ...(screen ? { screen: screen.context } : {}),
@@ -511,7 +517,9 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
 
   // Small talk ends when the owner leaves the device. Only the leader writes the end.
   watch(() => presence.value.awaySince, (awaySince) => {
-    if (awaySince !== undefined && leadership?.isLeader() && smallTalkAt(Date.now()))
+    // A listener of solo talk gives no input for a long time, so only a screen lock or sleep ends solo talk. See `initialize`.
+    const smallTalk = smallTalkAt(Date.now())
+    if (awaySince !== undefined && leadership?.isLeader() && smallTalk && !smallTalk.values.solo)
       void missions.endForeground('away', 'small-talk').catch(error => console.warn('[initiative] Failed to end small talk:', errorMessageFrom(error)))
   })
 
@@ -616,6 +624,8 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
     presenceSource = source
     stopAwayListener = source?.onAway?.(() => {
       presence.value = markAway(presence.value, Date.now())
+      if (leadership?.isLeader() && smallTalkAt(Date.now())?.values.solo)
+        void missions.endForeground('away', 'small-talk').catch(error => console.warn('[initiative] Failed to end solo talk:', errorMessageFrom(error)))
     })
     initiative.supported = true
     stopLeadershipListener = syncedPinia.onLeadershipChange((isLeader) => {

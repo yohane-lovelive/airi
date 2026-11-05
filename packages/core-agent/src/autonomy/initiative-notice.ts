@@ -74,6 +74,8 @@ export interface InitiativeNoticeContext {
   readonly thread?: TopicThread
   /** Epoch milliseconds when small talk ends, while the owner asked for small talk. */
   readonly smallTalkEndsAt?: number
+  /** The small talk is solo talk: the owner only listens. */
+  readonly solo?: boolean
   /** The owner's screen, while screen perception runs. */
   readonly screen?: InitiativeScreenContext
   /** The screen history of the conversation. It goes with the screen only. */
@@ -128,8 +130,11 @@ export function initiativeNoticeText(context: InitiativeNoticeContext): string {
     lines.push(`- The owner was away for: ${durationSince(context.now - context.awayMs, context.now)}.`)
   if (context.mode === 'commentary')
     lines.push('- Mode: commentary of the owner\'s screen.')
-  if (context.smallTalkEndsAt !== undefined)
-    lines.push(`- Mode: small talk. The owner asked you to keep them company for ${durationSince(context.now, context.smallTalkEndsAt)} more. Talk freely, and keep the talk going.`)
+  if (context.smallTalkEndsAt !== undefined) {
+    lines.push(context.solo
+      ? `- Mode: solo talk, like a radio host, for ${durationSince(context.now, context.smallTalkEndsAt)} more. The owner only listens. Keep talking on your own. Do not stay silent, ask the owner anything, or wait for an answer.`
+      : `- Mode: small talk. The owner asked you to keep them company for ${durationSince(context.now, context.smallTalkEndsAt)} more. Talk freely, and keep the talk going.`)
+  }
   if (context.speechType)
     lines.push(`- Idea, only if it fits: ${SPEECH_TYPE_HINTS[context.speechType]}.`)
   if (context.speechType === 'recall' && context.recallMemory)
@@ -173,7 +178,9 @@ export function initiativeNoticeText(context: InitiativeNoticeContext): string {
   // A short line lost the voice of a lively character in a live check, so the notice asks for it in every length.
   lines.push(`${LINE_LENGTH_TEXT[context.lineLength]} Keep it natural, in your own voice and habits.`)
   lines.push('If you speak, end with <|TOPIC a few words|> that name your topic, in the language of your line. Nobody sees or hears it.')
-  lines.push('Then add <|NEXT continue|> if you have more to say, <|NEXT wait|> if you want the owner\'s answer, or <|NEXT done|> if the topic is closed.')
+  // Solo talk keeps its pace with the pause between lines, so a line needs no signal.
+  if (!context.solo)
+    lines.push('Then add <|NEXT continue|> if you have more to say, <|NEXT wait|> if you want the owner\'s answer, or <|NEXT done|> if the topic is closed.')
   return lines.join('\n')
 }
 

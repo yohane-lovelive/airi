@@ -37,6 +37,8 @@ export interface SpeechTypeContext {
   readonly recentTypes: readonly SpeechType[]
   /** Whether it is night. At night, quiet types come more often than jokes and questions. */
   readonly night?: boolean
+  /** The owner only listens, so the draw offers no question. */
+  readonly noQuestions?: boolean
 }
 
 /** At night, each type weight is multiplied by its factor. A missing type keeps its weight. */
@@ -77,7 +79,7 @@ function speechTypeWeights(context: SpeechTypeContext): number[] {
   const base: Record<SpeechType, number> = {
     'react': 0.15 + 2 * context.eventShare,
     'joke': 0.35 * cheer * vigor,
-    'ask': (0.25 + 0.4 * context.curiosity + 0.3 * boredom * quietShare) * vigor,
+    'ask': context.noQuestions ? 0 : (0.25 + 0.4 * context.curiosity + 0.3 * boredom * quietShare) * vigor,
     'recall': 0.1 + 0.6 * boredom * quietShare,
     'think-aloud': 0.3 + 0.25 * Math.max(0, -context.mood) + 0.2 * context.curiosity,
     'watch-quietly': 0.15 + 0.7 * (1 - context.energy),

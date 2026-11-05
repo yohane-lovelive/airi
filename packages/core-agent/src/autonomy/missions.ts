@@ -71,6 +71,8 @@ export interface ReminderValues {
 export interface SmallTalkRequest {
   /** How long the small talk runs. */
   readonly minutes: number
+  /** The owner wants to listen, like to a radio, so the character talks on its own and asks for no answers. */
+  readonly solo?: boolean
 }
 
 /** The stored values of a `small-talk` instance. */
@@ -78,6 +80,8 @@ export interface SmallTalkValues {
   readonly minutes: number
   /** Epoch milliseconds. The small talk ends at this time. */
   readonly endsAt: number
+  /** The character talks on its own, like a radio host. */
+  readonly solo?: true
 }
 
 /** A commentary request, as the model asks for it. */
@@ -188,8 +192,8 @@ export const MISSION_TEMPLATES: readonly MissionTemplate[] = [
   },
   {
     name: 'small-talk',
-    description: 'Keep the owner company and talk more often, when the owner asks for it, for example "talk with me for a while". It ends at its time limit, when the owner leaves, or when the owner asks to stop or for quiet.',
-    values: '{ "minutes": how long, 5-120, 30 when the owner names no time }',
+    description: 'Keep the owner company and talk more often, when the owner asks for it, for example "talk with me for a while". With "solo", the character talks on its own like a radio host, when the owner wants to just listen, for example "keep talking by yourself". It ends at its time limit, when the owner leaves, or when the owner asks to stop or for quiet.',
+    values: '{ "minutes": how long, 5-120, 30 when the owner names no time, "solo": true when the owner wants to just listen, otherwise false }',
   },
   {
     name: 'commentary',
@@ -229,6 +233,8 @@ export const SMALL_TALK_LIMITS = {
   boredomIntervalMs: 2 * MINUTE_MS,
   /** While small talk runs, no turn starts for this time after a turn ends. */
   refractoryMs: 45_000,
+  /** The pause between lines of solo talk, from the end of the speech. */
+  soloPauseMs: 10_000,
 } as const
 
 /** Limits of a new reminder. */
@@ -418,7 +424,7 @@ export function createSmallTalk(input: { id: string, sessionId: string, request:
     mission: {
       id: input.id,
       template: 'small-talk',
-      values: { minutes, endsAt: input.now + minutes * MINUTE_MS },
+      values: { minutes, endsAt: input.now + minutes * MINUTE_MS, ...(input.request.solo ? { solo: true as const } : {}) },
       sessionId: input.sessionId,
       status: 'running',
       createdAt: input.now,

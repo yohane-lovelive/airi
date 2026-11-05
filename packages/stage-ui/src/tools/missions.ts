@@ -3,7 +3,7 @@ import type { Tool } from '@xsai/shared-chat'
 
 import { COMMENTARY_MISSION_LIMITS, formatTimePrefix, isMissionActive, MISSION_TEMPLATES, SMALL_TALK_LIMITS, WATCH_MISSION_LIMITS, WATCH_REGIONS } from '@proj-airi/core-agent'
 import { rawTool } from '@xsai/tool'
-import { array, description, integer, maxLength, maxValue, minLength, minValue, number, picklist, pipe, safeParse, strictObject, string, summarize, union } from 'valibot'
+import { array, boolean, description, integer, maxLength, maxValue, minLength, minValue, number, picklist, pipe, safeParse, strictObject, string, summarize, union } from 'valibot'
 import { toJsonSchema } from 'xsschema'
 
 export const START_MISSION_TOOL_NAME = 'builtIn_startMission'
@@ -27,6 +27,7 @@ const reminderValues = strictObject({
 })
 const smallTalkValues = strictObject({
   minutes: pipe(number(), integer(), description(`How long the small talk runs, ${SMALL_TALK_LIMITS.minMinutes} to ${SMALL_TALK_LIMITS.maxMinutes} minutes. ${SMALL_TALK_LIMITS.defaultMinutes} when the owner names no time.`)),
+  solo: pipe(boolean(), description('True when the owner wants to just listen, and you talk on your own like a radio host. Otherwise false.')),
 })
 const commentaryValues = strictObject({
   app: pipe(string(), maxLength(120), description('The app of the window to watch, as the owner names it. An empty string for the app in front.')),
@@ -92,7 +93,7 @@ function describeRepeat(repeat: ReminderRepeat) {
 
 function describeMission(mission: MissionInstance) {
   if (mission.template === 'small-talk')
-    return `- ${mission.id}: small-talk, until ${formatTimePrefix(mission.values.endsAt).trim()}`
+    return `- ${mission.id}: small-talk${mission.values.solo ? ' (solo)' : ''}, until ${formatTimePrefix(mission.values.endsAt).trim()}`
   if (mission.template === 'commentary')
     return `- ${mission.id}: commentary on ${mission.values.app}, until ${formatTimePrefix(mission.values.endsAt).trim()} or until the window closes`
   if (mission.template === 'watch')
@@ -126,9 +127,12 @@ export async function createMissionTools(options: CreateMissionToolsOptions): Pr
             ? await options.addWatch({ condition: values.condition, app: values.app, region: values.region, minutes: values.minutes })
             : 'app' in values
               ? await options.addCommentary({ app: values.app, minutes: values.minutes })
-              : await options.addSmallTalk({ minutes: values.minutes })
+              : await options.addSmallTalk({ minutes: values.minutes, solo: values.solo })
         if (!result.ok)
           return `Mission not started: ${result.reason}`
+        // A live check heard a first reply of about 5 minutes, before any line of the solo talk. The talk has its own turns.
+        if (result.mission.template === 'small-talk' && result.mission.values.solo)
+          return `Started mission:\n${describeMission(result.mission)}\nSay one short sentence now. Your solo talk comes in the next turns, so do not start it in this reply.`
         return `Started mission:\n${describeMission(result.mission)}`
       },
     }),

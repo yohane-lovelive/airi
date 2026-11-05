@@ -71,3 +71,11 @@ describe('speech type draw', () => {
     expect(night['watch-quietly']).toBeGreaterThan(day['watch-quietly'])
   })
 })
+
+describe('speech types without questions', () => {
+  it('never draws a question', () => {
+    for (let roll = 0; roll < 1; roll += 0.02) {
+      expect(drawSpeechType({ energy: 1, mood: 0, boredom: 1, curiosity: 1, eventShare: 0, recentTypes: [], noQuestions: true }, () => roll)).not.toBe('ask')
+    }
+  })
+})

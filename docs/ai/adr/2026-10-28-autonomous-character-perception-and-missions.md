@@ -857,6 +857,15 @@ On 2026-11-05, the owner asked for a separate model to read the screen, because 
 
 The same live check heard a commentary on one window speak while another app was in front. The turn had no frames, and the model made up what it could not see, for example "that move was good". This ADR pauses perception in that case, and it did not say that speech pauses too. A new gate now holds commentary turns while frames of the window do not come in: the window is not in front, the window in front is excluded, or capture does not run. Replies to the owner do not wait. A commentary with images used up still speaks, and the notice tells that it has no frames. In a live check, the commentary spoke no line for the 90 seconds that another window was in front, and spoke again at once when its window came back.
 
+On 2026-11-05, the owner asked for small talk that the owner can just listen to, like a radio, where the character keeps talking alone. The `small-talk` template got a `solo` value.
+
+- The model sets it from the owner's words. Without a voice, code refuses it, because the talk would only spend tokens.
+- The next line comes about 10 seconds after the voice ends. A setting changes this from 3 to 60 seconds. Lines are longer: short 10%, normal 40%, long 50%. A topic lasts about five lines, because nobody answers.
+- The character asks no questions. The notice asks for no `NEXT` marker, the code ignores one, and a line without an answer does not slow the talk.
+- Solo talk sends no images of the screen, so it stays fast, uses no image budget, and can search the web.
+- This ADR ends small talk when the owner leaves. A listener gives no input for a long time, so only a screen lock or sleep ends solo talk, for the same reason as commentary.
+- A live check on 2026-11-06 first heard a first reply of about 5 minutes, before any line of the talk. The tool result now asks for one short sentence, and the next run replied in 57 characters. In about 6 minutes, the character spoke 4 full lines, moved between connected topics, and sent no images. A line took 30 to 40 seconds to arrive, so the gap between voices was 37 to 51 seconds instead of the 10 of the setting. An earlier run got a longer line in 11 seconds, and the provider returned overload errors that morning, but the check did not find the cause. Each line used about 13,000 input tokens. The check did not cover a screen lock, a search for a topic, or more than 10 minutes without input.
+
 ## Work outside the steps
 
 The owner asked for this work between the steps. It is not in the step table, but some of it supports later steps.

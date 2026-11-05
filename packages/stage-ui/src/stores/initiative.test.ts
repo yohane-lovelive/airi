@@ -18,6 +18,9 @@ describe('initiative store', () => {
     expect(store.smallTalkIntervalMinutes).toBe(2)
     expect(store.commentaryIntervalSeconds).toBe(45)
     expect(store.settingsAt(0, { smallTalk: true }).modes?.idle?.boredomIntervalMs).toBe(120_000)
+    // Solo talk keeps its own short pace, on both the wait and the rest after a line.
+    expect(store.settingsAt(0, { smallTalk: true, solo: true })).toMatchObject({ solo: true, missionRunning: true, modes: { idle: { boredomIntervalMs: 10_000, refractoryMs: 10_000 } } })
+    expect(store.settingsAt(0, { solo: true }).solo).toBe(false)
     expect(store.settingsAt(0, { commentaryActivity: 0.5 }).modes?.commentary?.boredomIntervalMs).toBe(45_000 * commentaryIntervalFactor(0.5))
   })
 

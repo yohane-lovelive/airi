@@ -121,14 +121,16 @@ describe('mission tools', () => {
   it('starts small talk, lists it with its end time, and refuses values of another template', async () => {
     const harness = await createHarness()
 
-    const started = await harness.run(START_MISSION_TOOL_NAME, { template: 'small-talk', values: { minutes: 30 } })
-    expect(harness.addSmallTalk).toHaveBeenCalledWith({ minutes: 30 })
-    expect(started).toContain('mission-1: small-talk, until')
+    const started = await harness.run(START_MISSION_TOOL_NAME, { template: 'small-talk', values: { minutes: 30, solo: true } })
+    expect(harness.addSmallTalk).toHaveBeenCalledWith({ minutes: 30, solo: true })
+    expect(started).toContain('mission-1: small-talk (solo), until')
+    // The first reply stays short, because the talk has its own turns.
+    expect(started).toContain('Say one short sentence now.')
     expect(await harness.run(LIST_MISSIONS_TOOL_NAME, {})).toContain('small-talk')
 
-    const mismatch = await harness.run(START_MISSION_TOOL_NAME, { template: 'reminder', values: { minutes: 30 } })
+    const mismatch = await harness.run(START_MISSION_TOOL_NAME, { template: 'reminder', values: { minutes: 30, solo: false } })
     expect(mismatch).toContain('do not match the template')
-    const refused = await harness.run(START_MISSION_TOOL_NAME, { template: 'small-talk', values: { minutes: 500 } })
+    const refused = await harness.run(START_MISSION_TOOL_NAME, { template: 'small-talk', values: { minutes: 500, solo: false } })
     expect(refused).toContain('Mission not started: Small talk needs')
   })
 
@@ -148,7 +150,7 @@ describe('mission tools', () => {
 
     expect(parameters).toMatchObject({ properties: { values: { anyOf: [
       expect.objectContaining({ required: ['text', 'start', 'repeat'] }),
-      expect.objectContaining({ required: ['minutes'] }),
+      expect.objectContaining({ required: ['minutes', 'solo'] }),
       expect.objectContaining({ required: ['app', 'minutes'] }),
       expect.objectContaining({ required: ['condition', 'app', 'region', 'minutes'] }),
     ] } } })

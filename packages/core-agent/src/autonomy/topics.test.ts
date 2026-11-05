@@ -153,3 +153,14 @@ describe('scaledCosine', () => {
     expect(at(1)).toBe(1)
   })
 })
+
+describe('topic heat of solo talk', () => {
+  it('keeps a topic warm for about five lines without answers', () => {
+    const line: TopicLine = { at: 0, text: 'ラーメンの話', label: 'ラーメン', answered: false }
+    const lines = (count: number) => Array.from<TopicLine>({ length: count }).fill(line)
+
+    expect(currentTopicThread(lines(2))?.cold).toBe(true)
+    expect(currentTopicThread(lines(4), undefined, TOPIC_LIMITS.soloHeatStep)?.cold).toBe(false)
+    expect(currentTopicThread(lines(5), undefined, TOPIC_LIMITS.soloHeatStep)?.cold).toBe(true)
+  })
+})

@@ -14,6 +14,14 @@ function shares(context: LineLengthContext) {
 }
 
 describe('drawLineLength', () => {
+  it('talks the longest in solo talk', () => {
+    const solo = { mode: 'idle' as const, smallTalk: true, solo: true, hasNotes: false }
+
+    expect(drawLineLength(solo, () => 0.05)).toBe('short')
+    expect(drawLineLength(solo, () => 0.3)).toBe('normal')
+    expect(drawLineLength(solo, () => 0.9)).toBe('long')
+  })
+
   it('keeps idle speech mostly short and never long', () => {
     expect(shares({ mode: 'idle', smallTalk: false, hasNotes: true })).toEqual({ short: 0.7, normal: 0.3, long: 0 })
   })

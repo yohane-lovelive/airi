@@ -6,7 +6,7 @@ import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
-const { enabled, idleIntervalMinutes, dailyTurnBudget, commentaryIntervalSeconds, smallTalkIntervalMinutes, quietHoursEnabled, quietHoursStart, quietHoursEnd, greetingEnabled, welcomeBackEnabled } = storeToRefs(useInitiativeStore())
+const { enabled, idleIntervalMinutes, dailyTurnBudget, commentaryIntervalSeconds, smallTalkIntervalMinutes, soloPauseSeconds, quietHoursEnabled, quietHoursStart, quietHoursEnd, greetingEnabled, welcomeBackEnabled } = storeToRefs(useInitiativeStore())
 const { changes: talkChanges, reset: resetTalkChanges } = useTalkChanges()
 
 const KEY = 'settings.pages.modules.initiative'
@@ -41,6 +41,15 @@ const KEY = 'settings.pages.modules.initiative'
         :max="INITIATIVE_LIMITS.maxSmallTalkIntervalMinutes"
         :step="1"
         :format-value="value => t(`${KEY}.minutes`, { count: value })"
+      />
+      <FieldRange
+        v-model="soloPauseSeconds"
+        :label="t(`${KEY}.solo-pause`)"
+        :description="t(`${KEY}.solo-pause-description`)"
+        :min="INITIATIVE_LIMITS.minSoloPauseSeconds"
+        :max="INITIATIVE_LIMITS.maxSoloPauseSeconds"
+        :step="1"
+        :format-value="value => t(`${KEY}.seconds`, { count: value })"
       />
       <FieldRange
         v-model="commentaryIntervalSeconds"

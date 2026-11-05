@@ -455,3 +455,29 @@ describe('daily rhythm', () => {
     expect(initiativeReadout(tired, IDLE, night, resolveInitiativeOptions({ missionRunning: true })).threshold).toBeCloseTo(1)
   })
 })
+
+describe('solo talk', () => {
+  const solo = resolveInitiativeOptions({ solo: true, missionRunning: true, modes: { idle: { boredomIntervalMs: 10_000, refractoryMs: 10_000 } } })
+  const start = createInitiativeState(at(0))
+  const spoke = (next: 'continue' | 'wait' | 'done') => {
+    const { state } = decideInitiative(start, IDLE, at(20_000), middle, solo)
+    return observeInitiative(state, { type: 'turn-finished', outcome: 'spoke', next }, at(21_000), solo, middle)
+  }
+
+  it('starts a line after its short pause', () => {
+    expect(decideInitiative(start, IDLE, at(20_000), middle, solo).decision.kind).toBe('turn')
+  })
+
+  it('needs no answer: a line neither slows the talk nor schedules a follow-up', () => {
+    for (const next of ['continue', 'wait', 'done'] as const) {
+      const state = spoke(next)
+
+      expect(state.unanswered).toBe(0)
+      expect(state.followUp).toBeUndefined()
+    }
+  })
+
+  it('stays out of the owner\'s way: a message and input still stop it', () => {
+    expect(decideInitiative(start, { ...IDLE, ownerActive: true }, at(20_000), middle, solo).decision).toEqual({ kind: 'wait', reason: 'owner-active' })
+  })
+})

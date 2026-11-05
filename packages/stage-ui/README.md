@@ -283,6 +283,12 @@ The `web_search` tool then calls `ddg-search::search`, so its prompt, limits, an
 Hits in the `1. title`, `URL:`, `Summary:` format become cards. Other text reaches the model as data, without cards.
 This server reads the HTML page of DuckDuckGo, not an official API, so a change of that page or a block can stop it. A block returns the same text as no results.
 
+## Solo talk
+
+Small talk has a solo style for an owner who only wants to listen, like to a radio. The model starts it when the owner asks, for example "keep talking by yourself".
+The character speaks again about 10 seconds after its voice ends, and **Pause in solo talk** changes this from 3 to 60 seconds. It talks longer, asks no questions, sends no images of the screen, and can search the web for a topic. A topic lasts about five lines.
+A message from the owner gets a reply, and solo talk goes on after the grace time. It ends at its time limit, when the owner asks to stop or for quiet, and at a screen lock or sleep. Time without input does not end it. Code refuses to start it without a voice.
+
 ## Screen model
 
 Settings > Modules > Screen perception can name a model for each call that sends images of the screen: commentary, idle speech and small talk with images, and watch checks. A stronger model can read the screen while the card keeps a cheaper one for replies.

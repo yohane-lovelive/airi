@@ -137,6 +137,15 @@ describe('initiativeNoticeText', () => {
     expect(initiativeNoticeText(context())).toContain('in your own voice and habits')
   })
 
+  it('asks solo talk to go on alone, without questions or a NEXT marker', () => {
+    const text = initiativeNoticeText(context({ smallTalkEndsAt: NOW + 10 * 60_000, solo: true }))
+
+    expect(text).toContain('Mode: solo talk')
+    expect(text).toContain('ask the owner anything')
+    expect(text).not.toContain('<|NEXT')
+    expect(text).not.toContain('Mode: small talk')
+  })
+
   it('offers a search for a new topic only to a turn that can search', () => {
     const offer = 'find a new topic with web_search'
 
