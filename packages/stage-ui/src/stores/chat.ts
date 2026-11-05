@@ -1407,6 +1407,11 @@ export const useChatStore = defineStore('chat', () => {
   /** Options that only the host sets: a background recipe task, a notice, and what keyword-matched recipes gave the message. */
   type HostSendOptions = Pick<ChatOrchestratorSendOptions, 'background' | 'notice' | 'skills'>
 
+  /** Whether a notice brings images of the screen to this send. The owner's own attachments do not count. */
+  function noticeReadsScreen(payload: ChatSendPayload, extra: HostSendOptions) {
+    return Boolean(extra.notice && (payload.attachments?.length || extra.notice.anchor))
+  }
+
   /**
    * Freeze request settings before asynchronous provider and session startup.
    * `invoked` holds the recipes that this message invoked by keyword.
@@ -1425,7 +1430,13 @@ export const useChatStore = defineStore('chat', () => {
     if (!characterId)
       throw new Error('The target session has no character')
 
-    const { provider: providerId, model: modelId } = cardStore.getModules(characterId).consciousness
+    // A call with images of the screen uses the screen model of the owner. It follows the card when the owner names none.
+    const readsScreen = noticeReadsScreen(payload, extra)
+    const selectionOfTurn = () => {
+      const selection = cardStore.getModules(characterId).consciousness
+      return readsScreen ? perception.modelOfScreenCall(selection) : selection
+    }
+    const { provider: providerId, model: modelId } = selectionOfTurn()
     // Autonomous speech can reason less than a reply, so its turns ask for the level of autonomous speech.
     const reasoningUse = AUTONOMOUS_PURPOSES.includes(usagePurposeOf(payload.sessionId, extra.notice)) ? 'autonomous' : 'reply'
 
@@ -1462,7 +1473,7 @@ export const useChatStore = defineStore('chat', () => {
      * A tool step that edits the character changes the next request. Card selection does not.
      */
     const resolveStep = async () => {
-      const selection = cardStore.getModules(characterId).consciousness
+      const selection = selectionOfTurn()
       if (!isChatSelectionReady(selection.provider, selection.model))
         throw new Error('No chat provider or model configured for this character')
 
@@ -1543,7 +1554,7 @@ export const useChatStore = defineStore('chat', () => {
         void startRecipe(recipe, { parentSessionId: payload.sessionId, task: `The owner said: ${payload.text}` })
     }).catch(() => {})
 
-    requests.set(key, { sessionId: payload.sessionId, purpose: usagePurposeOf(payload.sessionId, extra.notice), readsScreen: Boolean(extra.notice && (payload.attachments?.length || extra.notice.anchor)), abort, request })
+    requests.set(key, { sessionId: payload.sessionId, purpose: usagePurposeOf(payload.sessionId, extra.notice), readsScreen: noticeReadsScreen(payload, extra), abort, request })
     void request.accepted.catch(() => {})
     void request.done.finally(() => requests.delete(key)).catch(() => {})
     // A finished send can push the recent history past its limits. The summary runs in the background.

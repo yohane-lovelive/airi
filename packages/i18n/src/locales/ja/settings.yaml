@@ -1118,6 +1118,13 @@ pages:
         scene-anchor: 先頭近くのシーンのアンカーと、最新のフレーム
         scene-anchor+contact-sheet: シーンのアンカーとコンタクトシート
       commentary-images-per-hour: 実況中の 1 時間あたりの画像
+      screen-model:
+        provider: 画面用のモデル
+        provider-description: 画面の画像を送る呼び出しに使うモデルです。実況、画像付きの放置中の発話、見張りの確認が入ります。話し方はカードのままです。あなたへの返事は、カードのモデルのままです。
+        same-as-card: カードのモデルと同じ
+        model: モデル
+        needs-model: モデルを選んでください。それまで、これらの呼び出しはカードのモデルを使います。
+        no-images: このモデルは画像を読めないので、視覚モジュールが先に各フレームを説明し、数秒かかります。画像を読めるモデルなら、上の画像の入力を変えてください。
       commentary-images-per-hour-description: 実況はよく話すので、別の予算を持ちます。実況の間は、上の上限の代わりにこの上限を使います。実況の 1 ターンで送るフレームは最大 2 枚です。
       states:
         off: 知覚はオフです。

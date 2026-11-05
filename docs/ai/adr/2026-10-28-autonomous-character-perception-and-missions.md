@@ -848,6 +848,13 @@ On 2026-11-05, the owner asked the character to talk about what its model does n
 - The owner wanted free search and chose MCP over the free tier of Tavily. The desktop app now offers MCP as a search service, with `duckduckgo-mcp-server` in `mcp.json` by default. `web_search` calls the server, so the prompt, limits, and cards stay the same. While the service is selected, the MCP proxy tools hide that server, because a direct call would skip the limits. So `fetch_content` of the server is not available for now. The server reads the HTML page of DuckDuckGo, not an official API, so it can stop working.
 - A live check on 2026-11-05 used the real server. Searches returned real results, and the character told them without URLs. Bold marks reached the speech, so the prompt also asks for no markdown marks. The model often searched two or three times for one news question. `builtIn_mcpListTools` listed nothing, and a direct call to the server was refused.
 
+On 2026-11-05, the owner asked for a separate model to read the screen, because commentary needs one that sees better. This ADR has one speech model, so this is a change.
+
+- Settings > Modules > Screen perception can name a model for each call that sends images of the screen: commentary, idle speech and small talk with images, and watch checks. A call without images, for example a reply to the owner or a commentary turn after the image budget ends, keeps the model of the card.
+- The principle stays that the model that speaks sees the pixels. A stronger model that describes the screen for a cheaper one adds a delay, and this ADR rejects that stage.
+- The choice stays on the device, like the keys of its provider. When the provider is not configured, the call uses the model of the card and the console warns. A failed call leaves that turn silent, and the next turn tries again.
+- A live check on 2026-11-06 used `mimo-v2.6-pro` of OpenCode Go with the demo game. Its 2 turns with images used that model, and read the area, the weather, the HP, and the kill count. Its first text came in 2.4 to 4.2 seconds, against about 1.2 seconds for `deepseek-v4.1-flash`. Replies to the owner and 2 commentary turns without images kept `deepseek-v4.1-flash`.
+
 ## Work outside the steps
 
 The owner asked for this work between the steps. It is not in the step table, but some of it supports later steps.

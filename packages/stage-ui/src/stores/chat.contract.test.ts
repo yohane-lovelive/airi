@@ -30,6 +30,8 @@ import { CHAT_FORMAT_RULES, composeReplyLengthPrompt, composeSharedPastPrompt } 
 import { useContextObservabilityStore } from './devtools/context-observability'
 import { useMemoryStore } from './memory'
 import { chatRequestOptionsOf, useConsciousnessSettingsStore } from './modules/consciousness-settings'
+import { usePerceptionStore } from './perception'
+import { useProviderConfigStore } from './providers/config'
 import { useRecipesStore } from './recipes'
 
 const ioTracerMocks = vi.hoisted(() => {
@@ -1266,6 +1268,28 @@ describe('chat store contract', () => {
     await store.send({ sessionId: 'session-1', text: 'a reply to the owner' })
     expect(getChatProviderInstanceMock).toHaveBeenLastCalledWith('mock-provider', { reasoning: 'enabled', effort: 'high' })
     await settings.resetState()
+  })
+
+  it('uses the screen model only for a notice with images of the screen', async () => {
+    llmStreamMock.mockImplementation(async (_model: string, _provider: GenerationProvider, _messages: Conversation, options: StreamOptions) => {
+      await options.onStreamEvent?.({ type: 'finish' })
+    })
+    const perception = usePerceptionStore()
+    useProviderConfigStore().providers['screen-provider'] = { id: 'screen-provider', definitionId: 'openai', name: 'Screen', config: {}, status: 'configured' } as never
+    perception.screenModelProvider = 'screen-provider'
+    perception.screenModelId = 'screen-model'
+    const store = useChatStore()
+
+    await store.notifyConversation('session-1', { source: 'initiative', text: 'With a frame', transient: true, attachments: [{ type: 'image', data: 'a', mimeType: 'image/jpeg' }] })
+    expect(llmStreamMock.mock.lastCall?.[0]).toBe('screen-model')
+
+    await store.notifyConversation('session-1', { source: 'initiative', text: 'Without a frame', transient: true })
+    expect(llmStreamMock.mock.lastCall?.[0]).not.toBe('screen-model')
+
+    await store.send({ sessionId: 'session-1', text: 'A reply with an image of the owner', attachments: [{ type: 'image', url: 'https://example.com/a.png' }] })
+    expect(llmStreamMock.mock.lastCall?.[0]).not.toBe('screen-model')
+
+    perception.resetState()
   })
 
   it('passes a native reply relation to the chat runtime', async () => {

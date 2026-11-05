@@ -283,6 +283,12 @@ The `web_search` tool then calls `ddg-search::search`, so its prompt, limits, an
 Hits in the `1. title`, `URL:`, `Summary:` format become cards. Other text reaches the model as data, without cards.
 This server reads the HTML page of DuckDuckGo, not an official API, so a change of that page or a block can stop it. A block returns the same text as no results.
 
+## Screen model
+
+Settings > Modules > Screen perception can name a model for each call that sends images of the screen: commentary, idle speech and small talk with images, and watch checks. A stronger model can read the screen while the card keeps a cheaper one for replies.
+That model speaks itself, so no second model describes the screen first. The card still sets the voice. The choice stays on the device, because the keys of its provider do.
+Without a choice, these calls use the model of the card. They also do so when the provider of the choice is not configured, and the console then shows a warning.
+
 ## Chat sampling
 
 In **Settings → Modules → Consciousness**, custom temperature and Top P are off
