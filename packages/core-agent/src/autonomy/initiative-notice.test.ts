@@ -137,6 +137,14 @@ describe('initiativeNoticeText', () => {
     expect(initiativeNoticeText(context())).toContain('in your own voice and habits')
   })
 
+  it('offers a search for a new topic only to a turn that can search', () => {
+    const offer = 'find a new topic with web_search'
+
+    expect(initiativeNoticeText(context({ canSearch: true }))).toContain(offer)
+    expect(initiativeNoticeText(context())).not.toContain(offer)
+    expect(initiativeNoticeText(context({ canSearch: true, thread: { topic: 'games', lines: 1, heat: 0.8, cold: false } }))).not.toContain(offer)
+  })
+
   it('tells why a follow-up turn comes, and asks every line for a NEXT marker', () => {
     expect(initiativeNoticeText(context({ trigger: 'continuation' }))).toContain('Go on with the next point of what you were saying')
     expect(initiativeNoticeText(context({ trigger: 'follow-up' }))).toContain('Nudge lightly once, or move on to another topic')

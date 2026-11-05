@@ -261,6 +261,10 @@ The tool requests five results by default, with a maximum of ten. It uses summar
 Results retain source links and site icons in the existing search cards. Search requests time out after 15 seconds and stop when the turn stops.
 An API error fails the tool call without switching services. Use another search service when your network cannot reach the selected endpoint.
 
+The model decides when to search. The prompt asks it to search when it is not sure about a fact, to say a few words first, and to write no URLs, because the words can be read aloud.
+Lines that the character starts can search too, for example to find a topic. The setting **Searches a day** limits them, 20 by default, and 0 turns them off. Replies to the owner have no limit.
+A turn with images of the screen cannot search. A commentary line must come fast, and the text on the screen must not leave the device as a query.
+
 ## Chat sampling
 
 In **Settings → Modules → Consciousness**, custom temperature and Top P are off

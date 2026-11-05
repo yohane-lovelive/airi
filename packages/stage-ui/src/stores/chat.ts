@@ -52,6 +52,7 @@ import { createProposeRecipeTool } from '../tools/propose-recipe'
 import { createSearchIconsTool } from '../tools/search-icons'
 import { createUseRecipeTool } from '../tools/use-recipe'
 import { createWakeWordTool } from '../tools/wake-words'
+import { createWebSearchTools, webSearchRefusalOf } from '../tools/web-search'
 import { useLLM } from './ai/chat-llm/llm'
 import { resolveLlmTools } from './ai/chat-llm/tool-resolver'
 import { useLlmToolsStore } from './ai/chat-llm/tools'
@@ -292,7 +293,7 @@ export const useChatStore = defineStore('chat', () => {
   // tool resolver that would otherwise be the first to create this store runs after
   // the system prompt is composed, which would expose web_search on the first turn
   // without its paired prompt-injection defense.
-  useWebSearchStore()
+  const webSearch = useWebSearchStore()
   const consciousnessStore = useConsciousnessStore()
   const consciousnessSettings = useConsciousnessSettingsStore()
   const chatVision = useChatVision()
@@ -724,6 +725,10 @@ export const useChatStore = defineStore('chat', () => {
     const persona = personaOf(sessionId)
     const sourceTools = async () => [
       ...(typeof tools === 'function' ? await tools() ?? [] : tools ?? []),
+      // This copy takes the place of the plain tool of the resolver, because a later tool wins over one with the same name.
+      ...(webSearch.configured
+        ? await createWebSearchTools({ provider: webSearch.provider, apiKey: webSearch.activeApiKey.trim(), refuse: () => webSearchRefusalOfTurn(sessionId, correlation.turnId) })
+        : []),
       ...memory.enabled ? await createMemoryTools({ read: id => memory.read(id, persona), search: async query => (await memoryRecall.recall(query, persona)).entries, write: entry => memory.write(entry, persona), forget: id => memory.forget(id, persona) }) : [],
     ]
     // A recipe's own session runs only that recipe. It cannot start recipes, save them, or choose silence.
@@ -1264,9 +1269,17 @@ export const useChatStore = defineStore('chat', () => {
     sessionId: string
     /** Why the send runs. The model calls of its turn record their usage under it. */
     purpose: UsagePurpose
+    /** A notice brought images of the screen to this turn. */
+    readsScreen?: boolean
     abort: AbortController
     request: ReturnType<typeof runtime.submit>
   }>()
+
+  /** Why a turn that this window runs cannot search the web now. */
+  function webSearchRefusalOfTurn(sessionId: string, turnId: string) {
+    const turn = requests.get(JSON.stringify([sessionId, turnId]))
+    return webSearchRefusalOf({ readsScreen: turn?.readsScreen, autonomous: Boolean(turn && AUTONOMOUS_PURPOSES.includes(turn.purpose)) }, webSearch.takeAutonomousSearch)
+  }
 
   /** The purpose of a turn that this window runs. */
   function usagePurposeOfTurn(sessionId: string, turnId: string) {
@@ -1530,7 +1543,7 @@ export const useChatStore = defineStore('chat', () => {
         void startRecipe(recipe, { parentSessionId: payload.sessionId, task: `The owner said: ${payload.text}` })
     }).catch(() => {})
 
-    requests.set(key, { sessionId: payload.sessionId, purpose: usagePurposeOf(payload.sessionId, extra.notice), abort, request })
+    requests.set(key, { sessionId: payload.sessionId, purpose: usagePurposeOf(payload.sessionId, extra.notice), readsScreen: Boolean(extra.notice && (payload.attachments?.length || extra.notice.anchor)), abort, request })
     void request.accepted.catch(() => {})
     void request.done.finally(() => requests.delete(key)).catch(() => {})
     // A finished send can push the recent history past its limits. The summary runs in the background.

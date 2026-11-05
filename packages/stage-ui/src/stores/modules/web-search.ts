@@ -1,11 +1,20 @@
 import type { WebSearchProvider } from '../../tools/web-search'
 
+import { initiativeTimeFrom } from '@proj-airi/core-agent'
 import { useLocalStorageManualReset } from '@proj-airi/stage-shared/composables'
+import { clamp } from 'es-toolkit'
 import { defineStore } from 'pinia'
 import { computed, watch } from 'vue'
 
 import { WEB_SEARCH_TOOLSET_PROMPT } from '../../tools/web-search'
 import { useLlmToolsetPromptsStore } from '../ai/chat-llm/toolset-prompts'
+
+/** The searches that turns the character starts on its own can make in a day. The owner's replies have no limit. */
+export const WEB_SEARCH_LIMITS = {
+  minAutonomousPerDay: 0,
+  maxAutonomousPerDay: 200,
+  defaultAutonomousPerDay: 20,
+} as const
 
 /**
  * Device-local search credentials and tool-prompt lifecycle for the selected service.
@@ -24,6 +33,9 @@ export const useWebSearchStore = defineStore('web-search', () => {
   const apiKey = useLocalStorageManualReset<string>('settings/web-search/api-key', '')
   const provider = useLocalStorageManualReset<WebSearchProvider>('settings/web-search/provider', 'tavily')
   const deepSeekApiKey = useLocalStorageManualReset<string>('settings/web-search/deepseek-api-key', '')
+  const autonomousPerDay = useLocalStorageManualReset<number>('settings/web-search/autonomous-per-day', WEB_SEARCH_LIMITS.defaultAutonomousPerDay)
+  /** The searches of the local day. The device keeps them, so a restart does not start the count again. */
+  const autonomousUsage = useLocalStorageManualReset<{ day: string, count: number }>('settings/web-search/autonomous-usage', { day: '', count: 0 })
 
   const activeApiKey = computed({
     get: () => provider.value === 'deepseek' ? deepSeekApiKey.value : apiKey.value,
@@ -46,7 +58,26 @@ export const useWebSearchStore = defineStore('web-search', () => {
       toolsetPromptsStore.clearToolsetPrompts('web-search')
   }, { immediate: true })
 
+  function autonomousSearchesUsed(now = Date.now()) {
+    return autonomousUsage.value.day === initiativeTimeFrom(new Date(now)).localDay ? autonomousUsage.value.count : 0
+  }
+
+  function autonomousSearchesLeft(now = Date.now()) {
+    const limit = clamp(autonomousPerDay.value, WEB_SEARCH_LIMITS.minAutonomousPerDay, WEB_SEARCH_LIMITS.maxAutonomousPerDay)
+    return Math.max(0, limit - autonomousSearchesUsed(now))
+  }
+
+  /** Counts one search of a turn that the character started. Returns false when none is left today. */
+  function takeAutonomousSearch(now = Date.now()) {
+    if (autonomousSearchesLeft(now) <= 0)
+      return false
+    autonomousUsage.value = { day: initiativeTimeFrom(new Date(now)).localDay, count: autonomousSearchesUsed(now) + 1 }
+    return true
+  }
+
   function resetState() {
+    autonomousPerDay.reset()
+    autonomousUsage.reset()
     enabled.reset()
     apiKey.reset()
     provider.reset()
@@ -60,6 +91,10 @@ export const useWebSearchStore = defineStore('web-search', () => {
     deepSeekApiKey,
     activeApiKey,
     configured,
+    autonomousPerDay,
+    autonomousSearchesUsed,
+    autonomousSearchesLeft,
+    takeAutonomousSearch,
     resetState,
   }
 })

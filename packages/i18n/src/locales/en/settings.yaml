@@ -1766,6 +1766,8 @@ pages:
       api-key-description: Web search is powered by Tavily. Get a free API key at tavily.com.
       api-key-placeholder: Enter your Tavily API key
       configured: Web search is ready to use!
+      autonomous-per-day: Searches a day for lines the character starts
+      autonomous-per-day-description: 'Idle speech and small talk can look for topics. Replies to you have no limit, and a turn that reads the screen cannot search. 0 turns this off. Used today: {used}.'
     mcp-server:
       title: MCP servers
       description: Configure MCP servers and bring their tools into AIRI.

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { createWebSearchTools } from './web-search'
+import { createWebSearchTools, webSearchRefusalOf } from './web-search'
 
 /** Minimal shape of the emitted tool JSON Schema this suite asserts against. */
 interface ToolParametersSchema {
@@ -43,7 +43,11 @@ describe('createWebSearchTools', () => {
       ],
     })
 
-    const [tool] = await createWebSearchTools({ provider: 'tavily', apiKey: 'tvly-key' })
+    const [refused] = await createWebSearchTools({ provider: 'tavily', apiKey: 'tvly-key', refuse: () => 'Not now.' })
+    expect(await refused.execute({ query: 'tokyo weather', max_results: 5 }, ctx)).toBe('Not now.')
+    expect(fetchMock).not.toHaveBeenCalled()
+
+    const [tool] = await createWebSearchTools({ provider: 'tavily', apiKey: 'tvly-key', refuse: () => undefined })
     const result = await tool.execute({ query: 'tokyo weather', max_results: 5 }, ctx) as string
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -217,5 +221,27 @@ describe('createWebSearchTools', () => {
       expect.objectContaining({ type: 'string' }),
       { type: 'null' },
     ])
+  })
+})
+
+describe('web search of a turn', () => {
+  it('refuses a turn that reads the screen, without using the daily limit', () => {
+    const take = vi.fn(() => true)
+
+    expect(webSearchRefusalOf({ readsScreen: true, autonomous: true }, take)).toContain('reads the screen')
+    expect(take).not.toHaveBeenCalled()
+  })
+
+  it('counts a line that the character starts, and refuses it at the limit', () => {
+    expect(webSearchRefusalOf({ autonomous: true }, () => true)).toBeUndefined()
+    // The refusal stays in the history, and a live check heard the model refuse the owner's questions after it.
+    expect(webSearchRefusalOf({ autonomous: true }, () => false)).toContain('This limit does not apply to replies')
+  })
+
+  it('leaves a reply to the owner without a limit', () => {
+    const take = vi.fn(() => false)
+
+    expect(webSearchRefusalOf({ autonomous: false }, take)).toBeUndefined()
+    expect(take).not.toHaveBeenCalled()
   })
 })

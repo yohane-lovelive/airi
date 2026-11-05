@@ -838,6 +838,14 @@ The same check found four weaker points of the characters, and a later change ad
 - The characters sometimes told of past events with the owner that never happened, for example "the other night, I said good night to you". A fixed sentence of the system prompt now asks them to tell of the shared past only from memories, the conversation, or the screen. Their own lore stays free. In a check of 5 small-talk lines, the character spoke only of the screen and the present, and told of no past with the owner.
 The memory ADR has its own steps. They can run beside steps 1 to 4.
 
+On 2026-11-05, the owner asked the character to talk about what its model does not know, and to search the web on its own will. `web_search` already existed.
+
+- The prompt preferred what the model already knows. It now asks the model to search when it is not sure about a fact, not to make up such facts, to say a few words before a search, and to write no URLs, because the words can be read aloud.
+- Lines that the character starts can search too. When a topic is cold, the notice offers a search for a new one. A setting limits these searches, 20 a day by default, and 0 turns them off. Replies to the owner have no limit. This ADR did not cover search.
+- A turn with images of the screen cannot search. A commentary line must come fast, and the text on the screen must not leave the device as a query. This narrows the known risk that text on the screen acts as an instruction. With screen perception on, idle speech and small talk usually carry images, so they search less often.
+- The tool checks the turn, because the tool list stays the same in every turn. The risk stays that a search result asks for a memory write. The prompt marks results as data, and this does not fully prevent it.
+- A live check used a stand-in for the search service. The model searched before it answered what it did not know, said that it found nothing instead of making up an author, did not search for 1 + 1, and wrote no URLs. It said a few words first only after the prompt asked for that more strongly. After a refusal of the daily limit, the model refused the owner's questions too, so the refusal now says that replies can still search.
+
 ## Work outside the steps
 
 The owner asked for this work between the steps. It is not in the step table, but some of it supports later steps.

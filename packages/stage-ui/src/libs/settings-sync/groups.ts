@@ -101,6 +101,7 @@ export const SETTINGS_SYNC_GROUPS = {
   modules: [
     'settings/web-search/enabled',
     'settings/web-search/provider',
+    'settings/web-search/autonomous-per-day',
     'settings/home-assistant/enabled',
     'settings/home-assistant/exposure-mode',
     'settings/home-assistant/allowed-entities',

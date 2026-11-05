@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { Alert, FieldCheckbox, FieldInput, FieldSelect, SettingsCard } from '@proj-airi/ui'
+import { Alert, FieldCheckbox, FieldInput, FieldRange, FieldSelect, SettingsCard } from '@proj-airi/ui'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 
-import { useWebSearchStore } from '../../stores/modules/web-search'
+import { useWebSearchStore, WEB_SEARCH_LIMITS } from '../../stores/modules/web-search'
 
 const { t } = useI18n()
 const webSearchStore = useWebSearchStore()
-const { enabled, provider, activeApiKey, configured } = storeToRefs(webSearchStore)
+const { enabled, provider, activeApiKey, configured, autonomousPerDay } = storeToRefs(webSearchStore)
 const providers = [
   { label: 'Tavily', value: 'tavily' },
   { label: 'DeepSeek', value: 'deepseek' },
@@ -43,6 +43,15 @@ const providers = [
       :label="t('settings.pages.modules.web-search.api-key')"
       :description="t('settings.pages.modules.web-search.api-key-description')"
       :placeholder="t('settings.pages.modules.web-search.api-key-placeholder')"
+    />
+
+    <FieldRange
+      v-model="autonomousPerDay"
+      :label="t('settings.pages.modules.web-search.autonomous-per-day')"
+      :description="t('settings.pages.modules.web-search.autonomous-per-day-description', { used: webSearchStore.autonomousSearchesUsed() })"
+      :min="WEB_SEARCH_LIMITS.minAutonomousPerDay"
+      :max="WEB_SEARCH_LIMITS.maxAutonomousPerDay"
+      :step="1"
     />
 
     <Alert

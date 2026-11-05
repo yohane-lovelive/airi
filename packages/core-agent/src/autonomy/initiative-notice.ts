@@ -51,6 +51,8 @@ const SCREEN_EVENT_TEXT: Record<InitiativeScreenContext['events'][number]['type'
 /** What the situation block of one autonomous turn says. The host fills it from the decision and the conversation. */
 export interface InitiativeNoticeContext {
   readonly mode: InitiativeMode
+  /** This turn can search the web, so the character can look for a topic. */
+  readonly canSearch?: boolean
   readonly trigger: InitiativeTrigger
   /** The hint of the decision. Undefined in the hintless share of turns. */
   readonly speechType?: SpeechType
@@ -153,8 +155,11 @@ export function initiativeNoticeText(context: InitiativeNoticeContext): string {
   }
   // Seeds come from memories and earlier topics, which every character shares. A live check heard two characters drift
   // to the same night topics, so a new topic can also come from the character. Commentary follows the screen instead.
-  if (context.mode !== 'commentary' && (!context.thread || context.thread.cold))
+  if (context.mode !== 'commentary' && (!context.thread || context.thread.cold)) {
     lines.push('- A new topic can also come from what you like or do, as your profile says.')
+    if (context.canSearch)
+      lines.push('- You can also find a new topic with web_search, for example news about what you like.')
+  }
   if (context.seeds?.length) {
     lines.push('- Topic ideas, only if one fits:')
     lines.push(...context.seeds.map(seed => `  - ${truncate(seed.text, TOPIC_LIMITS.maxSeedLength)}`))

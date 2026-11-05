@@ -49,6 +49,7 @@ import { useMemoryStore } from './memory'
 import { useMemoryRecallStore } from './memory-recall'
 import { useMemorySyncStore } from './memory-sync'
 import { useMissionsStore } from './missions'
+import { useWebSearchStore } from './modules/web-search'
 import { useOwnerTypingStore } from './owner-typing'
 import { usePerceptionStore } from './perception'
 import { usePerceptionRunnerStore } from './perception-runner'
@@ -125,6 +126,7 @@ const LASTING_WAIT_REASONS: readonly InitiativeWaitReason[] = ['quiet-hours', 'o
  */
 export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
   const initiative = useInitiativeStore()
+  const webSearch = useWebSearchStore()
   const intentions = useIntentionsStore()
   const chat = useChatStore()
   const chatSession = useChatSessionStore()
@@ -363,6 +365,8 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
       intentions: intentions.openAt(time.now),
       ...(awayMs !== undefined ? { awayMs } : {}),
       ...(smallTalk ? { smallTalkEndsAt: smallTalk.values.endsAt } : {}),
+      // A turn with images of the screen cannot search. See `webSearchRefusalOf`.
+      ...(!rhythm && !screen && webSearch.configured && webSearch.autonomousSearchesLeft(time.now) > 0 ? { canSearch: true } : {}),
       ...(screen ? { screen: screen.context } : {}),
       ...(screenTimeline ? { timeline: screenTimeline } : {}),
       ...(topics?.thread ? { thread: topics.thread } : {}),
