@@ -265,6 +265,24 @@ The model decides when to search. The prompt asks it to search when it is not su
 Lines that the character starts can search too, for example to find a topic. The setting **Searches a day** limits them, 20 by default, and 0 turns them off. Replies to the owner have no limit.
 A turn with images of the screen cannot search. A commentary line must come fast, and the text on the screen must not leave the device as a query.
 
+The desktop app also offers **MCP** as a search service, without an API key. Add a server in the MCP servers page, for example:
+
+```json
+{
+  "mcpServers": {
+    "ddg-search": {
+      "command": "uvx",
+      "args": ["duckduckgo-mcp-server==0.7.0"],
+      "env": { "DDG_REGION": "jp-ja", "DDG_REF_URL_THRESHOLD": "2048" }
+    }
+  }
+}
+```
+
+The `web_search` tool then calls `ddg-search::search`, so its prompt, limits, and cards stay the same. While this service is selected, `builtIn_mcpCallTool` cannot reach that server, because a direct call would skip the limits.
+Hits in the `1. title`, `URL:`, `Summary:` format become cards. Other text reaches the model as data, without cards.
+This server reads the HTML page of DuckDuckGo, not an official API, so a change of that page or a block can stop it. A block returns the same text as no results.
+
 ## Chat sampling
 
 In **Settings → Modules → Consciousness**, custom temperature and Top P are off

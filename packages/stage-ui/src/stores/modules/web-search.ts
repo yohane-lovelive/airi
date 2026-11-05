@@ -1,12 +1,13 @@
+import type { McpToolRuntime } from '../../tools/mcp'
 import type { WebSearchProvider } from '../../tools/web-search'
 
 import { initiativeTimeFrom } from '@proj-airi/core-agent'
 import { useLocalStorageManualReset } from '@proj-airi/stage-shared/composables'
 import { clamp } from 'es-toolkit'
 import { defineStore } from 'pinia'
-import { computed, watch } from 'vue'
+import { computed, shallowRef, watch } from 'vue'
 
-import { WEB_SEARCH_TOOLSET_PROMPT } from '../../tools/web-search'
+import { createWebSearchTools, WEB_SEARCH_TOOLSET_PROMPT } from '../../tools/web-search'
 import { useLlmToolsetPromptsStore } from '../ai/chat-llm/toolset-prompts'
 
 /** The searches that turns the character starts on its own can make in a day. The owner's replies have no limit. */
@@ -15,6 +16,9 @@ export const WEB_SEARCH_LIMITS = {
   maxAutonomousPerDay: 200,
   defaultAutonomousPerDay: 20,
 } as const
+
+/** The tool of the `ddg-search` server that the README shows for `mcp.json`. */
+const DEFAULT_MCP_SEARCH_TOOL = 'ddg-search::search'
 
 /**
  * Device-local search credentials and tool-prompt lifecycle for the selected service.
@@ -37,6 +41,15 @@ export const useWebSearchStore = defineStore('web-search', () => {
   /** The searches of the local day. The device keeps them, so a restart does not start the count again. */
   const autonomousUsage = useLocalStorageManualReset<{ day: string, count: number }>('settings/web-search/autonomous-usage', { day: '', count: 0 })
 
+  /** The MCP tool that answers searches. `mcp.json` belongs to this device, so the name does too. */
+  const mcpToolName = useLocalStorageManualReset<string>('settings/web-search/mcp-tool-name', DEFAULT_MCP_SEARCH_TOOL)
+  // Only the desktop app gives this. The web app has no MCP runtime, so it offers no `mcp` service.
+  const mcpCallTool = shallowRef<McpToolRuntime['callTool']>()
+  const mcpAvailable = computed(() => mcpCallTool.value !== undefined)
+  function setMcpCallTool(callTool: McpToolRuntime['callTool']) {
+    mcpCallTool.value = callTool
+  }
+
   const activeApiKey = computed({
     get: () => provider.value === 'deepseek' ? deepSeekApiKey.value : apiKey.value,
     set: (value: string) => {
@@ -46,7 +59,22 @@ export const useWebSearchStore = defineStore('web-search', () => {
         apiKey.value = value
     },
   })
-  const configured = computed(() => enabled.value && activeApiKey.value.trim().length > 0)
+  const configured = computed(() => enabled.value && (provider.value === 'mcp'
+    ? mcpAvailable.value && mcpToolName.value.trim().length > 0
+    : activeApiKey.value.trim().length > 0))
+  /** The server that answers searches. The MCP proxy tools must not reach it, or a call would skip the limits. */
+  const mcpSearchServer = computed(() => configured.value && provider.value === 'mcp' ? mcpToolName.value.trim().split('::')[0] : undefined)
+
+  /** Builds the search tool of the selected service. Mount it only while {@link configured} is true. */
+  async function createTools(refuse?: () => string | undefined) {
+    const callTool = mcpCallTool.value
+    return createWebSearchTools({
+      provider: provider.value,
+      apiKey: activeApiKey.value.trim(),
+      ...(provider.value === 'mcp' && callTool ? { mcp: { toolName: mcpToolName.value.trim(), callTool } } : {}),
+      ...(refuse ? { refuse } : {}),
+    })
+  }
 
   // Keep the safety/when-to-search guidance mounted iff the tool is mounted.
   // Clauses must key off the same `configured` gate the tool does, never a raw
@@ -76,6 +104,7 @@ export const useWebSearchStore = defineStore('web-search', () => {
   }
 
   function resetState() {
+    mcpToolName.reset()
     autonomousPerDay.reset()
     autonomousUsage.reset()
     enabled.reset()
@@ -91,6 +120,11 @@ export const useWebSearchStore = defineStore('web-search', () => {
     deepSeekApiKey,
     activeApiKey,
     configured,
+    mcpToolName,
+    mcpAvailable,
+    mcpSearchServer,
+    setMcpCallTool,
+    createTools,
     autonomousPerDay,
     autonomousSearchesUsed,
     autonomousSearchesLeft,

@@ -38,6 +38,33 @@ describe('useWebSearchStore', () => {
     })
   })
 
+  describe('the mcp service', () => {
+    it('needs no key, only the runtime of the desktop app and a tool name', () => {
+      const store = useWebSearchStore()
+      store.enabled = true
+      store.provider = 'mcp'
+      expect(store.configured).toBe(false)
+      expect(store.mcpSearchServer).toBeUndefined()
+
+      store.setMcpCallTool(async () => ({}))
+      expect(store.configured).toBe(true)
+      expect(store.mcpSearchServer).toBe('ddg-search')
+
+      store.mcpToolName = ' '
+      expect(store.configured).toBe(false)
+    })
+
+    it('names no server for another service, so the MCP proxy tools reach them all', () => {
+      const store = useWebSearchStore()
+      store.enabled = true
+      store.provider = 'tavily'
+      store.apiKey = 'key'
+      store.setMcpCallTool(async () => ({}))
+
+      expect(store.mcpSearchServer).toBeUndefined()
+    })
+  })
+
   describe('searches of lines that the character starts', () => {
     it('counts them per local day, and stops at the limit of the owner', () => {
       const store = useWebSearchStore()

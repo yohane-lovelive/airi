@@ -7,7 +7,7 @@ import type { DescribeToolImage } from './tool-images'
 import { createSparkCommandTool } from '@proj-airi/core-agent/agents/spark-command'
 import { uniqBy } from 'es-toolkit'
 
-import { createWebSearchTools, debug, mcp } from '../../../tools'
+import { debug, mcp } from '../../../tools'
 import { useModsServerChannelStore } from '../../mods/api/channel-server'
 import { useWebSearchStore } from '../../modules/web-search'
 import { withCallSummary } from './tool-call-summary'
@@ -137,8 +137,7 @@ async function resolveWebSearchTools(webSearchTools?: ToolSource): Promise<Tool[
   if (!webSearchStore.configured)
     return []
 
-  // Match the trimmed key used by the configuration gate.
-  return createWebSearchTools({ provider: webSearchStore.provider, apiKey: webSearchStore.activeApiKey.trim() })
+  return webSearchStore.createTools()
 }
 
 /**

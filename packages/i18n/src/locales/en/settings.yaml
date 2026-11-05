@@ -1766,6 +1766,10 @@ pages:
       api-key-description: Web search is powered by Tavily. Get a free API key at tavily.com.
       api-key-placeholder: Enter your Tavily API key
       configured: Web search is ready to use!
+      mcp:
+        tool-name: MCP search tool
+        tool-name-description: 'The tool that answers searches, as server::tool. Add its server in the MCP servers page. No API key is needed.'
+        unavailable: MCP search works only in the desktop app.
       autonomous-per-day: Searches a day for lines the character starts
       autonomous-per-day-description: 'Idle speech and small talk can look for topics. Replies to you have no limit, and a turn that reads the screen cannot search. 0 turns this off. Used today: {used}.'
     mcp-server:

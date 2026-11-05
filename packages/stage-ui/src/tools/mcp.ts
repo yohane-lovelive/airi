@@ -78,6 +78,25 @@ export interface McpToolRuntime {
   callTool: (payload: McpCallToolPayload) => Promise<McpCallToolResult>
 }
 
+/**
+ * Keeps one server away from the proxy tools, for example the server that answers `web_search`.
+ * A direct call would skip the limits of that tool. `server` is read at each call, because the owner can change it.
+ */
+export function withHiddenMcpServer(runtime: McpToolRuntime, server: () => string | undefined): McpToolRuntime {
+  return {
+    listTools: async () => {
+      const hidden = server()
+      return (await runtime.listTools()).filter(tool => tool.serverName !== hidden)
+    },
+    callTool: async (payload) => {
+      const hidden = server()
+      if (hidden && payload.name.startsWith(`${hidden}::`))
+        return { isError: true, content: [{ type: 'text', text: `The MCP server ${hidden} answers web_search only. Use web_search.` }] }
+      return await runtime.callTool(payload)
+    },
+  }
+}
+
 /** The proxy tool that calls an MCP tool. Each call names the MCP tool in its `name` argument, as `server::tool`. */
 export const MCP_CALL_TOOL_NAME = 'builtIn_mcpCallTool'
 

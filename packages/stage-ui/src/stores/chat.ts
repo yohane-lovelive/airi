@@ -52,7 +52,7 @@ import { createProposeRecipeTool } from '../tools/propose-recipe'
 import { createSearchIconsTool } from '../tools/search-icons'
 import { createUseRecipeTool } from '../tools/use-recipe'
 import { createWakeWordTool } from '../tools/wake-words'
-import { createWebSearchTools, webSearchRefusalOf } from '../tools/web-search'
+import { webSearchRefusalOf } from '../tools/web-search'
 import { useLLM } from './ai/chat-llm/llm'
 import { resolveLlmTools } from './ai/chat-llm/tool-resolver'
 import { useLlmToolsStore } from './ai/chat-llm/tools'
@@ -727,7 +727,7 @@ export const useChatStore = defineStore('chat', () => {
       ...(typeof tools === 'function' ? await tools() ?? [] : tools ?? []),
       // This copy takes the place of the plain tool of the resolver, because a later tool wins over one with the same name.
       ...(webSearch.configured
-        ? await createWebSearchTools({ provider: webSearch.provider, apiKey: webSearch.activeApiKey.trim(), refuse: () => webSearchRefusalOfTurn(sessionId, correlation.turnId) })
+        ? await webSearch.createTools(() => webSearchRefusalOfTurn(sessionId, correlation.turnId))
         : []),
       ...memory.enabled ? await createMemoryTools({ read: id => memory.read(id, persona), search: async query => (await memoryRecall.recall(query, persona)).entries, write: entry => memory.write(entry, persona), forget: id => memory.forget(id, persona) }) : [],
     ]

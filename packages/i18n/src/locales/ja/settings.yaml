@@ -1518,6 +1518,10 @@ pages:
       api-key-description: Web 検索機能は Tavily によって提供されています。tavily.com で無料の API キーを取得できます。
       api-key-placeholder: Tavily API キーを入力
       configured: Web 検索を利用する準備が整いました！
+      mcp:
+        tool-name: MCP の検索ツール
+        tool-name-description: '検索に答えるツールを server::tool の形で書きます。サーバーは MCP サーバーのページで追加します。API キーはいりません。'
+        unavailable: MCP の検索はデスクトップ版でだけ使えます。
       autonomous-per-day: キャラクターが自分から話すときの 1 日の検索回数
       autonomous-per-day-description: '放置中の発話と雑談で、話題を探せます。あなたへの返事に上限はありません。画面を読むターンは検索できません。0 でオフになります。今日の回数: {used}。'
     mcp-server:
