@@ -68,6 +68,7 @@ const providerAttributesById = {
   'google-generative-ai': paidCloud,
   'groq': paidCloud,
   'index-tts-vllm': freeLocal,
+  'irodori-tts': freeLocal,
   'kokoro-local': freeLocal,
   'lm-studio': freeLocal,
   'microsoft-speech': paidCloud,

@@ -5,6 +5,7 @@ import { errorMessageFrom } from '@moeru/std'
 import { z } from 'zod'
 
 import { defineProvider } from '../../registry'
+import { absoluteUrlError, readSpeechRequest } from '../speech-engine'
 import { fetchEngineVersion, fetchSpeakers, synthesizeSpeech } from './engine'
 
 /**
@@ -170,50 +171,11 @@ export function defineVoicevoxFamilyProvider<const TId extends string>(
   })
 }
 
-function absoluteUrlError(baseUrl: string, defaultBaseUrl: string) {
-  if (!baseUrl)
-    return `Base URL is required. Default to ${defaultBaseUrl} for this engine.`
-
-  try {
-    const url = new URL(baseUrl)
-    // Check the scheme as well as the host. `ftp://engine/` parses and has a
-    // host, so a host-only check accepts an address `fetch` cannot use, and then
-    // asks the user for a scheme they already gave.
-    if (!url.host || (url.protocol !== 'http:' && url.protocol !== 'https:'))
-      return 'Base URL is not absolute. Try to include a scheme (http:// or https://).'
-  }
-  catch {
-    return 'Base URL is not absolute. Try to include a scheme (http:// or https://).'
-  }
-
-  return ''
-}
-
 function createVoicevoxConfigSchema(defaultBaseUrl: string) {
   return z.object({
     baseUrl: z.string().default(defaultBaseUrl),
     voiceSettings: voicevoxVoiceSettingsSchema.default({ intonation: 1, pitch: 0, speed: 1, volume: 1 }),
   })
-}
-
-/**
- * Reads the segment text and the style id out of the OpenAI-shaped body that
- * `generateSpeech` builds.
- *
- * `requestBody` in `@xsai/shared` passes that object through `objCamelToSnake`.
- * Only single-word keys survive unchanged, and `input` and `voice` are two of
- * them. A key of more than one word arrives renamed. The synthesis parameters
- * therefore come from the provider configuration, not from this body.
- */
-function readSpeechRequest(init: RequestInit | undefined): { input: string, voice: string } {
-  if (!init?.body || typeof init.body !== 'string')
-    throw new Error('Invalid speech request body')
-
-  const body = JSON.parse(init.body) as { input?: string, voice?: string }
-  if (!body.voice)
-    throw new Error('No voice selected. Pick a character in the speech settings.')
-
-  return { input: body.input ?? '', voice: body.voice }
 }
 
 function toVoiceInfo(providerId: string, speakerName: string, style: { id: number, name: string }): VoiceInfo {

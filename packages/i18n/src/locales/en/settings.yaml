@@ -2226,6 +2226,33 @@ pages:
               label: Emotion expression strength
         callout_origin_title: Reaching the engine from a browser
         callout_origin: A browser reaches an engine on this machine only. For an engine on another machine, use the desktop application. The engine also has to accept this site, which you set on its settings page on port 10101.
+      irodori-tts:
+        description: github.com/Aratako/Irodori-TTS
+        title: Irodori-TTS
+        fields:
+          field:
+            caption:
+              label: Caption
+              description: Words about the voice and the way of speaking. The server joins them with the reference clips. Leave it empty to use only the clips.
+              placeholder: A bright girl who speaks close to the listener
+            num-steps:
+              label: Sampling steps
+              description: More steps take longer and can sound cleaner. 0 uses the default of the server, which suits the loaded model.
+        reference:
+          title: Reference voices
+          description: 'A reference voice joins several clips of one speaker in this order. Short, clean clips work best. About {recommended} seconds in total is enough. The server uses at most {max} seconds.'
+          add-voice: Add voice
+          new-voice-placeholder: Name of a new reference voice
+          remove-voice: Remove
+          add-clips: Add audio files
+          uploading: Sending to the server...
+          no-clips: No clips yet. Add audio files of one speaker.
+          total: 'Total {seconds}s of {max}s'
+          move-up: Move up
+          move-down: Move down
+          remove-clip: Remove clip
+          failed: The reference voice was not changed
+          unsupported: '{name} is not a supported audio file. Use wav, flac, mp3, m4a, ogg, opus, aac, or webm.'
       deepgram-tts:
         description: deepgram.com
         title: Deepgram

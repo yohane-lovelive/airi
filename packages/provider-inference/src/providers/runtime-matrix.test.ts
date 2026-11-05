@@ -9,6 +9,7 @@ const browserOnlyProviderIds = new Set(['browser-web-speech-api'])
 const localApiProviderIds = new Set([
   'aivis-speech',
   'index-tts-vllm',
+  'irodori-tts',
   'lm-studio',
   'ollama',
   'player2-speech',

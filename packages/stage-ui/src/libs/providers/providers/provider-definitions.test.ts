@@ -82,6 +82,7 @@ describe('migrated provider definitions', () => {
       'google-gemini-audio-speech',
       'voicevox',
       'aivis-speech',
+      'irodori-tts',
     ]
 
     for (const providerId of providerIds)

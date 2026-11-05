@@ -1930,6 +1930,33 @@ pages:
               label: 感情表現の強さ
         callout_origin_title: ブラウザーからエンジンに接続
         callout_origin: ブラウザーはこの端末のエンジンにのみ接続できます。別の端末のエンジンにはデスクトップアプリを使ってください。エンジン側でもこのサイトを許可する必要があります。ポート 10101 の設定ページで設定してください。
+      irodori-tts:
+        description: github.com/Aratako/Irodori-TTS
+        title: Irodori-TTS
+        fields:
+          field:
+            caption:
+              label: キャプション
+              description: 声と話し方を言葉で伝えます。サーバーは参照音声と合わせて使います。空にすると参照音声だけを使います。
+              placeholder: 聞き手の近くで話す、明るい少女
+            num-steps:
+              label: サンプリングステップ数
+              description: 多いほど時間がかかり、音がきれいになることがあります。0 は、読み込んだモデルに合ったサーバーの初期値を使います。
+        reference:
+          title: 参照ボイス
+          description: '参照ボイスは、1 人の話者の複数のクリップをこの順番でつなげて使います。短くてきれいなクリップが向いています。合計 {recommended} 秒ほどで十分です。サーバーが使うのは最大 {max} 秒です。'
+          add-voice: ボイスを追加
+          new-voice-placeholder: 新しい参照ボイスの名前
+          remove-voice: 削除
+          add-clips: 音声ファイルを追加
+          uploading: サーバーに送っています...
+          no-clips: クリップはまだありません。1 人の話者の音声ファイルを追加してください。
+          total: '合計 {seconds} 秒 / 最大 {max} 秒'
+          move-up: 上へ
+          move-down: 下へ
+          remove-clip: クリップを削除
+          failed: 参照ボイスを変更できませんでした
+          unsupported: '{name} は使えない音声ファイルです。wav、flac、mp3、m4a、ogg、opus、aac、webm を使ってください。'
       speech-noop:
         title: なし
         description: 音声を再生しません。

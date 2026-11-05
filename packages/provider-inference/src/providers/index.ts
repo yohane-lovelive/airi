@@ -53,6 +53,7 @@ import { providerXAI } from './cloud/xai'
 import { providerZai } from './cloud/zai'
 import { providerBrowserWebSpeechApi } from './local/browser-web-speech-api'
 import { providerIndexTtsVllm } from './local/index-tts-vllm'
+import { providerIrodoriTts } from './local/irodori-tts'
 import { providerLmStudio } from './local/lm-studio'
 import { providerOllama } from './local/ollama'
 import { providerPlayer2Speech } from './local/player2-speech'
@@ -139,6 +140,7 @@ export const portableProviderDefinitions = eraseProviderDefinitions(
   providerZai,
   providerBrowserWebSpeechApi,
   providerIndexTtsVllm,
+  providerIrodoriTts,
   providerLmStudio,
   providerOllama,
   providerPlayer2Speech,
