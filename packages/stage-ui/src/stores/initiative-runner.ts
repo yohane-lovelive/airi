@@ -218,6 +218,7 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
       speechPlaying: speaking.nowSpeaking,
       turnRunning: chat.sending || chat.activeTurns.length > 0,
       intentions: intentions.openAt(now).length,
+      commentaryBlind: Boolean(commentaryAt(now)) && !perceptionRunner.targetInView(),
     }
   }
 

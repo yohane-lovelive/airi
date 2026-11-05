@@ -441,6 +441,11 @@ export const usePerceptionRunnerStore = defineStore('perception-runner', () => {
     foregroundApp: () => foregroundApp,
     /** Whether the last frame was skipped, because the window in front is excluded. */
     excludedNow: () => excludedNow,
+    /**
+     * Whether frames of the watched window come in now. Capture must run, and the window in front must not be excluded.
+     * A device that cannot tell the window in front captures only what the owner shared, so that counts as in view.
+     */
+    targetInView: () => Boolean(stream) && !excludedNow && (!source?.foreground || targetInFront),
     /** Calls the listener with each batch of new screen events. Returns a function that removes it. */
     onEvents: (listener: (events: readonly ScreenEvent[]) => void) => {
       eventListeners.add(listener)

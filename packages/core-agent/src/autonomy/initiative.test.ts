@@ -194,6 +194,14 @@ describe('gates', () => {
     expect(decideInitiative(bored, { ...IDLE, turnRunning: true }, at(2_000), middle, options).decision).toEqual({ kind: 'wait', reason: 'turn-running' })
   })
 
+  it('waits while a commentary cannot see its window, and starts when it can', () => {
+    const bored = { ...createInitiativeState(at(0)), updatedAt: 0 }
+    const later = at(3_600_000)
+
+    expect(decideInitiative(bored, { ...IDLE, commentaryBlind: true }, later, middle, options).decision).toEqual({ kind: 'wait', reason: 'no-view' })
+    expect(decideInitiative(bored, IDLE, later, middle, options).decision.kind).toBe('turn')
+  })
+
   it('starts no second turn before the first one finishes', () => {
     const state = withTurn(options)
 

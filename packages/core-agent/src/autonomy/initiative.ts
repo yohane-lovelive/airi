@@ -322,6 +322,8 @@ export interface InitiativeHost {
   readonly turnRunning: boolean
   /** The count of open intentions. They add drive. */
   readonly intentions: number
+  /** A commentary runs, but its window is not in view now. The character cannot see what it comments on. */
+  readonly commentaryBlind?: boolean
 }
 
 /**
@@ -332,6 +334,7 @@ export type InitiativeWaitReason
   = | 'owner-active'
     | 'speech-playing'
     | 'turn-running'
+    | 'no-view'
     | 'quiet-hours'
     | 'owner-quiet'
     | 'daily-budget'
@@ -615,6 +618,11 @@ function waitReason(state: InitiativeState, host: InitiativeHost, time: Initiati
     return 'speech-playing'
   if (host.turnRunning || state.turn)
     return 'turn-running'
+  // ROOT CAUSE:
+  // A live check on 2026-11-06 heard a commentary on one window speak while another app was in front. The turn had no
+  // frames, and the model made up what it could not see.
+  if (host.commentaryBlind)
+    return 'no-view'
   // The owner started small talk or commentary, so the quiet hours stop idle talk only. A live check on 2026-11-05 found
   // a commentary that stayed silent after 23:00. A request for quiet with words still stops a mission below.
   if (!options.missionRunning && options.quietHours && inQuietHours(time.localMinutes, options.quietHours))

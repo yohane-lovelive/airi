@@ -104,6 +104,7 @@ devtools:
         owner-active: あなたの入力中または発話中なので待機中
         speech-playing: 読み上げ中なので待機中
         turn-running: ターンを実行中
+        no-view: 実況のウィンドウが見えていない
         quiet-hours: 静かな時間帯
         owner-quiet: 頼まれたので静かにしている
         daily-budget: 今日の回数を使い切った

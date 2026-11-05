@@ -117,7 +117,7 @@ All functions are pure. The host passes the time, a random source, and the state
 The drive is event pressure plus boredom plus a small part for each open intention. Pressure decays, and salience counts squared. Boredom grows by 1 per boredom interval of quiet.
 A turn starts when the drive passes a threshold. Low energy and the night raise the threshold of idle talk, and a random jitter changes it once per cycle. A mission that the owner started keeps its pace, and a new commentary opens after about a fifth of its interval.
 Each autonomous line without an owner message makes the idle interval longer, up to 3 times. `unansweredIntervalFactor` gives the factor.
-Gates stop a turn in this order: owner input and its grace time, speech playback, a running turn, quiet hours, the owner's quiet time, the daily budget, and the refractory time. The quiet hours and the daily budget do not stop a mission that the owner started.
+Gates stop a turn in this order: owner input and its grace time, speech playback, a running turn, a commentary that cannot see its window, quiet hours, the owner's quiet time, the daily budget, and the refractory time. The quiet hours and the daily budget do not stop a mission that the owner started.
 
 ```ts
 const options = resolveInitiativeOptions(settings)

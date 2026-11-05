@@ -191,10 +191,12 @@ describe('usePerceptionRunnerStore', { timeout: 60_000 }, () => {
     await expect.poll(() => screen.source.start).toHaveBeenLastCalledWith({ app: 'Game' })
     await expect.poll(() => runner.frames().length, { timeout: 15_000 }).toBeGreaterThan(0)
     await expect.poll(() => status.status, { timeout: 15_000 }).toMatchObject({ target: 'Game', targetInFront: true })
+    expect(runner.targetInView()).toBe(true)
 
     window = { title: 'Notes', app: 'Editor' }
     const before = runner.frames().length
     await expect.poll(() => status.status.targetInFront, { timeout: 15_000 }).toBe(false)
+    expect(runner.targetInView()).toBe(false)
     await new Promise(resolve => setTimeout(resolve, 1_200))
     expect(runner.frames().length).toBeLessThanOrEqual(before + 1)
 

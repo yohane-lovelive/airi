@@ -855,6 +855,8 @@ On 2026-11-05, the owner asked for a separate model to read the screen, because 
 - The choice stays on the device, like the keys of its provider. When the provider is not configured, the call uses the model of the card and the console warns. A failed call leaves that turn silent, and the next turn tries again.
 - A live check on 2026-11-06 used `mimo-v2.6-pro` of OpenCode Go with the demo game. Its 2 turns with images used that model, and read the area, the weather, the HP, and the kill count. Its first text came in 2.4 to 4.2 seconds, against about 1.2 seconds for `deepseek-v4.1-flash`. Replies to the owner and 2 commentary turns without images kept `deepseek-v4.1-flash`.
 
+The same live check heard a commentary on one window speak while another app was in front. The turn had no frames, and the model made up what it could not see, for example "that move was good". This ADR pauses perception in that case, and it did not say that speech pauses too. A new gate now holds commentary turns while frames of the window do not come in: the window is not in front, the window in front is excluded, or capture does not run. Replies to the owner do not wait. A commentary with images used up still speaks, and the notice tells that it has no frames. In a live check, the commentary spoke no line for the 90 seconds that another window was in front, and spoke again at once when its window came back.
+
 ## Work outside the steps
 
 The owner asked for this work between the steps. It is not in the step table, but some of it supports later steps.

@@ -110,6 +110,7 @@ devtools:
         owner-active: Waiting while you type or speak
         speech-playing: Waiting while speech plays
         turn-running: A turn runs now
+        no-view: The commentary cannot see its window now
         quiet-hours: Quiet hours
         owner-quiet: Quiet, because you asked
         daily-budget: The tries of today are used up
