@@ -4,6 +4,7 @@ import type { BrowserWindow } from 'electron'
 import type { ElectronStageSidecarStatus } from '../../../../shared/eventa'
 import type {
   UnityStageClipInput,
+  UnityStagePmxPackageInput,
   UnityStageSceneInput,
   UnityStageVrmaGestureInput,
 } from '../../../../shared/eventa/unity-stage'
@@ -19,9 +20,11 @@ import { defineInvokeHandler } from '@moeru/eventa'
 import { errorMessageFrom } from '@moeru/std'
 import { parseHostMessage } from '@proj-airi/stage-shared/stage-sidecar'
 import { app } from 'electron'
+import { array, instance, nonEmpty, object, pipe, regex, safeParse, string } from 'valibot'
 
 import {
   unityStageApplyIdle,
+  unityStageApplyPmxPackage,
   unityStageApplySceneInput,
   unityStageGetStatus,
   unityStagePlayVrmaGesture,
@@ -32,18 +35,26 @@ import {
   unityStageStop,
 } from '../../../../shared/eventa/unity-stage'
 import { onAppBeforeQuit } from '../../../libs/bootkit/lifecycle'
-import { createStageSidecarHost, materializeFile, parseSceneInput } from '../stage-sidecar'
+import { createStageSidecarHost, materializeFile, materializePackage, parseSceneInput } from '../stage-sidecar'
 
 type MainContext = ReturnType<typeof createContext>['context']
+
+const pmxPackageSchema = object({
+  files: array(object({ data: instance(Uint8Array), path: string() })),
+  modelId: pipe(string(), nonEmpty()),
+  modelPath: pipe(string(), regex(/\.pmx$/i, 'The model of a PMX package must be a PMX file.')),
+  name: pipe(string(), nonEmpty()),
+})
 
 /**
  * The Unity display sidecar, owned by Electron main.
  *
- * `applySceneInput`, `applyIdle`, and `playVrmaGesture` write files, so they wait for the lifecycle lock. `sendSignal`
+ * `applySceneInput`, `applyPmxPackage`, `applyIdle`, and `playVrmaGesture` write files, so they wait for the lifecycle lock. `sendSignal`
  * does not wait, and it drops a signal while the stage is not running, because a late signal has no value.
  */
 export interface UnityStageManager {
   applyIdle: (payload: UnityStageClipInput) => Promise<void>
+  applyPmxPackage: (payload: UnityStagePmxPackageInput) => Promise<void>
   applySceneInput: (payload: UnityStageSceneInput) => Promise<void>
   getStatus: () => ElectronStageSidecarStatus
   playVrmaGesture: (payload: UnityStageVrmaGestureInput) => Promise<void>
@@ -105,15 +116,30 @@ export function createUnityStageManager(): UnityStageManager {
         sendAfterWrite({ type: 'host.character.idle', payload: { path } })
       })
     },
+    async applyPmxPackage(payload) {
+      await host.runExclusive(async () => {
+        assertRunning()
+
+        const result = safeParse(pmxPackageSchema, payload)
+        if (!result.success)
+          throw new Error('Invalid Unity stage PMX package payload.')
+
+        const { files, modelId, modelPath, name } = result.output
+        const path = await materializePackage(modelDirectory(modelId), files, modelPath)
+
+        sendAfterWrite({
+          type: 'host.scene.apply',
+          payload: { format: 'pmx', modelId, name, path },
+        })
+      })
+    },
     async applySceneInput(payload) {
       await host.runExclusive(async () => {
         assertRunning()
 
         const sceneInput = parseSceneInput(payload, 'Invalid Unity stage scene input payload.')
-        // The model ID comes from a renderer and names a directory, so it goes through the same rule as a file name.
-        const directory = join(resolveUnityStageStorageRoot(), 'models')
         const path = await materializeFile(
-          join(directory, modelDirectoryName(sceneInput.modelId)),
+          modelDirectory(sceneInput.modelId),
           sceneInput.fileName,
           sceneInput.data,
         )
@@ -187,6 +213,7 @@ export function createUnityStageService(params: {
     defineInvokeHandler(params.context, unityStageStop, () => params.manager.stop()),
     defineInvokeHandler(params.context, unityStageGetStatus, () => params.manager.getStatus()),
     defineInvokeHandler(params.context, unityStageApplySceneInput, payload => params.manager.applySceneInput(payload)),
+    defineInvokeHandler(params.context, unityStageApplyPmxPackage, payload => params.manager.applyPmxPackage(payload)),
     defineInvokeHandler(params.context, unityStageApplyIdle, payload => params.manager.applyIdle(payload)),
     defineInvokeHandler(params.context, unityStagePlayVrmaGesture, payload => params.manager.playVrmaGesture(payload)),
     defineInvokeHandler(params.context, unityStageReportError, message => params.manager.reportError(message)),
@@ -226,14 +253,15 @@ function clipDirectory() {
 }
 
 /**
- * Makes one safe path part of a model ID. Each changed character becomes `_`, so an ID cannot leave the directory.
+ * Gives the directory of one model. The ID comes from a renderer, so each character outside a safe set becomes `_`, and
+ * an ID cannot leave the directory.
  *
  * @example
- * modelDirectoryName('../a/b')
- * // => '___a_b'
+ * modelDirectory('../a/b')
+ * // => '<userData>/unity-stage/models/___a_b'
  */
-function modelDirectoryName(modelId: string) {
-  return modelId.replace(/[^\w-]/g, '_') || 'model'
+function modelDirectory(modelId: string) {
+  return join(resolveUnityStageStorageRoot(), 'models', modelId.replace(/[^\w-]/g, '_') || 'model')
 }
 
 /**

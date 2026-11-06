@@ -9,7 +9,7 @@ import { join, resolve } from 'node:path'
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { createStageSidecarHost, materializeFile } from '.'
+import { createStageSidecarHost, materializeFile, materializePackage } from '.'
 
 const FAKE_SIDECAR = resolve(import.meta.dirname, '../../../../../scripts/fake-stage-sidecar.mjs')
 
@@ -308,5 +308,57 @@ describe('materializeFile', () => {
 
     expect(path).toBe(join(target, 'outside.vrm'))
     expect(readdirSync(directory)).toEqual(['models'])
+  })
+})
+
+describe('materializePackage', () => {
+  let directory = ''
+
+  function file(path: string) {
+    return { path, data: new Uint8Array([1, 2]) }
+  }
+
+  beforeEach(() => {
+    directory = mkdtempSync(join(tmpdir(), 'airi-stage-sidecar-package-'))
+  })
+
+  afterEach(() => {
+    rmSync(directory, { recursive: true, force: true })
+  })
+
+  it('keeps the folders of the package, also with Japanese names and backslashes', async () => {
+    const target = join(directory, 'model')
+
+    const path = await materializePackage(target, [file('モデル/結月.pmx'), file('モデル\\tex\\顔.png')], 'モデル/結月.pmx')
+
+    expect(path).toBe(join(target, 'モデル', '結月.pmx'))
+    expect([...readFileSync(path)]).toEqual([1, 2])
+    expect([...readFileSync(join(target, 'モデル', 'tex', '顔.png'))]).toEqual([1, 2])
+  })
+
+  it.each([
+    ['a parent folder', '../outside.png'],
+    ['a parent folder inside the path', 'tex/../../outside.png'],
+    ['a parent folder with backslashes', 'tex\\..\\..\\outside.png'],
+    ['an absolute path', '/outside.png'],
+    ['a drive path', 'C:/outside.png'],
+    ['a stream of a Windows file', 'tex/a.png:stream'],
+    ['a null character', 'tex/a\0.png'],
+    ['an empty path', ''],
+    ['a path with no name', './'],
+  ])('refuses %s, and writes nothing', async (_name, unsafe) => {
+    const target = join(directory, 'model')
+
+    await expect(materializePackage(target, [file('a.pmx'), file(unsafe)], 'a.pmx')).rejects.toThrow('unsafe path')
+
+    expect(readdirSync(directory)).toEqual([])
+  })
+
+  it('refuses a model path that the package does not have', async () => {
+    const target = join(directory, 'model')
+
+    await expect(materializePackage(target, [file('a.pmx')], 'b.pmx')).rejects.toThrow('has no file at b.pmx')
+
+    expect(readdirSync(directory)).toEqual([])
   })
 })

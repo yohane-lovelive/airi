@@ -20,6 +20,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# A `powershell -File` run gives the comma list of a package.json script as one string, so Unity ignores `-quit` and
+# never exits. A run inside PowerShell already gives an array, and this split does not change it.
+$Arguments = @($Arguments | ForEach-Object { $_ -split ',' } | Where-Object { $_ })
+
 $projectPath = Split-Path -Parent $PSScriptRoot
 $versionLine = Select-String -Path (Join-Path $projectPath 'ProjectSettings/ProjectVersion.txt') -Pattern '^m_EditorVersion: (.+)$'
 $version = $versionLine.Matches[0].Groups[1].Value.Trim()

@@ -3,6 +3,7 @@
   "rootNamespace": "Airi.Stage.Editor",
   "references": [
     "Airi.Stage",
+    "Mmd.Rendering.Universal",
     "Unity.RenderPipelines.Core.Runtime",
     "Unity.RenderPipelines.Universal.Runtime"
   ],

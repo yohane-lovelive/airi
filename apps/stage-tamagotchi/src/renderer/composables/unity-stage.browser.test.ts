@@ -2,7 +2,9 @@ import type { createContext } from '@moeru/eventa'
 import type { DisplayModel } from '@proj-airi/stage-ui/stores/display-models'
 
 import type { ElectronStageSidecarStatus } from '../../shared/eventa'
-import type { UnityStageClipInput, UnityStageSceneInput, UnityStageSignal, UnityStageVrmaGestureInput } from '../../shared/eventa/unity-stage'
+import type { UnityStageClipInput, UnityStagePmxPackageInput, UnityStageSceneInput, UnityStageSignal, UnityStageVrmaGestureInput } from '../../shared/eventa/unity-stage'
+
+import JSZip from 'jszip'
 
 import { defineInvokeHandler } from '@moeru/eventa'
 import { BUILT_IN_GESTURES } from '@proj-airi/stage-shared/body-motion'
@@ -18,6 +20,7 @@ import { createI18n } from 'vue-i18n'
 
 import {
   unityStageApplyIdle,
+  unityStageApplyPmxPackage,
   unityStageApplySceneInput,
   unityStageGetStatus,
   unityStagePlayVrmaGesture,
@@ -65,6 +68,22 @@ function vrmModel(id = 'model-1'): DisplayModel {
   } as DisplayModel
 }
 
+/** A stored MMD model, as the model selector keeps it: a ZIP with UTF-8 names. */
+async function mmdModel(files: Record<string, number[]>): Promise<DisplayModel> {
+  const zip = new JSZip()
+  for (const [path, data] of Object.entries(files))
+    zip.file(path, new Uint8Array(data))
+
+  return {
+    format: DisplayModelFormat.PMXZip,
+    id: 'mmd-1',
+    importedAt: 0,
+    name: 'MMD',
+    type: 'file',
+    file: new File([await zip.generateAsync({ type: 'blob' })], 'mmd.zip'),
+  } as DisplayModel
+}
+
 function emitStatus(status: ElectronStageSidecarStatus) {
   mocks.context!.emit(unityStageStatusChanged, status)
 }
@@ -73,6 +92,7 @@ describe('the Unity stage in the renderer', () => {
   let signals: UnityStageSignal[] = []
   let idles: UnityStageClipInput[] = []
   let scenes: UnityStageSceneInput[] = []
+  let packages: UnityStagePmxPackageInput[] = []
   let gestures: UnityStageVrmaGestureInput[] = []
   let errors: string[] = []
   let order: string[] = []
@@ -86,6 +106,7 @@ describe('the Unity stage in the renderer', () => {
     signals = []
     idles = []
     scenes = []
+    packages = []
     gestures = []
     errors = []
     order = []
@@ -108,6 +129,10 @@ describe('the Unity stage in the renderer', () => {
       defineInvokeHandler(context, unityStageApplySceneInput, (payload) => {
         order.push('scene')
         scenes.push(payload)
+      }),
+      defineInvokeHandler(context, unityStageApplyPmxPackage, (payload) => {
+        order.push('package')
+        packages.push(payload)
       }),
       defineInvokeHandler(context, unityStagePlayVrmaGesture, payload => playVrma(payload)),
       defineInvokeHandler(context, unityStageReportError, (message) => {
@@ -271,13 +296,73 @@ describe('the Unity stage in the renderer', () => {
 
     it('reports a model format that the sidecar cannot load, and sends nothing', async () => {
       const { settings } = await mount(useUnityStageBridge)
-      settings.stageModelSelectedDisplayModel = { ...vrmModel(), format: DisplayModelFormat.PMXZip } as DisplayModel
+      settings.stageModelSelectedDisplayModel = { ...vrmModel(), format: DisplayModelFormat.Live2dZip } as DisplayModel
 
       emitStatus(statusOf('running'))
 
       await vi.waitFor(() => expect(errors).toEqual(['tamagotchi.settings.pages.models.unity-stage.unsupported-model']))
       expect(idles).toEqual([])
       expect(scenes).toEqual([])
+      expect(packages).toEqual([])
+    })
+
+    it('sends a PMX package with its folders', async () => {
+      const { settings } = await mount(useUnityStageBridge)
+      settings.stageModelSelectedDisplayModel = await mmdModel({
+        'モデル/結月.pmx': [1, 2],
+        'モデル/tex/顔.png': [3],
+      })
+
+      emitStatus(statusOf('running'))
+
+      await vi.waitFor(() => expect(packages).toHaveLength(1))
+      expect(packages[0].modelId).toBe('mmd-1')
+      expect(packages[0].name).toBe('MMD')
+      expect(packages[0].modelPath).toBe('モデル/結月.pmx')
+      expect(packages[0].files.map(file => [file.path, [...file.data]])).toEqual([
+        ['モデル/結月.pmx', [1, 2]],
+        ['モデル/tex/顔.png', [3]],
+      ])
+      expect(scenes).toEqual([])
+      expect(errors).toEqual([])
+    })
+
+    it('sends the first model of a package, as the three.js stage does', async () => {
+      const { settings } = await mount(useUnityStageBridge)
+      settings.stageModelSelectedDisplayModel = await mmdModel({ 'z.pmx': [1], 'a.pmx': [2] })
+
+      emitStatus(statusOf('running'))
+
+      await vi.waitFor(() => expect(packages).toHaveLength(1))
+      expect(packages[0].modelPath).toBe('z.pmx')
+    })
+
+    it.each([
+      ['a PMD model', { 'a.pmd': [1], 'tex.png': [2] }],
+      ['no model', { 'tex.png': [2] }],
+    ])('reports a package with %s, and sends nothing', async (_name, files) => {
+      const { settings } = await mount(useUnityStageBridge)
+      settings.stageModelSelectedDisplayModel = await mmdModel(files)
+
+      emitStatus(statusOf('running'))
+
+      await vi.waitFor(() => expect(errors).toEqual(['tamagotchi.settings.pages.models.unity-stage.unsupported-model']))
+      expect(packages).toEqual([])
+    })
+
+    it('reports a file that is not a ZIP', async () => {
+      const { settings } = await mount(useUnityStageBridge)
+      settings.stageModelSelectedDisplayModel = {
+        ...vrmModel(),
+        format: DisplayModelFormat.PMXZip,
+        file: new File([new Uint8Array([1, 2, 3])], 'broken.zip'),
+      } as DisplayModel
+
+      emitStatus(statusOf('running'))
+
+      await vi.waitFor(() => expect(errors).toHaveLength(1))
+      expect(errors[0]).not.toBe('tamagotchi.settings.pages.models.unity-stage.unsupported-model')
+      expect(packages).toEqual([])
     })
 
     it('does not send a model before the sidecar runs', async () => {

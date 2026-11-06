@@ -16,6 +16,7 @@ import { useI18n } from 'vue-i18n'
 
 import {
   unityStageApplyIdle,
+  unityStageApplyPmxPackage,
   unityStageApplySceneInput,
   unityStageGetStatus,
   unityStagePlayVrmaGesture,
@@ -25,7 +26,7 @@ import {
   unityStageStatusChanged,
   unityStageStop,
 } from '../../shared/eventa/unity-stage'
-import { readDisplayModelFile } from './display-model-file'
+import { readDisplayModelFile, readPmxPackage } from './display-model-file'
 
 /**
  * Makes the renderer of this window follow the sidecar.
@@ -65,6 +66,7 @@ export function useUnityStageBridge() {
   const getStatus = useElectronEventaInvoke(unityStageGetStatus)
   const applyIdle = useElectronEventaInvoke(unityStageApplyIdle)
   const applySceneInput = useElectronEventaInvoke(unityStageApplySceneInput)
+  const applyPmxPackage = useElectronEventaInvoke(unityStageApplyPmxPackage)
   const playVrmaGesture = useElectronEventaInvoke(unityStagePlayVrmaGesture)
   const reportError = useElectronEventaInvoke(unityStageReportError)
   const sidecarState = shallowRef<ElectronStageSidecarStatus['state']>('stopped')
@@ -118,29 +120,56 @@ export function useUnityStageBridge() {
     await applyIdle({ id: 'idle-loop', data: new Uint8Array(await response.arrayBuffer()) })
   }
 
+  async function sendVrmModel(model: DisplayModel, generation: number) {
+    const file = await readDisplayModelFile(model)
+    if (generation !== sceneGeneration)
+      return
+
+    await applySceneInput({
+      modelId: model.id,
+      format: 'vrm',
+      name: model.name,
+      fileName: file.fileName,
+      data: file.data,
+    })
+  }
+
+  async function sendPmxModel(model: DisplayModel, generation: number) {
+    const modelPackage = await readPmxPackage(model)
+    if (generation !== sceneGeneration)
+      return
+
+    if (!modelPackage) {
+      await reportError(t('tamagotchi.settings.pages.models.unity-stage.unsupported-model'))
+      return
+    }
+
+    await applyPmxPackage({
+      modelId: model.id,
+      name: model.name,
+      modelPath: modelPackage.modelPath,
+      files: modelPackage.files,
+    })
+  }
+
   async function syncScene(model: DisplayModel) {
     sceneGeneration += 1
     const generation = sceneGeneration
 
-    // The sidecar has no loader for other formats yet. Step U4 of the ADR decides MMD.
-    if (model.format !== DisplayModelFormat.VRM) {
+    // The sidecar reads VRM and PMX files. A stored MMD model is a ZIP that can hold a PMD file, so the PMD check of
+    // that format comes after the unpack.
+    if (model.format !== DisplayModelFormat.VRM && model.format !== DisplayModelFormat.PMXZip) {
       await reportError(t('tamagotchi.settings.pages.models.unity-stage.unsupported-model'))
       return
     }
 
     try {
       await sendIdle()
-      const file = await readDisplayModelFile(model)
-      if (generation !== sceneGeneration)
-        return
 
-      await applySceneInput({
-        modelId: model.id,
-        format: 'vrm',
-        name: model.name,
-        fileName: file.fileName,
-        data: file.data,
-      })
+      if (model.format === DisplayModelFormat.VRM)
+        await sendVrmModel(model, generation)
+      else
+        await sendPmxModel(model, generation)
     }
     catch (error) {
       if (generation === sceneGeneration)

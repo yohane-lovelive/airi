@@ -28,7 +28,7 @@ pages:
       cancel-waiting: Unity Editor を待っています。選択するとキャンセルします。
       error-title: Unity ステージのエラー
       switch: Unity ステージに切り替える（実験的）
-      unsupported-model: Unity ステージは VRM モデルのみ表示できます。VRM モデルを選択してください。
+      unsupported-model: Unity ステージは VRM と PMX のモデルのみ表示できます。別のモデルを選択してください。
   modules:
     mcp-server:
       description: MCPサーバーとツールの接続と管理

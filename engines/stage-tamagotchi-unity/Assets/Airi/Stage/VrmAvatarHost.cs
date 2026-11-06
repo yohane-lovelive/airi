@@ -14,7 +14,7 @@ namespace Airi.Stage
     /// model only after it loads, so a failed load keeps the old model on the stage. A load that a
     /// newer load replaced drops its result, so an old model cannot arrive last.
     /// </summary>
-    public sealed class VrmAvatarHost
+    public sealed class VrmAvatarHost : IAvatarHost
     {
         private readonly Transform _parent;
         private Vrm10Instance _current;
@@ -56,15 +56,21 @@ namespace Airi.Stage
                 return null;
             }
 
-            if (_current != null)
-            {
-                UnityEngine.Object.Destroy(_current.gameObject);
-            }
+            Clear();
 
             _current = loaded;
             loaded.transform.SetParent(_parent, false);
 
             return MeasureBounds(loaded.gameObject);
+        }
+
+        public void Clear()
+        {
+            if (_current != null)
+            {
+                UnityEngine.Object.Destroy(_current.gameObject);
+                _current = null;
+            }
         }
 
         private static Bounds MeasureBounds(GameObject avatar)

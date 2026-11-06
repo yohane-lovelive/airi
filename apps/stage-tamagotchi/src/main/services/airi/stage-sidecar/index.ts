@@ -9,7 +9,7 @@ import type { ElectronStageSidecarStatus } from '../../../../shared/eventa'
 import { spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { mkdir, writeFile } from 'node:fs/promises'
-import { basename, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 
 import { useLogg } from '@guiiai/logg'
 import { errorMessageFrom } from '@moeru/std'
@@ -636,6 +636,57 @@ export async function materializeFile(directory: string, fileName: string, data:
   await writeFile(path, data)
 
   return path
+}
+
+/** One file of a model package, by its path inside the package. */
+export interface StageSidecarPackageFile {
+  path: string
+  data: Uint8Array
+}
+
+/**
+ * Resolves a path inside a package to a path on disk.
+ *
+ * The path comes from a ZIP, which a stranger can write. So this function refuses each path that can leave `directory`,
+ * and it never repairs one: a package with such a path is not a normal package.
+ *
+ * @example
+ * resolvePackagePath('C:/models/a', 'tex\\face.png')
+ * // => 'C:\\models\\a\\tex\\face.png'
+ */
+function resolvePackagePath(directory: string, path: string) {
+  const normalized = path.replaceAll('\\', '/')
+  const segments = normalized.split('/').filter(segment => segment !== '' && segment !== '.')
+  const unsafe = normalized.startsWith('/')
+    || segments.length === 0
+    || segments.some(segment => segment === '..' || segment.includes(':') || segment.includes('\0'))
+
+  if (unsafe)
+    throw new Error(`The model package has an unsafe path: ${path}`)
+
+  return join(directory, ...segments)
+}
+
+/**
+ * Writes a model package to disk, for a sidecar that reads its textures by paths relative to the model.
+ *
+ * The check of all paths comes before the first write, so a refused package leaves nothing on disk. Files of an earlier
+ * write stay in the directory, because a model ID always names the same package.
+ *
+ * @returns the path on disk of `modelPath`.
+ */
+export async function materializePackage(directory: string, files: StageSidecarPackageFile[], modelPath: string) {
+  if (!files.some(file => file.path === modelPath))
+    throw new Error(`The model package has no file at ${modelPath}`)
+
+  const targets = files.map(file => ({ data: file.data, path: resolvePackagePath(directory, file.path) }))
+
+  for (const target of targets) {
+    await mkdir(dirname(target.path), { recursive: true })
+    await writeFile(target.path, target.data)
+  }
+
+  return resolvePackagePath(directory, modelPath)
 }
 
 /**

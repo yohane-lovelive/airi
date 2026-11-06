@@ -189,6 +189,59 @@ describe('createUnityStageManager', () => {
       expect(received()[0].payload?.path).toBe(join(state.userData, 'unity-stage', 'models', '______outside', 'model.vrm'))
     })
 
+    it('writes a PMX package with its folders and sends the path of its model', async () => {
+      const manager = createManager()
+      await manager.start()
+
+      await manager.applyPmxPackage({
+        files: [
+          { path: 'モデル/結月.pmx', data: new Uint8Array([1]) },
+          { path: 'モデル/tex/顔.png', data: new Uint8Array([2]) },
+        ],
+        modelId: 'model-2',
+        modelPath: 'モデル/結月.pmx',
+        name: 'Yukari',
+      })
+
+      const folder = join(state.userData, 'unity-stage', 'models', 'model-2', 'モデル')
+      expect([...readFileSync(join(folder, 'tex', '顔.png'))]).toEqual([2])
+      await vi.waitFor(() => expect(received()).toHaveLength(1))
+      expect(received()[0]).toEqual({
+        type: 'host.scene.apply',
+        payload: { format: 'pmx', modelId: 'model-2', name: 'Yukari', path: join(folder, '結月.pmx') },
+      })
+    })
+
+    it('refuses a package with a path that leaves its folder, and sends nothing', async () => {
+      const manager = createManager()
+      await manager.start()
+
+      await expect(manager.applyPmxPackage({
+        files: [
+          { path: 'a.pmx', data: new Uint8Array([1]) },
+          { path: '../../../outside.png', data: new Uint8Array([2]) },
+        ],
+        modelId: 'model-2',
+        modelPath: 'a.pmx',
+        name: 'Model',
+      })).rejects.toThrow('unsafe path')
+
+      expect(existsSync(join(state.userData, 'unity-stage', 'models'))).toBe(false)
+      expect(received()).toEqual([])
+    })
+
+    it('refuses a package whose model is a PMD file, because the sidecar has no loader for it', async () => {
+      const manager = createManager()
+      await manager.start()
+
+      await expect(manager.applyPmxPackage({
+        files: [{ path: 'a.pmd', data: new Uint8Array([1]) }],
+        modelId: 'model-2',
+        modelPath: 'a.pmd',
+        name: 'Model',
+      })).rejects.toThrow('Invalid Unity stage PMX package payload.')
+    })
+
     it('writes the idle clip and sends its path', async () => {
       const manager = createManager()
       await manager.start()
@@ -217,6 +270,12 @@ describe('createUnityStageManager', () => {
       const manager = createManager()
 
       await expect(manager.applyIdle({ id: 'idle', data: new Uint8Array([1]) })).rejects.toThrow('Unity stage is not running.')
+      await expect(manager.applyPmxPackage({
+        files: [{ path: 'a.pmx', data: new Uint8Array([1]) }],
+        modelId: 'a',
+        modelPath: 'a.pmx',
+        name: 'a',
+      })).rejects.toThrow('Unity stage is not running.')
       await expect(manager.playVrmaGesture({ id: 'a', part: 'upper', data: new Uint8Array([1]) })).rejects.toThrow('Unity stage is not running.')
       await expect(manager.applySceneInput({
         data: new Uint8Array([1]),

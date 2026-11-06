@@ -147,7 +147,7 @@ namespace Airi.Stage.Core
             RequireOnlyFields(payload, "format", "modelId", "name", "path");
 
             string format = ReadText(payload, "format");
-            if (format != "vrm")
+            if (format != "vrm" && format != "pmx")
             {
                 throw new StageProtocolException($"Unsupported model format: {format}");
             }

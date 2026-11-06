@@ -94,7 +94,8 @@ export const HostMessageSchema = variant('type', [
   strictObject({
     type: literal('host.scene.apply'),
     payload: strictObject({
-      format: literal('vrm'),
+      /** `pmx`: the textures load from paths relative to `path`, so the file stays in the folder of its package. */
+      format: picklist(['vrm', 'pmx']),
       modelId: textSchema,
       name: textSchema,
       path: textSchema,

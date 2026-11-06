@@ -13,6 +13,19 @@ export interface UnityStageSceneInput {
   data: Uint8Array
 }
 
+/**
+ * An MMD model for the Unity stage. The sidecar reads the textures by paths relative to the model, so Electron main
+ * writes the whole package with its folders.
+ */
+export interface UnityStagePmxPackageInput {
+  modelId: string
+  name: string
+  /** The path of the PMX file inside the package. */
+  modelPath: string
+  /** The paths come from a ZIP. Electron main refuses each path that can leave the folder of the model. */
+  files: { path: string, data: Uint8Array }[]
+}
+
 /** A `.vrma` file for the Unity stage. Electron main writes it to disk, and the sidecar reads it by path. */
 export interface UnityStageClipInput {
   id: string
@@ -37,6 +50,7 @@ export const unityStageStart = defineInvokeEventa<ElectronStageSidecarStatus>('e
 export const unityStageStop = defineInvokeEventa<ElectronStageSidecarStatus>('eventa:invoke:unity-stage:stop')
 export const unityStageGetStatus = defineInvokeEventa<ElectronStageSidecarStatus>('eventa:invoke:unity-stage:get-status')
 export const unityStageApplySceneInput = defineInvokeEventa<void, UnityStageSceneInput>('eventa:invoke:unity-stage:apply-scene-input')
+export const unityStageApplyPmxPackage = defineInvokeEventa<void, UnityStagePmxPackageInput>('eventa:invoke:unity-stage:apply-pmx-package')
 export const unityStageApplyIdle = defineInvokeEventa<void, UnityStageClipInput>('eventa:invoke:unity-stage:apply-idle')
 export const unityStagePlayVrmaGesture = defineInvokeEventa<void, UnityStageVrmaGestureInput>('eventa:invoke:unity-stage:play-vrma-gesture')
 /** Records a failure that the renderer finds before the sidecar sees it, so Settings shows it. */

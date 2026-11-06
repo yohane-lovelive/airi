@@ -21,19 +21,36 @@ namespace Airi.Stage
         /// <summary>UniVRM finds this shader by name at runtime, so a build must include it.</summary>
         private const string MToonShader = "VRM10/Universal Render Pipeline/MToon10";
 
+        /// <summary>
+        /// The light of MMD itself. MMD materials expect this value, and a stronger light turns a pale
+        /// skin texture white, with its blush and its mouth gone.
+        /// </summary>
+        private const float MmdLightIntensity = 0.6f;
+
+        /// <summary>The light that shows MToon materials of VRM models with no white areas.</summary>
+        private const float VrmLightIntensity = 0.85f;
+
         [SerializeField]
         private Camera _camera;
+
+        [SerializeField]
+        private Light _light;
 
         private readonly CancellationTokenSource _lifetime = new CancellationTokenSource();
         private StageSocketClient _socket;
         private IStageOutput _output;
-        private VrmAvatarHost _avatar;
+        private VrmAvatarHost _vrm;
+        private MmdAvatarHost _mmd;
+
+        /// <summary>The number of the newest scene. An older scene drops its model when it finishes.</summary>
+        private int _newestScene;
 
         private async void Start()
         {
             Application.runInBackground = true;
             _output = new WindowOutput(_camera);
-            _avatar = new VrmAvatarHost(transform);
+            _vrm = new VrmAvatarHost(transform);
+            _mmd = new MmdAvatarHost(transform);
 
             await ConnectAsync();
         }
@@ -195,14 +212,27 @@ namespace Airi.Stage
 
         private async Task ApplySceneAsync(SceneApplyMessage scene)
         {
+            int current = ++_newestScene;
+            IAvatarHost host = scene.Format == "pmx" ? _mmd : _vrm;
+            IAvatarHost other = scene.Format == "pmx" ? _vrm : _mmd;
+
             try
             {
-                Bounds? bounds = await _avatar.LoadAsync(scene.Path, _lifetime.Token);
+                Bounds? bounds = await host.LoadAsync(scene.Path, _lifetime.Token);
                 if (bounds == null)
                 {
                     return;
                 }
 
+                // Two formats have two hosts, so a host alone cannot see that a newer scene replaced it.
+                if (current != _newestScene)
+                {
+                    host.Clear();
+                    return;
+                }
+
+                other.Clear();
+                _light.intensity = scene.Format == "pmx" ? MmdLightIntensity : VrmLightIntensity;
                 _output.Frame(bounds.Value);
                 _socket.Send(StageProtocol.SceneApplied(scene.ModelId, ToProtocol(bounds.Value)));
             }

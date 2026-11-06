@@ -10,6 +10,15 @@
       }
     },
     {
+      "type": "host.scene.apply",
+      "payload": {
+        "format": "pmx",
+        "modelId": "model-2",
+        "name": "MMD model",
+        "path": "C:/stage/models/model-2/mmd.pmx"
+      }
+    },
+    {
       "type": "host.character.idle",
       "payload": {
         "path": "C:/stage/clips/idle.vrma"
@@ -172,7 +181,7 @@
       "message": {
         "type": "host.scene.apply",
         "payload": {
-          "format": "pmx",
+          "format": "fbx",
           "modelId": "a",
           "name": "a",
           "path": "a"

@@ -1,0 +1,148 @@
+using System;
+using System.Diagnostics;
+using System.IO;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using Mmd;
+using Mmd.Parser;
+using Mmd.Physics;
+using Mmd.Rendering;
+using Mmd.UnityIntegration;
+using UnityEngine;
+using Debug = UnityEngine.Debug;
+using Object = UnityEngine.Object;
+
+namespace Airi.Stage
+{
+    /// <summary>
+    /// Owns the one MMD avatar of the stage. It uses the runtime API of unity-mmd-loader, because the
+    /// owner selects a model in AIRI and a built player has no Editor import.
+    ///
+    /// State: the current avatar, and the number of the newest load. A new model replaces the old
+    /// model only after it loads, so a broken file keeps the old model on the stage.
+    /// </summary>
+    public sealed class MmdAvatarHost : IAvatarHost
+    {
+        /// <summary>The default of the loader. MMD models are about 20 units tall.</summary>
+        private const float ImportScale = 0.1f;
+
+        private const float PlaybackFrameRate = 30f;
+
+        private readonly Transform _parent;
+        private GameObject _current;
+        private int _newestLoad;
+
+        public MmdAvatarHost(Transform parent)
+        {
+            _parent = parent;
+        }
+
+        /// <summary>
+        /// Loads a PMX file. The textures load from paths relative to this file, so the file must stay
+        /// in its folder.
+        ///
+        /// Returns:
+        /// - The bounds of the avatar, or null when a newer load replaced this load.
+        ///
+        /// Throws:
+        /// - The error of the parser when the file is missing or broken. The old avatar stays.
+        /// </summary>
+        public async Task<Bounds?> LoadAsync(string path, CancellationToken cancellation)
+        {
+            int load = ++_newestLoad;
+            var timer = Stopwatch.StartNew();
+
+            // The files are large and the parser is native, so both run away from the main thread.
+            (MmdModelDefinition model, MmdMotionDefinition restMotion) = await Task.Run(
+                () =>
+                {
+                    var parser = new NativeMmdParser();
+                    MmdModelDefinition parsed = parser.LoadModel(File.ReadAllBytes(path));
+                    MmdModelValidator.ThrowIfInvalid(parsed);
+                    return (parsed, parser.LoadMotion(BuildRestMotion()));
+                },
+                cancellation);
+
+            if (load != _newestLoad)
+            {
+                return null;
+            }
+
+            MmdUnityPlaybackBinding binding = MmdUnityPlaybackBinding.CreateSkinned(
+                model,
+                restMotion,
+                path,
+                "airi-rest",
+                path,
+                ImportScale,
+                MmdMaterialPreset.MmdToonLit);
+
+            MmdUnityModelInstance instance = binding.Instance;
+            GameObject root = instance.Root;
+            root.transform.SetParent(_parent, false);
+
+            var controller = root.AddComponent<MmdUnityPlaybackController>();
+            controller.Configure(binding, new MmdPlaybackConfig(PlaybackFrameRate, 0, true));
+            controller.SetPhysicsMode(MmdPhysicsMode.Live);
+            controller.Play();
+
+            Clear();
+            _current = root;
+
+            // A newer model can replace this one during the unload below, so the measure comes first.
+            Bounds bounds = MeasureBounds(instance);
+            Debug.Log(
+                $"[Airi] MMD {Path.GetFileName(path)}: {timer.ElapsedMilliseconds} ms, "
+                + $"{instance.VertexCount} vertices, {instance.PhysicsBodies.Length} bodies, "
+                + $"{instance.LoadedDiffuseTextureCount} textures, {instance.MissingTextureReferenceCount} missing, "
+                + $"{instance.UnsupportedTextureReferenceCount} unsupported");
+
+            // The old model leaves large textures and arrays behind. A destroy frees them only at the
+            // next unload, so a run of model changes grows without this call.
+            await Resources.UnloadUnusedAssets();
+            GC.Collect();
+
+            return bounds;
+        }
+
+        public void Clear()
+        {
+            if (_current != null)
+            {
+                Object.Destroy(_current);
+                _current = null;
+            }
+        }
+
+        /// <summary>
+        /// Builds a VMD file with no keys: a 30-byte header, a 20-byte model name, and four counts of
+        /// zero. The loader needs a motion to run its physics, and AIRI has no motion file. The name
+        /// stays empty, so this code needs no Shift_JIS encoding, which a Mono player can lack.
+        /// </summary>
+        private static byte[] BuildRestMotion()
+        {
+            var bytes = new byte[66];
+            byte[] header = Encoding.ASCII.GetBytes("Vocaloid Motion Data 0002");
+            Array.Copy(header, bytes, header.Length);
+            return bytes;
+        }
+
+        /// <summary>
+        /// Measures the mesh in its rest pose. The bounds of the renderer do not fit: the loader widens
+        /// them to a large cube, so that physics cannot move hair out of them and cull it.
+        /// </summary>
+        private static Bounds MeasureBounds(MmdUnityModelInstance instance)
+        {
+            Transform transform = instance.SkinnedMeshRenderer != null
+                ? instance.SkinnedMeshRenderer.transform
+                : instance.Root.transform;
+            Bounds local = instance.Mesh.bounds;
+            Vector3 size = transform.lossyScale;
+
+            return new Bounds(
+                transform.TransformPoint(local.center),
+                new Vector3(local.size.x * size.x, local.size.y * size.y, local.size.z * size.z));
+        }
+    }
+}

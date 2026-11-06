@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
+using Mmd.Rendering.Universal;
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.SceneManagement;
@@ -29,13 +30,15 @@ namespace Airi.Stage.Editor
         private const string ScenePath = "Assets/Airi/Scenes/Stage.unity";
 
         /// <summary>
-        /// UniVRM finds these shaders by name at runtime, while no asset of the project uses them.
-        /// Without this list, a build removes them, and the model shows no material.
+        /// UniVRM and unity-mmd-loader find these shaders by name at runtime, while no asset of the
+        /// project uses them. Without this list, a build removes them, and the model shows no material.
         /// </summary>
         private static readonly string[] RuntimeShaders =
         {
             "VRM10/Universal Render Pipeline/MToon10",
             "UniGLTF/UniUnlit",
+            "MMD URP Toon",
+            "MMD Basic URP Toon",
         };
 
         public static void Apply()
@@ -90,7 +93,36 @@ namespace Airi.Stage.Editor
 
             pipeline.msaaSampleCount = 4;
             EditorUtility.SetDirty(pipeline);
+
+            // MMD models draw their outlines and their shadows on themselves through these features.
+            AddRendererFeature<MmdOutlineRendererFeature>(renderer);
+            AddRendererFeature<MmdSelfShadowRendererFeature>(renderer);
             return pipeline;
+        }
+
+        private static void AddRendererFeature<T>(UniversalRendererData renderer)
+            where T : ScriptableRendererFeature
+        {
+            if (renderer.TryGetRendererFeature<T>(out _))
+            {
+                return;
+            }
+
+            var feature = ScriptableObject.CreateInstance<T>();
+            feature.name = typeof(T).Name;
+            AssetDatabase.AddObjectToAsset(feature, renderer);
+            AssetDatabase.TryGetGUIDAndLocalFileIdentifier(feature, out _, out long localId);
+
+            // The renderer reads the features through this map. The public list does not update it.
+            var serialized = new SerializedObject(renderer);
+            SerializedProperty features = serialized.FindProperty("m_RendererFeatures");
+            SerializedProperty map = serialized.FindProperty("m_RendererFeatureMap");
+            features.arraySize++;
+            features.GetArrayElementAtIndex(features.arraySize - 1).objectReferenceValue = feature;
+            map.arraySize++;
+            map.GetArrayElementAtIndex(map.arraySize - 1).longValue = localId;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(renderer);
         }
 
         private static void IncludeRuntimeShaders()
@@ -153,6 +185,7 @@ namespace Airi.Stage.Editor
             var rootObject = new GameObject("Stage Root", typeof(StageRoot));
             var root = new SerializedObject(rootObject.GetComponent<StageRoot>());
             root.FindProperty("_camera").objectReferenceValue = camera;
+            root.FindProperty("_light").objectReferenceValue = light;
             root.ApplyModifiedPropertiesWithoutUndo();
 
             EditorSceneManager.SaveScene(scene, ScenePath);

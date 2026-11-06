@@ -1,5 +1,36 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!114 &-8504151467181119367
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d67fd117e3184eb58708d7128aa6f5ba, type: 3}
+  m_Name: MmdSelfShadowRendererFeature
+  m_EditorClassIdentifier: Mmd.Rendering.Universal::Mmd.Rendering.Universal.MmdSelfShadowRendererFeature
+  m_Active: 1
+  shadowMapSize: 1024
+  shadowDirection: {x: 0.35, y: -1, z: 0.35}
+  shadowDepthBias: 0.02
+  pcfSamples: 1
+  softShadowRadius: 0
+--- !u!114 &-2787669390889153974
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4bece42029ac4d2bb7c73105d2c25653, type: 3}
+  m_Name: MmdOutlineRendererFeature
+  m_EditorClassIdentifier: Mmd.Rendering.Universal::Mmd.Rendering.Universal.MmdOutlineRendererFeature
+  m_Active: 1
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -24,8 +55,10 @@ MonoBehaviour:
     probeSamplingDebugMesh: {fileID: 0}
     probeSamplingDebugTexture: {fileID: 0}
     probeVolumeBlendStatesCS: {fileID: 0}
-  m_RendererFeatures: []
-  m_RendererFeatureMap: 
+  m_RendererFeatures:
+  - {fileID: -2787669390889153974}
+  - {fileID: -8504151467181119367}
+  m_RendererFeatureMap: 4a8ad26c753550d979688d2a4c2ffb89
   m_UseNativeRenderPass: 0
   postProcessData: {fileID: 0}
   m_AssetVersion: 3

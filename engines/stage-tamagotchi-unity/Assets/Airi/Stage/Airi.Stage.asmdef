@@ -3,6 +3,7 @@
   "rootNamespace": "Airi.Stage",
   "references": [
     "Airi.Stage.Core",
+    "Mmd.Runtime",
     "UniGLTF",
     "UniGLTF.Utils",
     "VRM10",

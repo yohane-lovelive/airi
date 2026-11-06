@@ -3,7 +3,7 @@ import type { UnityStageManager } from '.'
 import process from 'node:process'
 
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
@@ -117,6 +117,47 @@ describe.skipIf(!process.env.AIRI_UNITY_STAGE_PLAYER)('the Unity player', () => 
     // A leak of one set of 4K textures for each load is far more than this limit.
     expect(after - settled, `${settled.toFixed(0)} MB after 26 loads, ${after.toFixed(0)} MB after 66 loads`).toBeLessThan(60)
   }, LOAD_TIMEOUT_MS * 8)
+
+  // MMD models have terms of their own, so the repository has none. Give the folder of an unpacked model to run this.
+  it.skipIf(!process.env.AIRI_UNITY_STAGE_PMX_SAMPLE)('shows a real PMX package, and replaces it with a VRM model and back', async () => {
+    const folder = process.env.AIRI_UNITY_STAGE_PMX_SAMPLE!
+    const paths = (readdirSync(folder, { recursive: true }) as string[])
+      .filter(path => statSync(join(folder, path)).isFile())
+    const modelPath = paths.find(path => /\.pmx$/i.test(path))!
+    const pmxPackage = {
+      files: paths.map(path => ({ path, data: new Uint8Array(readFileSync(join(folder, path))) })),
+      modelId: 'pmx-sample',
+      modelPath,
+      name: 'PMX sample',
+    }
+    await manager.start()
+
+    async function loaded(load: () => Promise<void>) {
+      manager.reportError('The model is loading.')
+      await load()
+      await waitForLastError(lastError => lastError === undefined)
+    }
+
+    await loaded(() => manager.applyPmxPackage(pmxPackage))
+    await loaded(() => manager.applySceneInput(sceneInput('vrm-sample', new Uint8Array(readFileSync(SAMPLE_MODEL)))))
+    await loaded(() => manager.applyPmxPackage(pmxPackage))
+
+    expect(manager.getStatus().state).toBe('running')
+  }, LOAD_TIMEOUT_MS * 3)
+
+  it('reports a PMX file that is not a model, and stays running', async () => {
+    await manager.start()
+
+    await manager.applyPmxPackage({
+      files: [{ path: 'broken.pmx', data: new Uint8Array([1, 2, 3]) }],
+      modelId: 'broken',
+      modelPath: 'broken.pmx',
+      name: 'broken',
+    })
+
+    await waitForLastError(lastError => lastError?.includes('Could not load the model broken') ?? false)
+    expect(manager.getStatus().state).toBe('running')
+  }, LOAD_TIMEOUT_MS)
 
   it('accepts each signal without an error, because step U3 applies them later', async () => {
     await manager.start()

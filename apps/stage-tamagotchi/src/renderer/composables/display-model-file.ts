@@ -1,5 +1,8 @@
 import type { DisplayModel } from '@proj-airi/stage-ui/stores/display-models'
 
+import { entriesFromZip } from '@proj-airi/stage-ui-mmd/utils/mmd-package'
+import { detectMMDVariants } from '@proj-airi/stage-ui-mmd/utils/mmd-zip-loader'
+
 function inferModelFileName(model: DisplayModel) {
   if (model.type === 'file')
     return model.file.name
@@ -36,5 +39,29 @@ export async function readDisplayModelFile(model: DisplayModel) {
   return {
     fileName: inferModelFileName(model),
     data: await readModelData(model),
+  }
+}
+
+/**
+ * Unpacks an MMD package of the display models for a display sidecar. The names of old packages are Shift_JIS, and
+ * `entriesFromZip` decodes them.
+ *
+ * The package gives the model that the three.js stage shows: the first model file of the package. An import with a
+ * choice keeps only the chosen model, so a stored package normally has one.
+ *
+ * @returns the files, or undefined when the first model is not a PMX file, for example a PMD file.
+ */
+export async function readPmxPackage(model: DisplayModel) {
+  const entries = await entriesFromZip(new Blob([await readModelData(model)]))
+  const variant = detectMMDVariants(entries.map(entry => entry.path))[0]
+  if (variant?.format !== 'pmx')
+    return undefined
+
+  return {
+    modelPath: variant.modelPath,
+    files: await Promise.all(entries.map(async entry => ({
+      path: entry.path,
+      data: new Uint8Array(await entry.data.arrayBuffer()),
+    }))),
   }
 }

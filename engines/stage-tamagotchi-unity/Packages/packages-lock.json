@@ -162,6 +162,15 @@
       },
       "hash": "efd20f62f1bf0ac3fcc34de1e497324c5197d146"
     },
+    "com.yohawing.mmd-loader": {
+      "version": "file:com.yohawing.mmd-loader",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.unity.render-pipelines.universal": "17.0.0",
+        "com.unity.timeline": "1.8.12"
+      }
+    },
     "com.unity.modules.animation": {
       "version": "1.0.0",
       "depth": 0,

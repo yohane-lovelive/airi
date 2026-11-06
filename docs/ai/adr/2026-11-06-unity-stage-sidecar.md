@@ -133,6 +133,8 @@ The Valibot schemas go to `packages/stage-shared/src/stage-sidecar/`. The names 
 
 Files stay on disk, as in the Godot path. Electron main writes model bytes and `.vrma` bytes to `<userData>/unity-stage/`, and it sends the path.
 
+The value of `format` is `vrm` or `pmx`. A PMX model is a folder of files, so Electron main writes the whole package, and `path` names the PMX file in it.
+
 ### Who computes what
 
 | Signal | Computed in | Applied in |
@@ -143,6 +145,7 @@ Files stay on disk, as in the Godot path. Electron main writes model bytes and `
 | Mouth vowels | Renderer (`createWLipSyncVowelDriver`) | Unity |
 | Breath, sway, nods, thinking look-away | Renderer (`ProceduralBodyMotion`) | Unity |
 | Spring bones and blink | Unity (UniVRM) | Unity |
+| Physics of a PMX model | Unity (unity-mmd-loader) | Unity |
 
 The procedural layer stays in TypeScript and streams its offsets. A C# copy gives two sets of tuning values and two sets of tests. The offsets are small and slow, so 30 frames each second with smoothing in Unity is sufficient.
 
@@ -189,11 +192,34 @@ The README of UniVRM names the backends `.NET` and IL2CPP, and does not name Mon
 
 A new model replaces the old model only after it loads. So a broken file keeps the old model on the stage. Memory does not grow with each replacement: a measured run gave 614, 700, 703, 707, and 706 MB for each 20 loads. `player.integration.test.ts` runs these cases against a real player, when `AIRI_UNITY_STAGE_PLAYER` names one.
 
-**MMD** has no clear choice, so it is a separate step with a prototype. The owner picks a model in the app, so a loader must read a PMX file at runtime. A Unity Editor import does not work in a built player.
+**MMD** uses unity-mmd-loader v0.5.1, after a prototype in step U4. The owner picks a model in the app, so a loader must read a PMX file at runtime. A Unity Editor import does not work in a built player.
+
+These are the results of the prototype with the models of the owner, on a Mono player:
+
+- All 34 PMX models load and show correctly, in a median of 2.7 seconds and at most 5.9 seconds. The check was a view of a capture of each model. 3 of the 1066 textures are missing, because the ZIPs of 2 models do not have them.
+- 3 of the 37 models of the owner are PMD files. The loader reads only PMX files, so AIRI shows an error for them, and the old model stays.
+- Physics stays stable at rest for 45 seconds. No motion moved the models yet, so step U3 must check physics in motion.
+- `あ` opens the mouth and `まばたき` closes the eyes through `SkinnedMeshRenderer` on one model. The prototype code for this is gone, and step U3 adds the real code.
+- 29 models have plain vertex morphs for the vowels and the blink. Step U3 must expand group morphs for the other 5 models, and bone morphs for 1 of them.
+
+The runtime path of the loader needs a motion, and AIRI has no motion file. `MmdAvatarHost` gives it a 66-byte VMD file with no keys. The physics run on this motion. All calls are public API.
+
+The repository has a copy of the package with three patches. `engines/stage-tamagotchi-unity/docs/vendor-patches.md` lists them. Without them, the package does not compile on Unity 6000.3, a player does not include its DLL, and a 16-bit texture stays white.
+
+Other facts that a change of this path must keep:
+
+- A player needs `I18N.dll` and `I18N.CJK.dll`, because the loader uses Shift_JIS. `StageBuild` copies them.
+- A model change must call `Resources.UnloadUnusedAssets`. Without this call, memory grows with each model change. With it, memory stops at about 2 GB through 40 model changes.
+- An MMD model needs the light strength of MMD, 0.6. A VRM model keeps 0.85. `StageRoot` sets the light when a model loads.
+- `MmdOutlineRendererFeature` and `MmdSelfShadowRendererFeature` must be on the renderer, for the outlines and the shadows on the model.
+
+The renderer unpacks the ZIP, because `entriesFromZip` already reads Shift_JIS names. It chooses the first model of the package, as the three.js stage does. Electron main writes the files with their folders, because the textures load by paths relative to the model. The paths come from a ZIP that a stranger can write, so `materializePackage` refuses each path that can leave the folder of the model, and it writes nothing in that case.
+
+The table below is the comparison before the prototype. The source of unity-mmd-loader shows that the runtime load exists, although its README describes only the Editor import.
 
 | Library | License | Updated | Unity 6 and URP | Runtime PMX load |
 | --- | --- | --- | --- | --- |
-| [unity-mmd-loader](https://github.com/yohawing/unity-mmd-loader) v0.5.1 | MIT | 2026-10 | Yes | Not confirmed. The README describes import in the Editor. |
+| [unity-mmd-loader](https://github.com/yohawing/unity-mmd-loader) v0.5.1 | MIT | 2026-10 | Yes | Yes, through `NativeMmdParser` and `MmdUnityPlaybackBinding`. |
 | [mmd-anim](https://github.com/yohawing/mmd-anim) v0.5.4 | MIT | 2026-11 | Host-defined | Yes, from bytes. AIRI must build meshes and materials. The README says "still in an evaluation stage". |
 | [UnityPMXRuntimeLoader](https://github.com/hobosore/UnityPMXRuntimeLoader) | MIT | 2020-02 | Not stated | Yes, `PMXModelLoader.LoadPMXModel(path)`. |
 | [libmmd-for-unity](https://github.com/OneYoungMean/libmmd-for-unity) | BSD-3-Clause | 2019-08 | Not stated | Yes. Includes PMD and Bullet physics. |
@@ -222,8 +248,8 @@ No room or seat state exists in the repository at this time. This ADR does not a
 | U0 | Engine folder, `Core` with tests through `dotnet`, `stage-sidecar` schemas, shared fixture | No | TypeScript and C# tests pass on the same fixture. |
 | U1 | `stage-sidecar` host, Godot on the new host, Unity service, Eventa contracts, `unity` renderer, settings switch | No | A fake sidecar script receives the model path and the signals. Godot tests still pass. |
 | U2 | Unity project, VRM load, window output, attach and player modes | Yes | A VRM model selected in AIRI shows in a Unity window. |
-| U3 | Expressions, idle, gestures, mouth, procedural offsets | Yes | A chat reply with TTS moves the character. The 8 gestures match three.js. |
-| U4 | MMD prototype, then the choice of a library | Yes | An owner PMX model shows and speaks, or this ADR records why not. |
+| U3 | Expressions, idle, gestures, mouth, procedural offsets, for VRM and PMX models | Yes | A chat reply with TTS moves the character. The 8 gestures match three.js. |
+| U4 | MMD prototype, the choice of a library, and the model path from AIRI. The owner chose this step before U3. | Yes | A PMX model of the owner shows from the button of AIRI. The prototype moved its morphs by name. |
 | U5 | `SrDisplayOutput`, scale from bounds, gaze at the viewer, packaging | Yes, plus the plugin and the display | The character shows on a real ELF-MN1 in the view space. |
 
 Step U5 cannot start before 2026-12-11. Its message for the viewer position is not in this ADR, because the plugin is not available to read.
@@ -244,7 +270,8 @@ These are differences from the three.js stage. Each one is a choice, not a defec
 | The ELF-MN1 plugin has requirements that are not public yet. | Project settings change. | Read the plugin notes on release. All Sony use is in `SrDisplay/`. |
 | The plugin needs window focus or fullscreen. | The owner cannot use the chat window at the same time. | Test on the real display in step U5. Sony does not state this. |
 | UniVRM does not work on Mono. | Step U2 stops. | Test it first in step U2. If it fails, check the IL2CPP support of the Windows plugin. |
-| No runtime PMX loader is good enough. | MMD models do not show in Unity. | Step U4 is a prototype, and the owner decides with its result. |
+| A new version of unity-mmd-loader changes its API. The project is before version 1.0. | An update of the package fails. | The repository keeps a copy of v0.5.1, and it updates only by a decision. |
+| Nothing removes old folders from `<userData>/unity-stage/models/`. | The disk use grows with each model that the owner selects. | No step has this work yet. A later step must remove the folders of deleted models. |
 | The 30 Hz JSON stream causes garbage collection pauses in Unity. | Small stutters. | Measure in step U3. If the pauses are visible, change this message to a binary frame. |
 | Sony warns that content outside the view space can harm comfort. | The owner can feel discomfort. | Scale from bounds, keep Spatial Clipping on, and check on the real display. |
 
