@@ -3532,6 +3532,8 @@ importers:
 
   engines/stage-tamagotchi-godot: {}
 
+  engines/stage-tamagotchi-unity: {}
+
   evals/asr-rewrite:
     dependencies:
       '@proj-airi/agents':

@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="tests/stage-tamagotchi-unity.core/Airi.Stage.Core.csproj" />
+  <Project Path="tests/stage-tamagotchi-unity.tests/stage-tamagotchi-unity.tests.csproj" />
+</Solution>

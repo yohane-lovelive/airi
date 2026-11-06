@@ -25,6 +25,8 @@ export default defineConfig({
     'apps/stage-tamagotchi-kirie/addons/**',
     'apps/stage-tamagotchi-kirie/tests/**/bin/**',
     'apps/stage-tamagotchi-kirie/tests/**/obj/**',
+    'engines/stage-tamagotchi-unity/tests/**/bin/**',
+    'engines/stage-tamagotchi-unity/tests/**/obj/**',
     'apps/stage-tamagotchi/src/bindings/**',
     'apps/stage-tamagotchi-electron/out/**',
     'apps/stage-tamagotchi-electron/src/renderer/bindings/**',

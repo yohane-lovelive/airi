@@ -47,6 +47,8 @@ const pose = new BodyPoseApplier({ spine, chest, neck, head })
 
 The same entrypoint owns the gestures. `BUILT_IN_GESTURES` holds eight gestures as data, `matchGesture` chooses one for the free-text `motion` of an `ACT` marker, and `GestureLayer` plays a gesture over the parts of the idle that it moves. The layer takes an adapter for the mixer of a renderer, so it needs no three.js dependency. `gestureFromGeneratedTracks` turns the rotation tracks of a generated clip into a gesture of the upper body: the hips and the legs lose their tracks, the keys are smoothed, and the hands get relaxed fingers.
 
+The `stage-sidecar` entrypoint owns the messages between Electron main and a display sidecar, for example `engines/stage-tamagotchi-unity`. `parseHostMessage` and `parseSidecarMessage` read them. The C# tests of the sidecar read `protocol-fixtures.json` too, so a change of the protocol fails on the side that did not follow it.
+
 ## Do not use this package
 
 Keep Electron IPC definitions in the Electron application. Keep UI state and actions in `@proj-airi/stage-ui`. Keep Extension runtime and manifest behavior in `@proj-airi/plugin-sdk`.

@@ -33,6 +33,15 @@ jobs:
         working-directory: ./engines/stage-tamagotchi-godot
         run: dotnet format stage-tamagotchi-godot.slnx --verify-no-changes
 
+    # Lint and test the Unity Core. It needs no Unity install or license.
+      - name: Lint Unity Core C#
+        working-directory: ./engines/stage-tamagotchi-unity
+        run: dotnet format stage-tamagotchi-unity.slnx --verify-no-changes
+
+      - name: Test Unity Core C#
+        working-directory: ./engines/stage-tamagotchi-unity
+        run: dotnet run --project ./tests/stage-tamagotchi-unity.tests/stage-tamagotchi-unity.tests.csproj
+
       - run: docker run -v `pwd`:`pwd` -w `pwd` ghcr.io/realm/swiftlint:latest
         working-directory: ./apps/stage-pocket
 
