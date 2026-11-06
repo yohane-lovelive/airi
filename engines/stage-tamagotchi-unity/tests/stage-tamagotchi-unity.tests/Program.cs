@@ -37,6 +37,8 @@ public static class Program
         TestDateLikeText();
         TestSidecarMessages(fixtures);
         TestRotations(fixtures);
+        TestLaunch();
+        TestFraming();
         await TestSocketExchangesMessages();
         await TestSocketReportsHostClose();
         await TestSocketDropsSendsAfterDispose();
@@ -285,6 +287,45 @@ public static class Program
         CheckClose(actual.Y, (double)expected[1], $"{name} y");
         CheckClose(actual.Z, (double)expected[2], $"{name} z");
         CheckClose(actual.W, (double)expected[3], $"{name} w");
+    }
+
+    private static void TestLaunch()
+    {
+        const string url = "ws://127.0.0.1:1234/ws?token=abc";
+
+        Check(
+            StageLaunch.FindUrlInArguments(new[] { "stage.exe", "-batchmode", $"--airi-ws-url={url}" }) == url,
+            "finds the URL among the arguments");
+        Check(
+            StageLaunch.FindUrlInArguments(new[] { "stage.exe" }) == null,
+            "no URL without the argument");
+        Check(
+            StageLaunch.FindUrlInArguments(new[] { "--airi-ws-url=" }) == null,
+            "no URL from an empty argument");
+
+        Check(StageLaunch.ReadUrlFromAttachFile($"{{\"url\":\"{url}\"}}") == url, "reads the attach file");
+        Check(StageLaunch.ReadUrlFromAttachFile("{\"url\":1}") == null, "no URL from a number");
+        Check(StageLaunch.ReadUrlFromAttachFile("{}") == null, "no URL from an empty file");
+
+        // Electron main can write the file at the same moment, so a partial file is a normal state.
+        Check(StageLaunch.ReadUrlFromAttachFile("{\"url\":\"ws") == null, "no error from a partial file");
+        Check(StageLaunch.ReadUrlFromAttachFile(string.Empty) == null, "no error from no text");
+    }
+
+    private static void TestFraming()
+    {
+        // A vertical field of view of 90 degrees has a tangent of 1 at its half.
+        double tall = StageFraming.DistanceToFit(2, 0.5, 0, 90, 1, 1);
+        Check(Math.Abs(tall - 1) < 1e-9, $"the height sets the distance of a tall avatar: {tall}");
+
+        double narrowWindow = StageFraming.DistanceToFit(1, 2, 0, 90, 0.5, 1);
+        Check(Math.Abs(narrowWindow - 2) < 1e-9, $"the width sets the distance in a narrow window: {narrowWindow}");
+
+        double margin = StageFraming.DistanceToFit(2, 0.5, 0, 90, 1, 1.5);
+        Check(Math.Abs(margin - 1.5) < 1e-9, $"the margin moves the camera back: {margin}");
+
+        double depth = StageFraming.DistanceToFit(2, 0.5, 1, 90, 1, 1);
+        Check(Math.Abs(depth - 1.5) < 1e-9, $"the camera stays in front of the avatar: {depth}");
     }
 
     private static async Task TestSocketExchangesMessages()

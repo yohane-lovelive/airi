@@ -61,8 +61,13 @@ Unity にチャット、音声、記憶、設定のロジックは持たせな�
 - プロジェクトは Godot の隣の `engines/stage-tamagotchi-unity` に置く。
 - Editor は Unity 6.3 LTS とする。Sony の一覧にある最新版である。`unity-mmd-loader` は 6000.0 以降、UniVRM は 2022.3 以降を要求する。
 - レンダーパイプラインは URP、バックエンドは Mono、アーキテクチャは Intel 64-bit とする。
-- Active Input Handling は `Both` とする。ELF-SR1 / SR2 で Sony が旧 Input Manager か `Both` を要求しているためである。
+- Active Input Handling はプロジェクトの既定である旧 Input Manager のままとする。ELF-SR1 / SR2 で Sony は旧 Input Manager か `Both` を要求しており、`Both` にはステージが使わないパッケージが 1 つ余分に必要である。
 - `Application.runInBackground` は `true` とする。オーナーは Electron のウィンドウを操作しながらキャラクターを動かすためである。
+- これらの設定は `StageProjectSetup.Apply` が Unity の API で書き込む。レビューでは 1 つのファイルで各選択を読める。
+
+`tools/run-unity.ps1` は Unity をバッチモードで実行する。Microsoft Store 版の Unity Hub はライセンスをパッケージの仮想フォルダーに置くので、単純な `Unity.exe` の実行は "No valid Unity Editor license found" で失敗する。このスクリプトは Hub のパッケージの中で Unity を起動し、ライセンスファイルには触れない。パッケージ内の起動では終了コードを得られないので、ログから結果を読む。
+
+Unity は `Library/` に `package.json` を含むパッケージを置き、pnpm のワークスペース指定 `engines/**` がそれを読んでしまう。そこで `pnpm-workspace.yaml` で `Library/` と `Temp/` を除外する。
 
 ELF-MN1 のプラグインが別の Unity バージョンを必要とする場合は、プロジェクトをそのバージョンに変更する。これは設定の変更であり、設計は変わらない。
 
@@ -178,7 +183,11 @@ Valibot のスキーマは `packages/stage-shared/src/stage-sidecar/` に置く�
 - `Vrm10RuntimeExpression.SetWeight` で表情を設定する。
 - `VrmAnimationImporter` と `Vrm10AnimationInstance` で `.vrma` を読み込んで再生する。
 
-UniVRM の README はバックエンドとして `.NET` と IL2CPP を挙げ、Mono の名前を挙げていない。Sony が ELF-SR1 / SR2 で Mono を要求しているので、ステップ U2 で最初にこれを確認する。
+UniVRM の README はバックエンドとして `.NET` と IL2CPP を挙げ、Mono の名前を挙げていない。ステップ U2 で Mono のプレイヤーを確認し、VRM 0.x モデルを読み込んで表示できた。VRM 1.0 のファイルは手元になく、この確認に含まれていない。
+
+MToon シェーダーは実行時に `Shader.Find` で探され、プロジェクトのアセットからは参照されない。そこでグラフィック設定の「常に含める」一覧に入れる。ビルドに含まれていなければ、サイドカーは起動時に `stage.fatal` を返す。モデルごとに失敗させない。
+
+新しいモデルは読み込みが終わってから古いモデルと入れ替える。したがって、壊れたファイルでも古いモデルはステージに残る。入れ替えを繰り返してもメモリは増え続けない。計測では 20 回の読み込みごとに 614、700、703、707、706 MB だった。`player.integration.test.ts` は、`AIRI_UNITY_STAGE_PLAYER` でプレイヤーを指定すると、これらを実際のプレイヤーで確かめる。
 
 **MMD** は明確な選択肢がないので、試作を含む別ステップとする。オーナーはアプリ内でモデルを選ぶので、ローダーは実行時に PMX ファイルを読める必要がある。Unity Editor でのインポートはビルド後のプレイヤーでは使えない。
 

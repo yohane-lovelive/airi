@@ -38,6 +38,9 @@ packages:
   - apps/**
   - server/**
   - '!**/dist/**'
+  # Unity keeps UPM packages here, each with a package.json that pnpm must not read as a workspace package.
+  - '!engines/stage-tamagotchi-unity/Library/**'
+  - '!engines/stage-tamagotchi-unity/Temp/**'
 
 overrides:
   '@types/hast': 'catalog:'

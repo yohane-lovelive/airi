@@ -18,6 +18,8 @@
   "scripts": {
     "build": "dotnet build ./stage-tamagotchi-unity.slnx",
     "typecheck": "dotnet build ./stage-tamagotchi-unity.slnx",
-    "test": "dotnet run --project ./tests/stage-tamagotchi-unity.tests/stage-tamagotchi-unity.tests.csproj"
+    "test": "dotnet run --project ./tests/stage-tamagotchi-unity.tests/stage-tamagotchi-unity.tests.csproj",
+    "setup:project": "powershell -NoProfile -ExecutionPolicy Bypass -File ./tools/run-unity.ps1 -Arguments -quit,-executeMethod,Airi.Stage.Editor.StageProjectSetup.Apply",
+    "build:player": "powershell -NoProfile -ExecutionPolicy Bypass -File ./tools/run-unity.ps1 -Arguments -quit,-executeMethod,Airi.Stage.Editor.StageBuild.BuildPlayer"
   }
 }

@@ -10,21 +10,46 @@ Unity display sidecar for `stage-tamagotchi`. The target is the Sony ELF-MN1 spa
 
 ## Current State
 
-Steps U0 and U1 are done. The Electron side can start a sidecar and send it the model and the signals. This folder is not a Unity project yet. Step U2 adds `Packages/`, `ProjectSettings/`, the `.meta` files, and the scenes.
+Steps U0 to U2 are done. A VRM model that you select in AIRI shows in a Unity window. The character stands in a T-pose, because step U3 adds the idle, the expressions, the gestures, and the mouth. MMD models need step U4.
+
+## Run the Stage
+
+These steps need Unity 6000.3.28f1, with a license in Unity Hub.
+
+Build the player:
+
+```bash
+pnpm -F @proj-airi/stage-tamagotchi-unity build:player
+```
+
+Set `AIRI_UNITY_STAGE_EXECUTABLE` to `Builds/Windows/airi-unity-stage.exe`, with its absolute path. Then start `pnpm dev:tamagotchi`, and select the Unity Stage button on the model page of Settings.
+
+## Work in the Editor
+
+1. Open this folder with Unity Hub, and open `Assets/Airi/Scenes/Stage.unity`.
+2. Set the variable `AIRI_UNITY_STAGE_ATTACH` to `1`, and start `pnpm dev:tamagotchi`.
+3. Select the Unity Stage button on the model page of Settings.
+4. Start Play mode.
+
+Play mode can stop and start again while AIRI waits. Close the Editor before you run a command that starts Unity, because one project accepts one Editor.
 
 ## Check the Electron Side Without Unity
 
-The script `apps/stage-tamagotchi/scripts/fake-stage-sidecar.mjs` obeys the protocol and prints each message.
-
-1. Set the variable `AIRI_UNITY_STAGE_ATTACH` to `1`, and start `pnpm dev:tamagotchi`.
-2. Select the Unity Stage button on the model page of Settings.
-3. In `apps/stage-tamagotchi`, run the script with the path of the attach file:
+The script `apps/stage-tamagotchi/scripts/fake-stage-sidecar.mjs` obeys the protocol and prints each message. Use it in place of Play mode, from `apps/stage-tamagotchi`:
 
 ```bash
 node scripts/fake-stage-sidecar.mjs --attach=<userData>/unity-stage/attach.json
 ```
 
-After step U2, set `AIRI_UNITY_STAGE_EXECUTABLE` to a built player, or start Play mode in place of the script.
+## Change the Project Settings
+
+`Assets/Airi/Editor/StageProjectSetup.cs` writes the settings and the scene. Change this file, and run this command. Do not change these settings by hand, because the next run replaces them.
+
+```bash
+pnpm -F @proj-airi/stage-tamagotchi-unity setup:project
+```
+
+Unity runs only one `-executeMethod` in a batch run, so the setup and the build are two commands.
 
 ## When To Use It
 
@@ -40,8 +65,13 @@ After step U2, set `AIRI_UNITY_STAGE_EXECUTABLE` to a built player, or start Pla
 ## Directory Layout
 
 - `Assets/Airi/Core/`: code with no `UnityEngine` reference. It must compile with C# 9 on .NET Standard 2.1, as in Unity.
+- `Assets/Airi/Stage/`: the connection, the VRM loader, and the display output.
+- `Assets/Airi/Editor/`: the project setup and the player build.
+- `tools/run-unity.ps1`: runs Unity in batch mode, also with the Microsoft Store version of Unity Hub.
 - `tests/stage-tamagotchi-unity.core/`: compiles `Core` with these limits, outside Unity.
 - `tests/stage-tamagotchi-unity.tests/`: the verification host. It reads the fixtures of `stage-sidecar`.
+
+`apps/stage-tamagotchi/src/main/services/airi/unity-stage/player.integration.test.ts` tests a real player. It runs when `AIRI_UNITY_STAGE_PLAYER` names one.
 
 ## Commands
 
@@ -63,6 +93,6 @@ dotnet format stage-tamagotchi-unity.slnx --verify-no-changes
 
 ## Dependencies
 
-`Core` uses Newtonsoft.Json. `dotnet` gets it from NuGet, and Unity gets it from the `com.unity.nuget.newtonsoft-json` package.
+`Core` uses Newtonsoft.Json. `dotnet` gets it from NuGet, and Unity gets it from the `com.unity.nuget.newtonsoft-json` package. `Stage` uses UniVRM v0.131.4 and URP, which `Packages/manifest.json` pins.
 
 Sony does not give its plugin under the license of this repository, so `.gitignore` excludes `Assets/SRDisplayUnityPlugin/`. Model files also stay out of Git.

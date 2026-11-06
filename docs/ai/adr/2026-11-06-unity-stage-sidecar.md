@@ -61,8 +61,13 @@ The feature stays off by default and is experimental, like Godot Stage.
 - The project is at `engines/stage-tamagotchi-unity`, next to the Godot engine.
 - The Editor version is Unity 6.3 LTS. This is the newest version that Sony lists. `unity-mmd-loader` needs 6000.0 or later, and UniVRM needs 2022.3 or later.
 - The render pipeline is URP, the backend is Mono, and the architecture is Intel 64-bit.
-- Active Input Handling is `Both`, because Sony requires the old Input Manager or `Both` for ELF-SR1 and ELF-SR2.
+- Active Input Handling stays on the old Input Manager, the default of the project. Sony requires the old Input Manager or `Both` for ELF-SR1 and ELF-SR2, and `Both` needs one more package that the stage does not use.
 - `Application.runInBackground` is `true`. The owner uses the Electron window while the character moves.
+- `StageProjectSetup.Apply` writes these settings through the Unity API, so a review can read each choice in one file.
+
+`tools/run-unity.ps1` runs Unity in batch mode. The Microsoft Store version of Unity Hub keeps its license in a virtualized folder of its package, so a plain `Unity.exe` run fails with "No valid Unity Editor license found". The script starts Unity inside the package of the Hub, and the license files stay as they are. A start inside a package gives no exit code, so the script reads the result from the log.
+
+Unity keeps packages with a `package.json` in `Library/`, and the workspace glob `engines/**` of pnpm reads them. So `pnpm-workspace.yaml` excludes `Library/` and `Temp/`.
 
 If the ELF-MN1 plugin needs another Unity version, the project changes to that version. This is a settings change, and the design stays the same.
 
@@ -178,7 +183,11 @@ This is one pure function in `Core`, with tests. Step U3 checks the result again
 - `Vrm10RuntimeExpression.SetWeight` sets expressions.
 - `VrmAnimationImporter` and `Vrm10AnimationInstance` load and play `.vrma` files.
 
-The README of UniVRM names the backends `.NET` and IL2CPP, and does not name Mono. Step U2 tests this first, because Sony requires Mono on ELF-SR1 and ELF-SR2.
+The README of UniVRM names the backends `.NET` and IL2CPP, and does not name Mono. Step U2 tested a Mono player: it loads and shows VRM 0.x models. No VRM 1.0 file was available for this test.
+
+`Shader.Find` finds the MToon shader at runtime, and no asset of the project uses it. So the project includes the shader through the always-included list of the graphics settings. If a build does not have it, the sidecar reports `stage.fatal` at its start, and each model does not fail one at a time.
+
+A new model replaces the old model only after it loads. So a broken file keeps the old model on the stage. Memory does not grow with each replacement: a measured run gave 614, 700, 703, 707, and 706 MB for each 20 loads. `player.integration.test.ts` runs these cases against a real player, when `AIRI_UNITY_STAGE_PLAYER` names one.
 
 **MMD** has no clear choice, so it is a separate step with a prototype. The owner picks a model in the app, so a loader must read a PMX file at runtime. A Unity Editor import does not work in a built player.
 
