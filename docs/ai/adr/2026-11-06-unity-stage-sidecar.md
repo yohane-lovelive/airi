@@ -197,8 +197,9 @@ This is one pure function in `Core`, with tests.
 The live check of step U3 compared the 8 built-in gestures on both stages, with AvatarSample_A, AvatarSample_B, and one PMX model:
 
 - The PMX model matches the three.js stage.
-- VRM models in Unity follow the definition of each gesture. For example, `cross-arms` crosses the arms at the chest.
-- At that time, the three.js stage did not bend the forearms of VRM models, so these gestures differed. `VRMModel.vue` kept its `AnimationMixer` in a deep `ref`. Each read gave a reactive proxy, so each gesture played at half weight over the idle. A later fix keeps the mixer in a `shallowRef`. Now the elbows on the three.js stage reach the angles of the keys on both VRM models. This fix did not repeat the comparison with Unity.
+- VRM models differed at first, because the three.js stage did not bend their forearms. `VRMModel.vue` kept its `AnimationMixer` in a deep `ref`. Each read gave a reactive proxy, so each gesture played at half weight over the idle. A later fix keeps the mixer in a `shallowRef`.
+- The comparison ran again after that fix. All 8 gestures now show the same pose on both stages, on both VRM models. For example, `cross-arms` crosses the arms at the chest on both stages.
+- These comparisons are by eye, from captures. No test compares the final bones of the two stages. The cameras and the lights of the stages differ. The three.js camera is close, at shoulder height. The Unity camera frames the whole body.
 
 ### Models
 
@@ -274,7 +275,7 @@ No room or seat state exists in the repository at this time. This ADR does not a
 | U0 | Engine folder, `Core` with tests through `dotnet`, `stage-sidecar` schemas, shared fixture | No | TypeScript and C# tests pass on the same fixture. |
 | U1 | `stage-sidecar` host, Godot on the new host, Unity service, Eventa contracts, `unity` renderer, settings switch | No | A fake sidecar script receives the model path and the signals. Godot tests still pass. |
 | U2 | Unity project, VRM load, window output, attach and player modes | Yes | A VRM model selected in AIRI shows in a Unity window. |
-| U3 | Expressions, idle, gestures, mouth, procedural offsets, for VRM and PMX models | Yes | A chat reply with TTS moves the character. The 8 gestures match the three.js stage on PMX models, and their definitions on VRM models. |
+| U3 | Expressions, idle, gestures, mouth, procedural offsets, for VRM and PMX models | Yes | A chat reply with TTS moves the character. The 8 gestures match the three.js stage on PMX and VRM models. |
 | U4 | MMD prototype, the choice of a library, and the model path from AIRI. The owner chose this step before U3. | Yes | A PMX model of the owner shows from the button of AIRI. The prototype moved its morphs by name. |
 | U5 | `SrDisplayOutput`, scale from bounds, gaze at the viewer, packaging | Yes, plus the plugin and the display | The character shows on a real ELF-MN1 in the view space. |
 
