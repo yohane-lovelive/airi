@@ -6,6 +6,7 @@ import type { GodotStageManager } from '../../../services/airi/godot-stage'
 import type { IOTraceRecordingService } from '../../../services/airi/io-trace-recording'
 import type { McpManager } from '../../../services/airi/mcp-servers'
 import type { PerceptionRecorderService } from '../../../services/airi/perception-recorder'
+import type { UnityStageManager } from '../../../services/airi/unity-stage'
 import type { AutoUpdater } from '../../../services/electron/auto-updater'
 import type { GlobalShortcutService } from '../../../services/electron/global-shortcut'
 import type { ChatWindowManager } from '../../chat'
@@ -37,6 +38,7 @@ import { registerIOTraceRecording } from '../../../services/airi/io-trace-record
 import { createMcpServersService } from '../../../services/airi/mcp-servers'
 import { createOnboardingService } from '../../../services/airi/onboarding'
 import { registerPerceptionRecorder } from '../../../services/airi/perception-recorder/register'
+import { createUnityStageService } from '../../../services/airi/unity-stage'
 import { createWidgetsService } from '../../../services/airi/widgets'
 import { createAutoUpdaterService } from '../../../services/electron'
 import { setupBaseWindowElectronInvokes } from '../../shared/window'
@@ -51,6 +53,7 @@ export async function setupMainWindowElectronInvokes(params: {
   autoUpdater: AutoUpdater
   serverChannel: ServerChannel
   godotStageManager: GodotStageManager
+  unityStageManager: UnityStageManager
   mcpManager: McpManager
   i18n: I18n
   onboardingWindowManager: OnboardingWindowManager
@@ -78,6 +81,7 @@ export async function setupMainWindowElectronInvokes(params: {
   defineInvokeHandler(context, electronMainPageMounted, () => params.autoUpdater.markMainPageMounted())
   createMcpServersService({ context, manager: params.mcpManager })
   createGodotStageService({ context, manager: params.godotStageManager, window: params.window })
+  createUnityStageService({ context, manager: params.unityStageManager, window: params.window })
   createOnboardingService({ context, onboardingWindowManager: params.onboardingWindowManager, mainWindow: params.window })
   createAuthService({ context, window: params.window })
   const stopIOTraceRecording = registerIOTraceRecording(context, params.ioTraceRecording)

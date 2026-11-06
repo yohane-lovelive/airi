@@ -10,7 +10,21 @@ Unity display sidecar for `stage-tamagotchi`. The target is the Sony ELF-MN1 spa
 
 ## Current State
 
-Only step U0 is done, so this folder is not a Unity project yet. Step U2 adds `Packages/`, `ProjectSettings/`, the `.meta` files, and the scenes. Nothing starts this sidecar yet.
+Steps U0 and U1 are done. The Electron side can start a sidecar and send it the model and the signals. This folder is not a Unity project yet. Step U2 adds `Packages/`, `ProjectSettings/`, the `.meta` files, and the scenes.
+
+## Check the Electron Side Without Unity
+
+The script `apps/stage-tamagotchi/scripts/fake-stage-sidecar.mjs` obeys the protocol and prints each message.
+
+1. Set the variable `AIRI_UNITY_STAGE_ATTACH` to `1`, and start `pnpm dev:tamagotchi`.
+2. Select the Unity Stage button on the model page of Settings.
+3. In `apps/stage-tamagotchi`, run the script with the path of the attach file:
+
+```bash
+node scripts/fake-stage-sidecar.mjs --attach=<userData>/unity-stage/attach.json
+```
+
+After step U2, set `AIRI_UNITY_STAGE_EXECUTABLE` to a built player, or start Play mode in place of the script.
 
 ## When To Use It
 

@@ -4,6 +4,7 @@ import type { GodotStageManager } from '../../services/airi/godot-stage'
 import type { IOTraceRecordingService } from '../../services/airi/io-trace-recording'
 import type { McpManager } from '../../services/airi/mcp-servers'
 import type { PerceptionRecorderService } from '../../services/airi/perception-recorder'
+import type { UnityStageManager } from '../../services/airi/unity-stage'
 import type { AutoUpdater } from '../../services/electron/auto-updater'
 import type { GlobalShortcutService } from '../../services/electron/global-shortcut'
 import type { DevtoolsWindowManager } from '../devtools'
@@ -43,6 +44,7 @@ export function setupSettingsWindowReusableFunc(params: {
   onWindowCreated?: (window: BrowserWindow) => void
   serverChannel: ServerChannel
   godotStageManager: GodotStageManager
+  unityStageManager: UnityStageManager
   mcpManager: McpManager
   i18n: I18n
   globalShortcut: GlobalShortcutService
@@ -83,6 +85,7 @@ export function setupSettingsWindowReusableFunc(params: {
       getMainWindow: params.getMainWindow,
       serverChannel: params.serverChannel,
       godotStageManager: params.godotStageManager,
+      unityStageManager: params.unityStageManager,
       mcpManager: params.mcpManager,
       i18n: params.i18n,
       globalShortcut: params.globalShortcut,

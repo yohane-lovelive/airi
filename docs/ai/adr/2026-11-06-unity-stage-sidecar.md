@@ -95,6 +95,8 @@ These files stay out of Git: the Sony plugin package, model files, and Unity bui
 
 Godot can start its Editor with a project path, but a Unity Editor start takes too long for this use. Sony also requires the Settings app for Play mode on the display, so the attach mode is the normal development path.
 
+`AIRI_UNITY_STAGE_ATTACH=1` selects the attach mode, and it has priority over the executable. In this mode, `start` returns at once with the status `starting`. The status changes to `running` when the sidecar sends `stage.ready`. When the sidecar disconnects, the status returns to `starting`, and the URL stays valid. So Play mode can stop and start again. A stop deletes `attach.json`, because its socket no longer exists.
+
 Release packaging is out of scope until step U5. A Unity build needs a license, so CI cannot produce it without extra work.
 
 ### Protocol
@@ -141,6 +143,8 @@ The procedural layer stays in TypeScript and streams its offsets. A C# copy give
 
 Clips play in Unity, because a stream of a full body pose has visible jitter and clip data is already in a file or a short list of keys.
 
+The mouth follows the lip sync node only while the character speaks. The node keeps its last values when its input has no audio, and the frames continue. So without this rule, the mouth stays open after the speech ends. The live check of step U1 found this fault, and the Live2D path has the same rule.
+
 The stream has a deadline. If no frame arrives for 500 ms, Unity fades the mouth and the offsets to zero. So a throttled renderer or a stopped app does not freeze the character with an open mouth. The renderer sends frames from a worker timer, not from `requestAnimationFrame`, because a hidden window stops `requestAnimationFrame`.
 
 ### `Stage.vue` and the new renderer
@@ -149,11 +153,15 @@ The stream has a deadline. If no frame arrives for 500 ms, Unity fades the mouth
 
 `stage-ui` cannot import the Eventa contracts of `stage-tamagotchi`. So `stage-ui` gets a small store with a `StageSidecarOutput` interface. The desktop app registers an implementation that invokes Eventa, and the store has no implementation on the web app.
 
+The stage page sends the model, through `useUnityStageBridge`. This differs from Godot, where the Settings page sends the model. With Godot, a change of the character while Settings is closed does not reach the sidecar. The Unity path must not have this limit, because the agent can change the character at any time.
+
 ### Sidecar host in Electron main
 
 `godot-stage/index.ts` has 972 lines, and most of them do not depend on Godot: the process lifecycle, the socket, the ready wait, and the status channel. This ADR moves them to `services/airi/stage-sidecar/`. Godot and Unity each keep a thin file with the executable path, the arguments, and their own messages.
 
 This change touches upstream code, so a rebase can have conflicts in this file. The other choice is a 972-line copy, and the repository rules reject one-off copies. The Godot behavior must not change.
+
+The Godot manager had no tests before this change. So `godot-stage/index.test.ts` passed on the old code first, and it passes on the new code without a change. These tests use a real child process and a real socket, with `apps/stage-tamagotchi/scripts/fake-stage-sidecar.mjs` in place of the engine.
 
 ### Coordinate frame
 

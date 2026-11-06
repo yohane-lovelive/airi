@@ -700,28 +700,31 @@ export const electronMainPageMounted = defineInvokeEventa<void>('eventa:invoke:e
 export const electronAppIconGet = defineInvokeEventa<boolean>('eventa:invoke:electron:app-icon:get')
 export const electronAppIconSet = defineInvokeEventa<boolean, boolean>('eventa:invoke:electron:app-icon:set')
 
-export type ElectronGodotStageState = 'stopped' | 'starting' | 'running' | 'stopping' | 'error'
+export type ElectronStageSidecarState = 'stopped' | 'starting' | 'running' | 'stopping' | 'error'
 
 /**
- * Snapshot of the Godot sidecar lifecycle owned by Electron main.
+ * Snapshot of a display sidecar lifecycle owned by Electron main.
  *
  * Use when:
- * - Renderer windows need to reflect whether the external Godot window is available
+ * - Renderer windows need to reflect whether the external window of the sidecar is available
  * - Settings or stage pages need lifecycle feedback after start/stop actions
  *
  * Expects:
- * - `pid` is only set while the Godot child process exists
+ * - `pid` is only set while the child process exists. An attached sidecar has no child process.
  * - `lastError` is present for the most recent lifecycle or scene-apply failure
  *
  * Returns:
  * - N/A
  */
-export interface ElectronGodotStageStatus {
-  state: ElectronGodotStageState
+export interface ElectronStageSidecarStatus {
+  state: ElectronStageSidecarState
   pid: number | null
   lastError?: string
   updatedAt: number
 }
+
+export type ElectronGodotStageState = ElectronStageSidecarState
+export type ElectronGodotStageStatus = ElectronStageSidecarStatus
 
 /**
  * Serialized scene input payload forwarded from renderer to Electron main.

@@ -8,8 +8,13 @@ import { computed, onScopeDispose, shallowRef, watch } from 'vue'
 
 import { DisplayModelFormat, useDisplayModelsStore } from '../display-models'
 
-export type StageModelRenderer = 'live2d' | 'vrm' | 'spine' | 'tachie' | 'mmd' | 'godot' | 'disabled' | undefined
-type BuiltInStageModelRenderer = Exclude<StageModelRenderer, 'godot'>
+export type StageModelRenderer = 'live2d' | 'vrm' | 'spine' | 'tachie' | 'mmd' | 'godot' | 'unity' | 'disabled' | undefined
+type BuiltInStageModelRenderer = Exclude<StageModelRenderer, 'godot' | 'unity'>
+
+/** A sidecar window draws the character. Its lifecycle decides the renderer, so a model change must not replace it. */
+function isSidecarRenderer(renderer: StageModelRenderer) {
+  return renderer === 'godot' || renderer === 'unity'
+}
 
 const useStageModelSelectionStore = defineStore('settings-stage-model-selection', () => {
   // The active Character owns the durable Avatar Model references. This store
@@ -130,7 +135,7 @@ export const useSettingsStageModel = defineStore('settings-stage-model', () => {
       replaceStageModelUrl(undefined)
       stageModelSelectedDisplayModel.value = undefined
       stageModelBuiltInRenderer.value = 'disabled'
-      if (stageModelRenderer.value !== 'godot')
+      if (!isSidecarRenderer(stageModelRenderer.value))
         stageModelRenderer.value = 'disabled'
       return
     }
@@ -152,7 +157,7 @@ export const useSettingsStageModel = defineStore('settings-stage-model', () => {
       stageModelSelectedDisplayModel.value = undefined
       stageModelUnavailable.value = true
       stageModelBuiltInRenderer.value = 'disabled'
-      if (stageModelRenderer.value !== 'godot')
+      if (!isSidecarRenderer(stageModelRenderer.value))
         stageModelRenderer.value = 'disabled'
       return
     }
@@ -174,7 +179,7 @@ export const useSettingsStageModel = defineStore('settings-stage-model', () => {
     // Browser startup consumes the one-time legacy reset before these refs publish.
     // Direct ThreeScene routes mount from the refs and cannot start with stale identity state.
     stageModelBuiltInRenderer.value = builtInRenderer
-    if (stageModelRenderer.value !== 'godot')
+    if (!isSidecarRenderer(stageModelRenderer.value))
       stageModelRenderer.value = builtInRenderer
     replaceStageModelUrl(nextUrl)
     stageModelSelectedDisplayModel.value = model

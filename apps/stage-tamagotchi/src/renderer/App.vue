@@ -75,12 +75,14 @@ import {
   electronPluginUnload,
 } from '../shared/eventa/plugin/host'
 import { electronPluginToolsChanged } from '../shared/eventa/plugin/tools'
+import { unityStageStatusChanged } from '../shared/eventa/unity-stage'
 import { initializeElectronAuthCallbackBridge } from './bridges/electron-auth-callback'
 import { initializeIOTraceHubBridge } from './bridges/io-trace-hub'
 import { createElectronOwnerPresenceSource } from './bridges/owner-presence'
 import { createElectronPerceptionRecorder } from './bridges/perception-recorder'
 import { createElectronScreenSource } from './bridges/screen-source'
 import { initializeStageThreeRuntimeTraceBridge } from './bridges/stage-three-runtime-trace'
+import { syncUnityStageRenderer } from './composables/unity-stage'
 import { useLanguage } from './composables/use-language'
 import { useFullscreenStore } from './stores/fullscreen'
 import { useServerChannelSettingsStore } from './stores/settings/server-channel'
@@ -319,6 +321,11 @@ function createFullStageRuntime() {
     }
 
     syncGodotStageRenderer(event.body)
+  })
+
+  context.value.on(unityStageStatusChanged, (event) => {
+    if (event.body)
+      syncUnityStageRenderer(settingsStore, event.body)
   })
 
   context.value.on(electronPluginToolsChanged, () => {

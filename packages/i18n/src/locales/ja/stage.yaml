@@ -128,6 +128,9 @@ chat:
     cloud-badge: クラウドに同期しました
     new-chat-fallback: 新しいチャット
     delete: 会話を削除
+unity-stage:
+  title: Unity ステージ（実験的）
+  running: キャラクターは Unity のウィンドウに表示されています。
 render-error:
   title: '{renderer} でこのモデルを描画できませんでした'
   description: モデルは選択されていますが、ステージに表示できませんでした。

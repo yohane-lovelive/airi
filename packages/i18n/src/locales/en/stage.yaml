@@ -254,6 +254,9 @@ avatar-model-missing:
   unavailable-title: This model is not on this device
   description: Select a model to show {name} on the Stage.
   select: Select model
+unity-stage:
+  title: Unity Stage (Experimental)
+  running: The character shows in the Unity window.
 render-error:
   title: '{renderer} could not render this model'
   description: The model is selected, but the Stage could not display it.

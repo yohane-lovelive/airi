@@ -33,7 +33,9 @@ import {
   electronGodotStageViewSnapshotChanged,
   electronGodotStageViewStateError,
 } from '../../../../shared/eventa'
+import { readDisplayModelFile } from '../../../composables/display-model-file'
 import { useModelSettingsRuntimeSnapshot } from '../../../composables/model-settings-runtime-snapshot'
+import { useUnityStageSwitch } from '../../../composables/unity-stage'
 import { assertGodotSceneInputSupportedDisplayModel } from './godot-scene-input'
 import { createGodotViewPatchQueue } from './godot-view-patch-queue'
 import {
@@ -95,32 +97,6 @@ function createStoppedGodotStageStatus(): ElectronGodotStageStatus {
   }
 }
 
-function inferModelFileName(model: DisplayModel) {
-  if (model.type === 'file')
-    return model.file.name
-
-  try {
-    const url = new URL(model.url)
-    const parsedName = url.pathname.split('/').pop()
-    if (parsedName)
-      return parsedName
-  }
-  catch {}
-
-  return `${model.id}.vrm`
-}
-
-async function readSceneInputData(model: DisplayModel) {
-  if (model.type === 'file')
-    return new Uint8Array(await model.file.arrayBuffer())
-
-  const response = await fetch(model.url)
-  if (!response.ok)
-    throw new Error(`Failed to fetch model asset (${response.status} ${response.statusText})`)
-
-  return new Uint8Array(await response.arrayBuffer())
-}
-
 async function createSceneInputPayload(model: DisplayModel): Promise<ElectronGodotStageSceneInputPayload> {
   assertGodotSceneInputSupportedDisplayModel(model)
 
@@ -128,8 +104,7 @@ async function createSceneInputPayload(model: DisplayModel): Promise<ElectronGod
     modelId: model.id,
     format: 'vrm',
     name: model.name,
-    fileName: inferModelFileName(model),
-    data: await readSceneInputData(model),
+    ...await readDisplayModelFile(model),
   }
 }
 
@@ -277,6 +252,20 @@ async function syncGodotSceneInput(model: DisplayModel) {
 const { t } = useI18n()
 const { trackFeatureUsed } = useAnalytics()
 
+// One sidecar draws at a time, so each switch stops the other sidecar before it starts its own.
+const unityStage = useUnityStageSwitch(async () => {
+  if (usesGodotStage.value)
+    applyGodotStageStatus(await stopGodotStage())
+})
+const unityToggleLabel = computed(() => {
+  if (unityStage.waiting.value)
+    return t('tamagotchi.settings.pages.models.unity-stage.cancel-waiting')
+
+  return unityStage.active.value
+    ? t('tamagotchi.settings.pages.models.unity-stage.back')
+    : t('tamagotchi.settings.pages.models.unity-stage.switch')
+})
+
 async function handleGodotStageToggle() {
   switchingGodotStage.value = true
   godotStageError.value = undefined
@@ -289,6 +278,7 @@ async function handleGodotStageToggle() {
       return
     }
 
+    await unityStage.stopIfActive()
     applyGodotStageStatus(await startGodotStage())
     settingsStore.setStageModelRenderer('godot')
   }
@@ -372,6 +362,15 @@ onUnmounted(() => {
       {{ godotStatusMessage }}
     </Alert>
 
+    <Alert
+      v-if="unityStage.errorMessage.value"
+      :class="['w-full max-w-6xl']"
+      tone="danger"
+      :title="t('tamagotchi.settings.pages.models.unity-stage.error-title')"
+    >
+      {{ unityStage.errorMessage.value }}
+    </Alert>
+
     <div :class="['relative', 'h-full', 'flex justify-center', 'w-full']">
       <ModelSettingsPanel
         :allow-extract-colors="false"
@@ -394,9 +393,18 @@ onUnmounted(() => {
 
             :loading="switchingGodotStage"
             :active="usesGodotStage"
+            :aria-pressed="usesGodotStage"
             @click="handleGodotStageToggle"
           >
             {{ godotToggleLabel }}
+          </GhostButton>
+          <GhostButton
+            :loading="unityStage.switching.value"
+            :active="unityStage.active.value"
+            :aria-pressed="unityStage.active.value"
+            @click="unityStage.toggle"
+          >
+            {{ unityToggleLabel }}
           </GhostButton>
         </template>
       </ModelSettingsPanel>

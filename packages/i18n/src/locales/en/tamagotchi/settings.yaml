@@ -28,6 +28,12 @@ pages:
   models:
     godot-stage-error:
       title: Godot Stage error
+    unity-stage:
+      back: Back to Built-in Stage
+      cancel-waiting: Waiting for the Unity Editor. Select to cancel.
+      error-title: Unity Stage error
+      switch: Switch to Unity Stage (Experimental)
+      unsupported-model: Unity Stage shows only VRM models. Select a VRM model.
   modules:
     mcp-server:
       description: Connect and manage MCP server and tools

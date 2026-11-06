@@ -178,10 +178,10 @@ const runtimeSnapshot = computed<ModelSettingsRuntimeSnapshot>(() => {
     })
   }
 
-  if (stageModelRenderer.value === 'godot') {
+  if (stageModelRenderer.value === 'godot' || stageModelRenderer.value === 'unity') {
     return createEmptyModelSettingsRuntimeSnapshot({
       ownerInstanceId: vrmPreviewStageInstanceId,
-      renderer: 'godot',
+      renderer: stageModelRenderer.value,
       phase: hasModel ? 'mounted' : 'no-model',
       controlsLocked: false,
       previewAvailable: false,

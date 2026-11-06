@@ -7,6 +7,7 @@ import type { GodotStageManager } from '../../../services/airi/godot-stage'
 import type { IOTraceRecordingService } from '../../../services/airi/io-trace-recording'
 import type { McpManager } from '../../../services/airi/mcp-servers'
 import type { PerceptionRecorderService } from '../../../services/airi/perception-recorder'
+import type { UnityStageManager } from '../../../services/airi/unity-stage'
 import type { AutoUpdater } from '../../../services/electron/auto-updater'
 import type { GlobalShortcutService } from '../../../services/electron/global-shortcut'
 import type { DevtoolsWindowManager } from '../../devtools'
@@ -31,6 +32,7 @@ import { createGodotStageService } from '../../../services/airi/godot-stage'
 import { registerIOTraceRecording } from '../../../services/airi/io-trace-recording/register'
 import { createMcpServersService } from '../../../services/airi/mcp-servers'
 import { registerPerceptionRecorder } from '../../../services/airi/perception-recorder/register'
+import { createUnityStageService } from '../../../services/airi/unity-stage'
 import { createWidgetsService } from '../../../services/airi/widgets'
 import { createAutoUpdaterService } from '../../../services/electron'
 import { centerWindowOnDisplay } from '../../shared/display'
@@ -72,6 +74,7 @@ export async function setupSettingsWindowInvokes(params: {
   getMainWindow?: () => BrowserWindow | undefined
   serverChannel: ServerChannel
   godotStageManager: GodotStageManager
+  unityStageManager: UnityStageManager
   mcpManager: McpManager
   i18n: I18n
   globalShortcut: GlobalShortcutService
@@ -92,6 +95,7 @@ export async function setupSettingsWindowInvokes(params: {
   createAutoUpdaterService({ context, window: params.settingsWindow, service: params.autoUpdater })
   createMcpServersService({ context, manager: params.mcpManager })
   createGodotStageService({ context, manager: params.godotStageManager, window: params.settingsWindow })
+  createUnityStageService({ context, manager: params.unityStageManager, window: params.settingsWindow })
   createAuthService({ context, window: params.settingsWindow })
   const stopIOTraceRecording = registerIOTraceRecording(context, params.ioTraceRecording)
   const stopPerceptionRecorder = registerPerceptionRecorder(context, params.perceptionRecorder)
