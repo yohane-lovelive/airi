@@ -1,0 +1,24 @@
+{
+  "emotions": [
+    "happy",
+    "sad",
+    "angry",
+    "think",
+    "surprised",
+    "awkward",
+    "question",
+    "curious",
+    "neutral"
+  ],
+  "vrmExpressions": {
+    "happy": "happy",
+    "sad": "sad",
+    "angry": "angry",
+    "think": "think",
+    "surprised": "surprised",
+    "awkward": "neutral",
+    "question": "think",
+    "neutral": "neutral",
+    "curious": "think"
+  }
+}

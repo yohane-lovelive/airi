@@ -1,5 +1,6 @@
 using System.Threading;
 using System.Threading.Tasks;
+using Airi.Stage.Core;
 using UnityEngine;
 
 namespace Airi.Stage
@@ -7,6 +8,9 @@ namespace Airi.Stage
     /// <summary>Loads the models of one file format, and owns the avatar of this format on the stage.</summary>
     public interface IAvatarHost
     {
+        /// <summary>The emotions of this kind of model.</summary>
+        EmotionTable Emotions { get; }
+
         /// <summary>
         /// Loads a model and replaces the avatar of this host.
         ///
@@ -20,5 +24,10 @@ namespace Airi.Stage
 
         /// <summary>Removes the avatar of this host. The stage calls it when another format takes over.</summary>
         void Clear();
+
+        /// <summary>
+        /// Moves the avatar to the state of this frame, once each frame. Without an avatar, it does nothing.
+        /// </summary>
+        void ApplyCharacter(CharacterDriver character, float deltaSeconds);
     }
 }

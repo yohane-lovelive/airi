@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Airi.Stage.Core;
 using UniGLTF;
 using UnityEngine;
 using UniVRM10;
@@ -17,13 +19,20 @@ namespace Airi.Stage
     public sealed class VrmAvatarHost : IAvatarHost
     {
         private readonly Transform _parent;
+        private readonly Dictionary<string, ExpressionKey> _expressions =
+            new Dictionary<string, ExpressionKey>(StringComparer.OrdinalIgnoreCase);
+
         private Vrm10Instance _current;
+        private Vector3 _restHips;
         private int _newestLoad;
 
         public VrmAvatarHost(Transform parent)
         {
             _parent = parent;
         }
+
+        /// <inheritdoc/>
+        public EmotionTable Emotions => EmotionTable.Vrm;
 
         /// <summary>
         /// Loads a VRM 1.0 or VRM 0.x file. UniVRM migrates a VRM 0.x model to the form of VRM 1.0.
@@ -61,6 +70,10 @@ namespace Airi.Stage
             _current = loaded;
             loaded.transform.SetParent(_parent, false);
 
+            ReadExpressions(loaded);
+            ITPoseProvider tPose = loaded.Runtime.ControlRig;
+            _restHips = tPose.GetWorldTransform(HumanBodyBones.Hips).Value.Translation;
+
             return MeasureBounds(loaded.gameObject);
         }
 
@@ -70,6 +83,55 @@ namespace Airi.Stage
             {
                 UnityEngine.Object.Destroy(_current.gameObject);
                 _current = null;
+            }
+        }
+
+        /// <inheritdoc/>
+        public void ApplyCharacter(CharacterDriver character, float deltaSeconds)
+        {
+            if (_current == null)
+            {
+                return;
+            }
+
+            Vrm10Runtime runtime = _current.Runtime;
+            INormalizedPoseApplicable rig = runtime.ControlRig;
+            StagePose pose = character.Pose;
+
+            for (int index = 0; index < HumanBones.Count; index++)
+            {
+                StageQuaternion rotation = HumanoidFrame.ToUnity(pose.Rotations[index]);
+                rig.SetNormalizedLocalRotation(
+                    UnityHumanBones.ByIndex[index],
+                    new Quaternion(rotation.X, rotation.Y, rotation.Z, rotation.W));
+            }
+
+            // The pose gives the hips in hip heights of its clip, and the X axis is mirrored in Unity.
+            rig.SetRawHipsPosition(_restHips + new Vector3(-pose.HipsX, pose.HipsY, pose.HipsZ) * _restHips.y);
+
+            IReadOnlyList<string> names = character.WeightNames;
+            for (int index = 0; index < character.Weights.Length; index++)
+            {
+                if (_expressions.TryGetValue(names[index], out ExpressionKey key))
+                {
+                    runtime.Expression.SetWeight(key, character.Weights[index]);
+                }
+            }
+
+            // UniVRM counts yaw to the right of the character and pitch upward. The host counts yaw
+            // toward its +X, the left of the character, and pitch downward.
+            runtime.LookAt.SetYawPitchManually(
+                -character.EyesYaw * Mathf.Rad2Deg,
+                -character.EyesPitch * Mathf.Rad2Deg);
+        }
+
+        /// <summary>A model can spell a custom expression in another case, so the search ignores the case, as on three.js.</summary>
+        private void ReadExpressions(Vrm10Instance avatar)
+        {
+            _expressions.Clear();
+            foreach (ExpressionKey key in avatar.Runtime.Expression.ExpressionKeys)
+            {
+                _expressions[key.Name] = key;
             }
         }
 

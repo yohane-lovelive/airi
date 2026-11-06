@@ -5,12 +5,12 @@ Unity display sidecar for `stage-tamagotchi`. The target is the Sony ELF-MN1 spa
 ## What It Does
 
 - Holds the Unity side of the display sidecar. Electron stays the brain, and Unity only draws.
-- Holds `Assets/Airi/Core`, the part with no Unity reference: the protocol, the WebSocket client, and the frame conversion.
+- Holds `Assets/Airi/Core`, the part with no Unity reference: the protocol, the WebSocket client, the frame conversion, and the logic of the character.
 - Tests `Core` through `dotnet`. The tests need no Unity install and no Unity license.
 
 ## Current State
 
-Steps U0, U1, U2, and U4 are done. A VRM model or a PMX model that you select in AIRI shows in a Unity window, with the physics of the PMX model. The character stands in its rest pose, because step U3 adds the idle, the expressions, the gestures, and the mouth.
+Steps U0 to U4 are done. A VRM model or a PMX model that you select in AIRI shows in a Unity window. It plays the idle, the gestures, the expressions, the mouth, the blink, and the procedural layer, and a chat reply with TTS moves it. Step U5 adds the ELF-MN1 output.
 
 The stage cannot show a PMD model, because the MMD loader reads only PMX files. AIRI shows an error for such a model, and the old model stays.
 
@@ -67,11 +67,11 @@ Unity runs only one `-executeMethod` in a batch run, so the setup and the build 
 ## Directory Layout
 
 - `Assets/Airi/Core/`: code with no `UnityEngine` reference. It must compile with C# 9 on .NET Standard 2.1, as in Unity.
-- `Assets/Airi/Stage/`: the connection, the VRM and MMD loaders, and the display output.
+- `Assets/Airi/Stage/`: the connection, the VRM and MMD avatars, the `.vrma` clips, and the display output.
 - `Assets/Airi/Editor/`: the project setup and the player build.
 - `tools/run-unity.ps1`: runs Unity in batch mode, also with the Microsoft Store version of Unity Hub.
 - `tests/stage-tamagotchi-unity.core/`: compiles `Core` with these limits, outside Unity.
-- `tests/stage-tamagotchi-unity.tests/`: the verification host. It reads the fixtures of `stage-sidecar`.
+- `tests/stage-tamagotchi-unity.tests/`: the verification host. It reads the fixtures of `stage-sidecar`, also the output of the TypeScript code in `character-fixtures`.
 - `Packages/com.yohawing.mmd-loader/`: a vendored package with patches. [`docs/vendor-patches.md`](docs/vendor-patches.md) lists them.
 
 `apps/stage-tamagotchi/src/main/services/airi/unity-stage/player.integration.test.ts` tests a real player. It runs when `AIRI_UNITY_STAGE_PLAYER` names one. The test of a real MMD model also needs `AIRI_UNITY_STAGE_PMX_SAMPLE`, with the folder of an unpacked model. The repository has no MMD model, because MMD models have terms of their own.
@@ -99,5 +99,7 @@ dotnet format stage-tamagotchi-unity.slnx --verify-no-changes
 `Core` uses Newtonsoft.Json. `dotnet` gets it from NuGet, and Unity gets it from the `com.unity.nuget.newtonsoft-json` package. `Stage` uses UniVRM v0.131.4 and URP, which `Packages/manifest.json` pins, and the vendored unity-mmd-loader v0.5.1.
 
 MMD files use Shift_JIS, and a Mono player has no tables for it. So `StageBuild` copies `I18N.dll` and `I18N.CJK.dll` from the Editor to each player.
+
+A `dotnet` build cannot see a name that collides with `UnityEngine`, for example `HumanPose`. So build the player after a change of `Core`.
 
 Sony does not give its plugin under the license of this repository, so `.gitignore` excludes `Assets/SRDisplayUnityPlugin/`. Model files also stay out of Git.

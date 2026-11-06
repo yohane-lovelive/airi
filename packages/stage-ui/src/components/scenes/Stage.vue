@@ -337,11 +337,9 @@ const emotionsQueue = createQueue<EmotionPayload & { gestureSeconds?: number }>(
         mmdSceneRef.value?.setEmotion(ctx.data.name, ctx.data.intensity, !ctx.data.gestureSeconds, holdMs)
       }
       else if (stageModelRenderer.value === 'unity') {
-        const value = EMOTION_VRMExpressionName_value[ctx.data.name]
-        if (!value)
-          return
-
-        stageSidecar.setExpression(value, ctx.data.intensity, ctx.data.gestureSeconds ? ctx.data.gestureSeconds * 1000 : undefined)
+        // The sidecar owns the tables of VRM and MMD models. An MMD model shows emotions that a VRM model has no
+        // expression for, so the name must stay as it is here.
+        stageSidecar.setExpression(ctx.data.name, ctx.data.intensity, ctx.data.gestureSeconds ? ctx.data.gestureSeconds * 1000 : undefined)
       }
     },
   ],

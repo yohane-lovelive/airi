@@ -7,6 +7,7 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:f
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
+import { median } from 'es-toolkit'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createUnityStageManager } from '.'
@@ -26,6 +27,7 @@ vi.mock('../../../libs/bootkit/lifecycle', () => ({ onAppBeforeQuit: vi.fn() }))
 
 const SAMPLE_MODEL = resolve(import.meta.dirname, '../../../../../../../packages/stage-ui/src/assets/vrm/models/AvatarSample-A/AvatarSample_A.vrm')
 const SAMPLE_MODEL_B = resolve(import.meta.dirname, '../../../../../../../packages/stage-ui/src/assets/vrm/models/AvatarSample-B/AvatarSample_B.vrm')
+const IDLE_CLIP = resolve(import.meta.dirname, '../../../../../../../packages/stage-ui-three/src/assets/vrm/animations/idle_loop.vrma')
 
 /** A first model load compiles shaders and decodes textures, so it takes much longer than the protocol. */
 const LOAD_TIMEOUT_MS = 90_000
@@ -109,13 +111,17 @@ describe.skipIf(!process.env.AIRI_UNITY_STAGE_PLAYER)('the Unity player', () => 
     // The Mono heap grows through the first loads and then stops: a measured run gave 614, 700, 703, 707, and 706 MB
     // for each 20 loads. So the first 26 loads do not count.
     await loadModels(26)
-    const settled = memoryInMegabytes()
+    const samples = [memoryInMegabytes()]
+    for (let checkpoint = 0; checkpoint < 4; checkpoint++) {
+      await loadModels(10)
+      samples.push(memoryInMegabytes())
+    }
 
-    await loadModels(40)
-    const after = memoryInMegabytes()
-
-    // A leak of one set of 4K textures for each load is far more than this limit.
-    expect(after - settled, `${settled.toFixed(0)} MB after 26 loads, ${after.toFixed(0)} MB after 66 loads`).toBeLessThan(60)
+    // The Mono heap also adds blocks of 25 to 80 MB at random times, up to about 100 loads, and a block does not come back.
+    // A measured run of 200 loads gave 615, 622, 675, 678, 681, 682, 683, 682, 683, and 682 MB. A leak grows at each
+    // checkpoint and a block does not, so the median rise tells them apart. The limit finds a leak of 2 MB for each load.
+    const rises = samples.slice(1).map((sample, index) => sample - samples[index])
+    expect(median(rises), `samples in MB: ${samples.map(sample => sample.toFixed(0)).join(', ')}`).toBeLessThan(20)
   }, LOAD_TIMEOUT_MS * 8)
 
   // MMD models have terms of their own, so the repository has none. Give the folder of an unpacked model to run this.
@@ -130,12 +136,38 @@ describe.skipIf(!process.env.AIRI_UNITY_STAGE_PLAYER)('the Unity player', () => 
       modelPath,
       name: 'PMX sample',
     }
+    const rest = { x: 0, y: 0, z: 0 }
+    const moveCharacter = () => {
+      manager.sendSignal({
+        type: 'host.character.frame',
+        payload: {
+          mouth: { A: 0.5, E: 0, I: 0, O: 0, U: 0 },
+          bones: { spine: rest, chest: rest, neck: rest, head: { x: 0.1, y: 0, z: 0 } },
+          eyes: { yaw: 0.1, pitch: 0 },
+        },
+      })
+      manager.sendSignal({ type: 'host.character.expression', payload: { name: 'happy', intensity: 1, holdMs: 200 } })
+      manager.sendSignal({
+        type: 'host.character.gesture',
+        payload: {
+          kind: 'keys',
+          id: 'nod',
+          part: 'upper',
+          duration: 0.5,
+          tracks: [{ bone: 'head', times: [0, 0.5], values: [0, 0, 0, 1, 0.1, 0, 0, 0.995] }],
+        },
+      })
+    }
     await manager.start()
+    await manager.applyIdle({ id: 'idle-loop', data: new Uint8Array(readFileSync(IDLE_CLIP)) })
 
     async function loaded(load: () => Promise<void>) {
       manager.reportError('The model is loading.')
       await load()
       await waitForLastError(lastError => lastError === undefined)
+      moveCharacter()
+      await new Promise(resolve => setTimeout(resolve, 800))
+      expect(manager.getStatus().lastError).toBeUndefined()
     }
 
     await loaded(() => manager.applyPmxPackage(pmxPackage))
@@ -159,22 +191,52 @@ describe.skipIf(!process.env.AIRI_UNITY_STAGE_PLAYER)('the Unity player', () => 
     expect(manager.getStatus().state).toBe('running')
   }, LOAD_TIMEOUT_MS)
 
-  it('accepts each signal without an error, because step U3 applies them later', async () => {
-    await manager.start()
+  it('moves a VRM model from each signal, and a broken clip leaves it running', async () => {
+    const idle = new Uint8Array(readFileSync(IDLE_CLIP))
     const rest = { x: 0, y: 0, z: 0 }
-
-    manager.sendSignal({ type: 'host.character.expression', payload: { name: 'happy', intensity: 1 } })
-    manager.sendSignal({
+    const frame = {
       type: 'host.character.frame',
       payload: {
         mouth: { A: 0.5, E: 0, I: 0, O: 0, U: 0 },
-        bones: { spine: rest, chest: rest, neck: rest, head: rest },
-        eyes: { yaw: 0, pitch: 0 },
+        bones: { spine: rest, chest: rest, neck: rest, head: { x: 0.1, y: 0, z: 0 } },
+        eyes: { yaw: 0.1, pitch: 0 },
+      },
+    }
+    await manager.start()
+
+    // The host sends the idle before the model, so a signal also comes before a model.
+    await manager.applyIdle({ id: 'idle-loop', data: idle })
+    manager.sendSignal(frame)
+    manager.sendSignal({ type: 'host.character.expression', payload: { name: 'happy', intensity: 1 } })
+
+    manager.reportError('The model is loading.')
+    await manager.applySceneInput(sceneInput('sample', new Uint8Array(readFileSync(SAMPLE_MODEL))))
+    await waitForLastError(lastError => lastError === undefined)
+
+    manager.sendSignal(frame)
+    manager.sendSignal({ type: 'host.character.expression', payload: { name: 'surprised', intensity: 0.5, holdMs: 200 } })
+    manager.sendSignal({
+      type: 'host.character.gesture',
+      payload: {
+        kind: 'keys',
+        id: 'nod',
+        part: 'upper',
+        duration: 0.5,
+        tracks: [{ bone: 'head', times: [0, 0.5], values: [0, 0, 0, 1, 0.1, 0, 0, 0.995] }],
       },
     })
-    await new Promise(resolve => setTimeout(resolve, 500))
+    await manager.playVrmaGesture({ id: 'upper', part: 'upper', data: idle })
+    await manager.playVrmaGesture({ id: 'full', part: 'full', data: idle })
+    await manager.playVrmaGesture({ id: 'broken', part: 'upper', data: new Uint8Array([1, 2, 3]) })
+    await new Promise(resolve => setTimeout(resolve, 1500))
 
     expect(manager.getStatus().state).toBe('running')
     expect(manager.getStatus().lastError).toBeUndefined()
-  }, LOAD_TIMEOUT_MS)
+
+    // A later model still loads, so the character path did not break the scene path.
+    manager.reportError('The model is loading.')
+    await manager.applySceneInput(sceneInput('sample-b', new Uint8Array(readFileSync(SAMPLE_MODEL_B))))
+    await waitForLastError(lastError => lastError === undefined)
+    expect(manager.getStatus().state).toBe('running')
+  }, LOAD_TIMEOUT_MS * 2)
 })

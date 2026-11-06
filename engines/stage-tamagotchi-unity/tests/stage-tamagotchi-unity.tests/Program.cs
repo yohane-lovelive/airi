@@ -20,9 +20,10 @@ using Newtonsoft.Json.Linq;
 ///   -> TestHostMessages (protocol-fixtures.json)
 ///   -> TestSidecarMessages (protocol-fixtures.json)
 ///   -> TestRotations (protocol-fixtures.json)
+///   -> TestCharacter (character-fixtures)
 ///   -> TestSocket (a local WebSocket server)
 /// </summary>
-public static class Program
+public static partial class Program
 {
     private static int _checks;
     private static int _failures;
@@ -37,6 +38,7 @@ public static class Program
         TestDateLikeText();
         TestSidecarMessages(fixtures);
         TestRotations(fixtures);
+        TestCharacter();
         TestLaunch();
         TestFraming();
         await TestSocketExchangesMessages();

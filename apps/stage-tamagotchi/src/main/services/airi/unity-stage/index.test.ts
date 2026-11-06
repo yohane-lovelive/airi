@@ -4,7 +4,7 @@ import type { UnityStageManager } from '.'
 
 import process from 'node:process'
 
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
@@ -171,6 +171,56 @@ describe('createUnityStageManager', () => {
         type: 'host.scene.apply',
         payload: { format: 'vrm', modelId: 'model-1', name: 'Model', path },
       })
+    })
+
+    it('removes the model copies when it stops, and keeps the clips', async () => {
+      const manager = createManager()
+      await manager.start()
+      await manager.applySceneInput({
+        data: new Uint8Array([1, 2, 3]),
+        fileName: 'model.vrm',
+        format: 'vrm',
+        modelId: 'model-1',
+        name: 'Model',
+      })
+      await manager.applyIdle({ id: 'idle-loop', data: new Uint8Array([4]) })
+      const models = join(state.userData, 'unity-stage', 'models')
+      expect(existsSync(join(models, 'model-1', 'model.vrm'))).toBe(true)
+
+      await manager.stop()
+
+      expect(existsSync(models)).toBe(false)
+      expect(existsSync(join(state.userData, 'unity-stage', 'clips', 'idle-loop.vrma'))).toBe(true)
+    })
+
+    it('removes the model copies of an old session when it starts', async () => {
+      // A quit or a crash of the app skips `stop`, so its copies are still here.
+      const old = join(state.userData, 'unity-stage', 'models', 'old-model')
+      mkdirSync(old, { recursive: true })
+      writeFileSync(join(old, 'model.vrm'), new Uint8Array([1]))
+
+      const manager = createManager()
+      await manager.start()
+
+      expect(existsSync(old)).toBe(false)
+    })
+
+    it('keeps the copies of a running session when it starts again', async () => {
+      const manager = createManager()
+      await manager.start()
+      await manager.applySceneInput({
+        data: new Uint8Array([1]),
+        fileName: 'model.vrm',
+        format: 'vrm',
+        modelId: 'model-1',
+        name: 'Model',
+      })
+      const path = join(state.userData, 'unity-stage', 'models', 'model-1', 'model.vrm')
+
+      const status = await manager.start()
+
+      expect(status.state).toBe('running')
+      expect(existsSync(path)).toBe(true)
     })
 
     it('keeps a model ID from a renderer inside the storage directory', async () => {

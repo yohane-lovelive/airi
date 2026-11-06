@@ -11,5 +11,6 @@
     <ProjectReference Include="..\stage-tamagotchi-unity.core\Airi.Stage.Core.csproj" />
     <!-- The TypeScript tests read the same file, so the two sides cannot drift. -->
     <None Include="..\..\..\..\packages\stage-shared\src\stage-sidecar\protocol-fixtures.json" Link="protocol-fixtures.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\..\..\packages\stage-shared\src\stage-sidecar\character-fixtures\*.json" Link="character-fixtures\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

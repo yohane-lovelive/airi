@@ -1,12 +1,13 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Airi.Stage.Core;
 using Mmd;
 using Mmd.Parser;
-using Mmd.Physics;
 using Mmd.Rendering;
 using Mmd.UnityIntegration;
 using UnityEngine;
@@ -27,16 +28,26 @@ namespace Airi.Stage
         /// <summary>The default of the loader. MMD models are about 20 units tall.</summary>
         private const float ImportScale = 0.1f;
 
-        private const float PlaybackFrameRate = 30f;
+        /// <summary>A long frame must not throw the physics bodies away in one step.</summary>
+        private const float MaxPhysicsStepSeconds = 0.1f;
+
+        /// <summary>A smaller change of a morph does not show, and each change costs a write to the mesh.</summary>
+        private const float MorphChangeThreshold = 0.001f;
 
         private readonly Transform _parent;
         private GameObject _current;
+        private MmdHumanoidRetarget _retarget;
+        private AiriMmdHostPose _hostPose;
+        private Dictionary<string, int> _morphOfSlot = new Dictionary<string, int>();
         private int _newestLoad;
 
         public MmdAvatarHost(Transform parent)
         {
             _parent = parent;
         }
+
+        /// <inheritdoc/>
+        public EmotionTable Emotions => EmotionTable.Mmd;
 
         /// <summary>
         /// Loads a PMX file. The textures load from paths relative to this file, so the file must stay
@@ -82,13 +93,26 @@ namespace Airi.Stage
             GameObject root = instance.Root;
             root.transform.SetParent(_parent, false);
 
-            var controller = root.AddComponent<MmdUnityPlaybackController>();
-            controller.Configure(binding, new MmdPlaybackConfig(PlaybackFrameRate, 0, true));
-            controller.SetPhysicsMode(MmdPhysicsMode.Live);
-            controller.Play();
+            MmdHumanoidRetarget retarget;
+            AiriMmdHostPose hostPose;
+            try
+            {
+                retarget = new MmdHumanoidRetarget(ToRigBones(model));
+                hostPose = AiriMmdHostPose.Attach(binding, retarget.DrivenBones);
+            }
+            catch
+            {
+                // The old avatar stays, so this model must not stay on the stage with it.
+                binding.Dispose();
+                Object.Destroy(root);
+                throw;
+            }
 
             Clear();
             _current = root;
+            _retarget = retarget;
+            _hostPose = hostPose;
+            _morphOfSlot = FindMorphsOfSlots(model);
 
             // A newer model can replace this one during the unload below, so the measure comes first.
             Bounds bounds = MeasureBounds(instance);
@@ -112,7 +136,77 @@ namespace Airi.Stage
             {
                 Object.Destroy(_current);
                 _current = null;
+                _retarget = null;
+                _hostPose = null;
             }
+        }
+
+        /// <inheritdoc/>
+        public void ApplyCharacter(CharacterDriver character, float deltaSeconds)
+        {
+            if (_hostPose == null)
+            {
+                return;
+            }
+
+            IReadOnlyList<string> names = character.WeightNames;
+            float[] weights = character.Weights;
+            for (int index = 0; index < weights.Length; index++)
+            {
+                if (_morphOfSlot.TryGetValue(names[index], out int morph)
+                    && Math.Abs(_hostPose.MorphWeights[morph] - weights[index]) > MorphChangeThreshold)
+                {
+                    _hostPose.MorphWeights[morph] = weights[index];
+                    _hostPose.MarkMorphsChanged();
+                }
+            }
+
+            // Without a clip, the driver gives the T-pose. An MMD model rests in an A-pose, and its rest
+            // pose looks better while the idle clip is missing. The physics keep running in this pose.
+            if (character.HasMotion)
+            {
+                _retarget.Apply(
+                    character.Pose,
+                    character.EyesYaw,
+                    character.EyesPitch,
+                    _hostPose.LocalPositionOffsets,
+                    _hostPose.LocalRotations);
+            }
+            else
+            {
+                _hostPose.ResetToRest();
+            }
+
+            _hostPose.Step(Mathf.Min(deltaSeconds, MaxPhysicsStepSeconds));
+        }
+
+        private static Dictionary<string, int> FindMorphsOfSlots(MmdModelDefinition model)
+        {
+            var indexOfName = new Dictionary<string, int>();
+            for (int index = model.morphs.Count - 1; index >= 0; index--)
+            {
+                indexOfName[model.morphs[index].name] = index;
+            }
+
+            var morphs = new Dictionary<string, int>();
+            foreach (KeyValuePair<string, string> slot in MorphSlots.Resolve(indexOfName.ContainsKey))
+            {
+                morphs[slot.Key] = indexOfName[slot.Value];
+            }
+
+            return morphs;
+        }
+
+        private static MmdRigBone[] ToRigBones(MmdModelDefinition model)
+        {
+            var bones = new MmdRigBone[model.bones.Count];
+            for (int index = 0; index < bones.Length; index++)
+            {
+                MmdBoneDefinition bone = model.bones[index];
+                bones[index] = new MmdRigBone(bone.name, bone.parentIndex, bone.origin[0], bone.origin[1], bone.origin[2]);
+            }
+
+            return bones;
         }
 
         /// <summary>

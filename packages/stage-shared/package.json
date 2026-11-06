@@ -31,6 +31,7 @@
     "./settings-search": "./src/settings-search/index.ts",
     "./speaker-model": "./src/speaker-model.ts",
     "./stage-sidecar": "./src/stage-sidecar/index.ts",
+    "./stage-sidecar/fixture-text": "./src/stage-sidecar/fixture-text.ts",
     "./stores/screen-ambient-light": "./src/stores/screen-ambient-light.ts",
     "./types/io-trace": "./src/types/io-trace.ts",
     "./types/pinia-action-event": "./src/types/pinia-action-event.ts",

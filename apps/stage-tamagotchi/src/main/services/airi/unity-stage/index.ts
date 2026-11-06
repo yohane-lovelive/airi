@@ -108,6 +108,19 @@ export function createUnityStageManager(): UnityStageManager {
       throw new Error('Unity stage is not running.')
   }
 
+  /**
+   * Removes the copies of the models. The stored ZIP stays the source, and each selection writes its copy again, so a
+   * copy has no value after its session. Without this step, the folder grows with each model that the owner selects.
+   */
+  async function removeModelCopies() {
+    try {
+      await rm(modelsDirectory(), { force: true, recursive: true })
+    }
+    catch (error) {
+      log.withFields({ error: errorMessageFrom(error) }).warn('could not remove the Unity stage model copies')
+    }
+  }
+
   return {
     async applyIdle(payload) {
       await host.runExclusive(async () => {
@@ -179,11 +192,18 @@ export function createUnityStageManager(): UnityStageManager {
         log.withFields({ error: errorMessageFrom(error) }).warn('dropped an invalid Unity stage signal')
       }
     },
-    start: host.start,
+    async start() {
+      // A quit or a crash skips `stop`. A running sidecar can still read its files, so its copies stay.
+      if (host.getStatus().state !== 'running' && host.getStatus().state !== 'starting')
+        await removeModelCopies()
+
+      return host.start()
+    },
     async stop() {
       const status = await host.stop()
       // An old file names a socket that no longer exists, so an Editor must not find it.
       await rm(attachFilePath(), { force: true })
+      await removeModelCopies()
       return status
     },
     subscribe: host.subscribe,
@@ -261,7 +281,11 @@ function clipDirectory() {
  * // => '<userData>/unity-stage/models/___a_b'
  */
 function modelDirectory(modelId: string) {
-  return join(resolveUnityStageStorageRoot(), 'models', modelId.replace(/[^\w-]/g, '_') || 'model')
+  return join(modelsDirectory(), modelId.replace(/[^\w-]/g, '_') || 'model')
+}
+
+function modelsDirectory() {
+  return join(resolveUnityStageStorageRoot(), 'models')
 }
 
 /**

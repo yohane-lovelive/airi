@@ -1,0 +1,660 @@
+{
+  "owned": [
+    "happy",
+    "aa",
+    "sad",
+    "oh",
+    "angry",
+    "ee",
+    "surprised",
+    "neutral",
+    "think",
+    "relaxed"
+  ],
+  "timeline": [
+    {
+      "set": "happy",
+      "intensity": 1
+    },
+    {
+      "update": 0.05,
+      "mouthBusy": false,
+      "weights": {
+        "happy": 0.005469,
+        "aa": 0.001563,
+        "sad": 0,
+        "oh": 0,
+        "angry": 0,
+        "ee": 0,
+        "surprised": 0,
+        "neutral": 0,
+        "think": 0,
+        "relaxed": 0
+      },
+      "eyeAreaActive": true
+    },
+    {
+      "update": 0.1,
+      "mouthBusy": false,
+      "weights": {
+        "happy": 0.147656,
+        "aa": 0.042188,
+        "sad": 0,
+        "oh": 0,
+        "angry": 0,
+        "ee": 0,
+        "surprised": 0,
+        "neutral": 0,
+        "think": 0,
+        "relaxed": 0
+      },
+      "eyeAreaActive": true
+    },
+    {
+      "update": 0.1,
+      "mouthBusy": false,
+      "weights": {
+        "happy": 0.552344,
+        "aa": 0.157813,
+        "sad": 0,
+        "oh": 0,
+        "angry": 0,
+        "ee": 0,
+        "surprised": 0,
+        "neutral": 0,
+        "think": 0,
+        "relaxed": 0
+      },
+      "eyeAreaActive": true
+    },
+    {
+      "update": 1,
+      "mouthBusy": false,
+      "weights": {
+        "happy": 0.7,
+        "aa": 0.2,
+        "sad": 0,
+        "oh": 0,
+        "angry": 0,
+        "ee": 0,
+        "surprised": 0,
+        "neutral": 0,
+        "think": 0,
+        "relaxed": 0
+      },
+      "eyeAreaActive": true
+    },
+    {
+      "set": "sad",
+      "intensity": 0.5
+    },
+    {
+      "update": 0.05,
+      "mouthBusy": false,
+      "weights": {
+        "happy": 0.694531,
+        "aa": 0.198438,
+        "sad": 0.002734,
+        "oh": 0.000586,
+        "angry": 0,
+        "ee": 0,
+        "surprised": 0,
+        "neutral": 0,
+        "think": 0,
+        "relaxed": 0
+      },
+      "eyeAreaActive": true
+    },
+    {
+      "update": 0.1,
+      "mouthBusy": false,
+      "weights": {
+        "happy": 0.552344,
+        "aa": 0.157813,
+        "sad": 0.073828,
+        "oh": 0.01582,
+        "angry": 0,
+        "ee": 0,
+        "surprised": 0,
+        "neutral": 0,
+        "think": 0,
+        "relaxed": 0
+      },
+      "eyeAreaActive": true
+    },
+    {
+      "update": 0.1,
+      "mouthBusy": false,
+      "weights": {
+        "happy": 0.147656,
+        "aa": 0.042187,
+        "sad": 0.276172,
+        "oh": 0.05918,
+        "angry": 0,
+        "ee": 0,
+        "surprised": 0,
+        "neutral": 0,
+        "think": 0,
+        "relaxed": 0
+      },
+      "eyeAreaActive": true
+    },
+    {
+      "update": 1,
+      "mouthBusy": false,
+      "weights": {
+        "happy": 0,
+        "aa": 0,
+        "sad": 0.35,
+        "oh": 0.075,
+        "angry": 0,
+        "ee": 0,
+        "surprised": 0,
+        "neutral": 0,
+        "think": 0,
+        "relaxed": 0
+      },
+      "eyeAreaActive": true
+    },
+    {
+      "set": "surprised",
+      "intensity": 1
+    },
+    {
+      "update": 0.05,
+      "mouthBusy": false,
+      "weights": {
+        "happy": 0,
+        "aa": 0,
+        "sad": 0.298148,
+        "oh": 0.123148,
+        "angry": 0,
+        "ee": 0,
+        "surprised": 0.118519,
+        "neutral": 0,
+        "think": 0,
+        "relaxed": 0
+      },
+      "eyeAreaActive": true
+    },
+    {
+      "update": 0.1,
+      "mouthBusy": false,
+      "weights": {
+        "happy": 0,
+        "aa": 0,
+        "sad": 0,
+        "oh": 0.4,
+        "angry": 0,
+        "ee": 0,
+        "surprised": 0.8,
+        "neutral": 0,
+        "think": 0,
+        "relaxed": 0
+      },
+      "eyeAreaActive": true
+    },
+    {
+      "update": 0.1,
+      "mouthBusy": false,
+      "weights": {
+        "happy": 0,
+        "aa": 0,
+        "sad": 0,
+        "oh": 0.4,
+        "angry": 0,
+        "ee": 0,
+        "surprised": 0.8,
+        "neutral": 0,
+        "think": 0,
+        "relaxed": 0
+      },
+      "eyeAreaActive": true
+    },
+    {
+      "update": 1,
+      "mouthBusy": false,
+      "weights": {
+        "happy": 0,
+        "aa": 0,
+        "sad": 0,
+        "oh": 0.4,
+        "angry": 0,
+        "ee": 0,
+        "surprised": 0.8,
+        "neutral": 0,
+        "think": 0,
+        "relaxed": 0
+      },
+      "eyeAreaActive": true
+    },
+    {
+      "set": "think",
+      "intensity": 0.8
+    },
+    {
+      "update": 0.05,
+      "mouthBusy": false,
+      "weights": {
+        "happy": 0,
+        "aa": 0,
+        "sad": 0,
+        "oh": 0.3984,
+        "angry": 0,
+        "ee": 0,
+        "surprised": 0.7968,
+        "neutral": 0,
+        "think": 0.00224,
+        "relaxed": 0
+      },
+      "eyeAreaActive": true
+    },
+    {
+      "update": 0.1,
+      "mouthBusy": false,
+      "weights": {
+        "happy": 0,
+        "aa": 0,
+        "sad": 0,
+        "oh": 0.3568,
+        "angry": 0,
+        "ee": 0,
+        "surprised": 0.7136,
+        "neutral": 0,
+        "think": 0.06048,
+        "relaxed": 0
+      },
+      "eyeAreaActive": true
+    },
+    {
+      "update": 0.1,
+      "mouthBusy": false,
+      "weights": {
+        "happy": 0,
+        "aa": 0,
+        "sad": 0,
+        "oh": 0.2,
+        "angry": 0,
+        "ee": 0,
+        "surprised": 0.4,
+        "neutral": 0,
+        "think": 0.28,
+        "relaxed": 0
+      },
+      "eyeAreaActive": true
+    },
+    {
+      "update": 1,
+      "mouthBusy": false,
+      "weights": {
+        "happy": 0,
+        "aa": 0,
+        "sad": 0,
+        "oh": 0,
+        "angry": 0,
+        "ee": 0,
+        "surprised": 0,
+        "neutral": 0,
+        "think": 0.56,
+        "relaxed": 0
+      },
+      "eyeAreaActive": true
+    },
+    {
+      "set": "relaxed",
+      "intensity": 1
+    },
+    {
+      "update": 0.05,
+      "mouthBusy": false,
+      "weights": {
+        "happy": 0,
+        "aa": 0,
+        "sad": 0,
+        "oh": 0,
+        "angry": 0,
+        "ee": 0,
+        "surprised": 0,
+        "neutral": 0,
+        "think": 0.555625,
+        "relaxed": 0.005469
+      },
+      "eyeAreaActive": true
+    },
+    {
+      "update": 0.1,
+      "mouthBusy": false,
+      "weights": {
+        "happy": 0,
+        "aa": 0,
+        "sad": 0,
+        "oh": 0,
+        "angry": 0,
+        "ee": 0,
+        "surprised": 0,
+        "neutral": 0,
+        "think": 0.441875,
+        "relaxed": 0.147656
+      },
+      "eyeAreaActive": true
+    },
+    {
+      "update": 0.1,
+      "mouthBusy": false,
+      "weights": {
+        "happy": 0,
+        "aa": 0,
+        "sad": 0,
+        "oh": 0,
+        "angry": 0,
+        "ee": 0,
+        "surprised": 0,
+        "neutral": 0,
+        "think": 0.118125,
+        "relaxed": 0.552344
+      },
+      "eyeAreaActive": true
+    },
+    {
+      "update": 1,
+      "mouthBusy": false,
+      "weights": {
+        "happy": 0,
+        "aa": 0,
+        "sad": 0,
+        "oh": 0,
+        "angry": 0,
+        "ee": 0,
+        "surprised": 0,
+        "neutral": 0,
+        "think": 0,
+        "relaxed": 0.7
+      },
+      "eyeAreaActive": true
+    },
+    {
+      "set": "angry",
+      "intensity": 1
+    },
+    {
+      "update": 0.05,
+      "mouthBusy": false,
+      "weights": {
+        "happy": 0,
+        "aa": 0,
+        "sad": 0,
+        "oh": 0,
+        "angry": 0.012963,
+        "ee": 0.005556,
+        "surprised": 0,
+        "neutral": 0,
+        "think": 0,
+        "relaxed": 0.687037
+      },
+      "eyeAreaActive": true
+    },
+    {
+      "update": 0.1,
+      "mouthBusy": false,
+      "weights": {
+        "happy": 0,
+        "aa": 0,
+        "sad": 0,
+        "oh": 0,
+        "angry": 0.35,
+        "ee": 0.15,
+        "surprised": 0,
+        "neutral": 0,
+        "think": 0,
+        "relaxed": 0.35
+      },
+      "eyeAreaActive": true
+    },
+    {
+      "update": 0.1,
+      "mouthBusy": false,
+      "weights": {
+        "happy": 0,
+        "aa": 0,
+        "sad": 0,
+        "oh": 0,
+        "angry": 0.687037,
+        "ee": 0.294444,
+        "surprised": 0,
+        "neutral": 0,
+        "think": 0,
+        "relaxed": 0.012963
+      },
+      "eyeAreaActive": true
+    },
+    {
+      "update": 1,
+      "mouthBusy": false,
+      "weights": {
+        "happy": 0,
+        "aa": 0,
+        "sad": 0,
+        "oh": 0,
+        "angry": 0.7,
+        "ee": 0.3,
+        "surprised": 0,
+        "neutral": 0,
+        "think": 0,
+        "relaxed": 0
+      },
+      "eyeAreaActive": true
+    },
+    {
+      "set": "neutral",
+      "intensity": 1
+    },
+    {
+      "update": 0.05,
+      "mouthBusy": false,
+      "weights": {
+        "happy": 0,
+        "aa": 0,
+        "sad": 0,
+        "oh": 0,
+        "angry": 0.69838,
+        "ee": 0.299306,
+        "surprised": 0,
+        "neutral": 0.002315,
+        "think": 0,
+        "relaxed": 0
+      },
+      "eyeAreaActive": true
+    },
+    {
+      "update": 0.1,
+      "mouthBusy": false,
+      "weights": {
+        "happy": 0,
+        "aa": 0,
+        "sad": 0,
+        "oh": 0,
+        "angry": 0.65625,
+        "ee": 0.28125,
+        "surprised": 0,
+        "neutral": 0.0625,
+        "think": 0,
+        "relaxed": 0
+      },
+      "eyeAreaActive": true
+    },
+    {
+      "update": 0.1,
+      "mouthBusy": false,
+      "weights": {
+        "happy": 0,
+        "aa": 0,
+        "sad": 0,
+        "oh": 0,
+        "angry": 0.497454,
+        "ee": 0.213194,
+        "surprised": 0,
+        "neutral": 0.289352,
+        "think": 0,
+        "relaxed": 0
+      },
+      "eyeAreaActive": true
+    },
+    {
+      "update": 1,
+      "mouthBusy": false,
+      "weights": {
+        "happy": 0,
+        "aa": 0,
+        "sad": 0,
+        "oh": 0,
+        "angry": 0,
+        "ee": 0,
+        "surprised": 0,
+        "neutral": 1,
+        "think": 0,
+        "relaxed": 0
+      },
+      "eyeAreaActive": false
+    },
+    {
+      "set": "happy",
+      "intensity": 1
+    },
+    {
+      "update": 0.1,
+      "mouthBusy": false,
+      "weights": {
+        "happy": 0.04375,
+        "aa": 0.0125,
+        "sad": 0,
+        "oh": 0,
+        "angry": 0,
+        "ee": 0,
+        "surprised": 0,
+        "neutral": 0.9375,
+        "think": 0,
+        "relaxed": 0
+      },
+      "eyeAreaActive": true
+    },
+    {
+      "update": 0.5,
+      "mouthBusy": false,
+      "weights": {
+        "happy": 0.7,
+        "aa": 0.2,
+        "sad": 0,
+        "oh": 0,
+        "angry": 0,
+        "ee": 0,
+        "surprised": 0,
+        "neutral": 0,
+        "think": 0,
+        "relaxed": 0
+      },
+      "eyeAreaActive": true
+    },
+    {
+      "update": 0.1,
+      "mouthBusy": true,
+      "weights": {
+        "happy": 0.7,
+        "aa": 0,
+        "sad": 0,
+        "oh": 0,
+        "angry": 0,
+        "ee": 0,
+        "surprised": 0,
+        "neutral": 0,
+        "think": 0,
+        "relaxed": 0
+      },
+      "eyeAreaActive": true
+    },
+    {
+      "update": 0.1,
+      "mouthBusy": true,
+      "weights": {
+        "happy": 0.7,
+        "aa": 0,
+        "sad": 0,
+        "oh": 0,
+        "angry": 0,
+        "ee": 0,
+        "surprised": 0,
+        "neutral": 0,
+        "think": 0,
+        "relaxed": 0
+      },
+      "eyeAreaActive": true
+    },
+    {
+      "update": 0.1,
+      "mouthBusy": false,
+      "weights": {
+        "happy": 0.7,
+        "aa": 0.0125,
+        "sad": 0,
+        "oh": 0,
+        "angry": 0,
+        "ee": 0,
+        "surprised": 0,
+        "neutral": 0,
+        "think": 0,
+        "relaxed": 0
+      },
+      "eyeAreaActive": true
+    },
+    {
+      "update": 0.1,
+      "mouthBusy": false,
+      "weights": {
+        "happy": 0.7,
+        "aa": 0.1,
+        "sad": 0,
+        "oh": 0,
+        "angry": 0,
+        "ee": 0,
+        "surprised": 0,
+        "neutral": 0,
+        "think": 0,
+        "relaxed": 0
+      },
+      "eyeAreaActive": true
+    },
+    {
+      "update": 0.1,
+      "mouthBusy": false,
+      "weights": {
+        "happy": 0.7,
+        "aa": 0.1875,
+        "sad": 0,
+        "oh": 0,
+        "angry": 0,
+        "ee": 0,
+        "surprised": 0,
+        "neutral": 0,
+        "think": 0,
+        "relaxed": 0
+      },
+      "eyeAreaActive": true
+    },
+    {
+      "update": 0.5,
+      "mouthBusy": false,
+      "weights": {
+        "happy": 0.7,
+        "aa": 0.2,
+        "sad": 0,
+        "oh": 0,
+        "angry": 0,
+        "ee": 0,
+        "surprised": 0,
+        "neutral": 0,
+        "think": 0,
+        "relaxed": 0
+      },
+      "eyeAreaActive": true
+    }
+  ]
+}

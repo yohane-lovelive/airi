@@ -85,7 +85,7 @@ engines/stage-tamagotchi-unity/
   tests/                       # dotnet test host that compiles Assets/Airi/Core
 ```
 
-`Core` has the protocol parser, the WebSocket client loop, and the frame conversion. Step U3 adds the rules for holds and fades. `Core` has no Unity reference, so `dotnet` can test it on any PC and in CI, without a Unity license. The Godot engine uses the same approach with its verification host.
+`Core` has the protocol parser, the WebSocket client loop, the frame conversion, and the logic of the character: gestures, expressions, blink, and the frame stream. `Core` has no Unity reference, so `dotnet` can test it on any PC and in CI, without a Unity license. The Godot engine uses the same approach with its verification host.
 
 `Core` uses Newtonsoft.Json, the choice of the owner. Unity has an official package for it, and `dotnet` gets the same library from NuGet. A separate project compiles `Core` with C# 9 on .NET Standard 2.1, so a build outside Unity fails on the same language limits.
 
@@ -131,7 +131,7 @@ Sidecar to host:
 
 The Valibot schemas go to `packages/stage-shared/src/stage-sidecar/`. The names have no engine in them, so Godot can use the same messages later. A JSON fixture file in that folder holds one valid example of each message. The TypeScript tests and the C# tests both read this file, so the two sides cannot drift.
 
-Files stay on disk, as in the Godot path. Electron main writes model bytes and `.vrma` bytes to `<userData>/unity-stage/`, and it sends the path.
+Files stay on disk, as in the Godot path. Electron main writes model bytes and `.vrma` bytes to `<userData>/unity-stage/`, and it sends the path. A stop and a start remove the model copies, because each selection writes its copy again. The clips stay.
 
 The value of `format` is `vrm` or `pmx`. A PMX model is a folder of files, so Electron main writes the whole package, and `path` names the PMX file in it.
 
@@ -144,8 +144,25 @@ The value of `format` is `vrm` or `pmx`. A PMX model is a folder of files, so El
 | Gesture clip playback and the mix with the idle | Unity (like `GestureLayer`) | Unity |
 | Mouth vowels | Renderer (`createWLipSyncVowelDriver`) | Unity |
 | Breath, sway, nods, thinking look-away | Renderer (`ProceduralBodyMotion`) | Unity |
-| Spring bones and blink | Unity (UniVRM) | Unity |
+| Spring bones | Unity (UniVRM) | Unity |
+| Blink | Unity (`BlinkTimer`). The runtime of UniVRM has no automatic blink. | Unity |
 | Physics of a PMX model | Unity (unity-mmd-loader) | Unity |
+
+`CharacterDriver` in `Core` computes the state of each frame, and an avatar host only applies it. So this logic has tests without Unity.
+
+The host sends an emotion name as it is, for example `awkward`. An MMD model shows emotions that a VRM model has no expression for, so `EmotionTable` in `Core` holds one table for each kind of model.
+
+Tests of the TypeScript packages record the emotion tables, the morph names, the gesture keys, and the retarget in `packages/stage-shared/src/stage-sidecar/character-fixtures/`. The C# tests replay these files, so a change on one side fails on the other side. To update them after an intended change, run `vitest run -u` in the package of the test.
+
+These rules differ from the three.js stage on purpose:
+
+| Case | three.js | Unity |
+| --- | --- | --- |
+| A new gesture starts during a gesture | The old pose jumps. | The old gesture fades out under the new one. |
+| An upper-body gesture starts during a clip of the whole body | A VRM model plays both. An MMD model skips the gesture. | Each model skips the gesture. |
+| A clip of the whole body ends | The idle starts again from its start. | The idle kept its time under the clip. |
+| `happy` on a silent MMD model | Lip sync writes its vowel to 0 in each frame, so the accent does not show. | The accent shows. |
+| An expression with an intensity of 0 | An MMD model goes to a face of 0 weights. | Each model ignores it. |
 
 The procedural layer stays in TypeScript and streams its offsets. A C# copy gives two sets of tuning values and two sets of tests. The offsets are small and slow, so 30 frames each second with smoothing in Unity is sufficient.
 
@@ -175,7 +192,13 @@ The Godot manager had no tests before this change. So `godot-stage/index.test.ts
 
 Gesture keys rotate the normalized bones of a VRM humanoid. The frame is right-handed, faces +Z, and has +Y up. UniVRM keeps the model facing +Z in the left-handed Unity frame, which mirrors the X axis. So the conversion is `(x, y, z, w)` to `(x, -y, -z, w)`.
 
-This is one pure function in `Core`, with tests. Step U3 checks the result against the three.js renderer with the 8 built-in gestures.
+This is one pure function in `Core`, with tests.
+
+The live check of step U3 compared the 8 built-in gestures on both stages, with AvatarSample_A, AvatarSample_B, and one PMX model:
+
+- The PMX model matches the three.js stage.
+- VRM models in Unity follow the definition of each gesture. For example, `cross-arms` crosses the arms at the chest.
+- The three.js stage does not bend the forearms of VRM models, so these gestures differ. This fault is on the three.js stage. The cause is unknown, and this work does not change that stage.
 
 ### Models
 
@@ -198,13 +221,16 @@ These are the results of the prototype with the models of the owner, on a Mono p
 
 - All 34 PMX models load and show correctly, in a median of 2.7 seconds and at most 5.9 seconds. The check was a view of a capture of each model. 3 of the 1066 textures are missing, because the ZIPs of 2 models do not have them.
 - 3 of the 37 models of the owner are PMD files. The loader reads only PMX files, so AIRI shows an error for them, and the old model stays.
-- Physics stays stable at rest for 45 seconds. No motion moved the models yet, so step U3 must check physics in motion.
-- `あ` opens the mouth and `まばたき` closes the eyes through `SkinnedMeshRenderer` on one model. The prototype code for this is gone, and step U3 adds the real code.
-- 29 models have plain vertex morphs for the vowels and the blink. Step U3 must expand group morphs for the other 5 models, and bone morphs for 1 of them.
+- Physics follows the motion and stays stable at 180, 60, and 30 frames each second. The farthest bone stays within 1.3 times the height of the model on all 34 models.
+- The vowels and the blink move on all 34 models. 29 models have plain vertex morphs. The other 5 need group morphs or bone morphs, and the loader resolves them. AIRI has no code for this.
 
-The runtime path of the loader needs a motion, and AIRI has no motion file. `MmdAvatarHost` gives it a 66-byte VMD file with no keys. The physics run on this motion. All calls are public API.
+A bone that moves after the physics step does not move the physics. So `AiriMmdHostPose` gives the pose to the native session before its step, and the session computes grants, helper IK, and physics. The loader uses this session for its Humanoid path, and the session is internal. So this file is in the package, and it adds only one file. It does not change a file of the loader. Morph weights also go through this file, because the Humanoid path of the loader always sends 0 for them.
 
-The repository has a copy of the package with three patches. `engines/stage-tamagotchi-unity/docs/vendor-patches.md` lists them. Without them, the package does not compile on Unity 6000.3, a player does not include its DLL, and a 16-bit texture stays white.
+`CreateSkinned` still needs a motion, and AIRI has no motion file. So `MmdAvatarHost` gives it a 66-byte VMD file with no keys, and nothing plays this motion.
+
+`MmdHumanoidRetarget` in `Core` is a port of `retargetVRMAnimationToMMD`, and the fixtures check that both give the same result. It writes the rotations of the bones directly, so the model needs no Animator, no Avatar, and no proxy rig. The legs follow the clip directly, because the leg IK has no goal in this path. Without a clip, the model stays in its rest pose with its physics, because the T-pose of the driver looks wrong on an MMD model.
+
+The repository has a copy of the package with three patches and one added file. `engines/stage-tamagotchi-unity/docs/vendor-patches.md` lists them. Without them, the package does not compile on Unity 6000.3, a player does not include its DLL, and a 16-bit texture stays white.
 
 Other facts that a change of this path must keep:
 
@@ -248,7 +274,7 @@ No room or seat state exists in the repository at this time. This ADR does not a
 | U0 | Engine folder, `Core` with tests through `dotnet`, `stage-sidecar` schemas, shared fixture | No | TypeScript and C# tests pass on the same fixture. |
 | U1 | `stage-sidecar` host, Godot on the new host, Unity service, Eventa contracts, `unity` renderer, settings switch | No | A fake sidecar script receives the model path and the signals. Godot tests still pass. |
 | U2 | Unity project, VRM load, window output, attach and player modes | Yes | A VRM model selected in AIRI shows in a Unity window. |
-| U3 | Expressions, idle, gestures, mouth, procedural offsets, for VRM and PMX models | Yes | A chat reply with TTS moves the character. The 8 gestures match three.js. |
+| U3 | Expressions, idle, gestures, mouth, procedural offsets, for VRM and PMX models | Yes | A chat reply with TTS moves the character. The 8 gestures match the three.js stage on PMX models, and their definitions on VRM models. |
 | U4 | MMD prototype, the choice of a library, and the model path from AIRI. The owner chose this step before U3. | Yes | A PMX model of the owner shows from the button of AIRI. The prototype moved its morphs by name. |
 | U5 | `SrDisplayOutput`, scale from bounds, gaze at the viewer, packaging | Yes, plus the plugin and the display | The character shows on a real ELF-MN1 in the view space. |
 
@@ -262,6 +288,9 @@ These are differences from the three.js stage. Each one is a choice, not a defec
 - No camera sliders in Settings for Unity at the first steps. `SrDisplayOutput` has no camera to control. `WindowOutput` frames the avatar by itself.
 - No pointer interaction with the Unity character.
 - No Live2D, Spine, or tachie in Unity.
+- No VMD motions in Unity: neither an idle that the owner chose, nor a motion mapped to an emotion. The pose path and the playback of a VMD file cannot run together.
+- No expression tracks of a `.vrma` clip in Unity.
+- No idle saccades, no head aim from the gaze, and no gaze at a target in Unity. The thinking look-away moves the eyes. Step U5 adds the gaze at the viewer.
 
 ## Risks
 
@@ -271,8 +300,8 @@ These are differences from the three.js stage. Each one is a choice, not a defec
 | The plugin needs window focus or fullscreen. | The owner cannot use the chat window at the same time. | Test on the real display in step U5. Sony does not state this. |
 | UniVRM does not work on Mono. | Step U2 stops. | Test it first in step U2. If it fails, check the IL2CPP support of the Windows plugin. |
 | A new version of unity-mmd-loader changes its API. The project is before version 1.0. | An update of the package fails. | The repository keeps a copy of v0.5.1, and it updates only by a decision. |
-| Nothing removes old folders from `<userData>/unity-stage/models/`. | The disk use grows with each model that the owner selects. | No step has this work yet. A later step must remove the folders of deleted models. |
-| The 30 Hz JSON stream causes garbage collection pauses in Unity. | Small stutters. | Measure in step U3. If the pauses are visible, change this message to a binary frame. |
+| `AiriMmdHostPose` uses internal API of the loader. | An update of the package can break it. | The file is in the copy of the package, and `vendor-patches.md` names it in the update steps. |
+| The 30 Hz JSON stream causes garbage collection pauses in Unity. | Small stutters. | Step U3 measured about 450 KB each second, 0 or 1 collections in 10 seconds, and a largest frame of 17.1 ms at 60 frames each second. So the stream stays JSON. If pauses become visible, change this message to a binary frame. |
 | Sony warns that content outside the view space can harm comfort. | The owner can feel discomfort. | Scale from bounds, keep Spatial Clipping on, and check on the real display. |
 
 ## Sources

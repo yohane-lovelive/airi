@@ -14,12 +14,24 @@ Each code patch has a comment that starts with `AIRI patch`.
 | `Runtime/Plugins/x86_64/mmd_runtime_ffi.dll.meta` | The platform is `Standalone: Win64`, not `Standalone: Windows64`. | Unity does not know the old name, so a player build does not include the DLL. |
 | `Runtime/Import/MmdRuntimeTextureResolver.cs` | A PNG file that the decoder of the package refuses goes to `Texture2D.LoadImage`. | The decoder reads only 8-bit files with no interlace. A 16-bit face texture stayed white. |
 
+## Added File
+
+`Runtime/Components/Playback/AiriMmdHostPose.cs` is not a part of the package. It gives the pose of AIRI and the morph weights to the native session, so physics follow the character. It stays in the assembly of the package, because this path of the loader is internal:
+
+- `MmdUnityPlaybackBinding.TryEnableNativeHumanoidHostPose`
+- `MmdUnityPlaybackBinding.StepLivePhysicsFromHostPose`
+- `MmdUnityPlaybackController.BuildHumanoidHostPoseRigSelection`
+- `MmdUnityFrameApplier.ApplyMorphs`
+
+A new version can change these members without notice.
+
 ## Update the Package
 
 1. Read the release notes of the new version.
 2. Replace the folder with the files of the new version.
-3. Apply each patch that the new version still needs, and update this table.
-4. Run the test with a real player. The `README.md` of this engine gives the command.
+3. Copy `AiriMmdHostPose.cs` and its `.meta` file back, and fix it for the internal API of the new version.
+4. Apply each patch that the new version still needs, and update this table.
+5. Run the test with a real player. The `README.md` of this engine gives the command.
 
 ## Commit an Update
 

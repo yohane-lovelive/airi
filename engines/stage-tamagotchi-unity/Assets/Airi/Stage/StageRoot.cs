@@ -41,6 +41,7 @@ namespace Airi.Stage
         private IStageOutput _output;
         private VrmAvatarHost _vrm;
         private MmdAvatarHost _mmd;
+        private StageCharacter _character;
 
         /// <summary>The number of the newest scene. An older scene drops its model when it finishes.</summary>
         private int _newestScene;
@@ -51,6 +52,7 @@ namespace Airi.Stage
             _output = new WindowOutput(_camera);
             _vrm = new VrmAvatarHost(transform);
             _mmd = new MmdAvatarHost(transform);
+            _character = new StageCharacter(transform, (message, type) => _socket?.Send(StageProtocol.CharacterError(message, type)));
 
             await ConnectAsync();
         }
@@ -203,11 +205,33 @@ namespace Airi.Stage
                     Exit(0);
                     break;
 
-                // Step U3 of the ADR applies the idle, the expressions, the gestures, and the frames.
-                // They are valid messages, so no error goes back to the host.
+                case CharacterIdleMessage idle:
+                    _ = _character.SetIdleAsync(idle.Path);
+                    break;
+                case CharacterExpressionMessage expression:
+                    _character.SetExpression(expression);
+                    break;
+                case CharacterGestureKeysMessage keys:
+                    _character.PlayKeys(keys);
+                    break;
+                case CharacterGestureVrmaMessage vrma:
+                    _ = _character.PlayVrmaAsync(vrma);
+                    break;
+                case CharacterFrameMessage frame:
+                    _character.ReceiveFrame(frame);
+                    break;
                 default:
                     break;
             }
+        }
+
+        /// <summary>
+        /// Applies the character after the clips of this frame. UniVRM reads the result later in
+        /// this frame, because its execution order comes after the default order.
+        /// </summary>
+        private void LateUpdate()
+        {
+            _character?.Tick(Time.deltaTime);
         }
 
         private async Task ApplySceneAsync(SceneApplyMessage scene)
@@ -232,6 +256,7 @@ namespace Airi.Stage
                 }
 
                 other.Clear();
+                _character.ShowAvatar(host);
                 _light.intensity = scene.Format == "pmx" ? MmdLightIntensity : VrmLightIntensity;
                 _output.Frame(bounds.Value);
                 _socket.Send(StageProtocol.SceneApplied(scene.ModelId, ToProtocol(bounds.Value)));
