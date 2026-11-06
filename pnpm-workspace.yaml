@@ -40,6 +40,7 @@ packages:
   - '!**/dist/**'
   # Unity keeps UPM packages here, each with a package.json that pnpm must not read as a workspace package.
   - '!engines/stage-tamagotchi-unity/Library/**'
+  - '!engines/stage-tamagotchi-unity/Packages/**'
   - '!engines/stage-tamagotchi-unity/Temp/**'
 
 overrides:
