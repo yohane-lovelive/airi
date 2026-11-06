@@ -198,7 +198,7 @@ The live check of step U3 compared the 8 built-in gestures on both stages, with 
 
 - The PMX model matches the three.js stage.
 - VRM models in Unity follow the definition of each gesture. For example, `cross-arms` crosses the arms at the chest.
-- The three.js stage does not bend the forearms of VRM models, so these gestures differ. This fault is on the three.js stage. The cause is unknown, and this work does not change that stage.
+- At that time, the three.js stage did not bend the forearms of VRM models, so these gestures differed. `VRMModel.vue` kept its `AnimationMixer` in a deep `ref`. Each read gave a reactive proxy, so each gesture played at half weight over the idle. A later fix keeps the mixer in a `shallowRef`. Now the elbows on the three.js stage reach the angles of the keys on both VRM models. This fix did not repeat the comparison with Unity.
 
 ### Models
 

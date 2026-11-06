@@ -201,7 +201,9 @@ let loadSequence = 0
 const raycaster = new Raycaster()
 
 // Animation related ref
-const vrmAnimationMixer = ref<AnimationMixer>()
+// shallowRef: the gesture layer and the `finished` event of the mixer compare objects by identity, and a deep ref
+// returns a reactive proxy. With the proxy, a gesture gets a second layer without the idle, and both play at half weight.
+const vrmAnimationMixer = shallowRef<AnimationMixer>()
 const { onBeforeRender, stop, start } = useLoop()
 
 const vrmHooks: readonly VrmHook[] = resolveInternalVrmHooks()
