@@ -6,6 +6,8 @@ in a virtualized folder of its package, so a plain Unity.exe run fails with "No 
 script starts Unity inside the package of the Hub in that case. The license files stay as they are.
 
 A start inside a package gives no exit code and no stdout, so this script reads the result from the log of Unity.
+Unity can end with no result in its log, for example after EditorApplication.Exit(1) in a method of the Editor. So
+this script also watches the process of Unity, and such an end is a failure with exit code 1.
 
 Examples:
   ./tools/run-unity.ps1 -Arguments '-quit'
@@ -62,32 +64,76 @@ else {
     Start-Process -FilePath $editor -ArgumentList $unityArguments | Out-Null
 }
 
-$deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+# Gives the exit code from the result line of the log, or null when the log has no result line yet.
+function Read-UnityResult {
+    if (-not (Test-Path -LiteralPath $logFile)) {
+        return $null
+    }
+
+    $end = Select-String -LiteralPath $logFile -Pattern 'Application will terminate with return code (\d+)|^Exiting batchmode successfully' | Select-Object -Last 1
+    if (-not $end) {
+        return $null
+    }
+
+    if ($end.Matches[0].Groups[1].Success) {
+        return [int] $end.Matches[0].Groups[1].Value
+    }
+
+    return 0
+}
+
+# Tells whether the Unity of this run still runs. Its command line holds the path of this log, and the asset import
+# workers of Unity have logs of their own.
+function Test-UnityRunning {
+    $processes = Get-CimInstance -ClassName Win32_Process -Filter "Name = 'Unity.exe'"
+    return [bool] ($processes | Where-Object { $_.CommandLine -and $_.CommandLine.IndexOf($logFile, [StringComparison]::OrdinalIgnoreCase) -ge 0 })
+}
+
+# Unity that never appears in this time counts as ended, for example after a license error at the start.
+$startSeconds = 60
+$started = Get-Date
+$deadline = $started.AddSeconds($TimeoutSeconds)
 $exitCode = $null
+$seen = $false
+$endedWithoutResult = $false
 
 while ((Get-Date) -lt $deadline) {
     Start-Sleep -Seconds 3
 
-    if (-not (Test-Path -LiteralPath $logFile)) {
+    $exitCode = Read-UnityResult
+    if ($null -ne $exitCode) {
+        break
+    }
+
+    if (Test-UnityRunning) {
+        $seen = $true
         continue
     }
 
-    $end = Select-String -LiteralPath $logFile -Pattern 'Application will terminate with return code (\d+)|^Exiting batchmode successfully' | Select-Object -Last 1
-
-    if ($end) {
-        $exitCode = if ($end.Matches[0].Groups[1].Success) { [int] $end.Matches[0].Groups[1].Value } else { 0 }
+    if ($seen -or ((Get-Date) - $started).TotalSeconds -ge $startSeconds) {
+        # The log can get its last lines just after the process ends, so it gets one more read.
+        Start-Sleep -Seconds 1
+        $exitCode = Read-UnityResult
+        $endedWithoutResult = $null -eq $exitCode
         break
     }
 }
 
-if ($null -eq $exitCode) {
+if ($null -eq $exitCode -and -not $endedWithoutResult) {
     Write-Output "Unity did not finish in $TimeoutSeconds seconds. Read $logFile."
     exit 124
 }
 
-Select-String -LiteralPath $logFile -Pattern 'error CS\d+|Scripts have compiler errors|\[Package Manager\].*[Ee]rror|No valid Unity Editor license|^\[Airi\]' |
-    Select-Object -First 40 |
-    ForEach-Object { $_.Line }
+if (Test-Path -LiteralPath $logFile) {
+    Select-String -LiteralPath $logFile -Pattern 'error CS\d+|Scripts have compiler errors|\[Package Manager\].*[Ee]rror|No valid Unity Editor license|^\[Airi\]' |
+        Select-Object -First 40 |
+        ForEach-Object { $_.Line }
+}
+
+if ($endedWithoutResult) {
+    Write-Output "Unity ended with no result in its log, for example after EditorApplication.Exit(1). Read $logFile."
+    $exitCode = 1
+}
 
 Write-Output "Unity exit code: $exitCode (log: $logFile)"
 exit $exitCode

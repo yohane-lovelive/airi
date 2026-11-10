@@ -65,7 +65,7 @@ The feature stays off by default and is experimental, like Godot Stage.
 - `Application.runInBackground` is `true`. The owner uses the Electron window while the character moves.
 - `StageProjectSetup.Apply` writes these settings through the Unity API, so a review can read each choice in one file.
 
-`tools/run-unity.ps1` runs Unity in batch mode. The Microsoft Store version of Unity Hub keeps its license in a virtualized folder of its package, so a plain `Unity.exe` run fails with "No valid Unity Editor license found". The script starts Unity inside the package of the Hub, and the license files stay as they are. A start inside a package gives no exit code, so the script reads the result from the log.
+`tools/run-unity.ps1` runs Unity in batch mode. The Microsoft Store version of Unity Hub keeps its license in a virtualized folder of its package, so a plain `Unity.exe` run fails with "No valid Unity Editor license found". The script starts Unity inside the package of the Hub, and the license files stay as they are. A start inside a package gives no exit code, so the script reads the result from the log. `EditorApplication.Exit(1)` ends Unity with no result in the log, so the script also watches the process of Unity. Such an end gives exit code 1.
 
 Unity keeps packages with a `package.json` in `Library/`, and the workspace glob `engines/**` of pnpm reads them. So `pnpm-workspace.yaml` excludes `Library/` and `Temp/`.
 

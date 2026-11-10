@@ -65,7 +65,7 @@ Unity にチャット、音声、記憶、設定のロジックは持たせな�
 - `Application.runInBackground` は `true` とする。オーナーは Electron のウィンドウを操作しながらキャラクターを動かすためである。
 - これらの設定は `StageProjectSetup.Apply` が Unity の API で書き込む。レビューでは 1 つのファイルで各選択を読める。
 
-`tools/run-unity.ps1` は Unity をバッチモードで実行する。Microsoft Store 版の Unity Hub はライセンスをパッケージの仮想フォルダーに置くので、単純な `Unity.exe` の実行は "No valid Unity Editor license found" で失敗する。このスクリプトは Hub のパッケージの中で Unity を起動し、ライセンスファイルには触れない。パッケージ内の起動では終了コードを得られないので、ログから結果を読む。
+`tools/run-unity.ps1` は Unity をバッチモードで実行する。Microsoft Store 版の Unity Hub はライセンスをパッケージの仮想フォルダーに置くので、単純な `Unity.exe` の実行は "No valid Unity Editor license found" で失敗する。このスクリプトは Hub のパッケージの中で Unity を起動し、ライセンスファイルには触れない。パッケージ内の起動では終了コードを得られないので、ログから結果を読む。`EditorApplication.Exit(1)` で終わった Unity はログに結果を書かないので、スクリプトは Unity のプロセスも見張る。そのような終わり方は終了コード 1 になる。
 
 Unity は `Library/` に `package.json` を含むパッケージを置き、pnpm のワークスペース指定 `engines/**` がそれを読んでしまう。そこで `pnpm-workspace.yaml` で `Library/` と `Temp/` を除外する。
 
