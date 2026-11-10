@@ -59,6 +59,7 @@ Unity ステージは、キャラクターを部屋の中に表示できる。�
 歩行は、Quaternius の Universal Animation Library（CC0）から取る。
 
 - オーナーがパックをダウンロードする。AIRI の Editor ツールが、その歩行のクリップをヒューマノイドで再生し、`VrmAnimationExporter` で `walk.vrma` を書く。
+- このツールは `pnpm run import:motion` で動く。`.cache/motions/<name>/` の FBX ファイルのクリップ `Walk_Loop` を、`Assets/StreamingAssets/AiriMotions/walk.vrma` に変換する。
 - CC0 はリポジトリへのコピーを許す。そこで `walk.vrma` を Unity プロジェクトに入れ、プレイヤーが持つ。この ADR に入手元を書く。
 - 歩くのは Unity ステージだけである。そこでクリップは Unity プロジェクトに置き、プロトコルにはこのクリップのメッセージを足さない。
 - クリップはその場で再生する。ドライバーは歩行のクリップの `HipsX` と `HipsZ` を捨て、上下の揺れのために `HipsY` を残す。

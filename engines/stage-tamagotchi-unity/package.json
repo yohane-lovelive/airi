@@ -21,6 +21,7 @@
     "test": "dotnet run --project ./tests/stage-tamagotchi-unity.tests/stage-tamagotchi-unity.tests.csproj",
     "setup:project": "powershell -NoProfile -ExecutionPolicy Bypass -File ./tools/run-unity.ps1 -Arguments -quit,-executeMethod,Airi.Stage.Editor.StageProjectSetup.Apply",
     "build:player": "powershell -NoProfile -ExecutionPolicy Bypass -File ./tools/run-unity.ps1 -Arguments -quit,-executeMethod,Airi.Stage.Editor.StageBuild.BuildPlayer",
+    "import:motion": "powershell -NoProfile -ExecutionPolicy Bypass -File ./tools/run-unity.ps1 -Arguments -quit,-executeMethod,Airi.Stage.Editor.StageMotionImport.ImportAll",
     "import:room": "powershell -NoProfile -ExecutionPolicy Bypass -File ./tools/run-unity.ps1 -Arguments -quit,-executeMethod,Airi.Stage.Editor.StageRoomImport.ImportAll"
   }
 }

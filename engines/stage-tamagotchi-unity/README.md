@@ -67,6 +67,18 @@ The import also opens the doors that cut off a room, so the character can walk i
 
 The import takes only data files. It removes the scripts of the VRChat SDK, moves the materials to URP, and keeps the baked light. It also bakes the walkable area of the room, a NavMesh, for the walk of the character. The [ADR](../../docs/ai/adr/2026-11-06-unity-stage-sidecar.md) lists each step.
 
+## Convert the Walk Clip
+
+The walk of the character is `Assets/StreamingAssets/AiriMotions/walk.vrma`. It is the clip `Walk_Loop` of the [Universal Animation Library](https://quaternius.com/packs/universalanimationlibrary.html) by Quaternius. Its license is CC0, so the repository keeps the file.
+
+To convert the clip again, put `UAL1_Standard.fbx` of the pack in `.cache/motions/<name>/`. Close the Unity Editor, and run this command:
+
+```bash
+pnpm -F @proj-airi/stage-tamagotchi-unity import:motion
+```
+
+The [ADR of the walk](../../docs/ai/adr/2026-11-10-unity-stage-room-walking.md) describes the walk, the paths, and the camera.
+
 ## Work in the Editor
 
 1. Open this folder with Unity Hub, and open `Assets/Airi/Scenes/Stage.unity`.
@@ -109,9 +121,11 @@ Unity runs only one `-executeMethod` in a batch run, so the setup and the build 
 
 - `Assets/Airi/Core/`: code with no `UnityEngine` reference. It must compile with C# 9 on .NET Standard 2.1, as in Unity.
 - `Assets/Airi/Stage/`: the connection, the VRM and MMD avatars, the `.vrma` clips, the display output, the looks, and the rooms.
-- `Assets/Airi/Editor/`: the project setup, the player build, and the room import.
+- `Assets/Airi/Editor/`: the project setup, the player build, the room import, and the motion import.
 - `Assets/Airi/Looks/Resources/AiriLooks/`: material templates of the lilToon look. `setup:project` writes them.
+- `Assets/StreamingAssets/AiriMotions/`: the clips that the player carries, for now only the walk.
 - `Assets/LocalRooms/`: the files of imported rooms. Git ignores this folder.
+- `Assets/LocalMotions/`: the FBX files of the motion import. Git ignores this folder.
 - `tools/run-unity.ps1`: runs Unity in batch mode, also with the Microsoft Store version of Unity Hub.
 - `tests/stage-tamagotchi-unity.core/`: compiles `Core` with these limits, outside Unity.
 - `tests/stage-tamagotchi-unity.tests/`: the verification host. It reads the fixtures of `stage-sidecar`, also the output of the TypeScript code in `character-fixtures`.

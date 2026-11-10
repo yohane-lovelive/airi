@@ -59,6 +59,7 @@ The first test used the side of each door: reachable floor on one side, and floo
 The walk comes from the Universal Animation Library of Quaternius, under CC0.
 
 - The owner downloads the pack. An Editor tool of AIRI plays its walk clip on a humanoid and writes `walk.vrma` through `VrmAnimationExporter`.
+- `pnpm run import:motion` runs this tool. It converts the clip `Walk_Loop` from the FBX files in `.cache/motions/<name>/` to `Assets/StreamingAssets/AiriMotions/walk.vrma`.
 - CC0 allows a copy in the repository. So `walk.vrma` goes into the Unity project, and the player carries it. This ADR names the source.
 - Only the Unity stage walks. So the clip stays in the Unity project, and the protocol gets no message for it.
 - The clip plays in place. The driver drops `HipsX` and `HipsZ` of the walk clip, and keeps `HipsY` for the up and down move.
