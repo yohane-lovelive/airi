@@ -102,6 +102,10 @@ Godot can start its Editor with a project path, but a Unity Editor start takes t
 
 `AIRI_UNITY_STAGE_ATTACH=1` selects the attach mode, and it has priority over the executable. In this mode, `start` returns at once with the status `starting`. The status changes to `running` when the sidecar sends `stage.ready`. When the sidecar disconnects, the status returns to `starting`, and the URL stays valid. So Play mode can stop and start again. A stop deletes `attach.json`, because its socket no longer exists.
 
+In player mode, the host also gives `-force-d3d12-single-pso-disk-cache`. Without this flag, the player can end with the exit code `0xC0000005` after `host.shutdown`. In Unity 6000.3.28f1, `~GfxDeviceD3D12` releases pipeline states. Then `ID3D12PipelineLibrary::Serialize` reads their freed shaders.
+
+The fault needs a loaded `dx12_pso_cache_lib.bin` and a pipeline state that differs from the stored state of the same name. The result also depends on the heap, so it changes with the model, the shader, and the cache file. The flag selects `dx12_pso_cache.bin`, which does not use the library. `boot.config` ignores this flag, so the command line is the only place for it. Ten starts with an old library file gave 10 crashes without the flag and 0 with it, at the same CPU time. Remove the flag when a Unity version calls `Serialize` before it releases the states.
+
 Release packaging is out of scope until step U5. A Unity build needs a license, so CI cannot produce it without extra work.
 
 ### Protocol

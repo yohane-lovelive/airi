@@ -1,3 +1,5 @@
+import type { ChildProcess, SpawnOptions } from 'node:child_process'
+
 import type { UnityStageManager } from '.'
 
 import process from 'node:process'
@@ -12,7 +14,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createUnityStageManager } from '.'
 
-const state = vi.hoisted(() => ({ userData: '' }))
+const state = vi.hoisted(() => ({ exitCodes: [] as (number | null)[], userData: '' }))
+
+vi.mock('node:child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:child_process')>()
+  return {
+    ...actual,
+    // The host reports each exit after a stop as `stopped`, with no exit code. So only this wrapper can see a crash at exit.
+    spawn: (executable: string, args: string[], options: SpawnOptions): ChildProcess => {
+      const child = actual.spawn(executable, args, options)
+      child.once('exit', code => state.exitCodes.push(code))
+      return child
+    },
+  }
+})
 
 vi.mock('electron', () => ({
   app: {
@@ -52,6 +67,7 @@ describe.skipIf(!process.env.AIRI_UNITY_STAGE_PLAYER)('the Unity player', () => 
   }
 
   beforeEach(() => {
+    state.exitCodes.length = 0
     state.userData = mkdtempSync(join(tmpdir(), 'airi-unity-player-'))
     vi.stubEnv('AIRI_UNITY_STAGE_ATTACH', '')
     vi.stubEnv('AIRI_UNITY_STAGE_EXECUTABLE', process.env.AIRI_UNITY_STAGE_PLAYER!)
@@ -62,6 +78,9 @@ describe.skipIf(!process.env.AIRI_UNITY_STAGE_PLAYER)('the Unity player', () => 
     await manager.stop().catch(() => {})
     vi.unstubAllEnvs()
     rmSync(state.userData, { recursive: true, force: true })
+
+    // Each test starts one player and ends with a stop. A crash at exit gives 3221225477 (0xC0000005) here.
+    expect(state.exitCodes).toEqual([0])
   })
 
   it('starts, reports ready, and exits when the host stops it', async () => {

@@ -319,7 +319,15 @@ async function resolveUnityStageLaunch(websocketUrl: string): Promise<StageSidec
   await assertExecutableFile(executable)
 
   return {
-    args: [`--airi-ws-url=${websocketUrl}`],
+    args: [
+      `--airi-ws-url=${websocketUrl}`,
+      // NOTICE:
+      // Without this flag, the player can exit with 0xC0000005 after `host.shutdown`.
+      // Unity 6000.3.28f1 releases pipeline states, and then ID3D12PipelineLibrary::Serialize reads their freed shaders.
+      // See "Process start" in docs/ai/adr/2026-11-06-unity-stage-sidecar.md.
+      // Remove this flag when a Unity version calls Serialize before it releases the states.
+      '-force-d3d12-single-pso-disk-cache',
+    ],
     env: process.env,
     executable,
     kind: 'process',

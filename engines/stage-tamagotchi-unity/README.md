@@ -74,7 +74,7 @@ Unity runs only one `-executeMethod` in a batch run, so the setup and the build 
 - `tests/stage-tamagotchi-unity.tests/`: the verification host. It reads the fixtures of `stage-sidecar`, also the output of the TypeScript code in `character-fixtures`.
 - `Packages/com.yohawing.mmd-loader/`: a vendored package with patches. [`docs/vendor-patches.md`](docs/vendor-patches.md) lists them.
 
-`apps/stage-tamagotchi/src/main/services/airi/unity-stage/player.integration.test.ts` tests a real player. It runs when `AIRI_UNITY_STAGE_PLAYER` names one. The test of a real MMD model also needs `AIRI_UNITY_STAGE_PMX_SAMPLE`, with the folder of an unpacked model. The repository has no MMD model, because MMD models have terms of their own.
+`apps/stage-tamagotchi/src/main/services/airi/unity-stage/player.integration.test.ts` tests a real player. It runs when `AIRI_UNITY_STAGE_PLAYER` names one. Each test also expects the exit code 0 from the player. The test of a real MMD model also needs `AIRI_UNITY_STAGE_PMX_SAMPLE`, with the folder of an unpacked model. The repository has no MMD model, because MMD models have terms of their own.
 
 ## Commands
 

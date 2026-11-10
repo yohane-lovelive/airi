@@ -93,8 +93,23 @@ describe('createUnityStageManager', () => {
 
       expect(status.state).toBe('running')
       expect(state.spawned[0].executable).toBe(process.execPath)
-      expect(state.spawned[0].args).toHaveLength(1)
+      expect(state.spawned[0].args).toHaveLength(2)
       expect(state.spawned[0].args[0]).toMatch(/^--airi-ws-url=ws:\/\/127\.0\.0\.1:\d+\/ws\?token=/)
+    })
+
+    // ROOT CAUSE:
+    //
+    // If the player loads a PSO library file, ID3D12PipelineLibrary::Serialize can read freed shaders at exit.
+    // Then the exit code is 0xC0000005.
+    //
+    // We fixed this with a flag that selects the other PSO cache file of Unity.
+    // player.integration.test.ts measures the exit code.
+    it('starts the player without the pipeline library of Unity', async () => {
+      const manager = createManager()
+
+      await manager.start()
+
+      expect(state.spawned[0].args).toContain('-force-d3d12-single-pso-disk-cache')
     })
 
     it('explains both ways to connect when no variable is set', async () => {
