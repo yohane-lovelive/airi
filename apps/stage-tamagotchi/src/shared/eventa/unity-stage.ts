@@ -1,4 +1,4 @@
-import type { CharacterFrame } from '@proj-airi/stage-shared/stage-sidecar'
+import type { CharacterAttentionTarget, CharacterFrame } from '@proj-airi/stage-shared/stage-sidecar'
 
 import type { ElectronStageSidecarStatus } from '.'
 
@@ -45,6 +45,7 @@ export type UnityStageSignal
   = | { type: 'host.character.expression', payload: { name: string, intensity: number, holdMs?: number } }
     | { type: 'host.character.gesture', payload: { kind: 'keys', id: string, part: 'upper', duration: number, tracks: { bone: string, times: number[], values: number[] }[] } }
     | { type: 'host.character.frame', payload: CharacterFrame }
+    | { type: 'host.character.attention', payload: { target: CharacterAttentionTarget } }
 
 export const unityStageStart = defineInvokeEventa<ElectronStageSidecarStatus>('eventa:invoke:unity-stage:start')
 export const unityStageStop = defineInvokeEventa<ElectronStageSidecarStatus>('eventa:invoke:unity-stage:stop')

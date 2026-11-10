@@ -44,6 +44,7 @@ public static partial class Program
         TestCameraRig();
         TestRoom();
         TestWander();
+        TestGaze();
         await TestSocketExchangesMessages();
         await TestSocketReportsHostClose();
         await TestSocketDropsSendsAfterDispose();
@@ -79,7 +80,7 @@ public static partial class Program
         }
 
         // The TypeScript test checks that the fixtures cover every type of the schema.
-        Check(seen.Count == 6, $"host message types in the fixtures: {seen.Count}");
+        Check(seen.Count == 7, $"host message types in the fixtures: {seen.Count}");
     }
 
     /// <summary>Compares each parsed field with the fixture, so no field gets lost on the way.</summary>
@@ -115,6 +116,9 @@ public static partial class Program
                 break;
             case CharacterFrameMessage frame:
                 CheckFrame(frame, payload);
+                break;
+            case CharacterAttentionMessage attention:
+                Check(attention.ToViewer == ((string)payload["target"] == "viewer"), "attention target");
                 break;
             case ShutdownMessage:
                 Check(payload == null, "shutdown has no payload");

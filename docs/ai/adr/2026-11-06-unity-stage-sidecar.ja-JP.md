@@ -124,6 +124,7 @@ Player モードでは、ホストは `-force-d3d12-single-pso-disk-cache` も�
 | `host.character.expression` | `name`、`intensity`、`holdMs` | `ACT` マーカー時 |
 | `host.character.gesture` | `kind`、`id`、`part`、および `tracks` と `duration`（`keys`）、または `.vrma` ファイルの `path`（`vrma`） | `ACT` マーカー時 |
 | `host.character.frame` | `mouth`（A、E、I、O、U）、`bones`（spine、chest、neck、head）、`eyes` | 毎秒 30 回 |
+| `host.character.attention` | `target`：`viewer` か `none` | 変わったとき。新しく `running` になったときにも送り直す。[歩行の ADR](2026-11-10-unity-stage-room-walking.ja-JP.md) で足す。 |
 | `host.shutdown` | なし | 停止時 |
 
 サイドカーからホストへ:

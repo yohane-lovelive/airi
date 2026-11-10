@@ -95,6 +95,8 @@ namespace Airi.Stage.Core
                     return ParseGesture(payload);
                 case "host.character.frame":
                     return ParseFrame(payload);
+                case "host.character.attention":
+                    return ParseAttention(payload);
                 default:
                     throw new StageProtocolException($"Unknown host message type: {type}");
             }
@@ -255,6 +257,21 @@ namespace Airi.Stage.Core
                 ReadText(payload, "id"),
                 part,
                 ReadText(payload, "path"));
+        }
+
+        private static CharacterAttentionMessage ParseAttention(JObject payload)
+        {
+            RequireOnlyFields(payload, "target");
+            string target = ReadText(payload, "target");
+            switch (target)
+            {
+                case "viewer":
+                    return new CharacterAttentionMessage(true);
+                case "none":
+                    return new CharacterAttentionMessage(false);
+                default:
+                    throw new StageProtocolException($"Unknown attention target: {target}");
+            }
         }
 
         private static CharacterFrameMessage ParseFrame(JObject payload)

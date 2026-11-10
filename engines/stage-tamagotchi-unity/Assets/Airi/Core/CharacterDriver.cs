@@ -12,7 +12,8 @@ namespace Airi.Stage.Core
     /// Update
     ///   -> FrameFollower.Update (mouth, offsets, eyes)
     ///   -> GestureMixer.Update (idle, walk, and gestures)
-    ///   -> offsets after the clips, as <c>BodyPoseApplier</c> does
+    ///   -> GazeAim.Update (the turn to the viewer, after the clips)
+    ///   -> offsets after the aim, as <c>BodyPoseApplier</c> does after the clips
     ///   -> ExpressionFader.Update, BlinkTimer.Update
     ///   -> Weights (expressions, mouth, blink)
     ///
@@ -29,6 +30,7 @@ namespace Airi.Stage.Core
         private readonly Func<double> _random;
         private readonly GestureMixer _mixer = new GestureMixer();
         private readonly FrameFollower _frames = new FrameFollower();
+        private readonly GazeAim _gaze = new GazeAim();
         private EmotionTable _table;
         private ExpressionFader _fader;
         private BlinkTimer _blink;
@@ -58,10 +60,10 @@ namespace Airi.Stage.Core
         public float[] Weights { get; private set; } = Array.Empty<float>();
 
         /// <summary>Radians. A positive value turns toward +X of the frame of the host.</summary>
-        public float EyesYaw => _frames.EyesYaw;
+        public float EyesYaw => _gaze.EyesYaw + _frames.EyesYaw;
 
         /// <summary>Radians. A positive value turns down.</summary>
-        public float EyesPitch => _frames.EyesPitch;
+        public float EyesPitch => _gaze.EyesPitch + _frames.EyesPitch;
 
         /// <summary>Starts a new model with the emotions of its kind. A gesture of the old model ends.</summary>
         public void StartModel(EmotionTable table)
@@ -131,6 +133,18 @@ namespace Airi.Stage.Core
             _frames.Receive(frame);
         }
 
+        /// <summary>Turns the head and the eyes to a point in this frame. <see cref="GazeAim.Aim"/> gives the frame of the direction.</summary>
+        public void AimGaze(double x, double y, double z)
+        {
+            _gaze.Aim(x, y, z);
+        }
+
+        /// <summary>Lets the head and the eyes return to the clips.</summary>
+        public void ReleaseGaze()
+        {
+            _gaze.Release();
+        }
+
         /// <summary>Computes the state of this frame. A call before <see cref="StartModel"/> does nothing.</summary>
         public void Update(float deltaSeconds)
         {
@@ -141,6 +155,9 @@ namespace Airi.Stage.Core
 
             _frames.Update(deltaSeconds);
             _mixer.Update(deltaSeconds, Pose);
+            _gaze.Update(deltaSeconds);
+            Pose.Rotations[Neck] = Pose.Rotations[Neck] * _gaze.Neck;
+            Pose.Rotations[Head] = Pose.Rotations[Head] * _gaze.Head;
 
             AddOffset(Spine, _frames.Spine);
             AddOffset(Chest, _frames.Chest);

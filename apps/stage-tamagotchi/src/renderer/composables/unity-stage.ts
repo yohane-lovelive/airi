@@ -1,4 +1,5 @@
 import type { GestureClipSource } from '@proj-airi/stage-shared/body-motion'
+import type { CharacterAttentionTarget } from '@proj-airi/stage-shared/stage-sidecar'
 import type { DisplayModel } from '@proj-airi/stage-ui/stores/display-models'
 
 import type { ElectronStageSidecarStatus } from '../../shared/eventa'
@@ -54,8 +55,9 @@ export function syncUnityStageRenderer(
  * It lives on the page that owns the stage, not in Settings. So a change of the character reaches the sidecar while
  * Settings is closed.
  *
- * Owned state: the output of `useStageSidecarStore`, and the last known status of the sidecar. Both end with the scope
- * of the page. A new `running` status sends the idle and the model again, because a new sidecar has neither.
+ * Owned state: the output of `useStageSidecarStore`, the last known status of the sidecar, and the last attention target.
+ * All end with the scope of the page. A new `running` status sends the idle, the model, and a `viewer` attention again,
+ * because a new sidecar has none of them.
  */
 export function useUnityStageBridge() {
   const { t } = useI18n()
@@ -73,6 +75,13 @@ export function useUnityStageBridge() {
 
   /** A newer model or session replaces the sync in progress, so an old model cannot arrive last. */
   let sceneGeneration = 0
+
+  /** The renderer sends only changes, so this copy lets a new sidecar learn the current target. */
+  let attention: CharacterAttentionTarget = 'none'
+
+  function sendAttention() {
+    context.value.emit(unityStageSignal, { type: 'host.character.attention', payload: { target: attention } })
+  }
 
   async function playGesture(source: GestureClipSource) {
     try {
@@ -109,6 +118,10 @@ export function useUnityStageBridge() {
     playGesture,
     sendFrame(frame) {
       context.value.emit(unityStageSignal, { type: 'host.character.frame', payload: frame })
+    },
+    setAttention(target) {
+      attention = target
+      sendAttention()
     },
   })
 
@@ -195,8 +208,13 @@ export function useUnityStageBridge() {
   })
 
   function applyStatus(status: ElectronStageSidecarStatus) {
+    const started = status.state === 'running' && sidecarState.value !== 'running'
     sidecarState.value = status.state
     syncUnityStageRenderer(settingsStore, status)
+
+    // A new sidecar starts with `none`, so only `viewer` needs to go again.
+    if (started && attention === 'viewer')
+      sendAttention()
   }
 
   const disposeStatusListener = context.value.on(unityStageStatusChanged, (event) => {

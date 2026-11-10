@@ -1,5 +1,5 @@
 import type { GestureClipSource } from '@proj-airi/stage-shared/body-motion'
-import type { CharacterFrame } from '@proj-airi/stage-shared/stage-sidecar'
+import type { CharacterAttentionTarget, CharacterFrame } from '@proj-airi/stage-shared/stage-sidecar'
 
 import { defineStore } from 'pinia'
 
@@ -15,6 +15,8 @@ export interface StageSidecarOutput {
   /** @returns whether the clip reached the sidecar. */
   playGesture: (source: GestureClipSource) => Promise<boolean>
   sendFrame: (frame: CharacterFrame) => void
+  /** Called only when the target changes. A new sidecar has no target, so the output sends the last one again. */
+  setAttention: (target: CharacterAttentionTarget) => void
 }
 
 /**
@@ -33,5 +35,6 @@ export const useStageSidecarStore = defineStore('stage-sidecar', () => {
     setExpression: (name: string, intensity: number, holdMs?: number) => output?.setExpression(name, intensity, holdMs),
     playGesture: async (source: GestureClipSource) => await output?.playGesture(source) ?? false,
     sendFrame: (frame: CharacterFrame) => output?.sendFrame(frame),
+    setAttention: (target: CharacterAttentionTarget) => output?.setAttention(target),
   }
 })

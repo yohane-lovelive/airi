@@ -99,6 +99,14 @@ The protocol gets one host message, `host.character.attention`, with the payload
 - On `viewer`, the character stops, and turns her body to the camera of the window in about 0.5 seconds. Her head and her eyes aim at the camera, inside the limits of the neck.
 - The procedural offsets of the frame stay on top of this aim, so the breath and the nods continue.
 
+W1-3 builds it this way:
+
+- `useStageSidecarAttention` in `stage-ui` decides the target in the renderer. The bridge of the desktop app keeps the last target, and a new `running` status sends `viewer` again.
+- `GazeAim` in `Core` turns the neck and the head up to 50 degrees to the side, and 25 degrees up or down. The neck takes 40% of this turn.
+- The eyes take the rest of the angle, up to 12 degrees to the side and 8 degrees up or down. The aim fades in and out in 0.3 seconds.
+- The body turns at 360 degrees each second, so a half turn takes 0.5 seconds. The head reaches the camera first.
+- The sidecar acts on the message only with `--airi-wander`, as on each other part of W1. Without the argument, the stage looks as before.
+
 | Option | What it does | Result |
 | --- | --- | --- |
 | **A new host message** | Electron decides the attention, and Unity only moves. | Chosen. Electron stays the brain, as the ADR of the Unity stage requires. The message is rare, not 30 times each second. |

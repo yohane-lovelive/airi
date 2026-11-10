@@ -99,6 +99,25 @@ namespace Airi.Stage
             _driver.SetLocomotion(metersPerSecond > SlowestWalk ? 1f : 0f, (float)StageWalk.Rate(metersPerSecond, hipHeight, cycle));
         }
 
+        /// <summary>
+        /// Turns the head and the eyes to a point in the world, or lets them return to the clips with null. Without an
+        /// avatar, they return too.
+        /// </summary>
+        /// <param name="body">The root of the avatars. Its rotation is the facing of her body.</param>
+        public void LookAt(Vector3? point, Transform body)
+        {
+            float headHeight = _host?.HeadHeight ?? 0f;
+            if (point == null || headHeight <= 0f)
+            {
+                _driver.ReleaseGaze();
+                return;
+            }
+
+            Vector3 head = body.position + (body.up * headHeight);
+            Vector3 direction = body.InverseTransformDirection(point.Value - head);
+            _driver.AimGaze(direction.x, direction.y, direction.z);
+        }
+
         public async Task PlayVrmaAsync(CharacterGestureVrmaMessage gesture)
         {
             int current = ++_newestGesture;

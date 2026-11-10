@@ -181,6 +181,24 @@ namespace Airi.Stage.Core
         }
     }
 
+    /// <summary>
+    /// Who the character turns to. The sidecar keeps the last value until the next message, and a new sidecar starts
+    /// with <c>none</c>.
+    /// </summary>
+    public sealed class CharacterAttentionMessage : HostMessage
+    {
+        /// <summary>
+        /// True for <c>viewer</c>: she stops, and turns her body, her head, and her eyes to the camera of the window.
+        /// False for <c>none</c>: she returns to her own activity.
+        /// </summary>
+        public readonly bool ToViewer;
+
+        public CharacterAttentionMessage(bool toViewer)
+        {
+            ToViewer = toViewer;
+        }
+    }
+
     /// <summary>Electron main stops the sidecar. The sidecar exits by itself.</summary>
     public sealed class ShutdownMessage : HostMessage
     {

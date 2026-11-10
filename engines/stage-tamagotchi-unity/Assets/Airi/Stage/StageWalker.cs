@@ -29,6 +29,9 @@ namespace Airi.Stage
         /// <summary>The turn of the body after a walk, in degrees each second.</summary>
         private const float TurnSpeed = 150f;
 
+        /// <summary>The turn of the body to the viewer, in degrees each second. A half turn takes 0.5 seconds.</summary>
+        private const float AttendTurnSpeed = 360f;
+
         private const float MinimumDistance = 2f;
         private const float MinimumEdgeDistance = 0.5f;
 
@@ -95,11 +98,15 @@ namespace Airi.Stage
             return new StageWalker(avatarRoot, room.Manifest);
         }
 
-        /// <summary>Advances the plan, moves the character, and gives the walk its speed. It runs once each frame.</summary>
-        public void Tick(float deltaSeconds, StageCharacter character)
+        /// <summary>
+        /// Advances the plan, moves the character, and gives the walk its speed. It runs once each frame.
+        /// </summary>
+        /// <param name="attention">Whether the host asks for the attention of the viewer.</param>
+        /// <param name="camera">The place of the camera of the window. She turns her body to it during an attention.</param>
+        public void Tick(float deltaSeconds, StageCharacter character, bool attention, Vector3 camera)
         {
             bool arrived = _plan.State == WanderState.Walk && !_agent.pathPending && (!_agent.hasPath || _agent.remainingDistance <= _agent.stoppingDistance);
-            switch (_plan.Update(deltaSeconds, arrived, false))
+            switch (_plan.Update(deltaSeconds, arrived, attention))
             {
                 case WanderChange.StartWalk:
                     _turn = null;
@@ -118,12 +125,21 @@ namespace Airi.Stage
                 case WanderChange.StartAttend:
                     _turn = null;
                     _agent.ResetPath();
+                    Debug.Log($"[Airi] Turn to the viewer at {Format(_root.position)}.");
+                    break;
+                case WanderChange.EndAttend:
+                    Debug.Log("[Airi] The attention of the viewer ends.");
                     break;
             }
 
             if (_plan.State == WanderState.Walk && _agent.hasPath)
             {
                 FaceSteeringTarget(deltaSeconds);
+            }
+
+            if (_plan.State == WanderState.Attend)
+            {
+                Face(camera, AttendTurnSpeed * deltaSeconds);
             }
 
             if (_turn != null)
@@ -184,6 +200,19 @@ namespace Airi.Stage
             toward.Normalize();
             _root.rotation = Quaternion.RotateTowards(_root.rotation, Quaternion.LookRotation(toward, Vector3.up), WalkTurnSpeed * deltaSeconds);
             _agent.speed = Speed * Mathf.Clamp01(Vector3.Dot(_root.forward, toward));
+        }
+
+        /// <summary>Turns the body about the vertical axis toward a point. The camera follows her, so the point moves.</summary>
+        private void Face(Vector3 point, float maxDegrees)
+        {
+            Vector3 toward = point - _root.position;
+            toward.y = 0f;
+            if (toward.sqrMagnitude < 0.0001f)
+            {
+                return;
+            }
+
+            _root.rotation = Quaternion.RotateTowards(_root.rotation, Quaternion.LookRotation(toward, Vector3.up), maxDegrees);
         }
 
         /// <summary>Finds the direction with the most free floor in front, out of eight, so she does not face a wall.</summary>

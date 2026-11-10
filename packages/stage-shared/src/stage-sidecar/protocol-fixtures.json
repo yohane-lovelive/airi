@@ -115,6 +115,18 @@
       }
     },
     {
+      "type": "host.character.attention",
+      "payload": {
+        "target": "viewer"
+      }
+    },
+    {
+      "type": "host.character.attention",
+      "payload": {
+        "target": "none"
+      }
+    },
+    {
       "type": "host.shutdown"
     }
   ],
@@ -447,6 +459,25 @@
             "yaw": 0,
             "pitch": 0
           }
+        }
+      }
+    },
+    {
+      "reason": "unknown attention target",
+      "message": {
+        "type": "host.character.attention",
+        "payload": {
+          "target": "camera"
+        }
+      }
+    },
+    {
+      "reason": "extra field in an attention",
+      "message": {
+        "type": "host.character.attention",
+        "payload": {
+          "target": "viewer",
+          "seconds": 15
         }
       }
     }

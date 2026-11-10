@@ -63,6 +63,9 @@ namespace Airi.Stage
 
         private StageWalker _walker;
 
+        /// <summary>The last attention of the host: true for the viewer. Only a walking character acts on it.</summary>
+        private bool _attention;
+
         /// <summary>The number of the newest scene. An older scene drops its model when it finishes.</summary>
         private int _newestScene;
 
@@ -283,6 +286,10 @@ namespace Airi.Stage
                 case CharacterFrameMessage frame:
                     _character.ReceiveFrame(frame);
                     break;
+                case CharacterAttentionMessage attention:
+                    _attention = attention.ToViewer;
+                    Debug.Log($"[Airi] Attention: {(attention.ToViewer ? "viewer" : "none")}.");
+                    break;
                 default:
                     break;
             }
@@ -292,6 +299,9 @@ namespace Airi.Stage
         /// Applies the character after the clips of this frame. UniVRM reads the result later in
         /// this frame, because its execution order comes after the default order. The NavMesh agent
         /// moved the avatars before this call, so the camera follows them here.
+        ///
+        /// The attention of the viewer acts only while she walks through a room, as each part of W1 in
+        /// the walking ADR stays off without its argument. Without it, the stage looks as before.
         /// </summary>
         private void LateUpdate()
         {
@@ -300,7 +310,10 @@ namespace Airi.Stage
                 return;
             }
 
-            _walker?.Tick(Time.deltaTime, _character);
+            bool attending = _attention && _walker != null;
+            Vector3 camera = _camera.transform.position;
+            _walker?.Tick(Time.deltaTime, _character, attending, camera);
+            _character.LookAt(attending ? camera : (Vector3?)null, _avatarRoot);
             _character.Tick(Time.deltaTime);
             _output.Follow(_avatarRoot.position - _framedAt);
         }

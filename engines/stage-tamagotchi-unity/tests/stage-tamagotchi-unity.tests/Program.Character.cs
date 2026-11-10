@@ -364,6 +364,8 @@ public static partial class Program
         var small = new MmdHumanoidRetarget(new[] { new MmdRigBone("頭", -1, 0, 15, 0) });
         Check(small.DrivenBones.Count == 1, "a small model drives its one known bone");
         CheckClose(small.HipHeight, 0, "a model without hips has no hip height");
+        CheckClose(small.HeadHeight, 15, "the head height comes from the head bone");
+        CheckClose(new MmdHumanoidRetarget(new[] { new MmdRigBone("センター", -1, 0, 8, 0) }).HeadHeight, 0, "a model without a head has no head height");
         var smallPositions = new float[3];
         var smallRotations = new float[4];
         small.Apply(new StagePose(), 0, 0, smallPositions, smallRotations);

@@ -89,6 +89,17 @@ const characterFrameSchema = strictObject({
   }),
 })
 
+/**
+ * Who the character turns to. The renderer decides it, because it knows when AIRI thinks or speaks. The sidecar keeps
+ * the last value until the next message.
+ *
+ * - `viewer`: she stops, and she turns her body, her head, and her eyes to the camera of the window.
+ * - `none`: she returns to her own activity, for example a walk through the room.
+ */
+const characterAttentionSchema = strictObject({
+  target: picklist(['viewer', 'none']),
+})
+
 /** What Electron main sends to a display sidecar. A sidecar answers an invalid message with `character.error`. */
 export const HostMessageSchema = variant('type', [
   strictObject({
@@ -123,6 +134,10 @@ export const HostMessageSchema = variant('type', [
   strictObject({
     type: literal('host.character.frame'),
     payload: characterFrameSchema,
+  }),
+  strictObject({
+    type: literal('host.character.attention'),
+    payload: characterAttentionSchema,
   }),
   strictObject({
     type: literal('host.shutdown'),
@@ -167,6 +182,7 @@ export type HostMessage = InferOutput<typeof HostMessageSchema>
 export type SidecarMessage = InferOutput<typeof SidecarMessageSchema>
 export type CharacterGesture = InferOutput<typeof characterGestureSchema>
 export type CharacterFrame = InferOutput<typeof characterFrameSchema>
+export type CharacterAttentionTarget = InferOutput<typeof characterAttentionSchema>['target']
 
 /**
  * Parses a message for a sidecar.

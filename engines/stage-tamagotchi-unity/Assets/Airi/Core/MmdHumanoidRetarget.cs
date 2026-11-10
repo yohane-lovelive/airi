@@ -66,6 +66,9 @@ namespace Airi.Stage.Core
         /// <summary>The height of the hip joints in PMX units, for the scale of a hips motion.</summary>
         public float HipHeight { get; }
 
+        /// <summary>The height of the head joint in PMX units, or 0 without a head bone. A turn to the viewer aims from it.</summary>
+        public float HeadHeight { get; }
+
         public MmdHumanoidRetarget(IReadOnlyList<MmdRigBone> bones)
         {
             _bones = bones;
@@ -111,6 +114,8 @@ namespace Airi.Stage.Core
             _vrmWorld = new StageQuaternion[HumanBones.Count];
             _boneWorld = new StageQuaternion[bones.Count];
             HipHeight = ComputeHipHeight(boneIndex);
+            int headTarget = _targetOfHuman[HumanBones.IndexOf("head")];
+            HeadHeight = headTarget >= 0 ? _bones[headTarget].Y : 0;
         }
 
         /// <summary>

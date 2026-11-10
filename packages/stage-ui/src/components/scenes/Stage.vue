@@ -33,6 +33,7 @@ import { useI18n } from 'vue-i18n'
 import StageAvatarModelMissing from './stage-avatar-model-missing.vue'
 import StageRenderError from './stage-render-error.vue'
 
+import { useStageSidecarAttention } from '../../composables/stage-sidecar-attention'
 import { useStageSidecarFrames } from '../../composables/stage-sidecar-frames'
 // import { useDuckDb } from '../../composables/use-duck-db'
 import { Emotion, EMOTION_EmotionMotionName_value, EMOTION_VRMExpressionName_value, EmotionThinkMotionName } from '../../constants/emotions'
@@ -507,6 +508,11 @@ useStageSidecarFrames({
   isThinking: () => presenceBubble.value.thinking,
   isBodyMotionEnabled: () => bodyMotionEnabled.value,
   send: frame => stageSidecar.sendFrame(frame),
+})
+useStageSidecarAttention({
+  active: () => stageModelRenderer.value === 'unity',
+  isEngaged: () => presenceBubble.value.thinking || nowSpeaking.value,
+  send: target => stageSidecar.setAttention(target),
 })
 // setTargetAtTime smooths slider drags into the gain, so volume changes do not click.
 watch(speechVolume, (volume) => {

@@ -6,6 +6,7 @@ export {
 } from './protocol'
 
 export type {
+  CharacterAttentionTarget,
   CharacterFrame,
   CharacterGesture,
   HostMessage,
