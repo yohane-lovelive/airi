@@ -63,7 +63,9 @@ A room is a Unity package of a world, for example a VRChat world from BOOTH. Rea
 
 The folder then has `room.bundle` and `room.json`. The import chooses a stand point and a facing. To change them, edit `stand` and `facing` in `room.json`. The next import keeps them.
 
-The import takes only data files. It removes the scripts of the VRChat SDK, moves the materials to URP, and keeps the baked light. The [ADR](../../docs/ai/adr/2026-11-06-unity-stage-sidecar.md) lists each step.
+The import also opens the doors that cut off a room, so the character can walk into it. It hides these doors and lists them in `openDoors` of `room.json`. To open or close another door, edit this list, and import the room again.
+
+The import takes only data files. It removes the scripts of the VRChat SDK, moves the materials to URP, and keeps the baked light. It also bakes the walkable area of the room, a NavMesh, for the walk of the character. The [ADR](../../docs/ai/adr/2026-11-06-unity-stage-sidecar.md) lists each step.
 
 ## Work in the Editor
 
@@ -137,7 +139,7 @@ dotnet format stage-tamagotchi-unity.slnx --verify-no-changes
 
 ## Dependencies
 
-`Core` uses Newtonsoft.Json. `dotnet` gets it from NuGet, and Unity gets it from the `com.unity.nuget.newtonsoft-json` package. `Stage` uses UniVRM v0.131.4, lilToon 2.4.1, and URP, which `Packages/manifest.json` pins, and the vendored unity-mmd-loader v0.5.1.
+`Core` uses Newtonsoft.Json. `dotnet` gets it from NuGet, and Unity gets it from the `com.unity.nuget.newtonsoft-json` package. `Stage` uses UniVRM v0.131.4, lilToon 2.4.1, AI Navigation 2.0.16, and URP, which `Packages/manifest.json` pins, and the vendored unity-mmd-loader v0.5.1.
 
 The stage makes lilToon materials at runtime. So `setup:project` sets `LILTOON_DISABLE_OPTIMIZATION`, and a build keeps each feature of lilToon.
 

@@ -6,10 +6,12 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using Airi.Stage.Core;
+using Unity.AI.Navigation;
 using UnityEditor;
 using UnityEditor.Rendering;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.AI;
 using UnityEngine.Rendering.Universal;
 using UnityEngine.SceneManagement;
 
@@ -39,6 +41,8 @@ namespace Airi.Stage.Editor
     ///     -> <see cref="FillMissingSky"/>
     ///     -> <see cref="CheckLightmaps"/>
     ///     -> <see cref="MeasureRoom"/>
+    ///     -> <see cref="OpenDoors"/>
+    ///     -> <see cref="BakeNavMesh"/>
     ///     -> <see cref="BuildBundle"/>
     /// </summary>
     public static class StageRoomImport
@@ -60,6 +64,21 @@ namespace Airi.Stage.Editor
 
         /// <summary>A spot keeps this far from each wall and each piece of furniture, so hair and hands stay out of them.</summary>
         private const float MinimumWallClearance = 0.6f;
+
+        /// <summary>
+        /// An open door must add this much floor, in square meters. A toilet adds about 1.5. The inside of a closet adds
+        /// less, because the agent fits in it only as a narrow strip.
+        /// </summary>
+        private const float MinimumNewFloor = 1.5f;
+
+        /// <summary>Each round can open a door that a room of the round before shows. Three rooms deep is enough for a home.</summary>
+        private const int DoorRounds = 3;
+
+        /// <summary>Words of the names of doors, in English and in Japanese.</summary>
+        private static readonly string[] DoorWords = { "door", "ドア", "扉", "戸" };
+
+        /// <summary>A door frame stays, because it is a part of the wall.</summary>
+        private static readonly string[] FrameWords = { "frame", "枠" };
 
         /// <summary>Asset kinds that hold only data. Each other kind stays out of the project.</summary>
         private static readonly HashSet<string> DataKinds = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -150,7 +169,11 @@ namespace Airi.Stage.Editor
             EditorSceneManager.SaveScene(scene);
             AssetDatabase.SaveAssets();
 
-            StageRoomManifest manifest = MeasureRoom(scene, name, folder);
+            StageRoomManifest measured = MeasureRoom(scene, name, folder);
+            IReadOnlyList<string> openDoors = OpenDoors(scene, folder, measured);
+            var manifest = new StageRoomManifest(measured.Name, measured.Bundle, measured.StandX, measured.StandY, measured.StandZ, measured.FacingDegrees, measured.Box, openDoors);
+            BakeNavMesh(scene, target, manifest.Box);
+            EditorSceneManager.SaveScene(scene);
             BuildBundle(scene.path, folder);
 
             // The player reads the file with the same rules, so a file that it refuses must fail the import here.
@@ -850,6 +873,193 @@ namespace Airi.Stage.Editor
                 Debug.LogWarning($"[Airi] The import writes {path} again, because it is broken: {error.Message}");
                 return null;
             }
+        }
+
+        /// <summary>
+        /// Bakes the walkable area of the room from the render meshes inside the box of the room, with a margin of
+        /// 0.5 m on each side. So the furniture is part of the bake, also without colliders. The ceilings stay in the
+        /// volume, because a mesh outside the volume does not block the space above a surface. Their tops become
+        /// areas that the floor does not reach. The agent type Humanoid gives the size of the character, see
+        /// <see cref="StageProjectSetup"/>.
+        ///
+        /// The data is an asset next to the scene, so the scene bundle carries it. The surface adds the data to the
+        /// NavMesh when the player loads the room.
+        /// </summary>
+        private static void BakeNavMesh(Scene scene, string target, StageRoomBox box)
+        {
+            NavMeshSurface surface = AddSurface(scene, box, "Airi NavMesh");
+            surface.BuildNavMesh();
+            if (surface.navMeshData == null)
+            {
+                throw new InvalidOperationException("The bake of the NavMesh gave no data.");
+            }
+
+            string path = $"{target}/AiriNavMesh.asset";
+            AssetDatabase.CreateAsset(surface.navMeshData, path);
+            EditorSceneManager.MarkSceneDirty(scene);
+            NavMeshTriangulation triangulation = NavMesh.CalculateTriangulation();
+            Debug.Log($"[Airi] The NavMesh of the room has {triangulation.indices.Length / 3} triangles, in {path}.");
+        }
+
+        /// <summary>Adds a surface that collects the render meshes inside the box of the room, with a margin of 0.5 m.</summary>
+        private static NavMeshSurface AddSurface(Scene scene, StageRoomBox box, string name)
+        {
+            const float margin = 0.5f;
+            var holder = new GameObject(name);
+            SceneManager.MoveGameObjectToScene(holder, scene);
+            var surface = holder.AddComponent<NavMeshSurface>();
+            surface.collectObjects = CollectObjects.Volume;
+            surface.useGeometry = NavMeshCollectGeometry.RenderMeshes;
+            surface.center = new Vector3((float)(box.MinX + box.MaxX) / 2f, (float)(box.MinY + box.MaxY) / 2f, (float)(box.MinZ + box.MaxZ) / 2f);
+            surface.size = new Vector3((float)(box.MaxX - box.MinX) + (2f * margin), (float)(box.MaxY - box.MinY) + (2f * margin), (float)(box.MaxZ - box.MinZ) + (2f * margin));
+            return surface;
+        }
+
+        /// <summary>
+        /// Opens the doors that cut off floor of the room, so the character can walk into each room, also onto a
+        /// balcony. The import hides each such door, so its doorway is open in the bundle and in the NavMesh. A hidden
+        /// door does not swing or slide, and the baked light still holds its shade.
+        ///
+        /// An earlier <c>room.json</c> with a list keeps that list, so the owner can edit it once. Without a list, the
+        /// import finds the doors with <see cref="FindDoorsToOpen"/>.
+        ///
+        /// Returns:
+        /// - The names of the open doors, for <c>room.json</c>.
+        /// </summary>
+        private static IReadOnlyList<string> OpenDoors(Scene scene, string folder, StageRoomManifest room)
+        {
+            GameObject[] doors = AllObjects(scene).Where(IsDoor).ToArray();
+            StageRoomManifest earlier = ReadEarlierManifest(folder);
+            if (earlier?.OpenDoors == null)
+            {
+                return FindDoorsToOpen(scene, doors, room);
+            }
+
+            var listed = new HashSet<string>(earlier.OpenDoors, StringComparer.Ordinal);
+            foreach (GameObject door in doors.Where(door => listed.Contains(door.name)))
+            {
+                door.SetActive(false);
+            }
+
+            string[] missing = earlier.OpenDoors.Where(name => doors.All(door => door.name != name)).ToArray();
+            Debug.Log($"[Airi] Opened the {earlier.OpenDoors.Count} doors of room.json.{(missing.Length > 0 ? $" No door has these names: {string.Join(", ", missing)}." : string.Empty)}");
+            return earlier.OpenDoors;
+        }
+
+        /// <summary>A door is a part with a renderer and a name like a door, but not a door frame.</summary>
+        private static bool IsDoor(GameObject part)
+        {
+            string name = part.name.ToLowerInvariant();
+            return part.GetComponent<Renderer>() != null && DoorWords.Any(name.Contains) && !FrameWords.Any(name.Contains);
+        }
+
+        /// <summary>
+        /// Finds the doors that cut off floor. The import hides each group of doors, bakes, and measures the floor
+        /// that the stand point reaches. A group stays hidden only when it adds at least
+        /// <see cref="MinimumNewFloor"/>. So a closet, an open door, and the front door stay as they are.
+        ///
+        /// Doors that touch each other are one group, for example the panels of a sliding door, because one panel
+        /// alone leaves no passage. A new room can have a door further in, so the search runs a few rounds.
+        /// </summary>
+        private static List<string> FindDoorsToOpen(Scene scene, GameObject[] doors, StageRoomManifest room)
+        {
+            var open = new List<string>();
+            List<List<GameObject>> groups = GroupTouching(doors);
+            var stand = new Vector3((float)room.StandX, (float)room.StandY, (float)room.StandZ);
+            NavMeshSurface surface = AddSurface(scene, room.Box, "Airi Door Test");
+            try
+            {
+                surface.BuildNavMesh();
+                float first = ReachableFloor(stand, room.Box);
+                float floor = first;
+                for (int round = 0; round < DoorRounds; round++)
+                {
+                    bool opened = false;
+                    foreach (List<GameObject> group in groups.Where(group => group[0].activeSelf))
+                    {
+                        group.ForEach(door => door.SetActive(false));
+                        surface.BuildNavMesh();
+                        float reached = ReachableFloor(stand, room.Box);
+                        if (reached - floor < MinimumNewFloor)
+                        {
+                            group.ForEach(door => door.SetActive(true));
+                            continue;
+                        }
+
+                        Debug.Log($"[Airi] Opened {string.Join(", ", group.Select(door => door.name))}: {reached - floor:F1} m² more floor.");
+                        open.AddRange(group.Select(door => door.name));
+                        floor = reached;
+                        opened = true;
+                    }
+
+                    if (!opened)
+                    {
+                        break;
+                    }
+                }
+
+                Debug.Log($"[Airi] {doors.Length} doors in {groups.Count} groups. The stand point reaches {floor:F1} m² of floor, {floor - first:F1} m² more with {open.Count} open doors.");
+            }
+            finally
+            {
+                surface.RemoveData();
+                UnityEngine.Object.DestroyImmediate(surface.gameObject);
+            }
+
+            return open;
+        }
+
+        /// <summary>Puts doors whose bounds touch, with a gap of up to 0.1 m, into one group.</summary>
+        private static List<List<GameObject>> GroupTouching(GameObject[] doors)
+        {
+            var groups = new List<List<GameObject>>();
+            foreach (GameObject door in doors)
+            {
+                Bounds bounds = door.GetComponent<Renderer>().bounds;
+                bounds.Expand(0.1f);
+                List<List<GameObject>> touching = groups.Where(group => group.Any(other => bounds.Intersects(other.GetComponent<Renderer>().bounds))).ToList();
+                var merged = new List<GameObject> { door };
+                foreach (List<GameObject> group in touching)
+                {
+                    merged.AddRange(group);
+                    groups.Remove(group);
+                }
+
+                groups.Add(merged);
+            }
+
+            return groups;
+        }
+
+        /// <summary>The area of the floor of the stand point, inside the box, that a path from the stand point reaches.</summary>
+        private static float ReachableFloor(Vector3 stand, StageRoomBox box)
+        {
+            if (!NavMesh.SamplePosition(stand, out NavMeshHit start, 1f, NavMesh.AllAreas))
+            {
+                return 0f;
+            }
+
+            NavMeshTriangulation mesh = NavMesh.CalculateTriangulation();
+            var path = new NavMeshPath();
+            float area = 0f;
+            for (int index = 0; index + 2 < mesh.indices.Length; index += 3)
+            {
+                Vector3 a = mesh.vertices[mesh.indices[index]];
+                Vector3 b = mesh.vertices[mesh.indices[index + 1]];
+                Vector3 c = mesh.vertices[mesh.indices[index + 2]];
+                Vector3 center = (a + b + c) / 3f;
+                if (Mathf.Abs(center.y - start.position.y) > StageRoomManifest.SameFloor || !box.Contains(center.x, box.MinY, center.z))
+                {
+                    continue;
+                }
+
+                if (NavMesh.CalculatePath(start.position, center, NavMesh.AllAreas, path) && path.status == NavMeshPathStatus.PathComplete)
+                {
+                    area += Vector3.Cross(b - a, c - a).magnitude / 2f;
+                }
+            }
+
+            return area;
         }
 
         /// <summary>Builds the bundle in a temporary folder, and copies only the bundle to the room folder.</summary>

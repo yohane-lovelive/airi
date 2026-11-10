@@ -4,6 +4,7 @@
   "references": [
     "Airi.Stage.Core",
     "Mmd.Runtime",
+    "Unity.AI.Navigation",
     "UniGLTF",
     "UniGLTF.Utils",
     "VRM10",

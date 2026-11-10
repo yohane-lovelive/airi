@@ -41,6 +41,15 @@ public static partial class Program
 
         var precise = new StageRoomManifest("a", "b", 0.12345, 0, 0, 33.33333, new StageRoomBox(-1, -1, -1, 1, 1, 1));
         CheckNear(StageRoomManifest.Parse(precise.ToJson()).StandX, 0.123, "a written room keeps millimeters");
+
+        // Without a list, the import finds the doors. An empty list means that the owner opens no door.
+        Check(room.OpenDoors == null, "a room file without doors gives no list");
+        Check(copy.OpenDoors == null, "a room without a list writes no list");
+        StageRoomManifest doors = StageRoomManifest.Parse(RoomFile.Replace("\"facing\": 90,", "\"facing\": 90, \"openDoors\": [\"Door.011\", \"ドア\"],"));
+        Check(doors.OpenDoors != null && doors.OpenDoors.Count == 2 && doors.OpenDoors[1] == "ドア", "the room file gives the open doors");
+        Check(string.Join("|", StageRoomManifest.Parse(doors.ToJson()).OpenDoors) == "Door.011|ドア", "the open doors survive a write");
+        StageRoomManifest none = StageRoomManifest.Parse(RoomFile.Replace("\"facing\": 90,", "\"facing\": 90, \"openDoors\": [],"));
+        Check(none.OpenDoors != null && none.OpenDoors.Count == 0, "an empty list of doors stays empty");
     }
 
     private static void TestRoomFileRejections()
@@ -56,6 +65,9 @@ public static partial class Program
         CheckRoomRejected(RoomFile.Replace("\"facing\": 90,", string.Empty), "no facing");
         CheckRoomRejected(RoomFile.Replace("[-6, -0.1, -2.3]", "[3, -0.1, -2.3]"), "a box with min over max");
         CheckRoomRejected(RoomFile.Replace("[-1.5, 0, 0.25]", "[-1.5, 0, 5]"), "a stand point outside the box");
+        CheckRoomRejected(RoomFile.Replace("\"facing\": 90,", "\"facing\": 90, \"openDoors\": \"Door\","), "doors that are not a list");
+        CheckRoomRejected(RoomFile.Replace("\"facing\": 90,", "\"facing\": 90, \"openDoors\": [\"Door\", 3],"), "a door that is not a name");
+        CheckRoomRejected(RoomFile.Replace("\"facing\": 90,", "\"facing\": 90, \"openDoors\": [\" \"],"), "a door with an empty name");
     }
 
     private static void CheckRoomRejected(string text, string reason)

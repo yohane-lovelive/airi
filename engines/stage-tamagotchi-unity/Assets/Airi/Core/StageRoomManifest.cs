@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -102,6 +103,12 @@ namespace Airi.Stage.Core
         public const int CurrentVersion = 1;
         private const string Argument = "--airi-room=";
 
+        /// <summary>A point at most this far above or below the stand point is on the floor of the stand point.</summary>
+        public const float SameFloor = 0.3f;
+
+        /// <summary>A world has some dozens of doors. This limit only stops a broken file.</summary>
+        private const int MaxOpenDoors = 500;
+
         public StageRoomManifest(
             string name,
             string bundle,
@@ -109,7 +116,8 @@ namespace Airi.Stage.Core
             double standY,
             double standZ,
             double facingDegrees,
-            StageRoomBox box)
+            StageRoomBox box,
+            IReadOnlyList<string> openDoors = null)
         {
             Name = name;
             Bundle = bundle;
@@ -118,6 +126,7 @@ namespace Airi.Stage.Core
             StandZ = standZ;
             FacingDegrees = facingDegrees;
             Box = box;
+            OpenDoors = openDoors;
         }
 
         public string Name { get; }
@@ -137,6 +146,12 @@ namespace Airi.Stage.Core
 
         /// <summary>The inside of the room. The camera stays in it.</summary>
         public StageRoomBox Box { get; }
+
+        /// <summary>
+        /// The names of the doors that the import hides, so the character can walk through their doorways. Null when
+        /// the file has no list. Then the import finds the doors itself.
+        /// </summary>
+        public IReadOnlyList<string> OpenDoors { get; }
 
         /// <summary>
         /// Reads the room folder from the arguments of the process, or else from the environment variable
@@ -203,7 +218,7 @@ namespace Airi.Stage.Core
                 throw new StageRoomException("The point \"stand\" must be inside \"box\".");
             }
 
-            return new StageRoomManifest(name, bundle, stand[0], stand[1], stand[2], facing, box);
+            return new StageRoomManifest(name, bundle, stand[0], stand[1], stand[2], facing, box, ReadNames(root["openDoors"], "openDoors"));
         }
 
         /// <summary>Gives the text of the room file. <see cref="Parse"/> reads it back.</summary>
@@ -222,7 +237,39 @@ namespace Airi.Stage.Core
                     ["max"] = Point(Box.MaxX, Box.MaxY, Box.MaxZ),
                 },
             };
+            if (OpenDoors != null)
+            {
+                root["openDoors"] = new JArray(OpenDoors);
+            }
+
             return root.ToString(Formatting.Indented);
+        }
+
+        /// <summary>Reads an optional list of names. A missing field gives null, and an empty list stays empty.</summary>
+        private static IReadOnlyList<string> ReadNames(JToken value, string field)
+        {
+            if (value == null)
+            {
+                return null;
+            }
+
+            if (!(value is JArray array) || array.Count > MaxOpenDoors)
+            {
+                throw new StageRoomException($"The field \"{field}\" must be a list of at most {MaxOpenDoors} names.");
+            }
+
+            var names = new List<string>();
+            foreach (JToken item in array)
+            {
+                if (item.Type != JTokenType.String || string.IsNullOrWhiteSpace((string)item))
+                {
+                    throw new StageRoomException($"Each item of \"{field}\" must be a name.");
+                }
+
+                names.Add((string)item);
+            }
+
+            return names;
         }
 
         private static string ReadText(JObject root, string field)

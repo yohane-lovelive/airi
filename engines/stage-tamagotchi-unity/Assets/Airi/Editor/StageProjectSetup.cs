@@ -23,6 +23,7 @@ namespace Airi.Stage.Editor
     /// tools/run-unity.ps1 (-executeMethod)
     ///   -> <see cref="Apply"/>
     ///     -> <see cref="ApplyPlayerSettings"/>
+    ///     -> <see cref="ApplyNavMeshAgent"/>
     ///     -> <see cref="CreateRenderPipeline"/>
     ///     -> <see cref="IncludeRuntimeShaders"/>
     ///     -> <see cref="CreateScene"/>
@@ -48,6 +49,7 @@ namespace Airi.Stage.Editor
         public static void Apply()
         {
             ApplyPlayerSettings();
+            ApplyNavMeshAgent();
             UniversalRenderPipelineAsset pipeline = CreateRenderPipeline();
             GraphicsSettings.defaultRenderPipeline = pipeline;
             QualitySettings.renderPipeline = pipeline;
@@ -84,6 +86,30 @@ namespace Airi.Stage.Editor
                 var updated = new List<string>(defines) { keepLilToonFeatures };
                 PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.Standalone, updated.ToArray());
             }
+        }
+
+        /// <summary>
+        /// Sets the size of the agent type Humanoid. The import bakes the NavMesh of a room with it, and the character
+        /// walks with it. The default radius of 0.5 m does not pass a door of 0.8 m.
+        /// </summary>
+        private static void ApplyNavMeshAgent()
+        {
+            var settings = new SerializedObject(AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/NavMeshAreas.asset")[0]);
+            SerializedProperty humanoid = settings.FindProperty("m_Settings").GetArrayElementAtIndex(0);
+            if (humanoid.FindPropertyRelative("agentTypeID").intValue != 0)
+            {
+                throw new InvalidDataException("The first agent type of the NavMesh settings is not Humanoid.");
+            }
+
+            humanoid.FindPropertyRelative("agentRadius").floatValue = 0.25f;
+
+            // The character is about 1.6 m tall. So she does not walk under a table or a low shelf.
+            humanoid.FindPropertyRelative("agentHeight").floatValue = 1.7f;
+
+            // A step of a door frame is lower than this. A step of a stair is often higher.
+            humanoid.FindPropertyRelative("agentClimb").floatValue = 0.2f;
+            humanoid.FindPropertyRelative("agentSlope").floatValue = 30f;
+            settings.ApplyModifiedPropertiesWithoutUndo();
         }
 
         private static UniversalRenderPipelineAsset CreateRenderPipeline()
