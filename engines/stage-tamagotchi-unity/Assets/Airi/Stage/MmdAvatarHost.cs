@@ -35,15 +35,18 @@ namespace Airi.Stage
         private const float MorphChangeThreshold = 0.001f;
 
         private readonly Transform _parent;
+        private readonly StageLook _look;
+        private readonly LookMaterials _lookMaterials = new LookMaterials();
         private GameObject _current;
         private MmdHumanoidRetarget _retarget;
         private AiriMmdHostPose _hostPose;
         private Dictionary<string, int> _morphOfSlot = new Dictionary<string, int>();
         private int _newestLoad;
 
-        public MmdAvatarHost(Transform parent)
+        public MmdAvatarHost(Transform parent, StageLook look)
         {
             _parent = parent;
+            _look = look;
         }
 
         /// <inheritdoc/>
@@ -113,6 +116,7 @@ namespace Airi.Stage
             _retarget = retarget;
             _hostPose = hostPose;
             _morphOfSlot = FindMorphsOfSlots(model);
+            _look.Apply(root.GetComponentsInChildren<Renderer>(), AvatarMaterialFormat.Mmd, _lookMaterials);
 
             // A newer model can replace this one during the unload below, so the measure comes first.
             Bounds bounds = MeasureBounds(instance);
@@ -139,6 +143,8 @@ namespace Airi.Stage
                 _retarget = null;
                 _hostPose = null;
             }
+
+            _lookMaterials.Clear();
         }
 
         /// <inheritdoc/>
@@ -151,6 +157,7 @@ namespace Airi.Stage
 
             IReadOnlyList<string> names = character.WeightNames;
             float[] weights = character.Weights;
+            bool morphsChanged = false;
             for (int index = 0; index < weights.Length; index++)
             {
                 if (_morphOfSlot.TryGetValue(names[index], out int morph)
@@ -158,6 +165,7 @@ namespace Airi.Stage
                 {
                     _hostPose.MorphWeights[morph] = weights[index];
                     _hostPose.MarkMorphsChanged();
+                    morphsChanged = true;
                 }
             }
 
@@ -178,6 +186,12 @@ namespace Airi.Stage
             }
 
             _hostPose.Step(Mathf.Min(deltaSeconds, MaxPhysicsStepSeconds));
+
+            // The step writes the material morphs to the materials of the loader.
+            if (morphsChanged)
+            {
+                _lookMaterials.Sync();
+            }
         }
 
         private static Dictionary<string, int> FindMorphsOfSlots(MmdModelDefinition model)

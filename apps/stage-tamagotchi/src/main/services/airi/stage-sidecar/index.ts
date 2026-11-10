@@ -98,6 +98,12 @@ export interface StageSidecarHostOptions {
   onSessionEnd?: () => void
   /** @default 20000 */
   readyTimeoutMs?: number
+  /**
+   * The time that the sidecar gets to exit after `host.shutdown`. Then the host ends the process.
+   *
+   * @default 2000
+   */
+  exitTimeoutMs?: number
 }
 
 /**
@@ -547,7 +553,7 @@ export function createStageSidecarHost(options: StageSidecarHostOptions): StageS
         try {
           send('host.shutdown')
 
-          const exited = await waitForProcessExit(exitPromise, 2_000)
+          const exited = await waitForProcessExit(exitPromise, options.exitTimeoutMs ?? 2_000)
 
           if (!exited) {
             activeProcess.kill()

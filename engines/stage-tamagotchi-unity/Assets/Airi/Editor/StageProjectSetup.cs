@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
+using lilToon;
 using Mmd.Rendering.Universal;
 using UnityEditor;
 using UnityEditor.Build;
@@ -8,6 +9,8 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 using UnityEngine.SceneManagement;
+using VRM10.MToon10;
+using LilRenderingMode = lilToon.RenderingMode;
 
 namespace Airi.Stage.Editor
 {
@@ -28,6 +31,7 @@ namespace Airi.Stage.Editor
     {
         private const string SettingsFolder = "Assets/Airi/Settings";
         private const string ScenePath = "Assets/Airi/Scenes/Stage.unity";
+        private const string LookTemplateFolder = "Assets/Airi/Looks/Resources/AiriLooks";
 
         /// <summary>
         /// UniVRM and unity-mmd-loader find these shaders by name at runtime, while no asset of the
@@ -48,6 +52,7 @@ namespace Airi.Stage.Editor
             GraphicsSettings.defaultRenderPipeline = pipeline;
             QualitySettings.renderPipeline = pipeline;
             IncludeRuntimeShaders();
+            CreateLookTemplates();
             CreateScene();
             AssetDatabase.SaveAssets();
             Debug.Log("[Airi] The project settings and the scene are ready.");
@@ -69,6 +74,16 @@ namespace Airi.Stage.Editor
             PlayerSettings.defaultScreenHeight = 1080;
             PlayerSettings.resizableWindow = true;
             PlayerSettings.SplashScreen.show = false;
+
+            // Before each build, lilToon removes the features that no material of the project uses. The stage
+            // makes its materials at runtime, so this step must not see an empty project and remove them.
+            const string keepLilToonFeatures = "LILTOON_DISABLE_OPTIMIZATION";
+            PlayerSettings.GetScriptingDefineSymbols(NamedBuildTarget.Standalone, out string[] defines);
+            if (System.Array.IndexOf(defines, keepLilToonFeatures) < 0)
+            {
+                var updated = new List<string>(defines) { keepLilToonFeatures };
+                PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.Standalone, updated.ToArray());
+            }
         }
 
         private static UniversalRenderPipelineAsset CreateRenderPipeline()
@@ -91,13 +106,105 @@ namespace Airi.Stage.Editor
                 AssetDatabase.CreateAsset(pipeline, pipelinePath);
             }
 
-            pipeline.msaaSampleCount = 4;
+            ApplyPipelineQuality(pipeline);
             EditorUtility.SetDirty(pipeline);
 
             // MMD models draw their outlines and their shadows on themselves through these features.
             AddRendererFeature<MmdOutlineRendererFeature>(renderer);
             AddRendererFeature<MmdSelfShadowRendererFeature>(renderer);
+
+            // URP draws the outline pass of MToon only through this feature.
+            AddRendererFeature<MToonOutlineRenderFeature>(renderer);
+            AddRendererFeature<ScreenSpaceAmbientOcclusion>(renderer);
+            ApplyAmbientOcclusion(renderer);
             return pipeline;
+        }
+
+        /// <summary>
+        /// One character fills the window, so the budget goes to its edges and to its shadow. The shadow
+        /// distance covers only the character, so that the shadow map keeps its resolution.
+        /// </summary>
+        private static void ApplyPipelineQuality(UniversalRenderPipelineAsset pipeline)
+        {
+            pipeline.msaaSampleCount = 8;
+            pipeline.renderScale = 1.5f;
+            pipeline.supportsHDR = true;
+            pipeline.supportsCameraDepthTexture = true;
+            pipeline.shadowDistance = 8f;
+            pipeline.shadowCascadeCount = 1;
+
+            // These settings have no public setter.
+            var serialized = new SerializedObject(pipeline);
+            serialized.FindProperty("m_HDRColorBufferPrecision").intValue = (int)HDRColorBufferPrecision._64Bits;
+            serialized.FindProperty("m_SoftShadowsSupported").boolValue = true;
+            serialized.FindProperty("m_SoftShadowQuality").intValue = (int)SoftShadowQuality.High;
+            serialized.FindProperty("m_MainLightShadowmapResolution").intValue = 4096;
+            serialized.FindProperty("m_ColorGradingMode").intValue = (int)ColorGradingMode.HighDynamicRange;
+            serialized.FindProperty("m_ColorGradingLutSize").intValue = 64;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        /// <summary>
+        /// MToon and the example toon shaders declare the keyword of SSAO, but their code does not read it.
+        /// So the effect runs after the opaque pass, and it darkens the color target for each shader.
+        /// </summary>
+        private static void ApplyAmbientOcclusion(UniversalRendererData renderer)
+        {
+            renderer.TryGetRendererFeature(out ScreenSpaceAmbientOcclusion feature);
+            var serialized = new SerializedObject(feature);
+            SerializedProperty settings = serialized.FindProperty("m_Settings");
+            settings.FindPropertyRelative("AfterOpaque").boolValue = true;
+            settings.FindPropertyRelative("Source").enumValueIndex = 1;
+            settings.FindPropertyRelative("NormalSamples").enumValueIndex = 2;
+            settings.FindPropertyRelative("Samples").enumValueIndex = 0;
+            settings.FindPropertyRelative("Intensity").floatValue = 0.55f;
+            settings.FindPropertyRelative("Radius").floatValue = 0.025f;
+            settings.FindPropertyRelative("DirectLightingStrength").floatValue = 0.25f;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(feature);
+        }
+
+        /// <summary>A profile for each format, because the source colors of VRM and MMD models differ.</summary>
+        private static VolumeProfile CreateLookProfile(
+            string name,
+            TonemappingMode tonemapping,
+            float bloomIntensity,
+            float bloomThreshold)
+        {
+            string path = $"{SettingsFolder}/{name}.asset";
+            var profile = AssetDatabase.LoadAssetAtPath<VolumeProfile>(path);
+            if (profile == null)
+            {
+                profile = ScriptableObject.CreateInstance<VolumeProfile>();
+                AssetDatabase.CreateAsset(profile, path);
+            }
+
+            Tonemapping tone = OverrideIn<Tonemapping>(profile);
+            tone.mode.Override(tonemapping);
+
+            Bloom bloom = OverrideIn<Bloom>(profile);
+            bloom.intensity.Override(bloomIntensity);
+            bloom.threshold.Override(bloomThreshold);
+            bloom.scatter.Override(0.6f);
+            bloom.highQualityFiltering.Override(true);
+
+            EditorUtility.SetDirty(profile);
+            return profile;
+        }
+
+        private static T OverrideIn<T>(VolumeProfile profile)
+            where T : VolumeComponent
+        {
+            if (profile.TryGet(out T existing))
+            {
+                EditorUtility.SetDirty(existing);
+                return existing;
+            }
+
+            T added = profile.Add<T>(true);
+            added.name = typeof(T).Name;
+            AssetDatabase.AddObjectToAsset(added, profile);
+            return added;
         }
 
         private static void AddRendererFeature<T>(UniversalRendererData renderer)
@@ -154,6 +261,99 @@ namespace Airi.Stage.Editor
             settings.ApplyModifiedPropertiesWithoutUndo();
         }
 
+        /// <summary>
+        /// Writes one material for each state that <see cref="StageLook"/> can need. The inspector of lilToon
+        /// sets keywords and passes, and a player has no inspector. A clone of a template keeps them.
+        /// </summary>
+        private static void CreateLookTemplates()
+        {
+            Directory.CreateDirectory(LookTemplateFolder);
+            lilShaderManager.InitializeShaders();
+
+            SaveTemplate("liltoon-opaque", CreateLilToonTemplate(LilRenderingMode.Opaque, true));
+            SaveTemplate("liltoon-cutout", CreateLilToonTemplate(LilRenderingMode.Cutout, true));
+            SaveTemplate("liltoon-transparent", CreateLilToonTemplate(LilRenderingMode.Transparent, true));
+            SaveTemplate("liltoon-opaque-noline", CreateLilToonTemplate(LilRenderingMode.Opaque, false));
+            SaveTemplate("liltoon-cutout-noline", CreateLilToonTemplate(LilRenderingMode.Cutout, false));
+            SaveTemplate("liltoon-transparent-noline", CreateLilToonTemplate(LilRenderingMode.Transparent, false));
+        }
+
+        private static void SaveTemplate(string name, Material material)
+        {
+            string path = $"{LookTemplateFolder}/{name}.mat";
+            AssetDatabase.DeleteAsset(path);
+            AssetDatabase.CreateAsset(material, path);
+        }
+
+        private static Material CreateLilToonTemplate(LilRenderingMode mode, bool outline)
+        {
+            var material = new Material(Shader.Find("lilToon"));
+            lilToonInspector.SetupMaterialWithRenderingMode(material, mode, TransparentMode.Normal, outline, false, false, false);
+            return material;
+        }
+
+        /// <summary>
+        /// A soft studio: a bright top, a dim floor, and one large window at the front left of the character.
+        /// MToon reads no reflection, so only the reflection of lilToon changes with this map.
+        /// </summary>
+        private static Cubemap CreateEnvironment()
+        {
+            const int size = 64;
+            string path = $"{SettingsFolder}/StageEnvironment.asset";
+            AssetDatabase.DeleteAsset(path);
+
+            var cube = new Cubemap(size, TextureFormat.RGBAHalf, true);
+            var window = new Vector3(0.45f, 0.45f, 0.77f);
+            foreach (CubemapFace face in new[]
+            {
+                CubemapFace.PositiveX,
+                CubemapFace.NegativeX,
+                CubemapFace.PositiveY,
+                CubemapFace.NegativeY,
+                CubemapFace.PositiveZ,
+                CubemapFace.NegativeZ,
+            })
+            {
+                var pixels = new Color[size * size];
+                for (int y = 0; y < size; y++)
+                {
+                    for (int x = 0; x < size; x++)
+                    {
+                        Vector3 direction = DirectionOf(face, ((x + 0.5f) / size * 2f) - 1f, ((y + 0.5f) / size * 2f) - 1f);
+                        float up = (direction.y * 0.5f) + 0.5f;
+                        Color sky = Color.Lerp(new Color(0.16f, 0.15f, 0.16f), new Color(0.72f, 0.74f, 0.8f), up * up);
+                        float glow = Mathf.Pow(Mathf.Max(0f, Vector3.Dot(direction, window)), 18f) * 2.6f;
+                        pixels[(y * size) + x] = sky + (new Color(1f, 0.97f, 0.92f) * glow);
+                    }
+                }
+
+                cube.SetPixels(pixels, face);
+            }
+
+            cube.Apply(true, false);
+            AssetDatabase.CreateAsset(cube, path);
+            return cube;
+        }
+
+        private static Vector3 DirectionOf(CubemapFace face, float u, float v)
+        {
+            switch (face)
+            {
+                case CubemapFace.PositiveX:
+                    return new Vector3(1f, -v, -u).normalized;
+                case CubemapFace.NegativeX:
+                    return new Vector3(-1f, -v, u).normalized;
+                case CubemapFace.PositiveY:
+                    return new Vector3(u, 1f, v).normalized;
+                case CubemapFace.NegativeY:
+                    return new Vector3(u, -1f, -v).normalized;
+                case CubemapFace.PositiveZ:
+                    return new Vector3(u, -v, 1f).normalized;
+                default:
+                    return new Vector3(-u, -v, -1f).normalized;
+            }
+        }
+
         private static void CreateScene()
         {
             Directory.CreateDirectory(Path.GetDirectoryName(ScenePath));
@@ -162,6 +362,9 @@ namespace Airi.Stage.Editor
             RenderSettings.ambientMode = AmbientMode.Flat;
             RenderSettings.ambientLight = new Color(0.42f, 0.42f, 0.44f);
             RenderSettings.skybox = null;
+            RenderSettings.defaultReflectionMode = DefaultReflectionMode.Custom;
+            RenderSettings.customReflectionTexture = CreateEnvironment();
+            RenderSettings.reflectionIntensity = 1f;
 
             var cameraObject = new GameObject("Stage Camera", typeof(Camera), typeof(UniversalAdditionalCameraData))
             {
@@ -175,6 +378,18 @@ namespace Airi.Stage.Editor
                 new Vector3(0f, 1f, 4f),
                 Quaternion.LookRotation(Vector3.back, Vector3.up));
 
+            var cameraData = cameraObject.GetComponent<UniversalAdditionalCameraData>();
+            cameraData.renderPostProcessing = true;
+            cameraData.dithering = true;
+
+            // The three.js stage uses ACES for VRM models and Neutral for MMD models.
+            VolumeProfile vrmLook = CreateLookProfile("StageLookVrm", TonemappingMode.ACES, 0.25f, 1f);
+            VolumeProfile mmdLook = CreateLookProfile("StageLookMmd", TonemappingMode.Neutral, 0.3f, 0.9f);
+            var volumeObject = new GameObject("Stage Look", typeof(Volume));
+            var volume = volumeObject.GetComponent<Volume>();
+            volume.isGlobal = true;
+            volume.sharedProfile = vrmLook;
+
             var lightObject = new GameObject("Stage Light", typeof(Light));
             var light = lightObject.GetComponent<Light>();
             light.type = LightType.Directional;
@@ -186,6 +401,9 @@ namespace Airi.Stage.Editor
             var root = new SerializedObject(rootObject.GetComponent<StageRoot>());
             root.FindProperty("_camera").objectReferenceValue = camera;
             root.FindProperty("_light").objectReferenceValue = light;
+            root.FindProperty("_look").objectReferenceValue = volume;
+            root.FindProperty("_vrmLook").objectReferenceValue = vrmLook;
+            root.FindProperty("_mmdLook").objectReferenceValue = mmdLook;
             root.ApplyModifiedPropertiesWithoutUndo();
 
             EditorSceneManager.SaveScene(scene, ScenePath);

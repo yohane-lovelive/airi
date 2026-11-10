@@ -8,8 +8,10 @@
  *   `node scripts/fake-stage-sidecar.mjs --attach=<userData>/unity-stage/attach.json`
  *
  * Environment:
- * - `FAKE_SIDECAR_MODE`: `normal` (default), `fatal`, `crash`, `no-ready`, `ignore-shutdown`.
+ * - `FAKE_SIDECAR_MODE`: `normal` (default), `fatal`, `crash`, `no-ready`, `ignore-shutdown`, `slow-exit`.
  * - `FAKE_SIDECAR_LOG`: a file. Each received message gets one JSON line. Without it, this script prints to stdout.
+ * - `FAKE_SIDECAR_EXIT_DELAY_MS`: in `slow-exit` mode, the time from `host.shutdown` to the exit. Just before the exit,
+ *   the log gets the line `{"type":"fake.exit"}`, so a test can tell an exit from a kill.
  */
 import { appendFileSync, readFileSync } from 'node:fs'
 import { argv, env, exit } from 'node:process'
@@ -88,7 +90,13 @@ function answer(message) {
       return
     }
     case 'host.shutdown': {
-      if (mode !== 'ignore-shutdown') {
+      if (mode === 'slow-exit') {
+        setTimeout(() => {
+          record({ type: 'fake.exit' })
+          exit(0)
+        }, Number(env.FAKE_SIDECAR_EXIT_DELAY_MS ?? 0))
+      }
+      else if (mode !== 'ignore-shutdown') {
         socket.close()
         exit(0)
       }

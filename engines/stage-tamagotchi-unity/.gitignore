@@ -22,3 +22,7 @@ obj/
 # Developer-provided local models.
 /Assets/Airi/Fixtures/
 /Assets/Airi/Fixtures.meta
+
+# Rooms that a developer imports from local packages. Their licenses forbid redistribution.
+/Assets/LocalRooms/
+/Assets/LocalRooms.meta

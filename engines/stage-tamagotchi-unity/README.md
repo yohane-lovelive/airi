@@ -14,6 +14,8 @@ Steps U0 to U4 are done. A VRM model or a PMX model that you select in AIRI show
 
 The stage cannot show a PMD model, because the MMD loader reads only PMX files. AIRI shows an error for such a model, and the old model stays.
 
+The window also has prototypes: a lilToon look, light presets, a mouse camera, and rooms from local packages. Each one stays off until you turn it on. The Settings page has no control for them.
+
 ## Run the Stage
 
 These steps need Unity 6000.3.28f1, with a license in Unity Hub.
@@ -25,6 +27,43 @@ pnpm -F @proj-airi/stage-tamagotchi-unity build:player
 ```
 
 Set `AIRI_UNITY_STAGE_EXECUTABLE` to `Builds/Windows/airi-unity-stage.exe`, with its absolute path. Then start `pnpm dev:tamagotchi`, and select the Unity Stage button on the model page of Settings.
+
+## Try the Prototypes
+
+The player reads these variables from the environment of AIRI. Set them before you start `pnpm dev:tamagotchi`.
+
+| Variable | Player argument | Effect |
+| --- | --- | --- |
+| `AIRI_UNITY_STAGE_LOOK=liltoon` | `--airi-look=liltoon` | Replaces the materials of the model with lilToon. |
+| `AIRI_UNITY_STAGE_GRADE=backlit`, `live`, or `cinema` | `--airi-grade=...` | Sets the light and the camera effects. |
+| `AIRI_UNITY_STAGE_ROOM=<folder>` | `--airi-room=<folder>` | Shows the character in an imported room. |
+
+Move the camera with the mouse in the Unity window:
+
+- Left drag: goes around the character.
+- Right drag: moves across the view.
+- Wheel: comes closer or goes back.
+- Keys 1, 2, and 3: the full body, the upper body, and the face.
+- Double click: back to the full body.
+
+The player keeps the last camera for the next start. The argument `--airi-camera=full|upper|face|custom:...` fixes the camera, for example for captures.
+
+## Import a Room
+
+A room is a Unity package of a world, for example a VRChat world from BOOTH. Read its license first. Most such licenses forbid redistribution, so the package and each imported file stay on your PC.
+
+1. Put the package in its own folder, `.cache/rooms/<name>/<file>.unitypackage`, at the root of the repository. The name has only letters, digits, `-`, and `_`.
+2. Close the Unity Editor, and run this command. It imports each room folder.
+
+   ```bash
+   pnpm -F @proj-airi/stage-tamagotchi-unity import:room
+   ```
+
+3. Set `AIRI_UNITY_STAGE_ROOM` to the absolute path of the room folder.
+
+The folder then has `room.bundle` and `room.json`. The import chooses a stand point and a facing. To change them, edit `stand` and `facing` in `room.json`. The next import keeps them.
+
+The import takes only data files. It removes the scripts of the VRChat SDK, moves the materials to URP, and keeps the baked light. The [ADR](../../docs/ai/adr/2026-11-06-unity-stage-sidecar.md) lists each step.
 
 ## Work in the Editor
 
@@ -67,8 +106,10 @@ Unity runs only one `-executeMethod` in a batch run, so the setup and the build 
 ## Directory Layout
 
 - `Assets/Airi/Core/`: code with no `UnityEngine` reference. It must compile with C# 9 on .NET Standard 2.1, as in Unity.
-- `Assets/Airi/Stage/`: the connection, the VRM and MMD avatars, the `.vrma` clips, and the display output.
-- `Assets/Airi/Editor/`: the project setup and the player build.
+- `Assets/Airi/Stage/`: the connection, the VRM and MMD avatars, the `.vrma` clips, the display output, the looks, and the rooms.
+- `Assets/Airi/Editor/`: the project setup, the player build, and the room import.
+- `Assets/Airi/Looks/Resources/AiriLooks/`: material templates of the lilToon look. `setup:project` writes them.
+- `Assets/LocalRooms/`: the files of imported rooms. Git ignores this folder.
 - `tools/run-unity.ps1`: runs Unity in batch mode, also with the Microsoft Store version of Unity Hub.
 - `tests/stage-tamagotchi-unity.core/`: compiles `Core` with these limits, outside Unity.
 - `tests/stage-tamagotchi-unity.tests/`: the verification host. It reads the fixtures of `stage-sidecar`, also the output of the TypeScript code in `character-fixtures`.
@@ -96,10 +137,12 @@ dotnet format stage-tamagotchi-unity.slnx --verify-no-changes
 
 ## Dependencies
 
-`Core` uses Newtonsoft.Json. `dotnet` gets it from NuGet, and Unity gets it from the `com.unity.nuget.newtonsoft-json` package. `Stage` uses UniVRM v0.131.4 and URP, which `Packages/manifest.json` pins, and the vendored unity-mmd-loader v0.5.1.
+`Core` uses Newtonsoft.Json. `dotnet` gets it from NuGet, and Unity gets it from the `com.unity.nuget.newtonsoft-json` package. `Stage` uses UniVRM v0.131.4, lilToon 2.4.1, and URP, which `Packages/manifest.json` pins, and the vendored unity-mmd-loader v0.5.1.
+
+The stage makes lilToon materials at runtime. So `setup:project` sets `LILTOON_DISABLE_OPTIMIZATION`, and a build keeps each feature of lilToon.
 
 MMD files use Shift_JIS, and a Mono player has no tables for it. So `StageBuild` copies `I18N.dll` and `I18N.CJK.dll` from the Editor to each player.
 
 A `dotnet` build cannot see a name that collides with `UnityEngine`, for example `HumanPose`. So build the player after a change of `Core`.
 
-Sony does not give its plugin under the license of this repository, so `.gitignore` excludes `Assets/SRDisplayUnityPlugin/`. Model files also stay out of Git.
+Sony does not give its plugin under the license of this repository, so `.gitignore` excludes `Assets/SRDisplayUnityPlugin/`. Model files and rooms also stay out of Git.

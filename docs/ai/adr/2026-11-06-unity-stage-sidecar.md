@@ -63,6 +63,7 @@ The feature stays off by default and is experimental, like Godot Stage.
 - The render pipeline is URP, the backend is Mono, and the architecture is Intel 64-bit.
 - Active Input Handling stays on the old Input Manager, the default of the project. Sony requires the old Input Manager or `Both` for ELF-SR1 and ELF-SR2, and `Both` needs one more package that the stage does not use.
 - `Application.runInBackground` is `true`. The owner uses the Electron window while the character moves.
+- One character fills the window, so the picture spends its budget on edges and shadows: MSAA 8x, a render scale of 1.5, a 64-bit HDR buffer, soft shadows from a 4096 map over 8 m, and SSAO after the opaque pass. The camera effects use ACES for VRM models and Neutral for MMD models, like the three.js stage.
 - `StageProjectSetup.Apply` writes these settings through the Unity API, so a review can read each choice in one file.
 
 `tools/run-unity.ps1` runs Unity in batch mode. The Microsoft Store version of Unity Hub keeps its license in a virtualized folder of its package, so a plain `Unity.exe` run fails with "No valid Unity Editor license found". The script starts Unity inside the package of the Hub, and the license files stay as they are. A start inside a package gives no exit code, so the script reads the result from the log. `EditorApplication.Exit(1)` ends Unity with no result in the log, so the script also watches the process of Unity. Such an end gives exit code 1.
@@ -80,6 +81,8 @@ engines/stage-tamagotchi-unity/
   Assets/Airi/Core/            # No UnityEngine reference (noEngineReferences)
   Assets/Airi/Stage/           # MonoBehaviours, UniVRM use
   Assets/Airi/SrDisplay/       # Compiled only when the Sony plugin is present
+  Assets/Airi/Looks/Resources/ # Material templates of the lilToon look
+  Assets/LocalRooms/           # Rooms that a developer imports. Ignored by Git
   Packages/manifest.json
   ProjectSettings/
   tests/                       # dotnet test host that compiles Assets/Airi/Core
@@ -89,7 +92,7 @@ engines/stage-tamagotchi-unity/
 
 `Core` uses Newtonsoft.Json, the choice of the owner. Unity has an official package for it, and `dotnet` gets the same library from NuGet. A separate project compiles `Core` with C# 9 on .NET Standard 2.1, so a build outside Unity fails on the same language limits.
 
-These files stay out of Git: the Sony plugin package, model files, and Unity build output.
+These files stay out of Git: the Sony plugin package, model files, imported rooms, and Unity build output.
 
 ### Process start
 
@@ -255,13 +258,24 @@ The table below is the comparison before the prototype. The source of unity-mmd-
 | [UnityPMXRuntimeLoader](https://github.com/hobosore/UnityPMXRuntimeLoader) | MIT | 2020-02 | Not stated | Yes, `PMXModelLoader.LoadPMXModel(path)`. |
 | [libmmd-for-unity](https://github.com/OneYoungMean/libmmd-for-unity) | BSD-3-Clause | 2019-08 | Not stated | Yes. Includes PMD and Bullet physics. |
 
-The MMD look of AIRI (the PBR modes, the bloom, and the depth of field) stays in three.js. Step U4 does not port it.
+The MMD look of AIRI (the PBR modes, the bloom, and the depth of field) stays in three.js. Step U4 does not port it. Unity has its own optional looks instead, in the next section.
+
+### Looks and light
+
+These are prototypes. Each one stays off until a player argument or an environment variable turns it on. The Settings page has no control for them.
+
+- `--airi-look=liltoon` or `AIRI_UNITY_STAGE_LOOK=liltoon` replaces the materials of the model with lilToon 2.4.1. Without it, VRM models keep MToon, and PMX models keep MMD Toon Lit.
+- `StageLook` reads the values of each source material and writes them to a clone of a template in `Assets/Airi/Looks/Resources/AiriLooks`. A player keeps only the shader variants of its assets, and these templates are the assets.
+- `LILTOON_DISABLE_OPTIMIZATION` keeps each feature of lilToon in a build, because the stage makes its materials at runtime.
+- `--airi-grade=backlit|live|cinema` or `AIRI_UNITY_STAGE_GRADE` sets the key light, the ambient light, and the camera effects: bloom, color, vignette, and grain. With lilToon, a grade also writes the rim and the shade of each material.
+
+The owner compared four looks on about 10 PMX models and the 2 VRM samples: the source materials, lilToon, Unity Toon Shader, and URP Lit. Each look took under 1 ms for each frame on an RTX 5080. The owner chose lilToon. So the other two looks and the package `com.unity.toonshader` left the project. A flat backdrop behind the character also left, because a room replaces it.
 
 ### Display output
 
 A small interface, `IStageOutput`, has two implementations:
 
-- `WindowOutput`: one normal camera in a normal window. This is the output for steps U2 to U4. The camera frames the avatar from its bounds.
+- `WindowOutput`: one normal camera in a normal window. This is the output for steps U2 to U4. The camera frames the avatar from its bounds. The owner can move it with the mouse in the window: a left drag goes around the character, a right drag moves across the view, and the wheel comes closer. The keys 1, 2, and 3 frame the full body, the upper body, and the face, and a double click returns to the full body. `PlayerPrefs` keeps the last camera. The argument `--airi-camera=full|upper|face|custom:...` fixes the camera and ignores the input.
 - `SrDisplayOutput`: places `PortraitSRDisplayManager` in the scene and removes the normal camera.
 
 `Assets/Airi/SrDisplay/` has its own assembly definition and a define constraint, so the project compiles without the Sony plugin.
@@ -270,7 +284,17 @@ The scale comes from the avatar bounds, not from a fixed number. Step U5 sets `S
 
 ### Room state
 
-No room or seat state exists in the repository at this time. This ADR does not add one. When a room arrives, its state must be independent of the renderer, so that three.js and Unity can share it.
+No room or seat state of the character exists in the repository at this time. This ADR does not add one. When such state arrives, it must be independent of the renderer, so that three.js and Unity can share it.
+
+A prototype shows the Unity character in a room, with no such state. The room is only the scene around the character:
+
+- `pnpm -F @proj-airi/stage-tamagotchi-unity import:room` reads the Unity package in each folder `.cache/rooms/<name>/`, for example a VRChat world from BOOTH. It copies only data files to `Assets/LocalRooms/<name>`, never code or shaders.
+- The import removes missing scripts and missing prefabs, for example `VRCWorld`, and turns off the cameras of the world. It moves the materials to URP. A material of a transparent shader that the import left out becomes transparent. A sky from another package becomes `Skybox/Procedural`. The baked lightmaps stay.
+- The import builds `room.bundle` and writes `room.json`: the box of the light probes, the stand point, and the facing. The stand point is on the lowest floor, away from the walls, with space for the camera in front. During this search, furniture without colliders gets temporary colliders, and rays also meet back faces. So the point is not in a table or inside a hollow wall. An edited stand point in `room.json` stays through the next import.
+- `--airi-room=<folder>` or `AIRI_UNITY_STAGE_ROOM` loads the room next to the stage scene. The camera stays inside the box of the room. The stage light turns off, because the room has its own baked light. A grade keeps only its camera effects and its lilToon values.
+- The project has no audio module and no particle module, so the sounds and the particles of a world drop.
+- A player with a room took 2.1 seconds to exit on an RTX 5080, because it writes a larger shader cache. So the Unity manager gives the sidecar 5 seconds after `host.shutdown`. Other sidecars keep 2 seconds.
+- The licenses of such worlds forbid redistribution. So the packages, the bundles, and `Assets/LocalRooms` stay out of Git and out of each build. Each developer imports their own copy.
 
 ## Steps
 
@@ -290,7 +314,7 @@ Step U5 cannot start before 2026-12-11. Its message for the viewer position is n
 These are differences from the three.js stage. Each one is a choice, not a defect to hide:
 
 - No transparent desktop mascot window. The Unity window is opaque. The target is the ELF-MN1, and the three.js stage still serves the desktop.
-- No camera sliders in Settings for Unity at the first steps. `SrDisplayOutput` has no camera to control. `WindowOutput` frames the avatar by itself.
+- No camera sliders in Settings for Unity. `SrDisplayOutput` has no camera to control. In `WindowOutput`, the owner moves the camera with the mouse in the Unity window.
 - No pointer interaction with the Unity character.
 - No Live2D, Spine, or tachie in Unity.
 - No VMD motions in Unity: neither an idle that the owner chose, nor a motion mapped to an emotion. The pose path and the playback of a VMD file cannot run together.

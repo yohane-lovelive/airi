@@ -8,7 +8,7 @@ namespace Airi.Stage
     /// </summary>
     public interface IStageOutput
     {
-        /// <summary>Shows the whole avatar. It runs when a model loads.</summary>
+        /// <summary>Fits the output to a new avatar. It runs when a model loads.</summary>
         void Frame(Bounds avatarBounds);
 
         /// <summary>Follows a change of the output, for example a new window size. It runs each frame.</summary>

@@ -41,6 +41,8 @@ public static partial class Program
         TestCharacter();
         TestLaunch();
         TestFraming();
+        TestCameraRig();
+        TestRoom();
         await TestSocketExchangesMessages();
         await TestSocketReportsHostClose();
         await TestSocketDropsSendsAfterDispose();

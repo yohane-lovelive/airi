@@ -63,6 +63,7 @@ Unity にチャット、音声、記憶、設定のロジックは持たせな�
 - レンダーパイプラインは URP、バックエンドは Mono、アーキテクチャは Intel 64-bit とする。
 - Active Input Handling はプロジェクトの既定である旧 Input Manager のままとする。ELF-SR1 / SR2 で Sony は旧 Input Manager か `Both` を要求しており、`Both` にはステージが使わないパッケージが 1 つ余分に必要である。
 - `Application.runInBackground` は `true` とする。オーナーは Electron のウィンドウを操作しながらキャラクターを動かすためである。
+- ウィンドウにはキャラクターが 1 人だけ映るので、描画の予算を輪郭と影に使う。MSAA 8x、レンダースケール 1.5、64 ビットの HDR バッファー、8 m の範囲に 4096 のマップを使うソフトシャドウ、不透明パスの後の SSAO である。カメラ効果は three.js のステージと同じく、VRM モデルに ACES、MMD モデルに Neutral を使う。
 - これらの設定は `StageProjectSetup.Apply` が Unity の API で書き込む。レビューでは 1 つのファイルで各選択を読める。
 
 `tools/run-unity.ps1` は Unity をバッチモードで実行する。Microsoft Store 版の Unity Hub はライセンスをパッケージの仮想フォルダーに置くので、単純な `Unity.exe` の実行は "No valid Unity Editor license found" で失敗する。このスクリプトは Hub のパッケージの中で Unity を起動し、ライセンスファイルには触れない。パッケージ内の起動では終了コードを得られないので、ログから結果を読む。`EditorApplication.Exit(1)` で終わった Unity はログに結果を書かないので、スクリプトは Unity のプロセスも見張る。そのような終わり方は終了コード 1 になる。
@@ -80,6 +81,8 @@ engines/stage-tamagotchi-unity/
   Assets/Airi/Core/            # UnityEngine を参照しない（noEngineReferences）
   Assets/Airi/Stage/           # MonoBehaviour、UniVRM の利用
   Assets/Airi/SrDisplay/       # Sony プラグインがあるときだけコンパイルする
+  Assets/Airi/Looks/Resources/ # lilToon の見た目のマテリアルのテンプレート
+  Assets/LocalRooms/           # 開発者が取り込んだ部屋。Git は無視する
   Packages/manifest.json
   ProjectSettings/
   tests/                       # Assets/Airi/Core をコンパイルする dotnet のテストホスト
@@ -89,7 +92,7 @@ engines/stage-tamagotchi-unity/
 
 `Core` の JSON にはオーナーの選択で Newtonsoft.Json を使う。Unity に公式パッケージがあり、`dotnet` では同じライブラリを NuGet から得られる。別のプロジェクトが `Core` を C# 9 と .NET Standard 2.1 でコンパイルするので、Unity の外のビルドでも同じ言語の制限で失敗する。
 
-Sony のプラグインパッケージ、モデルファイル、Unity のビルド出力は Git に入れない。
+Sony のプラグインパッケージ、モデルファイル、取り込んだ部屋、Unity のビルド出力は Git に入れない。
 
 ### プロセスの起動
 
@@ -255,13 +258,24 @@ ZIP はレンダラーで展開する。`entriesFromZip` がすでに Shift_JIS 
 | [UnityPMXRuntimeLoader](https://github.com/hobosore/UnityPMXRuntimeLoader) | MIT | 2020-02 | 記載なし | 対応（`PMXModelLoader.LoadPMXModel(path)`）。 |
 | [libmmd-for-unity](https://github.com/OneYoungMean/libmmd-for-unity) | BSD-3-Clause | 2019-08 | 記載なし | 対応。PMD と Bullet 物理を含む。 |
 
-AIRI の MMD の見た目（PBR モード、ブルーム、被写界深度）は three.js に残す。ステップ U4 では移植しない。
+AIRI の MMD の見た目（PBR モード、ブルーム、被写界深度）は three.js に残す。ステップ U4 では移植しない。代わりに Unity には独自の任意の見た目があり、次の節に書く。
+
+### 見た目と光
+
+これらは試作である。どれもプレイヤーの引数か環境変数で有効にするまでは無効のままで、設定画面には操作がない。
+
+- `--airi-look=liltoon` または `AIRI_UNITY_STAGE_LOOK=liltoon` は、モデルのマテリアルを lilToon 2.4.1 に置き換える。指定がなければ、VRM モデルは MToon、PMX モデルは MMD Toon Lit のままである。
+- `StageLook` は元の各マテリアルの値を読み、`Assets/Airi/Looks/Resources/AiriLooks` のテンプレートの複製に書き込む。プレイヤーは自分のアセットのシェーダーバリアントだけを持つので、これらのテンプレートがそのアセットになる。
+- ステージは実行時にマテリアルを作るので、`LILTOON_DISABLE_OPTIMIZATION` でビルドに lilToon の各機能を残す。
+- `--airi-grade=backlit|live|cinema` または `AIRI_UNITY_STAGE_GRADE` は、キーライト、環境光、カメラ効果（ブルーム、色、ビネット、グレイン）を設定する。lilToon のときは、各マテリアルのリムと陰も書き込む。
+
+オーナーは約 10 体の PMX モデルと 2 体の VRM サンプルで、4 つの見た目を比べた。元のマテリアル、lilToon、Unity Toon Shader、URP Lit である。どれも RTX 5080 で 1 フレームあたり 1 ms 未満だった。オーナーは lilToon を選んだ。そこで残りの 2 つの見た目とパッケージ `com.unity.toonshader` はプロジェクトから外した。キャラクターの後ろの平面の背景も、部屋が置き換えるので外した。
 
 ### 表示の出力先
 
 小さなインターフェース `IStageOutput` に 2 つの実装を持たせる。
 
-- `WindowOutput`: 通常のウィンドウと通常のカメラ 1 台。ステップ U2 から U4 の出力である。カメラはアバターの境界から構図を決める。
+- `WindowOutput`: 通常のウィンドウと通常のカメラ 1 台。ステップ U2 から U4 の出力である。カメラはアバターの境界から構図を決める。オーナーはウィンドウの中でマウスでカメラを動かせる。左ドラッグでキャラクターの周りを回り、右ドラッグで画面に沿って動き、ホイールで近づく。キー 1、2、3 は全身、上半身、顔の構図にし、ダブルクリックで全身に戻る。最後のカメラは `PlayerPrefs` が覚える。引数 `--airi-camera=full|upper|face|custom:...` はカメラを固定し、入力を無視する。
 - `SrDisplayOutput`: `PortraitSRDisplayManager` をシーンに置き、通常のカメラを取り除く。
 
 `Assets/Airi/SrDisplay/` は専用のアセンブリ定義と define 制約を持つので、Sony のプラグインがなくてもプロジェクトはコンパイルできる。
@@ -270,7 +284,17 @@ AIRI の MMD の見た目（PBR モード、ブルーム、被写界深度）は
 
 ### 部屋の状態
 
-現在リポジトリに部屋や座席の状態はなく、この ADR でも追加しない。部屋を追加するときは、three.js と Unity で共有できるように、状態をレンダラーから独立させる必要がある。
+現在リポジトリにキャラクターの部屋や座席の状態はなく、この ADR でも追加しない。そのような状態を追加するときは、three.js と Unity で共有できるように、状態をレンダラーから独立させる必要がある。
+
+試作として、Unity のキャラクターを部屋の中に表示できる。ただし、そのような状態は持たない。部屋はキャラクターの周りのシーンにすぎない。
+
+- `pnpm -F @proj-airi/stage-tamagotchi-unity import:room` は、各フォルダー `.cache/rooms/<name>/` の Unity パッケージを読む。たとえば BOOTH の VRChat 用ワールドである。データファイルだけを `Assets/LocalRooms/<name>` にコピーし、コードとシェーダーはコピーしない。
+- 取り込みは、足りないスクリプトと足りないプレハブ（たとえば `VRCWorld`）を外し、ワールドのカメラを無効にする。マテリアルは URP に移す。取り込みが外した透明なシェーダーのマテリアルは、透明のままにする。別のパッケージにある空は `Skybox/Procedural` にする。焼いたライトマップは残す。
+- 取り込みは `room.bundle` を作り、`room.json` を書く。中身はライトプローブの箱、立ち位置、向きである。立ち位置は一番低い床の上で、壁から離れ、前にカメラの空きがある場所を選ぶ。この探索の間は、当たり判定のない家具に仮の当たり判定を付け、光線は裏面にも当たる。そのため、テーブルの中や空洞の壁の中は選ばない。`room.json` で書き換えた立ち位置は、次の取り込みでも残る。
+- `--airi-room=<folder>` または `AIRI_UNITY_STAGE_ROOM` は、ステージのシーンの隣に部屋を読み込む。カメラは部屋の箱の中に留まる。部屋には自分の焼いた光があるので、ステージのライトは消す。光のプリセットは、カメラ効果と lilToon の値だけを使う。
+- プロジェクトには音声のモジュールとパーティクルのモジュールがないので、ワールドの音とパーティクルは消える。
+- 部屋のあるプレイヤーは、大きいシェーダーキャッシュを書くので、RTX 5080 で終了に 2.1 秒かかった。そこで Unity のマネージャーは、`host.shutdown` の後にサイドカーへ 5 秒を与える。ほかのサイドカーは 2 秒のままである。
+- そのようなワールドのライセンスは再配布を禁じている。そこでパッケージ、バンドル、`Assets/LocalRooms` は Git にもビルドにも入れない。各開発者が自分のコピーを取り込む。
 
 ## ステップ
 
@@ -290,7 +314,7 @@ AIRI の MMD の見た目（PBR モード、ブルーム、被写界深度）は
 three.js のステージとの違いは次のとおりである。いずれも意図した選択である。
 
 - 透過のデスクトップマスコットウィンドウは作らない。Unity のウィンドウは不透過である。目標は ELF-MN1 であり、デスクトップには three.js のステージがある。
-- 最初のステップでは Unity 用のカメラスライダーを設定に出さない。`SrDisplayOutput` には操作するカメラがなく、`WindowOutput` は自分で構図を決める。
+- Unity 用のカメラスライダーを設定に出さない。`SrDisplayOutput` には操作するカメラがない。`WindowOutput` では、オーナーが Unity のウィンドウの中でマウスでカメラを動かす。
 - Unity のキャラクターへのポインター操作はない。
 - Unity で Live2D、Spine、立ち絵は扱わない。
 - Unity で VMD モーションは再生しない。オーナーが選ぶ待機モーションも、感情に割り当てたモーションも対象外である。姿勢の経路と VMD の再生は同時に動かせない。

@@ -100,6 +100,30 @@ describe('createStageSidecarHost', () => {
     expect(host.getStatus().state).toBe('error')
   })
 
+  it('waits for a slow exit after a stop, as long as the owner allows', async () => {
+    vi.stubEnv('FAKE_SIDECAR_MODE', 'slow-exit')
+    vi.stubEnv('FAKE_SIDECAR_EXIT_DELAY_MS', '600')
+    const host = createHost({ exitTimeoutMs: 3_000 })
+    await host.start()
+
+    const status = await host.stop()
+
+    expect(status.state).toBe('stopped')
+    expect(received().map(message => message.type)).toContain('fake.exit')
+  })
+
+  it('ends a sidecar that does not exit in the time of the owner', async () => {
+    vi.stubEnv('FAKE_SIDECAR_MODE', 'slow-exit')
+    vi.stubEnv('FAKE_SIDECAR_EXIT_DELAY_MS', '1500')
+    const host = createHost({ exitTimeoutMs: 300 })
+    await host.start()
+
+    const status = await host.stop()
+
+    expect(status.state).toBe('stopped')
+    expect(received().map(message => message.type)).not.toContain('fake.exit')
+  })
+
   it('fails the start when the launch cannot be resolved, without a socket left open', async () => {
     const host = createHost({
       resolveLaunch: async () => {

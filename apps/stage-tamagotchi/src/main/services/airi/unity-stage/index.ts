@@ -90,6 +90,9 @@ export function createUnityStageManager(): UnityStageManager {
       return message.type === 'scene.applied'
     },
     resolveLaunch: resolveUnityStageLaunch,
+    // A player with a room writes a larger shader cache at its exit. It took 2.1 seconds on an RTX 5080, and the
+    // default of 2 seconds ended it with no exit code.
+    exitTimeoutMs: 5_000,
   })
 
   /** Sends a message that follows a file write, so a sidecar that left during the write gives a clear error. */

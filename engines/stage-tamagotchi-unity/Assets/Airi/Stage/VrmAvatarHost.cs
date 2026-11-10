@@ -19,6 +19,8 @@ namespace Airi.Stage
     public sealed class VrmAvatarHost : IAvatarHost
     {
         private readonly Transform _parent;
+        private readonly StageLook _look;
+        private readonly LookMaterials _lookMaterials = new LookMaterials();
         private readonly Dictionary<string, ExpressionKey> _expressions =
             new Dictionary<string, ExpressionKey>(StringComparer.OrdinalIgnoreCase);
 
@@ -26,9 +28,10 @@ namespace Airi.Stage
         private Vector3 _restHips;
         private int _newestLoad;
 
-        public VrmAvatarHost(Transform parent)
+        public VrmAvatarHost(Transform parent, StageLook look)
         {
             _parent = parent;
+            _look = look;
         }
 
         /// <inheritdoc/>
@@ -68,7 +71,12 @@ namespace Airi.Stage
             Clear();
 
             _current = loaded;
+
+            // UniVRM keeps the world rotations of its first moment as the rest pose of the control rig. A room
+            // turns the parent, so the runtime must start here at the origin, or each rotation turns about a wrong axis.
+            _ = loaded.Runtime;
             loaded.transform.SetParent(_parent, false);
+            _look.Apply(loaded.GetComponentsInChildren<Renderer>(), AvatarMaterialFormat.Vrm, _lookMaterials);
 
             ReadExpressions(loaded);
             ITPoseProvider tPose = loaded.Runtime.ControlRig;
@@ -84,6 +92,8 @@ namespace Airi.Stage
                 UnityEngine.Object.Destroy(_current.gameObject);
                 _current = null;
             }
+
+            _lookMaterials.Clear();
         }
 
         /// <inheritdoc/>

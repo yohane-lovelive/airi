@@ -171,7 +171,20 @@
         "com.unity.timeline": "1.8.12"
       }
     },
+    "jp.lilxyzw.liltoon": {
+      "version": "https://github.com/lilxyzw/lilToon.git?path=Assets/lilToon#2.4.1",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {},
+      "hash": "e698a2f791bd28dd1aabf227c74f14bedeca3587"
+    },
     "com.unity.modules.animation": {
+      "version": "1.0.0",
+      "depth": 0,
+      "source": "builtin",
+      "dependencies": {}
+    },
+    "com.unity.modules.assetbundle": {
       "version": "1.0.0",
       "depth": 0,
       "source": "builtin",

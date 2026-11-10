@@ -36,9 +36,21 @@ namespace Airi.Stage
         [SerializeField]
         private Light _light;
 
+        [SerializeField]
+        private Volume _look;
+
+        [SerializeField]
+        private VolumeProfile _vrmLook;
+
+        [SerializeField]
+        private VolumeProfile _mmdLook;
+
         private readonly CancellationTokenSource _lifetime = new CancellationTokenSource();
         private StageSocketClient _socket;
         private IStageOutput _output;
+        private StageLook _stageLook;
+        private StageGrade _grade;
+        private StageRoom _room;
         private VrmAvatarHost _vrm;
         private MmdAvatarHost _mmd;
         private StageCharacter _character;
@@ -49,12 +61,48 @@ namespace Airi.Stage
         private async void Start()
         {
             Application.runInBackground = true;
-            _output = new WindowOutput(_camera);
-            _vrm = new VrmAvatarHost(transform);
-            _mmd = new MmdAvatarHost(transform);
+            string[] arguments = Environment.GetCommandLineArgs();
+            _grade = StageGrade.FromArguments(arguments);
+            try
+            {
+                _room = await StageRoom.LoadAsync(arguments, _lifetime.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                // The sidecar exits during the load, and nobody sees the room.
+                return;
+            }
+
+            _output = new WindowOutput(
+                _camera,
+                _room?.CameraLimits ?? StageCameraLimits.Free,
+                StageCameraRig.FindInArguments(arguments),
+                _room != null ? (float)_room.Manifest.FacingDegrees : 0f);
+            _stageLook = StageLook.FromArguments(arguments, _grade);
+            if (_room != null)
+            {
+                PrepareRoom();
+            }
+            else
+            {
+                _grade.PrepareStage(_light);
+            }
+
+            _vrm = new VrmAvatarHost(transform, _stageLook);
+            _mmd = new MmdAvatarHost(transform, _stageLook);
             _character = new StageCharacter(transform, (message, type) => _socket?.Send(StageProtocol.CharacterError(message, type)));
 
             await ConnectAsync();
+        }
+
+        /// <summary>Puts the avatars into the room. The room has its own lights, so the light of the stage would light the avatar twice.</summary>
+        private void PrepareRoom()
+        {
+            _room.PlaceAvatars(transform);
+            _light.enabled = false;
+            _camera.clearFlags = CameraClearFlags.Skybox;
+            _camera.fieldOfView = StageRoom.FieldOfView;
+            _grade.PrepareRoom();
         }
 
         private void Update()
@@ -257,7 +305,21 @@ namespace Airi.Stage
 
                 other.Clear();
                 _character.ShowAvatar(host);
-                _light.intensity = scene.Format == "pmx" ? MmdLightIntensity : VrmLightIntensity;
+                if (_room != null)
+                {
+                    _look.sharedProfile = _grade.IsActive ? _grade.Profile : scene.Format == "pmx" ? _mmdLook : _vrmLook;
+                }
+                else if (_grade.IsActive)
+                {
+                    _light.intensity = _grade.KeyIntensity;
+                    _look.sharedProfile = _grade.Profile;
+                }
+                else
+                {
+                    _light.intensity = _stageLook.LightIntensity(scene.Format == "pmx" ? MmdLightIntensity : VrmLightIntensity);
+                    _look.sharedProfile = scene.Format == "pmx" ? _mmdLook : _vrmLook;
+                }
+
                 _output.Frame(bounds.Value);
                 _socket.Send(StageProtocol.SceneApplied(scene.ModelId, ToProtocol(bounds.Value)));
             }
