@@ -15,11 +15,17 @@ namespace Airi.Stage.Core
     ///
     /// One difference: three.js stops an old gesture at once when a new one starts, so the old pose
     /// jumps. Here the old gesture fades out under the new one.
+    ///
+    /// A walk clip lies between the idle and the gestures, with a weight that follows the speed of the
+    /// character. Only the Unity stage walks, so three.js has no such layer.
     /// </summary>
     public sealed class GestureMixer
     {
         /// <summary>The cross-fade of a gesture in seconds, like <c>GESTURE_CROSSFADE</c>.</summary>
         public const float Crossfade = 0.4f;
+
+        /// <summary>The time in seconds in which the weight of the walk goes from 0 to 1, or back.</summary>
+        public const float WalkFade = 0.25f;
 
         private static readonly int[] AllBones = BuildAllBones();
 
@@ -73,18 +79,45 @@ namespace Airi.Stage.Core
         private readonly StagePose _scratch = new StagePose();
         private IHumanClip _idle;
         private float _idleTime;
+        private IHumanClip _walk;
+        private float _walkTime;
+        private float _walkTarget;
+        private float _walkRate = 1f;
 
         /// <summary>Whether a gesture plays now, including its fade back to the idle.</summary>
         public bool IsPlaying => _layers.Count > 0;
 
         /// <summary>Whether a clip gives the pose. Without one, the pose is the T-pose.</summary>
-        public bool HasMotion => _idle != null || _layers.Count > 0;
+        public bool HasMotion => _idle != null || _layers.Count > 0 || WalkWeight > 0;
+
+        /// <summary>How much the walk shows now, from 0 to 1.</summary>
+        public float WalkWeight { get; private set; }
 
         /// <summary>Sets the clip that loops under the gestures. Without a clip, the base is the T-pose.</summary>
         public void SetIdle(IHumanClip clip)
         {
             _idle = clip;
             _idleTime = 0;
+        }
+
+        /// <summary>
+        /// Sets the walk clip. It plays in place: the mixer takes its rotations and the height of its hips,
+        /// and drops the move of its hips to the sides and to the front. Something else moves the character.
+        /// </summary>
+        public void SetWalk(IHumanClip clip)
+        {
+            _walk = clip;
+            _walkTime = 0;
+        }
+
+        /// <summary>
+        /// Sets how much the walk shows, from 0 to 1, and how fast it plays. The weight moves to the new value in
+        /// <see cref="WalkFade"/>, so a start and a stop do not jump.
+        /// </summary>
+        public void SetLocomotion(float weight, float rate)
+        {
+            _walkTarget = Math.Max(0f, Math.Min(1f, weight));
+            _walkRate = Math.Max(0f, rate);
         }
 
         /// <summary>Removes each gesture at once, for a new model.</summary>
@@ -148,6 +181,8 @@ namespace Airi.Stage.Core
                 _idle.Sample(_idle.Duration > 0 ? _idleTime % _idle.Duration : 0, output);
             }
 
+            BlendWalk(deltaSeconds, output);
+
             for (int index = 0; index < _layers.Count; index++)
             {
                 Layer layer = _layers[index];
@@ -166,6 +201,35 @@ namespace Airi.Stage.Core
 
                 Blend(layer, output);
             }
+        }
+
+        /// <summary>Moves the weight of the walk toward its target, and blends the walk over the idle.</summary>
+        private void BlendWalk(float deltaSeconds, StagePose output)
+        {
+            if (_walk == null)
+            {
+                WalkWeight = 0;
+                return;
+            }
+
+            float step = deltaSeconds / WalkFade;
+            WalkWeight = WalkWeight < _walkTarget ? Math.Min(_walkTarget, WalkWeight + step) : Math.Max(_walkTarget, WalkWeight - step);
+            if (WalkWeight <= 0)
+            {
+                // The next walk starts at the start of the cycle.
+                _walkTime = 0;
+                return;
+            }
+
+            _walkTime += deltaSeconds * _walkRate;
+            _scratch.Reset();
+            _walk.Sample(_walk.Duration > 0 ? _walkTime % _walk.Duration : 0, _scratch);
+            foreach (int bone in _walk.Bones)
+            {
+                output.Rotations[bone] = StageQuaternion.Slerp(output.Rotations[bone], _scratch.Rotations[bone], WalkWeight);
+            }
+
+            output.HipsY += (_scratch.HipsY - output.HipsY) * WalkWeight;
         }
 
         private void Blend(Layer layer, StagePose output)

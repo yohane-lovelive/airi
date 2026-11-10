@@ -43,6 +43,7 @@ public static partial class Program
         TestFraming();
         TestCameraRig();
         TestRoom();
+        TestWander();
         await TestSocketExchangesMessages();
         await TestSocketReportsHostClose();
         await TestSocketDropsSendsAfterDispose();

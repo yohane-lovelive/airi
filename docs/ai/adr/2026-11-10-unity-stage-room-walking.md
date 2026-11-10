@@ -84,6 +84,8 @@ A new class `WanderPlan` in `Core` decides where the character goes. It has no U
 The Stage side moves the character with a `NavMeshAgent`:
 
 - The avatars move under a new transform, a child of `StageRoot`. The agent moves this transform.
+- The agent does not turn her. The Stage side turns her body to the next corner of the path, at 240 degrees each second.
+- Her speed follows her facing. So at the start of a walk, she turns first, and she does not slide to the side.
 - The speed is 0.8 m/s. The weight of the walk clip against the idle clip follows the speed of the agent.
 - The walk clip plays faster or slower with the speed of the agent, so the feet slide less.
 - `--airi-wander` or `AIRI_UNITY_STAGE_WANDER=1` turns this on. Without a room, the argument has no effect.
@@ -115,6 +117,8 @@ The camera of the window follows the character.
 - The box of the room stays as the outer limit.
 - The keys 1, 2, and 3, the mouse, and `--airi-camera` keep their functions.
 
+W1-2 takes one part of this early: the target follows her, without smoothing. Without it, she walks out of the view. W1-4 adds the smoothing and the sphere cast.
+
 | Option | What it does | Result |
 | --- | --- | --- |
 | **A follow camera** | The camera keeps its angle, and its target follows her. Walls push it closer. | Chosen. It works in each room without data of the room. |
@@ -129,9 +133,9 @@ Each step starts after the owner approves its plan.
 | --- | --- | --- |
 | W1-0 | This ADR | The owner accepts it. |
 | W1-1 | The NavMesh in the room import, and its load in the player | In 2LDK, the player finds a path from the stand point to at least 18 of 20 random points. |
-| W1-2 | `walk.vrma`, the walk layer of the driver, `WanderPlan` with tests, and the agent | In captures over 60 seconds, she walks to new places and does not enter furniture or walls. |
+| W1-2 | `walk.vrma`, the walk layer of the driver, `WanderPlan` with tests, the agent, and a camera target that follows her | In captures over 60 seconds, she walks to new places and does not enter furniture or walls. |
 | W1-3 | `host.character.attention` in the protocol, Electron, and Unity, with tests on both sides | A test message turns her to the camera, and a chat in the app does the same. |
-| W1-4 | The follow camera with the sphere cast, with tests of the math in `Core` | In captures, no wall comes between the camera and the character. |
+| W1-4 | The smoothing and the sphere cast of the follow camera, with tests of the math in `Core` | In captures, no wall comes between the camera and the character. |
 
 ## What this design does not do
 
@@ -148,7 +152,7 @@ Each step starts after the owner approves its plan.
 | Risk | Result | Action |
 | --- | --- | --- |
 | The free tier of the Quaternius pack has no walk clip. | W1-2 has no clip. | The owner checks the download first. The other sources of the table stay as options. |
-| The feet slide, or the steps look wrong. | The walk looks unnatural. | The clip speed follows the agent speed. Check by eye in captures, also on PMX models. |
+| The feet slide, or the steps look wrong. | The walk looks unnatural. | The clip speed follows the agent speed. In captures of a VRM sample in W1-2, a planted shoe slid by about 8% of the walk speed. Check PMX models too. |
 | The build of the player removes `NavMeshSurface`. | The NavMesh does not load. | `StageRoom` uses the type. Check the log of the player in W1-1. |
 | The bake of a world gives gaps in the NavMesh. | Some destinations cannot be reached. | The plan selects only reachable points. W1-1 measures the share. |
 | The camera shakes in a narrow corridor. | An unsteady view. | Smooth the camera, and check in captures. |

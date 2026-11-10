@@ -61,6 +61,8 @@ public static partial class Program
         TestGestureMixerGroups();
         TestGestureMixerOverlap();
         TestGestureMixerWholeBody();
+        TestGestureMixerWalk();
+        TestWalkRate();
         TestBlink();
         TestFrameFollower();
         TestCharacterDriver();
@@ -666,6 +668,81 @@ public static partial class Program
         CheckClose(counter.LastTime, 1.5, "the idle time runs");
         looped.Update(1f, pose);
         CheckClose(counter.LastTime, 0.5, "the idle loops");
+    }
+
+    /// <summary>A walk that holds one rotation on the left leg, and moves the hips on each axis.</summary>
+    private sealed class WalkClip : IHumanClip
+    {
+        private readonly int[] _bones = { HumanBones.IndexOf("leftUpperLeg") };
+
+        public float Duration => 1f;
+
+        public IReadOnlyList<int> Bones => _bones;
+
+        public void Sample(float time, StagePose pose)
+        {
+            pose.Rotations[_bones[0]] = TurnX;
+            pose.HipsX = 0.3f;
+            pose.HipsY = -0.08f;
+            pose.HipsZ = 0.2f;
+        }
+    }
+
+    private static void TestGestureMixerWalk()
+    {
+        int leg = HumanBones.IndexOf("leftUpperLeg");
+        int head = HumanBones.IndexOf("head");
+        var mixer = new GestureMixer();
+        var pose = new StagePose();
+        mixer.SetIdle(new HoldClip(5f, TurnZ, 0f, "head", "leftUpperLeg"));
+        mixer.SetWalk(new WalkClip());
+
+        mixer.Update(0.1f, pose);
+        CheckSameRotation(pose.Rotations[leg], TurnZ, "a walk without weight leaves the idle");
+        CheckClose(mixer.WalkWeight, 0, "the walk has no weight at the start");
+
+        mixer.SetLocomotion(1f, 1f);
+        mixer.Update(GestureMixer.WalkFade / 2, pose);
+        CheckClose(mixer.WalkWeight, 0.5, "the walk fades in");
+        CheckNear(pose.HipsY, -0.04, 1e-4, "the hips go down with the weight of the walk");
+        mixer.Update(GestureMixer.WalkFade, pose);
+        CheckSameRotation(pose.Rotations[leg], TurnX, "the walk moves the leg");
+        CheckSameRotation(pose.Rotations[head], TurnZ, "a bone without a track of the walk keeps the idle");
+        CheckNear(pose.HipsY, -0.08, 1e-4, "the walk gives the height of the hips");
+        CheckClose(pose.HipsX, 0, "the walk does not move the hips to the side");
+        CheckClose(pose.HipsZ, 0, "the walk does not move the hips to the front");
+        Check(mixer.HasMotion, "a walk is a motion");
+
+        mixer.SetLocomotion(0f, 1f);
+        mixer.Update(GestureMixer.WalkFade, pose);
+        CheckSameRotation(pose.Rotations[leg], TurnZ, "the idle returns when the walk ends");
+        CheckClose(pose.HipsY, 0, "the hips return when the walk ends");
+
+        // The rate scales the time of the clip, and a new walk starts at the start of its cycle.
+        var phase = new GestureMixer();
+        var counter = new CountingClip(1.33f);
+        phase.SetWalk(counter);
+        phase.SetLocomotion(1f, 2f);
+        phase.Update(0.1f, pose);
+        CheckClose(counter.LastTime, 0.2, "the rate scales the time of the walk");
+        phase.SetLocomotion(0f, 2f);
+        phase.Update(1f, pose);
+        phase.SetLocomotion(1f, 1f);
+        phase.Update(0.1f, pose);
+        CheckClose(counter.LastTime, 0.1, "a new walk starts at the start of its cycle");
+
+        phase.SetLocomotion(5f, -1f);
+        phase.Update(1f, pose);
+        CheckClose(phase.WalkWeight, 1, "the weight stays at most 1");
+        CheckClose(counter.LastTime, 0.1, "a negative rate holds the walk");
+    }
+
+    private static void TestWalkRate()
+    {
+        // One cycle covers 1.30 / 0.90 hip heights, so a model with hips of 0.8 m covers 1.156 m in 1.333 s.
+        CheckNear(StageWalk.Rate(0.8, 0.8, 1.333), 0.8 / (1.30 / 0.90 * 0.8 / 1.333), 1e-9, "the rate matches the speed");
+        Check(StageWalk.Rate(0.8, 1.0, 1.333) < StageWalk.Rate(0.8, 0.8, 1.333), "longer legs play the walk slower");
+        CheckNear(StageWalk.Rate(0.8, 0, 1.333), 1, 1e-9, "a model without a size plays at the normal rate");
     }
 
     private sealed class CountingClip : IHumanClip

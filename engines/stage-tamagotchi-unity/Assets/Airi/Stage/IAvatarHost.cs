@@ -11,6 +11,9 @@ namespace Airi.Stage
         /// <summary>The emotions of this kind of model.</summary>
         EmotionTable Emotions { get; }
 
+        /// <summary>The height of the hips of the avatar in its rest pose, in meters, or 0 without an avatar. A walk takes its step length from it.</summary>
+        float HipHeight { get; }
+
         /// <summary>
         /// Loads a model and replaces the avatar of this host.
         ///

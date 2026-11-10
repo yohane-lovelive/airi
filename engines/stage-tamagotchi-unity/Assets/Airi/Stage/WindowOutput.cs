@@ -38,6 +38,7 @@ namespace Airi.Stage
         private readonly bool _isFixed;
         private readonly float _facingDegrees;
         private Bounds? _avatarBounds;
+        private Vector3 _follow;
         private float _framedAspect;
         private int _dragButton = NoButton;
         private Vector3 _lastMouse;
@@ -64,7 +65,22 @@ namespace Airi.Stage
         public void Frame(Bounds avatarBounds)
         {
             _avatarBounds = avatarBounds;
+            _follow = Vector3.zero;
             Apply();
+        }
+
+        public void Follow(Vector3 offset)
+        {
+            if (offset == _follow)
+            {
+                return;
+            }
+
+            _follow = offset;
+            if (_avatarBounds != null)
+            {
+                Apply();
+            }
         }
 
         public void Tick()
@@ -224,12 +240,13 @@ namespace Airi.Stage
                 _camera.aspect,
                 FitMargin);
 
+            Vector3 center = bounds.center + _follow;
             return new StageCameraFrame(
-                bounds.center.x,
-                bounds.center.y,
-                bounds.center.z,
+                center.x,
+                center.y,
+                center.z,
                 bounds.size.y,
-                bounds.min.y,
+                bounds.min.y + _follow.y,
                 fitDistance,
                 _camera.fieldOfView,
                 _facingDegrees);

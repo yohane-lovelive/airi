@@ -52,6 +52,9 @@ namespace Airi.Stage
         /// <inheritdoc/>
         public EmotionTable Emotions => EmotionTable.Mmd;
 
+        /// <inheritdoc/>
+        public float HipHeight => _retarget != null ? _retarget.HipHeight * ImportScale : 0f;
+
         /// <summary>
         /// Loads a PMX file. The textures load from paths relative to this file, so the file must stay
         /// in its folder.

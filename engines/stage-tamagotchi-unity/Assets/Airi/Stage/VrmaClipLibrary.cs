@@ -43,11 +43,18 @@ namespace Airi.Stage
         private readonly INormalizedPoseProvider _pose;
         private readonly List<int> _bones;
         private readonly Vector3 _firstHips;
+        private readonly Vector3 _restHips;
         private readonly float _restHipsHeight;
 
         public float Duration { get; }
 
         public IReadOnlyList<int> Bones => _bones;
+
+        /// <summary>
+        /// Whether the clip gives the move of the hips from its T-pose, not from its first frame. A walk bends its
+        /// knees in each frame, so only its T-pose gives the drop of its hips, and without the drop the feet float.
+        /// </summary>
+        public bool HipsFromRest { get; set; }
 
         private VrmaClip(RuntimeGltfInstance instance, List<int> bones)
         {
@@ -60,7 +67,8 @@ namespace Airi.Stage
 
             _pose = clip.ControlRig.Item1;
             ITPoseProvider tPose = clip.ControlRig.Item2;
-            _restHipsHeight = tPose.GetWorldTransform(HumanBodyBones.Hips).Value.Translation.y;
+            _restHips = tPose.GetWorldTransform(HumanBodyBones.Hips).Value.Translation;
+            _restHipsHeight = _restHips.y;
 
             _animation = instance.GetComponent<Animation>();
             _animation.cullingType = AnimationCullingType.AlwaysAnimate;
@@ -147,7 +155,7 @@ namespace Airi.Stage
             }
 
             // The X axis is mirrored between the frame of Unity and the frame of the host.
-            Vector3 hips = _pose.GetRawHipsPosition() - _firstHips;
+            Vector3 hips = _pose.GetRawHipsPosition() - (HipsFromRest ? _restHips : _firstHips);
             float scale = _restHipsHeight > 0 ? 1f / _restHipsHeight : 0;
             pose.HipsX = -hips.x * scale;
             pose.HipsY = hips.y * scale;

@@ -55,6 +55,14 @@ namespace Airi.Stage
         private MmdAvatarHost _mmd;
         private StageCharacter _character;
 
+        /// <summary>The parent of the avatars. A walk moves it, and the stage under it stays.</summary>
+        private Transform _avatarRoot;
+
+        /// <summary>The place of <see cref="_avatarRoot"/> at the last framing. The camera follows the walk from it.</summary>
+        private Vector3 _framedAt;
+
+        private StageWalker _walker;
+
         /// <summary>The number of the newest scene. An older scene drops its model when it finishes.</summary>
         private int _newestScene;
 
@@ -88,9 +96,16 @@ namespace Airi.Stage
                 _grade.PrepareStage(_light);
             }
 
-            _vrm = new VrmAvatarHost(transform, _stageLook);
-            _mmd = new MmdAvatarHost(transform, _stageLook);
+            _avatarRoot = new GameObject("Avatar Root").transform;
+            _avatarRoot.SetParent(transform, false);
+            _vrm = new VrmAvatarHost(_avatarRoot, _stageLook);
+            _mmd = new MmdAvatarHost(_avatarRoot, _stageLook);
             _character = new StageCharacter(transform, (message, type) => _socket?.Send(StageProtocol.CharacterError(message, type)));
+            _walker = StageWalker.Create(arguments, _avatarRoot, _room);
+            if (_walker != null)
+            {
+                _ = _character.SetWalkAsync(Path.Combine(Application.streamingAssetsPath, "AiriMotions", StageWalk.FileName));
+            }
 
             await ConnectAsync();
         }
@@ -275,11 +290,19 @@ namespace Airi.Stage
 
         /// <summary>
         /// Applies the character after the clips of this frame. UniVRM reads the result later in
-        /// this frame, because its execution order comes after the default order.
+        /// this frame, because its execution order comes after the default order. The NavMesh agent
+        /// moved the avatars before this call, so the camera follows them here.
         /// </summary>
         private void LateUpdate()
         {
-            _character?.Tick(Time.deltaTime);
+            if (_character == null)
+            {
+                return;
+            }
+
+            _walker?.Tick(Time.deltaTime, _character);
+            _character.Tick(Time.deltaTime);
+            _output.Follow(_avatarRoot.position - _framedAt);
         }
 
         private async Task ApplySceneAsync(SceneApplyMessage scene)
@@ -320,6 +343,7 @@ namespace Airi.Stage
                     _look.sharedProfile = scene.Format == "pmx" ? _mmdLook : _vrmLook;
                 }
 
+                _framedAt = _avatarRoot.position;
                 _output.Frame(bounds.Value);
                 _socket.Send(StageProtocol.SceneApplied(scene.ModelId, ToProtocol(bounds.Value)));
             }

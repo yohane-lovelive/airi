@@ -37,6 +37,9 @@ namespace Airi.Stage
         /// <inheritdoc/>
         public EmotionTable Emotions => EmotionTable.Vrm;
 
+        /// <inheritdoc/>
+        public float HipHeight => _current != null ? _restHips.y : 0f;
+
         /// <summary>
         /// Loads a VRM 1.0 or VRM 0.x file. UniVRM migrates a VRM 0.x model to the form of VRM 1.0.
         ///

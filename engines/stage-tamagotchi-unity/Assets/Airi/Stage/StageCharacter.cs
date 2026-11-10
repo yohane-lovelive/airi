@@ -14,10 +14,14 @@ namespace Airi.Stage
     /// </summary>
     internal sealed class StageCharacter
     {
+        /// <summary>Below this speed in meters each second, the character stands, and the walk fades out.</summary>
+        private const float SlowestWalk = 0.05f;
+
         private readonly CharacterDriver _driver = new CharacterDriver(() => UnityEngine.Random.value);
         private readonly VrmaClipLibrary _clips;
         private readonly Action<string, string> _reportError;
         private IAvatarHost _host;
+        private VrmaClip _walk;
         private int _newestIdle;
         private int _newestGesture;
 
@@ -67,6 +71,32 @@ namespace Airi.Stage
                 Debug.LogError($"[Airi] Could not load the idle clip {path}: {error}");
                 _reportError($"Could not load the idle clip: {error.Message}", "host.character.idle");
             }
+        }
+
+        /// <summary>Loads the walk clip of the player. It reports its hips from its T-pose, see <see cref="VrmaClip.HipsFromRest"/>.</summary>
+        public async Task SetWalkAsync(string path)
+        {
+            try
+            {
+                _walk = await _clips.LoadAsync(path);
+                _walk.HipsFromRest = true;
+                _driver.SetWalk(_walk);
+            }
+            catch (Exception error)
+            {
+                Debug.LogError($"[Airi] Could not load the walk clip {path}: {error}");
+            }
+        }
+
+        /// <summary>
+        /// Shows the walk at the speed of the character. The clip plays at the rate that matches the speed to the
+        /// legs of the avatar, so the feet slide less.
+        /// </summary>
+        public void Move(float metersPerSecond)
+        {
+            float hipHeight = _host?.HipHeight ?? 0f;
+            float cycle = _walk?.Duration ?? 0f;
+            _driver.SetLocomotion(metersPerSecond > SlowestWalk ? 1f : 0f, (float)StageWalk.Rate(metersPerSecond, hipHeight, cycle));
         }
 
         public async Task PlayVrmaAsync(CharacterGestureVrmaMessage gesture)

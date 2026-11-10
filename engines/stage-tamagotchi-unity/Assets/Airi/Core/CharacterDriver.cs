@@ -11,7 +11,7 @@ namespace Airi.Stage.Core
     ///
     /// Update
     ///   -> FrameFollower.Update (mouth, offsets, eyes)
-    ///   -> GestureMixer.Update (idle and gestures)
+    ///   -> GestureMixer.Update (idle, walk, and gestures)
     ///   -> offsets after the clips, as <c>BodyPoseApplier</c> does
     ///   -> ExpressionFader.Update, BlinkTimer.Update
     ///   -> Weights (expressions, mouth, blink)
@@ -87,6 +87,21 @@ namespace Airi.Stage.Core
         {
             _mixer.SetIdle(clip);
         }
+
+        /// <summary>Sets the walk clip. <see cref="GestureMixer.SetWalk"/> gives the rules.</summary>
+        public void SetWalk(IHumanClip clip)
+        {
+            _mixer.SetWalk(clip);
+        }
+
+        /// <summary>Sets how much the walk shows and how fast it plays. <see cref="GestureMixer.SetLocomotion"/> gives the rules.</summary>
+        public void SetLocomotion(float weight, float rate)
+        {
+            _mixer.SetLocomotion(weight, rate);
+        }
+
+        /// <summary>How much the walk shows now, from 0 to 1.</summary>
+        public float WalkWeight => _mixer.WalkWeight;
 
         /// <summary>
         /// Plays a gesture.
