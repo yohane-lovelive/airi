@@ -120,6 +120,25 @@ namespace Airi.Stage.Core
                 return Math.Sqrt((x * x) + (y * y) + (z * z));
             }
         }
+
+        /// <summary>The camera on the same line to the same target, at another distance. The view keeps its direction.</summary>
+        public StageCameraPose AtDistance(double distance)
+        {
+            double current = Distance;
+            if (current <= 0)
+            {
+                return this;
+            }
+
+            double share = distance / current;
+            return new StageCameraPose(
+                TargetX + ((X - TargetX) * share),
+                TargetY + ((Y - TargetY) * share),
+                TargetZ + ((Z - TargetZ) * share),
+                TargetX,
+                TargetY,
+                TargetZ);
+        }
     }
 
     /// <summary>
@@ -217,16 +236,23 @@ namespace Airi.Stage.Core
             _custom.Distance = LimitDistance(_custom.Distance * Math.Pow(DistancePerWheelStep, steps), frame);
         }
 
+        /// <summary>The distance from the camera to its target that the framing asks for, before any wall shortens it.</summary>
+        public double FramedDistance(in StageCameraFrame frame)
+        {
+            return PlacementFor(frame).Distance * HeightOf(frame);
+        }
+
         /// <summary>
         /// Gives the camera for this avatar and this lens. The angles and the target count from the front
         /// of the avatar, so they turn with <see cref="StageCameraFrame.FacingDegrees"/>.
         /// </summary>
-        public StageCameraPose Resolve(in StageCameraFrame frame)
+        /// <param name="yawOffsetDegrees">A turn around the target on top of the framing. A camera that goes around a wall uses it.</param>
+        public StageCameraPose Resolve(in StageCameraFrame frame, double yawOffsetDegrees = 0)
         {
             Placement placement = PlacementFor(frame);
             double height = HeightOf(frame);
             double distance = placement.Distance * height;
-            double yaw = Radians(placement.Yaw);
+            double yaw = Radians(placement.Yaw + yawOffsetDegrees);
             double pitch = Radians(placement.Pitch);
             double facing = Radians(frame.FacingDegrees);
 

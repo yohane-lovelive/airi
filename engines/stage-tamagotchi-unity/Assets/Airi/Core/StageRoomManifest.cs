@@ -320,4 +320,24 @@ namespace Airi.Stage.Core
             return Math.Round(value, 3, MidpointRounding.AwayFromZero);
         }
     }
+
+    /// <summary>
+    /// Tells the doors of a room from its other parts by their names. The import opens the doors that cut off floor.
+    /// The player gives each closed door a collider, so the camera does not look through it.
+    /// </summary>
+    public static class StageRoomDoors
+    {
+        /// <summary>Words of the names of doors, in English and in Japanese.</summary>
+        private static readonly string[] DoorWords = { "door", "ドア", "扉", "戸" };
+
+        /// <summary>A door frame stays, because it is a part of the wall.</summary>
+        private static readonly string[] FrameWords = { "frame", "枠" };
+
+        /// <summary>Whether a name is the name of a door, and not of a door frame. The case does not matter.</summary>
+        public static bool IsDoorName(string name)
+        {
+            string lower = name.ToLowerInvariant();
+            return DoorWords.Any(lower.Contains) && !FrameWords.Any(lower.Contains);
+        }
+    }
 }

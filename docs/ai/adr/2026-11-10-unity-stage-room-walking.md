@@ -127,9 +127,26 @@ The camera of the window follows the character.
 
 W1-2 takes one part of this early: the target follows her, without smoothing. Without it, she walks out of the view. W1-4 adds the smoothing and the sphere cast.
 
+W1-4 builds the rest this way:
+
+- `StageCameraFollow` in `Core` smooths the target with a time constant of 0.25 seconds. A wall pulls the camera in at once, and the camera returns in 0.5 seconds.
+- The sphere has a radius of 0.15 m. The cast also hits the back of a face, because a wall of a world can be one plane. The colliders of an MMD model are not walls.
+- A wall does not pull the camera nearer than 0.3 m to its target.
+- A world often gives no collider to a door. So when the room loads, each door that shows gets a box from the bounds of its renderer.
+- These rules work in each room, also without `--airi-wander`, because the mouse can also turn the camera behind a wall. Without a room, the camera is as before.
+
+The captures showed only her hips and hands when she stood at a wall, because no place in front of the wall shows her whole body. So W1-4 also moves the camera around her. This changes the fixed yaw above:
+
+- Below 60% of its framed distance, the camera tests turns of up to 120 degrees, in steps of 20 degrees.
+- It takes the middle of a span of turns with at least 90% of the distance. A wide span wins, and then the span nearest to the camera.
+- A turn of up to 45 degrees swings, at most 90 degrees each second. A larger turn cuts, as between two cameras. A swing through a corridor faces its walls.
+- When the angle of the owner has room again for 1 second, the camera returns to it.
+
+In the last captures of W1-4, two VRM samples walked for 70 seconds each in 2LDK. No wall stood between the camera and her. A sofa or a table can still stand in front of her, because furniture has no collider.
+
 | Option | What it does | Result |
 | --- | --- | --- |
-| **A follow camera** | The camera keeps its angle, and its target follows her. Walls push it closer. | Chosen. It works in each room without data of the room. |
+| **A follow camera** | The camera keeps its angle, and its target follows her. Walls push it closer, or move it around her. | Chosen. It works in each room without data of the room. |
 | A fixed camera | The camera of today. | She walks out of the view. |
 | A director | The camera cuts between viewpoints of the room. | It looks better, but each room needs its viewpoints. A later step can add it. |
 
@@ -143,7 +160,7 @@ Each step starts after the owner approves its plan.
 | W1-1 | The NavMesh in the room import, and its load in the player | In 2LDK, the player finds a path from the stand point to at least 18 of 20 random points. |
 | W1-2 | `walk.vrma`, the walk layer of the driver, `WanderPlan` with tests, the agent, and a camera target that follows her | In captures over 60 seconds, she walks to new places and does not enter furniture or walls. |
 | W1-3 | `host.character.attention` in the protocol, Electron, and Unity, with tests on both sides | A test message turns her to the camera, and a chat in the app does the same. |
-| W1-4 | The smoothing and the sphere cast of the follow camera, with tests of the math in `Core` | In captures, no wall comes between the camera and the character. |
+| W1-4 | The smoothing, the sphere cast, and the move around walls of the follow camera, with tests of the math in `Core` | In captures, no wall comes between the camera and the character. |
 
 ## What this design does not do
 
@@ -153,6 +170,7 @@ Each step starts after the owner approves its plan.
 - No stairs. The destinations stay on the floor of the stand point.
 - No doors that open and close. The import opens each door that cuts off floor, once, and the door stays open.
 - No avoidance of objects that move, because nothing else moves in the room.
+- No furniture stops the camera. Only walls, floors, and doors do.
 - No attention from the microphone. W1 reads only the thinking state and the speaking state.
 
 ## Risks
@@ -163,7 +181,7 @@ Each step starts after the owner approves its plan.
 | The feet slide, or the steps look wrong. | The walk looks unnatural. | The clip speed follows the agent speed. In captures of a VRM sample in W1-2, a planted shoe slid by about 8% of the walk speed. Check PMX models too. |
 | The build of the player removes `NavMeshSurface`. | The NavMesh does not load. | `StageRoom` uses the type. Check the log of the player in W1-1. |
 | The bake of a world gives gaps in the NavMesh. | Some destinations cannot be reached. | The plan selects only reachable points. W1-1 measures the share. |
-| The camera shakes in a narrow corridor. | An unsteady view. | Smooth the camera, and check in captures. |
+| The camera shakes in a narrow corridor. | An unsteady view. | Smooth the camera, and check in captures. In W1-4, a corridor gives a cut, and the captures showed no shake. |
 | A PMX model walks differently from a VRM model. | Wrong legs on PMX models. | The repository has no PMX model. Check with the models of the owner. |
 
 ## Sources

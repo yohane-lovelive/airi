@@ -49,6 +49,8 @@ Move the camera with the mouse in the Unity window:
 
 The player keeps the last camera for the next start. The argument `--airi-camera=full|upper|face|custom:...` fixes the camera, for example for captures.
 
+In a room, the camera stops in front of walls and doors. When a wall leaves too little room, the camera moves around the character, and it returns to your angle later. Furniture does not stop the camera.
+
 ## Import a Room
 
 A room is a Unity package of a world, for example a VRChat world from BOOTH. Read its license first. Most such licenses forbid redistribution, so the package and each imported file stay on your PC.

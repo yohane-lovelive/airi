@@ -74,12 +74,6 @@ namespace Airi.Stage.Editor
         /// <summary>Each round can open a door that a room of the round before shows. Three rooms deep is enough for a home.</summary>
         private const int DoorRounds = 3;
 
-        /// <summary>Words of the names of doors, in English and in Japanese.</summary>
-        private static readonly string[] DoorWords = { "door", "ドア", "扉", "戸" };
-
-        /// <summary>A door frame stays, because it is a part of the wall.</summary>
-        private static readonly string[] FrameWords = { "frame", "枠" };
-
         /// <summary>Asset kinds that hold only data. Each other kind stays out of the project.</summary>
         private static readonly HashSet<string> DataKinds = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -949,8 +943,7 @@ namespace Airi.Stage.Editor
         /// <summary>A door is a part with a renderer and a name like a door, but not a door frame.</summary>
         private static bool IsDoor(GameObject part)
         {
-            string name = part.name.ToLowerInvariant();
-            return part.GetComponent<Renderer>() != null && DoorWords.Any(name.Contains) && !FrameWords.Any(name.Contains);
+            return part.GetComponent<Renderer>() != null && StageRoomDoors.IsDoorName(part.name);
         }
 
         /// <summary>

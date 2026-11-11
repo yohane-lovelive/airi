@@ -84,11 +84,14 @@ namespace Airi.Stage
                 return;
             }
 
+            _avatarRoot = new GameObject("Avatar Root").transform;
+            _avatarRoot.SetParent(transform, false);
             _output = new WindowOutput(
                 _camera,
                 _room?.CameraLimits ?? StageCameraLimits.Free,
                 StageCameraRig.FindInArguments(arguments),
-                _room != null ? (float)_room.Manifest.FacingDegrees : 0f);
+                _room != null ? (float)_room.Manifest.FacingDegrees : 0f,
+                _avatarRoot);
             _stageLook = StageLook.FromArguments(arguments, _grade);
             if (_room != null)
             {
@@ -99,8 +102,6 @@ namespace Airi.Stage
                 _grade.PrepareStage(_light);
             }
 
-            _avatarRoot = new GameObject("Avatar Root").transform;
-            _avatarRoot.SetParent(transform, false);
             _vrm = new VrmAvatarHost(_avatarRoot, _stageLook);
             _mmd = new MmdAvatarHost(_avatarRoot, _stageLook);
             _character = new StageCharacter(transform, (message, type) => _socket?.Send(StageProtocol.CharacterError(message, type)));

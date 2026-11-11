@@ -42,6 +42,7 @@ public static partial class Program
         TestLaunch();
         TestFraming();
         TestCameraRig();
+        TestCameraFollow();
         TestRoom();
         TestWander();
         TestGaze();

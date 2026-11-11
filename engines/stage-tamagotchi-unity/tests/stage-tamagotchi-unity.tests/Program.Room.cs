@@ -21,6 +21,20 @@ public static partial class Program
         TestRoomBox();
         TestCameraFacing();
         TestCameraInRoom();
+        TestDoorNames();
+    }
+
+    private static void TestDoorNames()
+    {
+        foreach (string name in new[] { "Door", "Door.018", "Glass_Door.001", "BathroomDOOR", "ドア", "引き戸", "扉.002" })
+        {
+            Check(StageRoomDoors.IsDoorName(name), $"{name} is a door");
+        }
+
+        foreach (string name in new[] { "DoorFrame.005", "Door_frame", "ドア枠", "Wall.008", "Window" })
+        {
+            Check(!StageRoomDoors.IsDoorName(name), $"{name} is not a door");
+        }
     }
 
     private static void TestRoomFile()

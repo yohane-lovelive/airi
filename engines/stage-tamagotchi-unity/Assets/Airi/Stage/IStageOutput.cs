@@ -12,8 +12,9 @@ namespace Airi.Stage
         void Frame(Bounds avatarBounds);
 
         /// <summary>
-        /// Moves the framing with the avatar, by the move of the avatar since the last <see cref="Frame"/>. A walk
-        /// calls it in each frame. The angles of the camera stay.
+        /// Moves the framing with the avatar, by the move of the avatar since the last <see cref="Frame"/>. The stage
+        /// calls it once in each frame, after the avatar moved. The output can smooth the move, and the angles of the
+        /// camera stay.
         /// </summary>
         void Follow(Vector3 offset);
 

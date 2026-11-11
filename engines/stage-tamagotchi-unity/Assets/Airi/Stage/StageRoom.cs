@@ -88,7 +88,9 @@ namespace Airi.Stage
 
                 Debug.Log($"[Airi] Room {manifest.Name}: {LightmapSettings.lightmaps.Length} lightmaps, stand at ({manifest.StandX}, {manifest.StandY}, {manifest.StandZ}), facing {manifest.FacingDegrees} degrees.");
                 var room = new StageRoom(manifest);
-                room.CheckNavMesh(SceneManager.GetSceneByPath(scenes[0]));
+                Scene scene = SceneManager.GetSceneByPath(scenes[0]);
+                room.CheckNavMesh(scene);
+                room.BlockClosedDoors(scene);
                 return room;
             }
             catch (Exception error) when (!(error is OperationCanceledException))
@@ -144,6 +146,40 @@ namespace Airi.Stage
 
             int triangles = NavMesh.CalculateTriangulation().indices.Length / 3;
             Debug.Log($"[Airi] Room {Manifest.Name}: NavMesh with {triangles} triangles. {reached} of {found} points on the floor are reachable from the stand point.");
+        }
+
+        /// <summary>
+        /// Gives each door that shows a box collider, so the camera stops in front of it as in front of a wall. A world
+        /// gives colliders to its walls, but not always to its doors. The import hid the doors that it opened, so each
+        /// door that shows is closed, or it stands open in its doorway.
+        ///
+        /// A box fits a door, and it needs no readable mesh. A mesh collider needs one, and a mesh of a bundle can be
+        /// unreadable.
+        /// </summary>
+        private void BlockClosedDoors(Scene scene)
+        {
+            int blocked = 0;
+            foreach (MeshFilter filter in scene.GetRootGameObjects().SelectMany(root => root.GetComponentsInChildren<MeshFilter>()))
+            {
+                Renderer renderer = filter.GetComponent<Renderer>();
+                if (filter.sharedMesh == null || renderer == null || !renderer.enabled || filter.GetComponent<Collider>() != null || !StageRoomDoors.IsDoorName(filter.name))
+                {
+                    continue;
+                }
+
+                // A static batch puts many parts into one mesh in world space, so the bounds of the mesh do not fit the
+                // door. The bounds of the renderer fit it. They follow the axes of the world, and so does a door of a
+                // home, so the box fits. A turned door gets a larger box.
+                Transform door = filter.transform;
+                Bounds bounds = renderer.bounds;
+                Vector3 size = door.InverseTransformVector(bounds.size);
+                BoxCollider box = filter.gameObject.AddComponent<BoxCollider>();
+                box.center = door.InverseTransformPoint(bounds.center);
+                box.size = new Vector3(Mathf.Abs(size.x), Mathf.Abs(size.y), Mathf.Abs(size.z));
+                blocked++;
+            }
+
+            Debug.Log($"[Airi] Room {Manifest.Name}: {blocked} doors without a collider got one for the camera.");
         }
 
         /// <summary>Moves the root of the avatars to the stand point, and turns it to the facing of the room.</summary>
