@@ -49,6 +49,7 @@ public static partial class Program
         TestGaze();
         TestSitting();
         TestActivity();
+        TestPlaceShot();
         await TestSocketExchangesMessages();
         await TestSocketReportsHostClose();
         await TestSocketDropsSendsAfterDispose();

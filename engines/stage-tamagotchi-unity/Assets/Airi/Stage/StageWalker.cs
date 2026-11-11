@@ -164,6 +164,39 @@ namespace Airi.Stage
         }
 
         /// <summary>
+        /// What a shot of the camera shows while she sits or stands at a place with a screen, or null elsewhere. The
+        /// head of a sitting character lies above the hips of the fit of the seat, by the length of her body above the
+        /// hips.
+        /// </summary>
+        public StagePlaceSubject? PlaceSubject
+        {
+            get
+            {
+                StageRoomPlace place = _plan.Place;
+                if (place?.Screen == null)
+                {
+                    return null;
+                }
+
+                if (_plan.State == WanderState.Sit && place.Seat != null && _character.SeatPhase != SeatPhase.Standing)
+                {
+                    StagePoint hips = _fit.Hips;
+                    var head = new StagePoint(hips.X, hips.Y + _character.HeadHeight - _character.HipHeight, hips.Z);
+                    return new StagePlaceSubject(place.Name, head, place.Seat.Value, place.FacingDegrees, place.Screen);
+                }
+
+                if (_plan.State == WanderState.Rest)
+                {
+                    Vector3 feet = _root.position;
+                    var head = new StagePoint(feet.x, feet.y + _character.HeadHeight, feet.z);
+                    return new StagePlaceSubject(place.Name, head, new StagePoint(feet.x, feet.y, feet.z), place.FacingDegrees, place.Screen);
+                }
+
+                return null;
+            }
+        }
+
+        /// <summary>
         /// Gives the point for her head and her eyes: the camera during an attention, or the screen of her place while
         /// she watches it.
         ///

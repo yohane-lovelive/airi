@@ -1,3 +1,4 @@
+using Airi.Stage.Core;
 using UnityEngine;
 
 namespace Airi.Stage
@@ -20,5 +21,11 @@ namespace Airi.Stage
 
         /// <summary>Follows a change of the output, for example a new window size. It runs each frame.</summary>
         void Tick();
+
+        /// <summary>
+        /// Shows the character and the screen of her place together, or returns to the usual view with null. The stage
+        /// calls it once in each frame, before <see cref="Follow"/>.
+        /// </summary>
+        void ShowPlace(StagePlaceSubject? subject);
     }
 }

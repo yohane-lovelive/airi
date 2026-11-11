@@ -222,6 +222,24 @@ While she is at a place with a screen, the camera shows both her and the screen.
 | The follow camera of W1 | No new code. | The screen often stays out of the view, or her back hides it. |
 | A cut to her face for each line | A second camera in front of her shows her while she speaks. | Her face shows well, but a cut each 15 to 45 seconds can feel restless. A later step can add it. |
 
+W2-5 builds it this way. It adds two points above: furniture stops the shot as a wall does, and a key returns to the usual camera.
+
+- `StagePlaceShot` computes the shot. Its target is the middle between her head and the center of the screen. The camera stands 0.3 m above her head.
+- Its distance is the shortest that holds the top of her head, her low point, and the four corners of the screen. The view keeps a border of 12%.
+- The low point is the seat point while she sits, and her feet while she stands.
+- The stage tries 125, 105, 145, and 85 degrees, each to both sides. The side with more room behind the camera wins.
+- A side counts only when no wall cuts its distance, and the camera stands outside each furniture box.
+- Also, no wall and no furniture box stands between the camera and her head or the screen.
+- The usual camera of W1 does not stop at furniture. In the desk room of 2LDK, it looked through the desk from below.
+- The camera moves to the shot in 1.2 seconds, with a soft start and end. It returns the same way when she leaves the place.
+- A drag or the wheel moves the shot, as it moves the usual camera. A key of a view or a double click returns to the usual camera at this place.
+- The saved camera of the owner does not change.
+- The aim of her head started from the head of her stand. While she sits, it now starts from her real head, so she looks at the monitor, not the keyboard.
+- In 2LDK, the shot at the desk stands 125 degrees to her left, 2.3 m from the target with AvatarSample_A. With a PMX model of the owner, it stands 2.4 m away.
+- The view shows her at the desk and the whole monitor. For a line, her face turns to the camera.
+- A TV of 2.5 m needs a camera 5.9 m away in a tall window, so she looks small there.
+- The math of a drag has tests. A drag in the window waits for a check by the owner.
+
 ## Steps
 
 Each step starts after the owner approves its plan.
@@ -236,6 +254,8 @@ Each step starts after the owner approves its plan.
 | W2-5 | The camera at a place, with tests of the math in `Core` | In captures of a commentary in 2LDK, the view shows her and the game, and no wall hides her head or the screen. A drag of the mouse still turns the camera. |
 
 W2-3 and W2-4 add their messages to the protocol table of [the ADR of the Unity stage](2026-11-06-unity-stage-sidecar.md) in the same commit.
+
+W2-5 came before W2-4. In the check of W2-3 in the app, the owner asked for a view of her and the monitor.
 
 ## What this design does not do
 

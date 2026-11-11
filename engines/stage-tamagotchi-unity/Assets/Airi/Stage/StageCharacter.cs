@@ -147,6 +147,9 @@ namespace Airi.Stage
         /// <summary>The height of her hips in the rest pose, in meters, or 0 without an avatar.</summary>
         public float HipHeight => _host?.HipHeight ?? 0f;
 
+        /// <summary>The height of her head joint in the rest pose, in meters, or 0 without an avatar.</summary>
+        public float HeadHeight => _host?.HeadHeight ?? 0f;
+
         /// <summary>
         /// The hips of the sit loop from the root of the avatar, in meters, in the frame of her body: to her right, up,
         /// and to her front. The X axis of a pose is mirrored, so her right is its negative X.
@@ -215,7 +218,8 @@ namespace Airi.Stage
                 return;
             }
 
-            Vector3 head = body.position + (body.up * headHeight);
+            // When she sits, her head moves down and back with her hips, so the aim starts from there.
+            Vector3 head = body.position + (body.up * headHeight) + (body.rotation * SeatShift);
             Vector3 direction = body.InverseTransformDirection(point.Value - head);
             _driver.AimGaze(direction.x, direction.y, direction.z);
         }

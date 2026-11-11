@@ -365,6 +365,9 @@ namespace Airi.Stage
             _character.LookAt(_walker?.GazeTarget(attending, camera), _avatarRoot);
             _character.Tick(Time.deltaTime);
 
+            // At a place with a screen, the camera shows her and the screen. Elsewhere, it follows her.
+            _output.ShowPlace(_walker?.PlaceSubject);
+
             // When she sits, her head moves down and back with her hips, so the target of the camera moves too.
             _output.Follow(_avatarRoot.position - _framedAt + (_avatarRoot.rotation * _character.SeatShift));
 
