@@ -106,6 +106,7 @@ W1-3 builds it this way:
 - The eyes take the rest of the angle, up to 12 degrees to the side and 8 degrees up or down. The aim fades in and out in 0.3 seconds.
 - The body turns at 360 degrees each second, so a half turn takes 0.5 seconds. The head reaches the camera first.
 - The sidecar acts on the message only with `--airi-wander`, as on each other part of W1. Without the argument, the stage looks as before.
+- In the app, a chat in 2LDK turned her to the camera while AIRI thought. After the reply, the attention ended, and she walked again.
 
 | Option | What it does | Result |
 | --- | --- | --- |
@@ -178,7 +179,7 @@ Each step starts after the owner approves its plan.
 | Risk | Result | Action |
 | --- | --- | --- |
 | The free tier of the Quaternius pack has no walk clip. | W1-2 has no clip. | The owner checks the download first. The other sources of the table stay as options. |
-| The feet slide, or the steps look wrong. | The walk looks unnatural. | The clip speed follows the agent speed. In captures of a VRM sample in W1-2, a planted shoe slid by about 8% of the walk speed. Check PMX models too. |
+| The feet slide, or the steps look wrong. | The walk looks unnatural. | The clip speed follows the agent speed. In captures of a VRM sample in W1-2, a planted shoe slid by about 8% of the walk speed. Check PMX models too. Later the stride took 92% of 1.30 / 0.90. A log of the foot bones then gave planted feet within 2% of the walk speed. |
 | The build of the player removes `NavMeshSurface`. | The NavMesh does not load. | `StageRoom` uses the type. Check the log of the player in W1-1. |
 | The bake of a world gives gaps in the NavMesh. | Some destinations cannot be reached. | The plan selects only reachable points. W1-1 measures the share. |
 | The camera shakes in a narrow corridor. | An unsteady view. | Smooth the camera, and check in captures. In W1-4, a corridor gives a cut, and the captures showed no shake. |

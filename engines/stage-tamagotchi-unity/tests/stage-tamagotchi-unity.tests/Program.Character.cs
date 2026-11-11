@@ -741,8 +741,8 @@ public static partial class Program
 
     private static void TestWalkRate()
     {
-        // One cycle covers 1.30 / 0.90 hip heights, so a model with hips of 0.8 m covers 1.156 m in 1.333 s.
-        CheckNear(StageWalk.Rate(0.8, 0.8, 1.333), 0.8 / (1.30 / 0.90 * 0.8 / 1.333), 1e-9, "the rate matches the speed");
+        // One cycle covers 92% of 1.30 / 0.90 hip heights, so a model with hips of 0.8 m covers 1.063 m in 1.333 s.
+        CheckNear(StageWalk.Rate(0.8, 0.8, 1.333), 0.8 / (1.30 / 0.90 * 0.92 * 0.8 / 1.333), 1e-9, "the rate matches the speed");
         Check(StageWalk.Rate(0.8, 1.0, 1.333) < StageWalk.Rate(0.8, 0.8, 1.333), "longer legs play the walk slower");
         CheckNear(StageWalk.Rate(0.8, 0, 1.333), 1, 1e-9, "a model without a size plays at the normal rate");
     }

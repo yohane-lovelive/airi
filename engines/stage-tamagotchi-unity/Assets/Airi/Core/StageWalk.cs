@@ -12,8 +12,11 @@ namespace Airi.Stage.Core
         /// <summary>
         /// The distance of one cycle, in hip heights. The version of the clip with root motion moves 1.30 m in one
         /// cycle, and its hips are 0.90 m high in its T-pose.
+        ///
+        /// With 1.30 / 0.90, a planted shoe of a VRM sample moved at 92% of the floor in captures, so the feet slid. The
+        /// stride takes 92% of it, so the clip plays faster, and the shoe stays on the floor.
         /// </summary>
-        public const double StrideHipHeights = 1.30 / 0.90;
+        public const double StrideHipHeights = 1.30 / 0.90 * 0.92;
 
         /// <summary>
         /// Gives the rate of the clip that makes the feet move at the speed of the character. A model with longer
