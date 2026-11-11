@@ -47,6 +47,7 @@ public static partial class Program
         TestRoom();
         TestWander();
         TestGaze();
+        TestSitting();
         await TestSocketExchangesMessages();
         await TestSocketReportsHostClose();
         await TestSocketDropsSendsAfterDispose();

@@ -38,7 +38,8 @@ The player reads these variables from the environment of AIRI. Set them before y
 | `AIRI_UNITY_STAGE_GRADE=backlit`, `live`, or `cinema` | `--airi-grade=...` | Sets the light and the camera effects. |
 | `AIRI_UNITY_STAGE_ROOM=<folder>` | `--airi-room=<folder>` | Shows the character in an imported room. |
 | `AIRI_UNITY_STAGE_DISPLAY=<number>` | `--airi-display=<number>` | Moves the window to a display, for example a second monitor beside a game. The player log lists the numbers. |
-| `AIRI_UNITY_STAGE_WANDER=1` | `--airi-wander` | Lets the character walk through the room. It needs a room with a NavMesh. While AIRI thinks or speaks, and for 15 seconds after that, she stops and turns to the camera. |
+| `AIRI_UNITY_STAGE_WANDER=1` | `--airi-wander` | Lets the character walk through the room. It needs a room with a NavMesh. While AIRI thinks or speaks, and for 15 seconds after that, she stops and turns to the camera. One rest in three goes to a place of the room, where she sits or stands. |
+| `AIRI_UNITY_STAGE_PLACE=<name>` | `--airi-place=<name>` | Sends the walking character to a place of `room.json` after her first rest, for example for a check of a seat. |
 
 Move the camera with the mouse in the Unity window:
 
@@ -73,13 +74,15 @@ The import takes only data files. It removes the scripts of the VRChat SDK, move
 
 The import also finds places from the names of objects. These are screens, for example a monitor or a TV, and seats, for example a chair, a sofa, or a bed. It lists them in `places` of `room.json`. A place has a stand point, a facing, a seat point at the front edge of its seat, and the surface of its screen. The player reads the list at each start, so an edit needs no new import. The next import keeps the list. To find the places again, delete `places`, and import the room again. The [ADR of the places](../../docs/ai/adr/2026-11-11-unity-stage-room-places-commentary.md) describes the search.
 
+During a walk, the character sits on the seat of a place for 20 to 60 seconds. At a place without a seat, she stands and faces it. When she sits in a wrong spot, move `seat` or change `facing` of the place in `room.json`.
+
 In a room, the character gets a light of her own from the side of the camera, because a world bakes its lights. Only the character receives it. If you imported a room before this light came, import it again. Otherwise the light also brightens the room.
 
-## Convert the Walk Clip
+## Convert the Walk and Sit Clips
 
-The walk of the character is `Assets/StreamingAssets/AiriMotions/walk.vrma`. It is the clip `Walk_Loop` of the [Universal Animation Library](https://quaternius.com/packs/universalanimationlibrary.html) by Quaternius. Its license is CC0, so the repository keeps the file.
+The walk of the character is `Assets/StreamingAssets/AiriMotions/walk.vrma`. It is the clip `Walk_Loop` of the [Universal Animation Library](https://quaternius.com/packs/universalanimationlibrary.html) by Quaternius. The four sit clips `sit-enter.vrma`, `sit-idle.vrma`, `sit-talk.vrma`, and `sit-exit.vrma` come from `Sitting_Enter`, `Sitting_Idle_Loop`, `Sitting_Talking_Loop`, and `Sitting_Exit` of the same pack. Its license is CC0, so the repository keeps the files.
 
-To convert the clip again, put `UAL1_Standard.fbx` of the pack in `.cache/motions/<name>/`. Close the Unity Editor, and run this command:
+To convert the clips again, put `UAL1_Standard.fbx` of the pack in `.cache/motions/<name>/`. Close the Unity Editor, and run this command:
 
 ```bash
 pnpm -F @proj-airi/stage-tamagotchi-unity import:motion
@@ -131,7 +134,7 @@ Unity runs only one `-executeMethod` in a batch run, so the setup and the build 
 - `Assets/Airi/Stage/`: the connection, the VRM and MMD avatars, the `.vrma` clips, the display output, the looks, the rooms, and the walk.
 - `Assets/Airi/Editor/`: the project setup, the player build, the room import, and the motion import.
 - `Assets/Airi/Looks/Resources/AiriLooks/`: material templates of the lilToon look. `setup:project` writes them.
-- `Assets/StreamingAssets/AiriMotions/`: the clips that the player carries, for now only the walk.
+- `Assets/StreamingAssets/AiriMotions/`: the clips that the player carries, for now the walk and the four sit clips.
 - `Assets/LocalRooms/`: the files of imported rooms. Git ignores this folder.
 - `Assets/LocalMotions/`: the FBX files of the motion import. Git ignores this folder.
 - `tools/run-unity.ps1`: runs Unity in batch mode, also with the Microsoft Store version of Unity Hub.

@@ -111,10 +111,12 @@ namespace Airi.Stage
             _vrm = new VrmAvatarHost(_avatarRoot, _stageLook);
             _mmd = new MmdAvatarHost(_avatarRoot, _stageLook);
             _character = new StageCharacter(transform, (message, type) => _socket?.Send(StageProtocol.CharacterError(message, type)));
-            _walker = StageWalker.Create(arguments, _avatarRoot, _room);
+            _walker = StageWalker.Create(arguments, _avatarRoot, _room, _character);
             if (_walker != null)
             {
-                _ = _character.SetWalkAsync(Path.Combine(Application.streamingAssetsPath, "AiriMotions", StageWalk.FileName));
+                string motions = Path.Combine(Application.streamingAssetsPath, "AiriMotions");
+                _ = _character.SetWalkAsync(Path.Combine(motions, StageWalk.FileName));
+                _ = _character.SetSeatAsync(motions);
             }
 
             await ConnectAsync();
@@ -347,10 +349,12 @@ namespace Airi.Stage
 
             bool attending = _attention && _walker != null;
             Vector3 camera = _camera.transform.position;
-            _walker?.Tick(Time.deltaTime, _character, attending, camera);
+            _walker?.Tick(Time.deltaTime, attending, camera);
             _character.LookAt(attending ? camera : (Vector3?)null, _avatarRoot);
             _character.Tick(Time.deltaTime);
-            _output.Follow(_avatarRoot.position - _framedAt);
+
+            // When she sits, her head moves down and back with her hips, so the target of the camera moves too.
+            _output.Follow(_avatarRoot.position - _framedAt + (_avatarRoot.rotation * _character.SeatShift));
 
             // The camera moved in the line above, so the light comes from its side of this frame.
             _characterLight?.Tick(Time.deltaTime, _avatarRoot.position, _camera.transform);
@@ -379,6 +383,10 @@ namespace Airi.Stage
 
                 other.Clear();
                 _character.ShowAvatar(host);
+
+                // The new model stands, so it leaves a seat. The bounds came from the old place of the root.
+                Bounds framed = bounds.Value;
+                framed.center += _walker?.ModelChanged() ?? Vector3.zero;
                 if (_room != null)
                 {
                     StageCharacterLight.Mark(_avatarRoot);
@@ -396,8 +404,8 @@ namespace Airi.Stage
                 }
 
                 _framedAt = _avatarRoot.position;
-                _output.Frame(bounds.Value);
-                _socket.Send(StageProtocol.SceneApplied(scene.ModelId, ToProtocol(bounds.Value)));
+                _output.Frame(framed);
+                _socket.Send(StageProtocol.SceneApplied(scene.ModelId, ToProtocol(framed)));
             }
             catch (OperationCanceledException)
             {

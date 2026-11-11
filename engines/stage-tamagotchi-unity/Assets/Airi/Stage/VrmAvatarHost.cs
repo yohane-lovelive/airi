@@ -27,6 +27,7 @@ namespace Airi.Stage
         private Vrm10Instance _current;
         private Vector3 _restHips;
         private float _restHeadHeight;
+        private float _thighLength;
         private int _newestLoad;
 
         public VrmAvatarHost(Transform parent, StageLook look)
@@ -43,6 +44,9 @@ namespace Airi.Stage
 
         /// <inheritdoc/>
         public float HeadHeight => _current != null ? _restHeadHeight : 0f;
+
+        /// <inheritdoc/>
+        public float ThighLength => _current != null ? _thighLength : 0f;
 
         /// <summary>
         /// Loads a VRM 1.0 or VRM 0.x file. UniVRM migrates a VRM 0.x model to the form of VRM 1.0.
@@ -89,6 +93,9 @@ namespace Airi.Stage
             ITPoseProvider tPose = loaded.Runtime.ControlRig;
             _restHips = tPose.GetWorldTransform(HumanBodyBones.Hips).Value.Translation;
             _restHeadHeight = tPose.GetWorldTransform(HumanBodyBones.Head).Value.Translation.y;
+            _thighLength = Vector3.Distance(
+                tPose.GetWorldTransform(HumanBodyBones.LeftUpperLeg).Value.Translation,
+                tPose.GetWorldTransform(HumanBodyBones.LeftLowerLeg).Value.Translation);
 
             return MeasureBounds(loaded.gameObject);
         }

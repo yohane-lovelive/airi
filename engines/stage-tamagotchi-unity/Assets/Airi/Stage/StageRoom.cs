@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -20,7 +21,8 @@ namespace Airi.Stage
     /// settings page has no control for it.
     ///
     /// State: the scene of the room, which stays loaded as long as the player runs. Its NavMesh, when the import
-    /// baked one, stays in the NavMesh of the player as long as the scene.
+    /// baked one, stays in the NavMesh of the player as long as the scene. The furniture boxes for the camera stay
+    /// too, and the box of the seat where she sits turns off.
     /// </summary>
     public sealed class StageRoom
     {
@@ -31,6 +33,8 @@ namespace Airi.Stage
         private const double WallClearance = 0.2;
 
         private const int CheckPoints = 20;
+
+        private readonly List<BoxCollider> _furnitureBoxes = new List<BoxCollider>();
 
         private StageRoom(StageRoomManifest manifest)
         {
@@ -230,14 +234,29 @@ namespace Airi.Stage
                 var boxObject = new GameObject(renderer.name) { layer = StageCameraFollow.FurnitureLayer };
                 boxObject.transform.SetParent(parent.transform, false);
                 boxObject.transform.position = bounds.center;
-                boxObject.AddComponent<BoxCollider>().size = size;
+                var collider = boxObject.AddComponent<BoxCollider>();
+                collider.size = size;
+                _furnitureBoxes.Add(collider);
                 boxed++;
             }
 
             Debug.Log($"[Airi] Room {Manifest.Name}: {boxed} pieces of furniture can hide the character from the camera.");
         }
 
-        /// <summary>Names the places of the room in the log. The character does not use them yet.</summary>
+        /// <summary>
+        /// Turns off each furniture box around a point of a seat under her hips, or turns them on again with null. Her
+        /// body is in the box of her seat, and the box then hides her from each side of the camera.
+        /// </summary>
+        public void SetSeatBox(Vector3? underHips)
+        {
+            foreach (BoxCollider box in _furnitureBoxes)
+            {
+                // A disabled collider has empty bounds, so the box takes its own place and size. No box turns.
+                box.enabled = underHips == null || !new Bounds(box.transform.position, box.size).Contains(underHips.Value);
+            }
+        }
+
+        /// <summary>Names the places of the room in the log. The walk of the character visits them.</summary>
         private void LogPlaces()
         {
             if (Manifest.Places == null)

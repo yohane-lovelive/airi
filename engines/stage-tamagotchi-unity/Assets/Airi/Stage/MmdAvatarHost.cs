@@ -58,6 +58,9 @@ namespace Airi.Stage
         /// <inheritdoc/>
         public float HeadHeight => _retarget != null ? _retarget.HeadHeight * ImportScale : 0f;
 
+        /// <inheritdoc/>
+        public float ThighLength => _retarget != null ? _retarget.ThighLength * ImportScale : 0f;
+
         /// <summary>
         /// Loads a PMX file. The textures load from paths relative to this file, so the file must stay
         /// in its folder.

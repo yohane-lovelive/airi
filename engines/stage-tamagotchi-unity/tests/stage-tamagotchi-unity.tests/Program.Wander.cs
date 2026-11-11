@@ -5,7 +5,7 @@ using Airi.Stage.Core;
 /// <summary>Tests of the plan that moves the character through a room.</summary>
 public static partial class Program
 {
-    /// <summary>A room that gives its destinations in order, and none when the list ends.</summary>
+    /// <summary>A room that gives its destinations in order, and none when the list ends. A path reaches each point.</summary>
     private sealed class ListRoom : IWanderRoom
     {
         private readonly Queue<StagePoint> _points;
@@ -16,6 +16,16 @@ public static partial class Program
         }
 
         public int Asked { get; private set; }
+
+        public bool CanSit { get; set; } = true;
+
+        /// <summary>The X of points that no path reaches.</summary>
+        public HashSet<double> Unreachable { get; } = new HashSet<double>();
+
+        public bool CanReach(StagePoint point)
+        {
+            return !Unreachable.Contains(point.X);
+        }
 
         public bool TryPickDestination(Func<double> random, out StagePoint destination)
         {

@@ -11,7 +11,7 @@ namespace Airi.Stage.Core
     ///
     /// Update
     ///   -> FrameFollower.Update (mouth, offsets, eyes)
-    ///   -> GestureMixer.Update (idle, walk, and gestures)
+    ///   -> GestureMixer.Update (idle, walk, sit, and gestures)
     ///   -> GazeAim.Update (the turn to the viewer, after the clips)
     ///   -> offsets after the aim, as <c>BodyPoseApplier</c> does after the clips
     ///   -> ExpressionFader.Update, BlinkTimer.Update
@@ -105,21 +105,19 @@ namespace Airi.Stage.Core
         /// <summary>How much the walk shows now, from 0 to 1.</summary>
         public float WalkWeight => _mixer.WalkWeight;
 
+        /// <summary>The sit clips. A new model stands her up at once.</summary>
+        public SeatMotion Seat => _mixer.Seat;
+
         /// <summary>
         /// Plays a gesture.
         ///
         /// Returns:
-        /// - False when the gesture cannot play. <see cref="GestureMixer.PlayUpper"/> gives the rules.
+        /// - False when the gesture cannot play. <see cref="GestureMixer.PlayUpper"/> and
+        ///   <see cref="GestureMixer.PlayWholeBody"/> give the rules.
         /// </summary>
         public bool PlayGesture(IHumanClip clip, bool wholeBody)
         {
-            if (wholeBody)
-            {
-                _mixer.PlayWholeBody(clip);
-                return true;
-            }
-
-            return _mixer.PlayUpper(clip);
+            return wholeBody ? _mixer.PlayWholeBody(clip) : _mixer.PlayUpper(clip);
         }
 
         /// <summary>Starts an expression. Without a model, it does nothing.</summary>
@@ -145,6 +143,12 @@ namespace Airi.Stage.Core
             _gaze.Release();
         }
 
+        /// <summary>Whether her body cannot turn to the viewer, for example while she sits. <see cref="GazeAim.SetBodyFixed"/> gives the rules.</summary>
+        public void SetBodyFixed(bool bodyFixed)
+        {
+            _gaze.SetBodyFixed(bodyFixed);
+        }
+
         /// <summary>Computes the state of this frame. A call before <see cref="StartModel"/> does nothing.</summary>
         public void Update(float deltaSeconds)
         {
@@ -156,6 +160,7 @@ namespace Airi.Stage.Core
             _frames.Update(deltaSeconds);
             _mixer.Update(deltaSeconds, Pose);
             _gaze.Update(deltaSeconds);
+            Pose.Rotations[Spine] = Pose.Rotations[Spine] * _gaze.Spine;
             Pose.Rotations[Neck] = Pose.Rotations[Neck] * _gaze.Neck;
             Pose.Rotations[Head] = Pose.Rotations[Head] * _gaze.Head;
 

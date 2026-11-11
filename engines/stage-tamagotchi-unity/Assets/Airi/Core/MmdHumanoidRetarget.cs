@@ -69,6 +69,9 @@ namespace Airi.Stage.Core
         /// <summary>The height of the head joint in PMX units, or 0 without a head bone. A turn to the viewer aims from it.</summary>
         public float HeadHeight { get; }
 
+        /// <summary>The length from the hip joint to the knee in PMX units, or 0 without these bones. A sit takes it.</summary>
+        public float ThighLength { get; }
+
         public MmdHumanoidRetarget(IReadOnlyList<MmdRigBone> bones)
         {
             _bones = bones;
@@ -116,6 +119,7 @@ namespace Airi.Stage.Core
             HipHeight = ComputeHipHeight(boneIndex);
             int headTarget = _targetOfHuman[HumanBones.IndexOf("head")];
             HeadHeight = headTarget >= 0 ? _bones[headTarget].Y : 0;
+            ThighLength = DistanceBetween(_targetOfHuman[HumanBones.IndexOf("leftUpperLeg")], _targetOfHuman[HumanBones.IndexOf("leftLowerLeg")]);
         }
 
         /// <summary>
@@ -235,6 +239,20 @@ namespace Airi.Stage.Core
             }
 
             return corrections;
+        }
+
+        /// <summary>The distance between two bones at rest, or 0 when one of them is missing.</summary>
+        private float DistanceBetween(int first, int second)
+        {
+            if (first < 0 || second < 0)
+            {
+                return 0;
+            }
+
+            float x = _bones[first].X - _bones[second].X;
+            float y = _bones[first].Y - _bones[second].Y;
+            float z = _bones[first].Z - _bones[second].Z;
+            return (float)Math.Sqrt((x * x) + (y * y) + (z * z));
         }
 
         private float ComputeHipHeight(Dictionary<string, int> boneIndex)

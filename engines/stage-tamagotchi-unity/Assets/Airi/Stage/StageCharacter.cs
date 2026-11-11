@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Threading.Tasks;
 using Airi.Stage.Core;
 using UnityEngine;
@@ -89,6 +90,107 @@ namespace Airi.Stage
         }
 
         /// <summary>
+        /// Loads the four sit clips of the player. They report their hips from their T-pose, so the drop of the hips
+        /// and their move back stay.
+        /// </summary>
+        public async Task SetSeatAsync(string folder)
+        {
+            try
+            {
+                var clips = new VrmaClip[4];
+                string[] files = { SeatMotion.EnterFile, SeatMotion.IdleFile, SeatMotion.TalkFile, SeatMotion.ExitFile };
+                for (int index = 0; index < files.Length; index++)
+                {
+                    clips[index] = await _clips.LoadAsync(Path.Combine(folder, files[index]));
+                    clips[index].HipsFromRest = true;
+                }
+
+                _driver.Seat.SetClips(clips[0], clips[1], clips[2], clips[3]);
+                SeatMotion seat = _driver.Seat;
+                Debug.Log($"[Airi] The sit clips load. While she sits, her hips are at ({seat.SeatedHipsX:F2}, {seat.SeatedHipsY:F2}, {seat.SeatedHipsZ:F2}) hip heights from the T-pose.");
+            }
+            catch (Exception error)
+            {
+                Debug.LogError($"[Airi] Could not load the sit clips from {folder}: {error}");
+            }
+        }
+
+        /// <summary>Whether she can sit: an avatar with legs is on the stage, and the sit clips loaded.</summary>
+        public bool CanSit => _host != null && _host.HipHeight > 0f && _host.ThighLength > 0f && _driver.Seat.HasClips;
+
+        public SeatPhase SeatPhase => _driver.Seat.Phase;
+
+        /// <summary>How far she sat down, from 0 to 1. <see cref="SeatMotion.Depth"/> gives the rules.</summary>
+        public float SeatDepth => _driver.Seat.Depth;
+
+        /// <summary>
+        /// The move of her hips from a stand as far as she sat down, in meters, in the frame of her body: to her right,
+        /// up, and to her front. Her head moves with her hips, so the camera follows this move.
+        /// </summary>
+        public Vector3 SeatShift
+        {
+            get
+            {
+                if (!CanSit)
+                {
+                    return Vector3.zero;
+                }
+
+                SeatMotion seat = _driver.Seat;
+                return new Vector3(-seat.SeatedHipsX, seat.SeatedHipsY, seat.SeatedHipsZ) * (_host.HipHeight * seat.Depth);
+            }
+        }
+
+        /// <summary>The length from her hip joint to her knee, in meters, or 0 without an avatar.</summary>
+        public float ThighLength => _host?.ThighLength ?? 0f;
+
+        /// <summary>The height of her hips in the rest pose, in meters, or 0 without an avatar.</summary>
+        public float HipHeight => _host?.HipHeight ?? 0f;
+
+        /// <summary>
+        /// The hips of the sit loop from the root of the avatar, in meters, in the frame of her body: to her right, up,
+        /// and to her front. The X axis of a pose is mirrored, so her right is its negative X.
+        /// </summary>
+        public Vector3 SeatedHips
+        {
+            get
+            {
+                float height = HipHeight;
+                SeatMotion seat = _driver.Seat;
+                return new Vector3(-seat.SeatedHipsX * height, (1f + seat.SeatedHipsY) * height, seat.SeatedHipsZ * height);
+            }
+        }
+
+        /// <summary>
+        /// Sits her down.
+        ///
+        /// Returns:
+        /// - False when she cannot sit now, or does not stand.
+        /// </summary>
+        public bool Sit()
+        {
+            return CanSit && _driver.Seat.Sit();
+        }
+
+        /// <summary>Gets her up. The exit clip plays, and the stand returns after it.</summary>
+        public void StandUp()
+        {
+            _driver.Seat.StandUp();
+        }
+
+        /// <summary>Whether she talks to the viewer while she sits. The talk loop then plays.</summary>
+        public void SetTalking(bool talking)
+        {
+            _driver.Seat.SetTalking(talking);
+        }
+
+        /// <summary>Whether her body cannot turn to the viewer. The spine then takes a share of the turn.</summary>
+        public void SetBodyFixed(bool bodyFixed)
+        {
+            _driver.SetBodyFixed(bodyFixed);
+        }
+
+        /// <summary>
         /// Shows the walk at the speed of the character. The clip plays at the rate that matches the speed to the
         /// legs of the avatar, so the feet slide less.
         /// </summary>
@@ -124,9 +226,10 @@ namespace Airi.Stage
             try
             {
                 VrmaClip clip = await _clips.LoadAsync(gesture.Path);
-                if (current == _newestGesture)
+                bool wholeBody = gesture.Part == "full";
+                if (current == _newestGesture && !_driver.PlayGesture(clip, wholeBody) && wholeBody)
                 {
-                    _driver.PlayGesture(clip, gesture.Part == "full");
+                    Debug.Log($"[Airi] The gesture {gesture.Id} moves the whole body, so it does not play while she sits.");
                 }
             }
             catch (Exception error)

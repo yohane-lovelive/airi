@@ -39,11 +39,16 @@ namespace Airi.Stage.Editor
 
         /// <summary>
         /// The clips to convert, by the end of their name in a model file, and the names of the files to write. The
-        /// owner chose the casual walk of the Universal Animation Library over its formal walk.
+        /// owner chose the casual walk of the Universal Animation Library over its formal walk. The four sit clips
+        /// come from the same pack.
         /// </summary>
         private static readonly (string Clip, string File)[] Motions =
         {
             ("Walk_Loop", "walk"),
+            ("Sitting_Enter", "sit-enter"),
+            ("Sitting_Idle_Loop", "sit-idle"),
+            ("Sitting_Talking_Loop", "sit-talk"),
+            ("Sitting_Exit", "sit-exit"),
         };
 
         /// <summary>Converts the clips of each model. A missing clip or a failed model fails the run, so the batch reports it.</summary>
@@ -297,9 +302,12 @@ namespace Airi.Stage.Editor
         private static byte[] Convert(AnimationClip clip, Animator source, HumanPoseHandler sourcePose, NormalizedSkeleton skeleton)
         {
             var data = new ExportingGltfData();
-            int legMuscle = Array.IndexOf(HumanTrait.MuscleName, "Left Upper Leg Front-Back");
-            float legLow = float.PositiveInfinity;
-            float legHigh = float.NegativeInfinity;
+            float[] muscleLow = Enumerable.Repeat(float.PositiveInfinity, HumanTrait.MuscleCount).ToArray();
+            float[] muscleHigh = Enumerable.Repeat(float.NegativeInfinity, HumanTrait.MuscleCount).ToArray();
+            Transform hips = skeleton.Bones[HumanBodyBones.Hips];
+            float restHips = 0f;
+            float hipsLow = float.PositiveInfinity;
+            float hipsHigh = float.NegativeInfinity;
             var rest = default(HumanPose);
             AnimationMode.StartAnimationMode();
             try
@@ -309,6 +317,7 @@ namespace Airi.Stage.Editor
                 {
                     // The export takes the rest pose from the skeleton as it stands now. A clip before this one moved it.
                     skeleton.Reset();
+                    restHips = hips.position.y;
                     targetPose.GetHumanPose(ref rest);
                     Quaternion targetTurn = Yaw(rest.bodyRotation);
                     AnimationMode.BeginSampling();
@@ -334,11 +343,17 @@ namespace Airi.Stage.Editor
                             AnimationMode.SampleAnimationClip(source.gameObject, clip, (float)time);
                             AnimationMode.EndSampling();
                             sourcePose.GetHumanPose(ref pose);
-                            legLow = Mathf.Min(legLow, pose.muscles[legMuscle]);
-                            legHigh = Mathf.Max(legHigh, pose.muscles[legMuscle]);
+                            for (int muscle = 0; muscle < muscleLow.Length; muscle++)
+                            {
+                                muscleLow[muscle] = Mathf.Min(muscleLow[muscle], pose.muscles[muscle]);
+                                muscleHigh[muscle] = Mathf.Max(muscleHigh[muscle], pose.muscles[muscle]);
+                            }
+
                             pose.bodyRotation = correction * pose.bodyRotation;
                             pose.bodyPosition = correction * pose.bodyPosition;
                             targetPose.SetHumanPose(ref pose);
+                            hipsLow = Mathf.Min(hipsLow, hips.position.y);
+                            hipsHigh = Mathf.Max(hipsHigh, hips.position.y);
                             vrma.AddFrame(TimeSpan.FromSeconds(time));
                         }
                     });
@@ -349,11 +364,14 @@ namespace Airi.Stage.Editor
                 AnimationMode.StopAnimationMode();
             }
 
-            // A clip that did not move gives the same muscle in each frame. Then the file holds one still pose.
-            Debug.Log($"[Airi] {clip.name}: the muscle of the left upper leg moves from {legLow:F2} to {legHigh:F2}.");
-            if (legHigh - legLow < 0.05f)
+            // A clip that did not move gives the same muscles in each frame. Then the file holds one still pose. A sit
+            // loop moves its legs little, so the check takes the muscle that moves the most.
+            int most = Enumerable.Range(0, muscleLow.Length).OrderByDescending(muscle => muscleHigh[muscle] - muscleLow[muscle]).First();
+            float largest = muscleHigh[most] - muscleLow[most];
+            Debug.Log($"[Airi] {clip.name}: the muscle {HumanTrait.MuscleName[most]} moves the most, by {largest:F2}. The hips go from {hipsLow / restHips:F2} to {hipsHigh / restHips:F2} of their height in the T-pose.");
+            if (largest < 0.05f)
             {
-                throw new InvalidOperationException($"The clip {clip.name} did not move the legs of the source.");
+                throw new InvalidOperationException($"The clip {clip.name} did not move the source.");
             }
 
             return data.ToGlbBytes();

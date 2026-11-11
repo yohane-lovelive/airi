@@ -6,7 +6,8 @@ using Newtonsoft.Json.Linq;
 namespace Airi.Stage.Core
 {
     /// <summary>
-    /// Finds the socket of Electron main, in the two ways that a sidecar can start, and the display of the window.
+    /// Finds the socket of Electron main, in the two ways that a sidecar can start, the display of the window, and a
+    /// place for a check.
     ///
     /// - Player mode: Electron main starts the player with <c>--airi-ws-url=&lt;url&gt;</c>.
     /// - Attach mode: Electron main writes <c>attach.json</c>, and Play mode in the Editor reads it.
@@ -15,6 +16,21 @@ namespace Airi.Stage.Core
     {
         private const string UrlArgument = "--airi-ws-url=";
         private const string DisplayArgument = "--airi-display=";
+        private const string PlaceArgument = "--airi-place=";
+
+        /// <summary>
+        /// Reads the place of the room where the character goes after her first rest, for example for a check of a
+        /// seat. The argument <c>--airi-place=&lt;name&gt;</c> wins over the environment variable AIRI_UNITY_STAGE_PLACE.
+        ///
+        /// Returns:
+        /// - The name of the place, or null when neither gives one.
+        /// </summary>
+        public static string FindPlace(string[] arguments, string environmentValue)
+        {
+            string argument = arguments.LastOrDefault(value => value.StartsWith(PlaceArgument, StringComparison.Ordinal));
+            string name = argument != null ? argument.Substring(PlaceArgument.Length) : environmentValue;
+            return string.IsNullOrWhiteSpace(name) ? null : name.Trim();
+        }
 
         /// <summary>
         /// Reads the display for the window of the player, for example a second monitor beside a game. The number counts

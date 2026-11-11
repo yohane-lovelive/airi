@@ -17,6 +17,9 @@ namespace Airi.Stage
         /// <summary>The height of the head joint of the avatar in its rest pose, in meters, or 0 without an avatar. A turn to the viewer aims from it.</summary>
         float HeadHeight { get; }
 
+        /// <summary>The length from the hip joint to the knee of the avatar, in meters, or 0 without an avatar. A sit takes it.</summary>
+        float ThighLength { get; }
+
         /// <summary>
         /// Loads a model and replaces the avatar of this host.
         ///

@@ -17,7 +17,8 @@ namespace Airi.Stage.Core
     /// jumps. Here the old gesture fades out under the new one.
     ///
     /// A walk clip lies between the idle and the gestures, with a weight that follows the speed of the
-    /// character. Only the Unity stage walks, so three.js has no such layer.
+    /// character. Only the Unity stage walks, so three.js has no such layer. The sit clips of
+    /// <see cref="Seat"/> lie over the walk, and under the gestures.
     /// </summary>
     public sealed class GestureMixer
     {
@@ -88,10 +89,13 @@ namespace Airi.Stage.Core
         public bool IsPlaying => _layers.Count > 0;
 
         /// <summary>Whether a clip gives the pose. Without one, the pose is the T-pose.</summary>
-        public bool HasMotion => _idle != null || _layers.Count > 0 || WalkWeight > 0;
+        public bool HasMotion => _idle != null || _layers.Count > 0 || WalkWeight > 0 || Seat.Weight > 0;
 
         /// <summary>How much the walk shows now, from 0 to 1.</summary>
         public float WalkWeight { get; private set; }
+
+        /// <summary>The sit clips. While she sits, a clip of the whole body does not play.</summary>
+        public SeatMotion Seat { get; } = new SeatMotion();
 
         /// <summary>Sets the clip that loops under the gestures. Without a clip, the base is the T-pose.</summary>
         public void SetIdle(IHumanClip clip)
@@ -120,10 +124,11 @@ namespace Airi.Stage.Core
             _walkRate = Math.Max(0f, rate);
         }
 
-        /// <summary>Removes each gesture at once, for a new model.</summary>
+        /// <summary>Removes each gesture at once, and stands her up, for a new model.</summary>
         public void Clear()
         {
             _layers.Clear();
+            Seat.Stop();
         }
 
         /// <summary>
@@ -158,9 +163,19 @@ namespace Airi.Stage.Core
             return true;
         }
 
-        /// <summary>Plays a clip of the whole body once, instead of the idle.</summary>
-        public void PlayWholeBody(IHumanClip clip)
+        /// <summary>
+        /// Plays a clip of the whole body once, instead of the idle.
+        ///
+        /// Returns:
+        /// - False while she sits, sits down, or gets up, because the clip stands her up.
+        /// </summary>
+        public bool PlayWholeBody(IHumanClip clip)
         {
+            if (Seat.Weight > 0 || Seat.Phase != SeatPhase.Standing)
+            {
+                return false;
+            }
+
             ReleaseAll();
             _layers.Add(new Layer
             {
@@ -169,6 +184,7 @@ namespace Airi.Stage.Core
                 Bones = AllBones,
                 ReleaseAt = clip.Duration,
             });
+            return true;
         }
 
         /// <summary>Advances the time and writes the pose of this frame.</summary>
@@ -182,6 +198,7 @@ namespace Airi.Stage.Core
             }
 
             BlendWalk(deltaSeconds, output);
+            Seat.Update(deltaSeconds, output);
 
             for (int index = 0; index < _layers.Count; index++)
             {

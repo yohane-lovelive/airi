@@ -70,7 +70,7 @@ W2-1 builds it this way. It changes three values above: the height of a seat, th
 - Parts at least 0.15 m above the seat, within 0.8 m of its middle, are its back. Their directions add up, so two arms cancel.
 - A seat with a back faces away from it. A seat without a back faces the nearest floor that she reaches.
 - The rounded edges of cushions split a sofa into one area for each cushion. An area with a back wins over a larger area without one.
-- The seat point is the middle of the front edge of the seat, where her knees go. W2-2 puts her hips behind it by the length of her thighs.
+- The seat point is the middle of the front edge of the seat, where her knees go. W2-2 puts her hips behind it by about the length of her thighs.
 - The stand point is the point of the NavMesh nearest to the seat point, at most 1.2 m away. The front edge of a chair at a table lies under the table.
 - A screen without a seat gets a stand point in front of it. Its distance is the width of the screen, and at least 0.8 m.
 - The bake of the NavMesh makes the parts of seats not walkable. The modifiers of the bake leave the scene before the bundle.
@@ -90,18 +90,18 @@ W2-1 builds it this way. It changes three values above: the height of a seat, th
 The motion import converts four more clips of the same pack. CC0 allows copies in the repository, so the player carries them.
 
 - `Sitting_Enter`, `Sitting_Idle_Loop`, `Sitting_Talking_Loop`, and `Sitting_Exit` become `sit-enter.vrma`, `sit-idle.vrma`, `sit-talk.vrma`, and `sit-exit.vrma` in `AiriMotions`.
-- She walks to the stand point of the place, and she turns to the facing of the place.
-- The enter clip then plays. During its first half, the stage moves her from the stand point to the seat.
+- She walks to the stand point of the place.
+- She then steps off the NavMesh to the spot in front of the seat, and turns to the facing of the place. The enter clip plays there.
 - The seat point lies off the NavMesh, because the chair is part of the bake. So the agent lets go of her while she sits.
-- The driver drops `HipsX` and `HipsZ` of these clips, as of the walk clip. `HipsY` stays, so she still lowers herself.
+- The driver keeps the whole move of the hips of these clips. A sit clip moves the hips down and back while the feet stay.
 - Models differ in the length of their legs. So the stage puts her hips on the seat, behind the seat point by the length of her thighs.
 - She sits with the idle loop. While the attention is `viewer`, the talk loop takes its place.
-- To leave, the exit clip plays, and the stage moves her back to the stand point. Then the agent takes her again.
+- To leave, the exit clip plays, and she steps back to the stand point. Then the agent takes her again.
 
 While she sits, the attention of the viewer does not end the sitting:
 
-- Her body does not turn. Her chest turns up to 30 degrees, and her neck, her head, and her eyes take the rest, inside the limits of `GazeAim`.
-- So her face turns up to about 90 degrees from her facing.
+- Her body does not turn. Her spine takes 30% of the turn, up to 30 degrees, and her chest turns with it.
+- Her neck, her head, and her eyes take the rest, inside the limits of `GazeAim`. So her face turns up to about 90 degrees from her facing.
 - The procedural offsets of the frame stay on top, as they do while she stands.
 
 In a walk without an activity, some rests take a place:
@@ -109,6 +109,29 @@ In a walk without an activity, some rests take a place:
 - One rest in three goes to a free place, when the room has one.
 - She sits when the place has a seat. Otherwise she stands at the stand point and faces the facing of the place.
 - A rest on a seat lasts 20 to 60 seconds, because a short sit looks restless.
+
+W2-2 builds it this way. It changes three points above: the move of the hips, the way to the seat, and the bone that turns.
+
+- In the sit loop of the pack, the hips lie 0.41 hip heights lower than in the T-pose. They also lie 0.42 hip heights behind it.
+- The hips keep this move back. Without it, the root must move in its place, and her feet slide about 0.5 m.
+- So she steps at 0.5 m/s to the spot of her feet, and she sits there with no slide. The step leaves the NavMesh.
+- The spine turns, not the chest. VRM 1.0 does not require a chest bone, and the chest turns with the spine.
+- A sit loop moves its legs little. So the check of the motion import takes the muscle that moves the most, not the left thigh.
+- `SeatMotion` plays the sit clips over the walk and under the gestures. A change of clip fades from the last pose in 0.25 seconds.
+- `StageSit` fits a seat. Her knees go 0.08 m in front of the seat point, and her hip joints 0.12 hip heights above the seat.
+- With her knees on the edge, her calves went into the front of the sofa of 2LDK. The margin of 0.08 m keeps them in front.
+- Short legs let her feet hang. The root rises or sinks as far as she sat down.
+- Long legs sink her feet by at most 0.02 m, about one sole. Then her hips stay above the seat for the rest.
+- On the low bed of 2LDK, a sink of 0.05 m hid her shoes in the floor. Her hips now stay 0.07 m above the bed.
+- While she sits, the furniture box around her seat turns off. Her body is inside it, so the camera saw her as hidden from each side.
+- Her hips move down and back as she sits. The target of the camera follows this move, or a face view loses her.
+- A clip of the whole body does not play while she sits. An upper-body gesture plays over the sit.
+- A new model stands her up at once at the stand point.
+- `--airi-place=<name>`, or `AIRI_UNITY_STAGE_PLACE`, sends her to a place after her first rest. It is for checks.
+- In 2LDK, AvatarSample_A sat at the desk, on the sofa, and on the bed. A PMX model of the owner sat at the desk and on the sofa.
+- Each time, her hips rested on the seat, and she got up and walked on. The talk loop and the turn of the spine showed during an attention.
+- The sofa of 2LDK faces 74 degrees, because its pillows pull the sum of its back aside. An edit to 90 in `room.json` fixes it.
+- The cameras of W1 do not stop at furniture without a collider. At the desk, a close camera can stand in the desk or the PC. W2-5 adds the camera at a place.
 
 ### The activity
 
