@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Airi.Stage.Core;
@@ -76,6 +78,7 @@ namespace Airi.Stage
         {
             Application.runInBackground = true;
             string[] arguments = Environment.GetCommandLineArgs();
+            MoveToDisplay(StageLaunch.FindDisplay(arguments, Environment.GetEnvironmentVariable("AIRI_UNITY_STAGE_DISPLAY")));
             _grade = StageGrade.FromArguments(arguments);
             try
             {
@@ -115,6 +118,30 @@ namespace Airi.Stage
             }
 
             await ConnectAsync();
+        }
+
+        /// <summary>
+        /// Moves the window to a display, for example a second monitor beside a game. The log lists the displays, so the
+        /// owner can find the number. In the Editor, the Game view has no window of its own, so nothing moves.
+        /// </summary>
+        private static void MoveToDisplay(int? number)
+        {
+            var displays = new List<DisplayInfo>();
+            Screen.GetDisplayLayout(displays);
+            Debug.Log($"[Airi] Displays: {string.Join(", ", displays.Select((display, index) => $"{index + 1} = {display.name} at ({display.workArea.x}, {display.workArea.y}), {display.width}x{display.height}"))}.");
+            if (number == null || Application.isEditor)
+            {
+                return;
+            }
+
+            if (number.Value > displays.Count)
+            {
+                Debug.LogWarning($"[Airi] Display {number.Value} does not exist, so the window stays.");
+                return;
+            }
+
+            // The margin keeps the title bar on the display, so the owner can still drag the window.
+            Screen.MoveMainWindowTo(displays[number.Value - 1], new Vector2Int(40, 40));
         }
 
         /// <summary>

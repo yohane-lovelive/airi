@@ -279,6 +279,8 @@ A small interface, `IStageOutput`, has two implementations:
 - `WindowOutput`: one normal camera in a normal window. This is the output for steps U2 to U4. The camera frames the avatar from its bounds. The owner can move it with the mouse in the window: a left drag goes around the character, a right drag moves across the view, and the wheel comes closer. The keys 1, 2, and 3 frame the full body, the upper body, and the face, and a double click returns to the full body. `PlayerPrefs` keeps the last camera. The argument `--airi-camera=full|upper|face|custom:...` fixes the camera and ignores the input.
 - `SrDisplayOutput`: places `PortraitSRDisplayManager` in the scene and removes the normal camera.
 
+`--airi-display=<number>` or `AIRI_UNITY_STAGE_DISPLAY` moves the window of the player to a display at its start, for example a second monitor beside a game. The number counts from 1 in the display layout of Unity, and the player log lists the displays.
+
 `Assets/Airi/SrDisplay/` has its own assembly definition and a define constraint, so the project compiles without the Sony plugin.
 
 The scale comes from the avatar bounds, not from a fixed number. Step U5 sets `SRD View Space Scale` so that the full character, with a margin for arms and hair, stays in the view space. Spatial Clipping stays on. The earlier note of "a desk corner of 2 m at 1/10 scale" is only a calculation, and the vertical axis of the view space is unknown.

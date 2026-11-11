@@ -6,7 +6,7 @@ using Newtonsoft.Json.Linq;
 namespace Airi.Stage.Core
 {
     /// <summary>
-    /// Finds the socket of Electron main, in the two ways that a sidecar can start.
+    /// Finds the socket of Electron main, in the two ways that a sidecar can start, and the display of the window.
     ///
     /// - Player mode: Electron main starts the player with <c>--airi-ws-url=&lt;url&gt;</c>.
     /// - Attach mode: Electron main writes <c>attach.json</c>, and Play mode in the Editor reads it.
@@ -14,6 +14,25 @@ namespace Airi.Stage.Core
     public static class StageLaunch
     {
         private const string UrlArgument = "--airi-ws-url=";
+        private const string DisplayArgument = "--airi-display=";
+
+        /// <summary>
+        /// Reads the display for the window of the player, for example a second monitor beside a game. The number counts
+        /// from 1, in the order of the display layout of Unity, which the player logs at its start. The argument
+        /// <c>--airi-display=&lt;number&gt;</c> wins over the environment variable AIRI_UNITY_STAGE_DISPLAY.
+        ///
+        /// Returns:
+        /// - The number, or null when neither gives a whole number of 1 or more. The window then stays where the system
+        ///   puts it.
+        /// </summary>
+        public static int? FindDisplay(string[] arguments, string environmentValue)
+        {
+            string argument = arguments.LastOrDefault(value => value.StartsWith(DisplayArgument, StringComparison.Ordinal));
+            string text = argument != null ? argument.Substring(DisplayArgument.Length) : environmentValue;
+            return int.TryParse(text, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out int number) && number >= 1
+                ? number
+                : (int?)null;
+        }
 
         /// <summary>
         /// Reads the socket URL from the arguments of the process.

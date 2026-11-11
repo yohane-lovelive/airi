@@ -321,6 +321,15 @@ public static partial class Program
         // Electron main can write the file at the same moment, so a partial file is a normal state.
         Check(StageLaunch.ReadUrlFromAttachFile("{\"url\":\"ws") == null, "no error from a partial file");
         Check(StageLaunch.ReadUrlFromAttachFile(string.Empty) == null, "no error from no text");
+
+        Check(StageLaunch.FindDisplay(new[] { "stage.exe", "--airi-display=2" }, null) == 2, "reads the display of the argument");
+        Check(StageLaunch.FindDisplay(new[] { "stage.exe" }, "3") == 3, "reads the display of the environment");
+        Check(StageLaunch.FindDisplay(new[] { "--airi-display=2" }, "3") == 2, "the argument wins over the environment");
+        Check(StageLaunch.FindDisplay(new[] { "stage.exe" }, null) == null, "no display without a value");
+        foreach (string text in new[] { "0", "-1", "x", string.Empty, "1.5", " 2" })
+        {
+            Check(StageLaunch.FindDisplay(new[] { $"--airi-display={text}" }, null) == null, $"no display from \"{text}\"");
+        }
     }
 
     private static void TestFraming()
