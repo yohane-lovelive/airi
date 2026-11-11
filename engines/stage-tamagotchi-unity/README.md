@@ -55,6 +55,8 @@ In a room, the camera stops in front of walls and doors. When a wall leaves too 
 
 At a place with a screen, for example the desk, the camera moves to a view of the character and the screen. The mouse moves this view in the same way. Keys 1, 2, and 3 or a double click return to your camera until she leaves the place.
 
+The desk of the commentary gets a second monitor and a webcam. While she sits there, the second monitor shows her face from the front. During a commentary, she looks into the webcam for each line.
+
 ## Import a Room
 
 A room is a Unity package of a world, for example a VRChat world from BOOTH. Read its license first. Most such licenses forbid redistribution, so the package and each imported file stay on your PC.
@@ -136,6 +138,7 @@ Unity runs only one `-executeMethod` in a batch run, so the setup and the build 
 - `Assets/Airi/Stage/`: the connection, the VRM and MMD avatars, the `.vrma` clips, the display output, the looks, the rooms, and the walk.
 - `Assets/Airi/Editor/`: the project setup, the player build, the room import, and the motion import.
 - `Assets/Airi/Looks/Resources/AiriLooks/`: material templates of the lilToon look. `setup:project` writes them.
+- `Assets/Airi/Room/Resources/AiriRoom/`: the unlit material of the screens that the stage adds to a room. `setup:project` writes it.
 - `Assets/StreamingAssets/AiriMotions/`: the clips that the player carries, for now the walk and the four sit clips.
 - `Assets/LocalRooms/`: the files of imported rooms. Git ignores this folder.
 - `Assets/LocalMotions/`: the FBX files of the motion import. Git ignores this folder.

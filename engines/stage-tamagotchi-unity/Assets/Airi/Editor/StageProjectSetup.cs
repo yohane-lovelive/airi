@@ -34,6 +34,7 @@ namespace Airi.Stage.Editor
         private const string SettingsFolder = "Assets/Airi/Settings";
         private const string ScenePath = "Assets/Airi/Scenes/Stage.unity";
         private const string LookTemplateFolder = "Assets/Airi/Looks/Resources/AiriLooks";
+        private const string RoomTemplateFolder = "Assets/Airi/Room/Resources/AiriRoom";
 
         /// <summary>
         /// UniVRM and unity-mmd-loader find these shaders by name at runtime, while no asset of the
@@ -57,6 +58,7 @@ namespace Airi.Stage.Editor
             QualitySettings.renderPipeline = pipeline;
             IncludeRuntimeShaders();
             CreateLookTemplates();
+            CreateRoomTemplates();
             CreateScene();
             AssetDatabase.SaveAssets();
             Debug.Log("[Airi] The project settings and the scene are ready.");
@@ -331,11 +333,23 @@ namespace Airi.Stage.Editor
             SaveTemplate("liltoon-transparent-noline", CreateLilToonTemplate(LilRenderingMode.Transparent, false));
         }
 
-        private static void SaveTemplate(string name, Material material)
+        private static void SaveTemplate(string name, Material material, string folder = LookTemplateFolder)
         {
-            string path = $"{LookTemplateFolder}/{name}.mat";
+            string path = $"{folder}/{name}.mat";
             AssetDatabase.DeleteAsset(path);
             AssetDatabase.CreateAsset(material, path);
+        }
+
+        /// <summary>
+        /// Writes the unlit material of the screens that the stage adds to a room, for example the monitor of the
+        /// webcam. No asset of the scene uses the unlit shader of URP, so without this material a build removes it.
+        /// </summary>
+        private static void CreateRoomTemplates()
+        {
+            Directory.CreateDirectory(RoomTemplateFolder);
+            const string shaderName = "Universal Render Pipeline/Unlit";
+            Shader shader = Shader.Find(shaderName) ?? throw new FileNotFoundException($"The shader {shaderName} does not exist. Check the URP package.");
+            SaveTemplate("screen-unlit", new Material(shader), RoomTemplateFolder);
         }
 
         private static Material CreateLilToonTemplate(LilRenderingMode mode, bool outline)

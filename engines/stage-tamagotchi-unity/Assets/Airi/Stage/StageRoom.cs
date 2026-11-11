@@ -36,6 +36,9 @@ namespace Airi.Stage
 
         private readonly List<BoxCollider> _furnitureBoxes = new List<BoxCollider>();
 
+        /// <summary>The bounds of each part of the room up to 3 m, also small things on a desk. Walls and floors are larger.</summary>
+        private readonly List<Bounds> _parts = new List<Bounds>();
+
         private StageRoom(StageRoomManifest manifest)
         {
             Manifest = manifest;
@@ -195,6 +198,8 @@ namespace Airi.Stage
         ///
         /// A box follows the bounds of the renderer, so it also fills the space under a table. A camera then sees her
         /// legs there as hidden, and it prefers another side, which a viewer does not mind.
+        ///
+        /// The same pass keeps the bounds of each part up to 3 m for <see cref="IsFree"/>.
         /// </summary>
         private void BoxFurniture(Scene scene)
         {
@@ -218,6 +223,10 @@ namespace Airi.Stage
             {
                 Bounds bounds = renderer.bounds;
                 Vector3 size = bounds.size;
+                if (renderer.enabled && Mathf.Max(size.x, size.y, size.z) <= LargestSize)
+                {
+                    _parts.Add(bounds);
+                }
                 bool furniture = renderer.enabled
                     && renderer.GetComponent<Collider>() == null
                     && !StageRoomDoors.IsDoorName(renderer.name)
@@ -241,6 +250,15 @@ namespace Airi.Stage
             }
 
             Debug.Log($"[Airi] Room {Manifest.Name}: {boxed} pieces of furniture can hide the character from the camera.");
+        }
+
+        /// <summary>
+        /// Whether a space of the room is free, for example for a monitor that the stage adds. It is free when no part of
+        /// the room up to 3 m touches it. Walls and floors are larger, and the caller keeps the space away from them.
+        /// </summary>
+        public bool IsFree(Bounds space)
+        {
+            return !_parts.Any(part => part.Intersects(space));
         }
 
         /// <summary>

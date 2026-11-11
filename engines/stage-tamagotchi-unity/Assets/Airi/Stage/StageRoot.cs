@@ -65,6 +65,9 @@ namespace Airi.Stage
 
         private StageWalker _walker;
 
+        /// <summary>The second monitor and the webcam at the desk of the commentary, or null.</summary>
+        private StageWebcam _webcam;
+
         /// <summary>The last attention of the host: true for the viewer. Only a walking character acts on it.</summary>
         private bool _attention;
 
@@ -117,6 +120,7 @@ namespace Airi.Stage
                 string motions = Path.Combine(Application.streamingAssetsPath, "AiriMotions");
                 _ = _character.SetWalkAsync(Path.Combine(motions, StageWalk.FileName));
                 _ = _character.SetSeatAsync(motions);
+                _webcam = StageWebcam.Create(_room, _walker.ScreenPlace, transform);
             }
 
             await ConnectAsync();
@@ -362,17 +366,32 @@ namespace Airi.Stage
             bool attending = _attention && _walker != null;
             Vector3 camera = _camera.transform.position;
             _walker?.Tick(Time.deltaTime, attending, camera);
-            _character.LookAt(_walker?.GazeTarget(attending, camera), _avatarRoot);
+
+            // The webcam films her while she sits at its desk.
+            StagePlaceSubject? subject = _walker?.PlaceSubject;
+            bool atWebcam = _webcam != null && _walker.Sits && subject?.Name == _webcam.PlaceName;
+            _webcam?.Tick(Time.deltaTime, atWebcam ? subject.Value.Head : (StagePoint?)null);
+
+            // During a commentary at the desk, she speaks to the webcam, as a streamer does.
+            Vector3 viewer = atWebcam && _walker.WatchingScreen ? _webcam.Position : camera;
+            _character.LookAt(_walker?.GazeTarget(attending, viewer), _avatarRoot);
             _character.Tick(Time.deltaTime);
 
-            // At a place with a screen, the camera shows her and the screen. Elsewhere, it follows her.
-            _output.ShowPlace(_walker?.PlaceSubject);
+            // At a place with a screen, the camera shows her and the screen, also the second one. Elsewhere, it follows her.
+            _output.ShowPlace(_webcam != null && subject?.Name == _webcam.PlaceName ? subject.Value.WithSecondScreen(_webcam.Screen) : subject);
 
             // When she sits, her head moves down and back with her hips, so the target of the camera moves too.
             _output.Follow(_avatarRoot.position - _framedAt + (_avatarRoot.rotation * _character.SeatShift));
 
-            // The camera moved in the line above, so the light comes from its side of this frame.
-            _characterLight?.Tick(Time.deltaTime, _avatarRoot.position, _camera.transform);
+            // The camera moved in the line above, so the light comes from its side of this frame. At the desk, the light
+            // moves to the side of the webcam, as the light of a monitor.
+            Vector3 view = _camera.transform.forward;
+            if (_webcam != null)
+            {
+                view = Vector3.Slerp(view, _webcam.Forward, _webcam.Weight);
+            }
+
+            _characterLight?.Tick(Time.deltaTime, _avatarRoot.position, view);
         }
 
         private async Task ApplySceneAsync(SceneApplyMessage scene)

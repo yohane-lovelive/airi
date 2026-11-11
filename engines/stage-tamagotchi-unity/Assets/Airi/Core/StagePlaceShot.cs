@@ -9,13 +9,15 @@ namespace Airi.Stage.Core
         /// <param name="head">Her head joint.</param>
         /// <param name="low">The lowest point to show, for example the seat point, or her feet while she stands.</param>
         /// <param name="facingDegrees">Her facing, as in the room file: 0 is +Z, and 90 is +X.</param>
-        public StagePlaceSubject(string name, StagePoint head, StagePoint low, double facingDegrees, StageRoomScreen screen)
+        /// <param name="secondScreen">A second screen beside the first, for example the monitor of the webcam, or null.</param>
+        public StagePlaceSubject(string name, StagePoint head, StagePoint low, double facingDegrees, StageRoomScreen screen, StageRoomScreen secondScreen = null)
         {
             Name = name;
             Head = head;
             Low = low;
             FacingDegrees = facingDegrees;
             Screen = screen;
+            SecondScreen = secondScreen;
         }
 
         /// <summary>The name of the place, for the log.</summary>
@@ -28,6 +30,15 @@ namespace Airi.Stage.Core
         public double FacingDegrees { get; }
 
         public StageRoomScreen Screen { get; }
+
+        /// <summary>The second screen that the shot also holds, or null.</summary>
+        public StageRoomScreen SecondScreen { get; }
+
+        /// <summary>The same subject with a second screen.</summary>
+        public StagePlaceSubject WithSecondScreen(StageRoomScreen secondScreen)
+        {
+            return new StagePlaceSubject(Name, Head, Low, FacingDegrees, Screen, secondScreen);
+        }
     }
 
     /// <summary>
@@ -35,7 +46,7 @@ namespace Airi.Stage.Core
     ///
     /// The camera stands behind her and to one side, about 125 degrees from her facing, and a little above her head. Its
     /// target lies between her head and the center of the screen. Its distance is the shortest that holds her head, the
-    /// low point of her body, and the corners of the screen in the view. When she turns to the viewer, her face turns up
+    /// low point of her body, and the corners of each screen in the view. When she turns to the viewer, her face turns up
     /// to about 90 degrees, so the camera sees it from the side.
     /// </summary>
     public static class StagePlaceShot
@@ -173,33 +184,47 @@ namespace Airi.Stage.Core
                 from.TargetZ + ((to.TargetZ - from.TargetZ) * share));
         }
 
-        /// <summary>The points that the view must hold: the top of her head, her low point, and the four corners of the screen.</summary>
+        /// <summary>
+        /// The points that the view must hold: the top of her head, her low point, and the four corners of each screen.
+        /// </summary>
         public static StagePoint[] PointsOf(in StagePlaceSubject subject)
         {
-            StageRoomScreen screen = subject.Screen;
+            var points = new List<StagePoint>
+            {
+                new StagePoint(subject.Head.X, subject.Head.Y + HeadTop, subject.Head.Z),
+                subject.Low,
+            };
+            points.AddRange(CornersOf(subject.Screen));
+            if (subject.SecondScreen != null)
+            {
+                points.AddRange(CornersOf(subject.SecondScreen));
+            }
+
+            return points.ToArray();
+        }
+
+        /// <summary>The four corners of a screen.</summary>
+        public static StagePoint[] CornersOf(StageRoomScreen screen)
+        {
             double radians = screen.FacingDegrees * Math.PI / 180.0;
 
             // The right of a screen that faces +Z is +X in Unity, as for a body.
             double rightX = Math.Cos(radians) * screen.Width / 2;
             double rightZ = -Math.Sin(radians) * screen.Width / 2;
             double halfHeight = screen.Height / 2;
-            var points = new List<StagePoint>
-            {
-                new StagePoint(subject.Head.X, subject.Head.Y + HeadTop, subject.Head.Z),
-                subject.Low,
-            };
+            var corners = new List<StagePoint>();
             foreach (double side in new[] { -1.0, 1.0 })
             {
                 foreach (double level in new[] { -1.0, 1.0 })
                 {
-                    points.Add(new StagePoint(
+                    corners.Add(new StagePoint(
                         screen.Center.X + (rightX * side),
                         screen.Center.Y + (halfHeight * level),
                         screen.Center.Z + (rightZ * side)));
                 }
             }
 
-            return points.ToArray();
+            return corners.ToArray();
         }
 
         /// <summary>Whether each point lies in front of the camera and inside the view less its border.</summary>

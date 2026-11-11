@@ -240,6 +240,36 @@ W2-5 builds it this way. It adds two points above: furniture stops the shot as a
 - A TV of 2.5 m needs a camera 5.9 m away in a tall window, so she looks small there.
 - The math of a drag has tests. A drag in the window waits for a check by the owner.
 
+### The webcam monitor
+
+The shot from behind her hides her face. So the desk gets a second monitor, as a streamer has, and it shows her face from the front.
+
+- The first monitor of the place shows the game. A webcam on its top edge films her, and the second monitor shows this film.
+- The second monitor goes to the first screen place with a seat, the desk of the commentary. It stays in the room.
+- The webcam films only while she sits at the desk, 15 pictures each second. Otherwise the second monitor is dark.
+- During a commentary at the desk, she looks into the webcam for each line, as a streamer does. So the second monitor shows her face from the front.
+- Outside a commentary, she still turns to the camera of the window.
+- At the desk, the light of the character comes from the side of the webcam, as the light of a monitor.
+- The shot of the camera also holds the corners of the second screen.
+
+| Option | What it does | Result |
+| --- | --- | --- |
+| **A second monitor with a webcam** | A monitor in the room shows her face from the front. | Chosen. The owner asked for it, and the room looks like a desk of a streamer. |
+| A picture in the corner of the window | The window shows a second view of her face. | A larger face, but the view looks like a layout of a stream, not like the room. |
+| The shot from the front | The camera stands in front of her. | Her face shows, but the game screen stands behind the camera. |
+
+W2-6 builds it this way.
+
+- The furniture cannot move, so the stage adds the monitor. It has a dark frame, a screen of 0.55 m, and a pole down to the desk.
+- `StageWebcamRig` gives three places: beside the first monitor on her right, on her left, each turned 25 degrees toward her, and above it.
+- A place counts only when no part of the room up to 3 m touches it. In 2LDK, speakers stand on both sides, so the monitor stands above.
+- The webcam stands 0.03 m above the top edge of the first screen, and 0.04 m toward her. It films 0.6 m around her neck.
+- A camera of URP renders into a texture of 512x288. The screen uses an unlit material of URP, so the light of the room does not change the film.
+- `setup:project` writes this material into `Resources`, so a build keeps its shader. W2-4 can use the same material for the game.
+- The light moves to the side of the webcam in 1.2 seconds, as the camera moves to its shot.
+- In 2LDK, the webcam took 749 pictures in 52 seconds. The mean frame time stayed at 5.6 ms with and without the webcam.
+- With AvatarSample_A and a PMX model of the owner, the second monitor showed her face. For a line, she looked into the webcam.
+
 ## Steps
 
 Each step starts after the owner approves its plan.
@@ -252,10 +282,13 @@ Each step starts after the owner approves its plan.
 | W2-3 | `host.character.activity` in the protocol, Electron, and Unity, and the gaze during commentary, with tests on both sides | A test message sends her to the desk, and she sits and watches the screen. A commentary in the app does the same, and her face turns to the camera for each line. |
 | W2-4 | `host.room.screen`, the sampler, and the screen material in Unity | During a commentary in the app, the monitor of the room shows the game at about 8 frames each second. When the window leaves the front, the monitor returns to its material within 3 seconds. The player log gives the decode time. |
 | W2-5 | The camera at a place, with tests of the math in `Core` | In captures of a commentary in 2LDK, the view shows her and the game, and no wall hides her head or the screen. A drag of the mouse still turns the camera. |
+| W2-6 | The second monitor, the webcam, her look into the webcam, and the light of the monitor, with tests of the places in `Core` | In captures of a commentary in 2LDK, the shot shows her, the game monitor, and her face on the second monitor. For a line, she looks into the webcam. The player log gives the frame time. |
 
 W2-3 and W2-4 add their messages to the protocol table of [the ADR of the Unity stage](2026-11-06-unity-stage-sidecar.md) in the same commit.
 
 W2-5 came before W2-4. In the check of W2-3 in the app, the owner asked for a view of her and the monitor.
+
+The owner then asked for her face from the front. So W2-6 came after W2-5, also before W2-4.
 
 ## What this design does not do
 

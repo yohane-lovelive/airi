@@ -11,6 +11,53 @@ public static partial class Program
         TestPlaceShotDistance();
         TestPlaceShotAdjust();
         TestPlaceShotBlend();
+        TestWebcamRig();
+    }
+
+    private static void TestWebcamRig()
+    {
+        // She sits at -Z and faces +Z. The first screen faces her, so her right is +X.
+        var first = new StageRoomScreen("Monitor", "Screen", new StagePoint(0, 1, 0), 180, 0.9, 0.5);
+        var candidates = StageWebcamRig.Candidates(first);
+        Check(candidates.Count == 3, "the second monitor has three places to try");
+
+        StageRoomScreen right = candidates[0];
+        Check(right.Center.X > 0.45 && right.Center.Z < 0, "the first place lies on her right, a little toward her");
+        double rightTurn = ((right.FacingDegrees - 180 + 540) % 360) - 180;
+        CheckNear(Math.Abs(rightTurn), StageWebcamRig.TurnDegrees, 1e-6, "the monitor beside her turns toward her");
+        CheckNear(right.Center.Y - (right.Height / 2), 0.75, 1e-9, "the two monitors stand on the same line at the bottom");
+
+        // The inner edge of the second screen stays at the gap from the edge of the first.
+        double turn = StageWebcamRig.TurnDegrees * Math.PI / 180.0;
+        double innerX = right.Center.X - (Math.Cos(turn) * right.Width / 2);
+        double innerZ = right.Center.Z + (Math.Sin(turn) * right.Width / 2);
+        CheckNear(innerX, 0.45 + StageWebcamRig.SideGap, 1e-9, "the inner edge stays near the first monitor");
+        CheckNear(innerZ, 0, 1e-9, "the inner edge stays on the line of the first screen");
+
+        // A screen faces where its corners show their front, so the turned screen faces her middle.
+        double normalX = Math.Sin(right.FacingDegrees * Math.PI / 180.0);
+        Check(normalX < 0, "the monitor on her right faces toward her middle");
+
+        StageRoomScreen left = candidates[1];
+        CheckNear(left.Center.X, -right.Center.X, 1e-9, "the second place mirrors the first on her left");
+
+        StageRoomScreen above = candidates[2];
+        CheckNear(above.Center.Y, 1 + 0.25 + StageWebcamRig.AboveGap + (StageWebcamRig.Height / 2), 1e-9, "the last place lies above the first monitor");
+        CheckNear(above.FacingDegrees, 180, 1e-9, "the monitor above faces as the first");
+        CheckNear(above.Width / above.Height, 16.0 / 9.0, 1e-9, "the second screen is 16:9");
+
+        StagePoint webcam = StageWebcamRig.WebcamPosition(first);
+        CheckNear(webcam.Y, 1.25 + StageWebcamRig.WebcamAbove, 1e-9, "the webcam stands on the top edge");
+        CheckNear(webcam.Z, -StageWebcamRig.WebcamFront, 1e-9, "the webcam stands a little toward her");
+
+        // At 0.71 m from her neck, the webcam needs about 46 degrees for her head and her shoulders.
+        double fov = StageWebcamRig.FieldOfView(webcam, new StagePoint(0, 1.1, -0.7));
+        CheckNear(fov, 2 * Math.Atan(0.3 / Math.Sqrt((0.26 * 0.26) + (0.66 * 0.66))) * 180.0 / Math.PI, 1e-6, "the lens holds her head and her shoulders");
+
+        StagePlaceSubject withSecond = DeskSubject().WithSecondScreen(above);
+        Check(StagePlaceShot.PointsOf(withSecond).Length == 10, "the shot also holds the corners of the second screen");
+        StageCameraPose wide = StagePlaceShot.Compute(withSecond, 125, 45, 0.72).Value;
+        Check(HorizontalDistance(wide) >= HorizontalDistance(StagePlaceShot.Compute(DeskSubject(), 125, 45, 0.72).Value), "the second screen moves the camera back or keeps it");
     }
 
     private static void TestPlaceShotAdjust()

@@ -49,13 +49,13 @@ namespace Airi.Stage
             }
         }
 
-        /// <summary>Moves the light to the room light at her place and to the camera of this frame.</summary>
+        /// <summary>Moves the light to the room light at her place and to the view of this frame.</summary>
         /// <param name="feet">The place of her feet. The probe reads the light above it.</param>
-        public void Tick(float deltaSeconds, Vector3 feet, Transform camera)
+        /// <param name="viewForward">The view direction that the light follows, for example of the camera of the window.</param>
+        public void Tick(float deltaSeconds, Vector3 feet, Vector3 viewForward)
         {
             LightProbes.GetInterpolatedProbe(feet + (Vector3.up * ProbeHeight), null, out SphericalHarmonicsL2 probe);
-            Vector3 forward = camera.forward;
-            _math.Update(deltaSeconds, probe[0, 0], probe[1, 0], probe[2, 0], forward.x, forward.z);
+            _math.Update(deltaSeconds, probe[0, 0], probe[1, 0], probe[2, 0], viewForward.x, viewForward.z);
 
             // The math gives linear values, and the color of a light is in gamma space.
             _light.color = new Color((float)_math.Red, (float)_math.Green, (float)_math.Blue).gamma;

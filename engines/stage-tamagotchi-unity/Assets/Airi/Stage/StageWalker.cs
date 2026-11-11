@@ -148,6 +148,15 @@ namespace Airi.Stage
         /// <inheritdoc/>
         public bool CanSit => _character.CanSit;
 
+        /// <summary>The place where she watches a screen during a commentary, or null. <see cref="WanderPlan.ScreenPlace"/> gives it.</summary>
+        public StageRoomPlace ScreenPlace => _plan.ScreenPlace;
+
+        /// <summary>Whether a commentary goes on.</summary>
+        public bool WatchingScreen => _plan.WatchingScreen;
+
+        /// <summary>Whether she sits on a seat now, also while she sits down or gets up.</summary>
+        public bool Sits => _plan.State == WanderState.Sit && _character.SeatPhase != SeatPhase.Standing;
+
         /// <summary>Starts or ends the activity of watching a screen. <see cref="WanderPlan.SetWatchingScreen"/> gives the rules.</summary>
         public void SetActivity(bool watchingScreen)
         {
