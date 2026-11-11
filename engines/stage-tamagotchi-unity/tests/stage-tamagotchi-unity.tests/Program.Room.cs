@@ -22,6 +22,7 @@ public static partial class Program
         TestCameraFacing();
         TestCameraInRoom();
         TestDoorNames();
+        TestRoomPlaces();
     }
 
     private static void TestDoorNames()

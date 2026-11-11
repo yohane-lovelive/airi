@@ -92,6 +92,7 @@ namespace Airi.Stage
                 room.CheckNavMesh(scene);
                 room.BlockClosedDoors(scene);
                 room.BoxFurniture(scene);
+                room.LogPlaces();
                 return room;
             }
             catch (Exception error) when (!(error is OperationCanceledException))
@@ -234,6 +235,19 @@ namespace Airi.Stage
             }
 
             Debug.Log($"[Airi] Room {Manifest.Name}: {boxed} pieces of furniture can hide the character from the camera.");
+        }
+
+        /// <summary>Names the places of the room in the log. The character does not use them yet.</summary>
+        private void LogPlaces()
+        {
+            if (Manifest.Places == null)
+            {
+                Debug.Log($"[Airi] Room {Manifest.Name} has no list of places. Import the room again to find them.");
+                return;
+            }
+
+            string names = string.Join(", ", Manifest.Places);
+            Debug.Log($"[Airi] Room {Manifest.Name} has {Manifest.Places.Count} places{(names.Length > 0 ? $": {names}" : string.Empty)}.");
         }
 
         /// <summary>Moves the root of the avatars to the stand point, and turns it to the facing of the room.</summary>

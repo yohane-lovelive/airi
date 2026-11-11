@@ -69,7 +69,9 @@ The folder then has `room.bundle` and `room.json`. The import chooses a stand po
 
 The import also opens the doors that cut off a room, so the character can walk into it. It hides these doors and lists them in `openDoors` of `room.json`. To open or close another door, edit this list, and import the room again.
 
-The import takes only data files. It removes the scripts of the VRChat SDK, moves the materials to URP, and keeps the baked light. It also bakes the walkable area of the room, a NavMesh, for the walk of the character. The [ADR](../../docs/ai/adr/2026-11-06-unity-stage-sidecar.md) lists each step.
+The import takes only data files. It removes the scripts of the VRChat SDK, moves the materials to URP, and keeps the baked light. It also bakes the walkable area of the room, a NavMesh, for the walk of the character. Seats are not walkable, so she does not walk over a bed or a sofa. The [ADR](../../docs/ai/adr/2026-11-06-unity-stage-sidecar.md) lists each step.
+
+The import also finds places from the names of objects. These are screens, for example a monitor or a TV, and seats, for example a chair, a sofa, or a bed. It lists them in `places` of `room.json`. A place has a stand point, a facing, a seat point at the front edge of its seat, and the surface of its screen. The player reads the list at each start, so an edit needs no new import. The next import keeps the list. To find the places again, delete `places`, and import the room again. The [ADR of the places](../../docs/ai/adr/2026-11-11-unity-stage-room-places-commentary.md) describes the search.
 
 In a room, the character gets a light of her own from the side of the camera, because a world bakes its lights. Only the character receives it. If you imported a room before this light came, import it again. Otherwise the light also brightens the room.
 

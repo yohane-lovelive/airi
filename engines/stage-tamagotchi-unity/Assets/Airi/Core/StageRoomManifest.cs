@@ -109,6 +109,9 @@ namespace Airi.Stage.Core
         /// <summary>A world has some dozens of doors. This limit only stops a broken file.</summary>
         private const int MaxOpenDoors = 500;
 
+        /// <summary>A home has some dozens of seats. This limit only stops a broken file.</summary>
+        private const int MaxPlaces = 200;
+
         public StageRoomManifest(
             string name,
             string bundle,
@@ -117,7 +120,8 @@ namespace Airi.Stage.Core
             double standZ,
             double facingDegrees,
             StageRoomBox box,
-            IReadOnlyList<string> openDoors = null)
+            IReadOnlyList<string> openDoors = null,
+            IReadOnlyList<StageRoomPlace> places = null)
         {
             Name = name;
             Bundle = bundle;
@@ -127,6 +131,7 @@ namespace Airi.Stage.Core
             FacingDegrees = facingDegrees;
             Box = box;
             OpenDoors = openDoors;
+            Places = places;
         }
 
         public string Name { get; }
@@ -152,6 +157,12 @@ namespace Airi.Stage.Core
         /// the file has no list. Then the import finds the doors itself.
         /// </summary>
         public IReadOnlyList<string> OpenDoors { get; }
+
+        /// <summary>
+        /// The places with a meaning, for example a desk with a monitor, or a sofa. Null when the file has no list. Then
+        /// the import finds the places itself. A screen place with a seat comes first.
+        /// </summary>
+        public IReadOnlyList<StageRoomPlace> Places { get; }
 
         /// <summary>
         /// Reads the room folder from the arguments of the process, or else from the environment variable
@@ -218,7 +229,7 @@ namespace Airi.Stage.Core
                 throw new StageRoomException("The point \"stand\" must be inside \"box\".");
             }
 
-            return new StageRoomManifest(name, bundle, stand[0], stand[1], stand[2], facing, box, ReadNames(root["openDoors"], "openDoors"));
+            return new StageRoomManifest(name, bundle, stand[0], stand[1], stand[2], facing, box, ReadNames(root["openDoors"], "openDoors"), ReadPlaces(root["places"], box));
         }
 
         /// <summary>Gives the text of the room file. <see cref="Parse"/> reads it back.</summary>
@@ -242,7 +253,146 @@ namespace Airi.Stage.Core
                 root["openDoors"] = new JArray(OpenDoors);
             }
 
+            if (Places != null)
+            {
+                root["places"] = new JArray(Places.Select(WritePlace));
+            }
+
             return root.ToString(Formatting.Indented);
+        }
+
+        private static JObject WritePlace(StageRoomPlace place)
+        {
+            var value = new JObject
+            {
+                ["name"] = place.Name,
+                ["role"] = place.Role == StageRoomPlaceRole.Screen ? "screen" : "seat",
+                ["stand"] = Point(place.Stand.X, place.Stand.Y, place.Stand.Z),
+                ["facing"] = Round(place.FacingDegrees),
+            };
+            if (place.Seat is StagePoint seat)
+            {
+                value["seat"] = Point(seat.X, seat.Y, seat.Z);
+            }
+
+            if (place.Screen != null)
+            {
+                StageRoomScreen screen = place.Screen;
+                value["screen"] = new JObject
+                {
+                    ["object"] = screen.ObjectName,
+                    ["material"] = screen.Material,
+                    ["center"] = Point(screen.Center.X, screen.Center.Y, screen.Center.Z),
+                    ["facing"] = Round(screen.FacingDegrees),
+                    ["width"] = Round(screen.Width),
+                    ["height"] = Round(screen.Height),
+                };
+            }
+
+            return value;
+        }
+
+        /// <summary>
+        /// Reads an optional list of places. A missing field gives null, and an empty list stays empty. Each stand point
+        /// and each seat point must be inside the box of the room.
+        /// </summary>
+        private static IReadOnlyList<StageRoomPlace> ReadPlaces(JToken value, StageRoomBox box)
+        {
+            if (value == null)
+            {
+                return null;
+            }
+
+            if (!(value is JArray array) || array.Count > MaxPlaces)
+            {
+                throw new StageRoomException($"The field \"places\" must be a list of at most {MaxPlaces} places.");
+            }
+
+            var places = new List<StageRoomPlace>();
+            for (int index = 0; index < array.Count; index++)
+            {
+                if (!(array[index] is JObject item))
+                {
+                    throw new StageRoomException($"Each item of \"places\" must be an object, and places[{index}] is not.");
+                }
+
+                places.Add(ReadPlace(item, $"places[{index}]", box));
+            }
+
+            return places;
+        }
+
+        private static StageRoomPlace ReadPlace(JObject item, string field, StageRoomBox box)
+        {
+            string name = ReadText(item, "name", field);
+            string roleText = item["role"]?.Type == JTokenType.String ? (string)item["role"] : null;
+            StageRoomPlaceRole role;
+            switch (roleText)
+            {
+                case "screen":
+                    role = StageRoomPlaceRole.Screen;
+                    break;
+                case "seat":
+                    role = StageRoomPlaceRole.Seat;
+                    break;
+                default:
+                    throw new StageRoomException($"The field \"{field}.role\" must be \"screen\" or \"seat\".");
+            }
+
+            StagePoint stand = ReadPointInside(item["stand"], $"{field}.stand", box);
+            double facing = ReadNumber(item["facing"], $"{field}.facing");
+            StagePoint? seat = item["seat"] == null ? (StagePoint?)null : ReadPointInside(item["seat"], $"{field}.seat", box);
+            if (role == StageRoomPlaceRole.Seat && seat == null)
+            {
+                throw new StageRoomException($"The seat place {field} needs the field \"seat\".");
+            }
+
+            StageRoomScreen screen = null;
+            if (role == StageRoomPlaceRole.Screen)
+            {
+                if (!(item["screen"] is JObject screenItem))
+                {
+                    throw new StageRoomException($"The screen place {field} needs the object \"screen\".");
+                }
+
+                string screenField = $"{field}.screen";
+                double[] center = ReadPoint(screenItem["center"], $"{screenField}.center");
+                screen = new StageRoomScreen(
+                    ReadText(screenItem, "object", screenField),
+                    ReadText(screenItem, "material", screenField),
+                    new StagePoint(center[0], center[1], center[2]),
+                    ReadNumber(screenItem["facing"], $"{screenField}.facing"),
+                    ReadPositive(screenItem["width"], $"{screenField}.width"),
+                    ReadPositive(screenItem["height"], $"{screenField}.height"));
+            }
+            else if (item["screen"] != null)
+            {
+                throw new StageRoomException($"Only a screen place has the field \"screen\", and {field} is a seat.");
+            }
+
+            return new StageRoomPlace(name, role, stand, facing, seat, screen);
+        }
+
+        private static StagePoint ReadPointInside(JToken value, string field, StageRoomBox box)
+        {
+            double[] point = ReadPoint(value, field);
+            if (!box.Contains(point[0], point[1], point[2]))
+            {
+                throw new StageRoomException($"The point \"{field}\" must be inside \"box\".");
+            }
+
+            return new StagePoint(point[0], point[1], point[2]);
+        }
+
+        private static double ReadPositive(JToken value, string field)
+        {
+            double number = ReadNumber(value, field);
+            if (number <= 0)
+            {
+                throw new StageRoomException($"The field \"{field}\" must be more than 0.");
+            }
+
+            return number;
         }
 
         /// <summary>Reads an optional list of names. A missing field gives null, and an empty list stays empty.</summary>
@@ -272,12 +422,12 @@ namespace Airi.Stage.Core
             return names;
         }
 
-        private static string ReadText(JObject root, string field)
+        private static string ReadText(JObject root, string field, string parent = null)
         {
             JToken value = root[field];
             if (value?.Type != JTokenType.String || string.IsNullOrWhiteSpace((string)value))
             {
-                throw new StageRoomException($"The room file needs the text field \"{field}\".");
+                throw new StageRoomException($"The room file needs the text field \"{(parent == null ? field : $"{parent}.{field}")}\".");
             }
 
             return (string)value;

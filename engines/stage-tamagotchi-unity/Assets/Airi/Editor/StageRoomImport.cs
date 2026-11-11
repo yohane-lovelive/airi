@@ -165,8 +165,10 @@ namespace Airi.Stage.Editor
 
             StageRoomManifest measured = MeasureRoom(scene, name, folder);
             IReadOnlyList<string> openDoors = OpenDoors(scene, folder, measured);
-            var manifest = new StageRoomManifest(measured.Name, measured.Bundle, measured.StandX, measured.StandY, measured.StandZ, measured.FacingDegrees, measured.Box, openDoors);
-            BakeNavMesh(scene, target, manifest.Box);
+            var withDoors = new StageRoomManifest(measured.Name, measured.Bundle, measured.StandX, measured.StandY, measured.StandZ, measured.FacingDegrees, measured.Box, openDoors);
+            BakeNavMesh(scene, target, withDoors.Box);
+            IReadOnlyList<StageRoomPlace> places = FindPlaces(scene, folder, withDoors);
+            var manifest = new StageRoomManifest(withDoors.Name, withDoors.Bundle, withDoors.StandX, withDoors.StandY, withDoors.StandZ, withDoors.FacingDegrees, withDoors.Box, openDoors, places);
             EditorSceneManager.SaveScene(scene);
             BuildBundle(scene.path, folder);
 
@@ -174,7 +176,7 @@ namespace Airi.Stage.Editor
             string text = manifest.ToJson();
             StageRoomManifest.Parse(text);
             File.WriteAllText(Path.Combine(folder, StageRoomManifest.FileName), text);
-            Debug.Log($"[Airi] Room {name} is ready in {folder}: scene {scene.path}, stand at ({manifest.StandX}, {manifest.StandY}, {manifest.StandZ}), facing {manifest.FacingDegrees} degrees.");
+            Debug.Log($"[Airi] Room {name} is ready in {folder}: scene {scene.path}, stand at ({manifest.StandX}, {manifest.StandY}, {manifest.StandZ}), facing {manifest.FacingDegrees} degrees, {manifest.Places.Count} places.");
         }
 
         /// <summary>
@@ -876,13 +878,38 @@ namespace Airi.Stage.Editor
         /// areas that the floor does not reach. The agent type Humanoid gives the size of the character, see
         /// <see cref="StageProjectSetup"/>.
         ///
+        /// The parts of seats are not walkable. Without this, the frame of a low bed is a step onto the bed, and a path
+        /// can cross it. The modifiers that mark them leave the scene after the bake, so the bundle never has them.
+        ///
         /// The data is an asset next to the scene, so the scene bundle carries it. The surface adds the data to the
         /// NavMesh when the player loads the room.
         /// </summary>
         private static void BakeNavMesh(Scene scene, string target, StageRoomBox box)
         {
+            int notWalkable = NavMesh.GetAreaFromName("Not Walkable");
+            List<NavMeshModifier> seats = AllObjects(scene)
+                .Where(part => part.activeInHierarchy && part.GetComponent<Renderer>() != null && StageRoomPlaceNames.IsSeatName(part.name))
+                .Select(part =>
+                {
+                    NavMeshModifier modifier = part.AddComponent<NavMeshModifier>();
+                    modifier.overrideArea = true;
+                    modifier.area = notWalkable;
+                    return modifier;
+                })
+                .ToList();
             NavMeshSurface surface = AddSurface(scene, box, "Airi NavMesh");
-            surface.BuildNavMesh();
+            try
+            {
+                surface.BuildNavMesh();
+            }
+            finally
+            {
+                foreach (NavMeshModifier modifier in seats)
+                {
+                    UnityEngine.Object.DestroyImmediate(modifier);
+                }
+            }
+
             if (surface.navMeshData == null)
             {
                 throw new InvalidOperationException("The bake of the NavMesh gave no data.");
@@ -892,7 +919,320 @@ namespace Airi.Stage.Editor
             AssetDatabase.CreateAsset(surface.navMeshData, path);
             EditorSceneManager.MarkSceneDirty(scene);
             NavMeshTriangulation triangulation = NavMesh.CalculateTriangulation();
-            Debug.Log($"[Airi] The NavMesh of the room has {triangulation.indices.Length / 3} triangles, in {path}.");
+            Debug.Log($"[Airi] The NavMesh of the room has {triangulation.indices.Length / 3} triangles, in {path}. {seats.Count} parts of seats are not walkable.");
+        }
+
+        /// <summary>
+        /// Finds the places of the room: screens by <see cref="StageRoomPlaceNames.IsScreenName"/>, and seats by
+        /// <see cref="StageRoomPlaceNames.IsSeatName"/>. An earlier <c>room.json</c> with a list keeps that list, so the
+        /// owner can edit it once.
+        ///
+        /// - A seat is a group of parts that touch, for example the cushions and the backs of a sofa. Rays down onto the
+        ///   group give its heights, and <see cref="StageSeatSearch"/> finds the seat.
+        /// - A seat in front of a screen joins the screen, and she faces the screen there. A screen without a seat is a
+        ///   place to stand in front of it.
+        /// - Each stand point is a point of the NavMesh on the floor of the stand point of the room, and a path from the
+        ///   stand point of the room reaches it.
+        ///
+        /// Returns:
+        /// - The places: screens with a seat, a monitor before a TV, then screens without a seat, then seats. The log
+        ///   names each candidate that the import leaves out, and the cause.
+        /// </summary>
+        private static IReadOnlyList<StageRoomPlace> FindPlaces(Scene scene, string folder, StageRoomManifest room)
+        {
+            StageRoomManifest earlier = ReadEarlierManifest(folder);
+            if (earlier?.Places != null)
+            {
+                var objects = new HashSet<string>(AllObjects(scene).Select(part => part.name), StringComparer.Ordinal);
+                string[] missing = earlier.Places.Where(place => place.Screen != null && !objects.Contains(place.Screen.ObjectName)).Select(place => place.Screen.ObjectName).ToArray();
+                Debug.Log($"[Airi] Kept the {earlier.Places.Count} places of room.json.{(missing.Length > 0 ? $" No object has these screen names: {string.Join(", ", missing)}." : string.Empty)}");
+                return earlier.Places;
+            }
+
+            var places = new List<StageRoomPlace>();
+            var standPoint = new Vector3((float)room.StandX, (float)room.StandY, (float)room.StandZ);
+            if (!NavMesh.SamplePosition(standPoint, out NavMeshHit start, 1f, NavMesh.AllAreas))
+            {
+                Debug.LogWarning("[Airi] The stand point of the room is not on the NavMesh, so the room gets no places.");
+                return places;
+            }
+
+            MeshRenderer[] renderers = AllObjects(scene)
+                .Where(part => part.activeInHierarchy)
+                .SelectMany(part => part.GetComponents<MeshRenderer>())
+                .Where(renderer => renderer.enabled && renderer.GetComponent<MeshFilter>()?.sharedMesh != null)
+                .ToArray();
+            var finder = new PlaceFinder(start.position, room);
+            List<StageRoomScreen> screens = renderers
+                .Where(renderer => StageRoomPlaceNames.IsScreenName(renderer.name))
+                .Select(MeasureScreen)
+                .Where(screen => screen != null)
+                .OrderBy(screen => StageRoomPlaceNames.IsTvName(screen.ObjectName) ? 1 : 0)
+                .ThenBy(screen => screen.ObjectName, StringComparer.Ordinal)
+                .ToList();
+            List<SeatCandidate> seats = GroupTouching(renderers.Where(renderer => StageRoomPlaceNames.IsSeatName(renderer.name)).Select(renderer => renderer.gameObject).ToArray())
+                .Select(group => MeasureSeat(group, (float)room.StandY))
+                .Where(seat => seat != null)
+                .OrderBy(seat => seat.Name, StringComparer.Ordinal)
+                .ToList();
+
+            var standing = new List<StageRoomPlace>();
+            foreach (StageRoomScreen screen in screens)
+            {
+                SeatCandidate seat = seats
+                    .Where(candidate => StageSeatSearch.InFrontOf(screen, candidate.Surface.CenterX, candidate.Surface.CenterZ))
+                    .OrderBy(candidate => Square(candidate.Surface.CenterX - screen.Center.X) + Square(candidate.Surface.CenterZ - screen.Center.Z))
+                    .FirstOrDefault();
+                StageRoomPlace place = seat != null
+                    ? finder.Sit(seat, StageSeatSearch.FacingOf(screen.Center.X - seat.Surface.CenterX, screen.Center.Z - seat.Surface.CenterZ), screen)
+                    : finder.Watch(screen);
+                if (place == null)
+                {
+                    continue;
+                }
+
+                if (seat != null)
+                {
+                    seats.Remove(seat);
+                    places.Add(place);
+                }
+                else
+                {
+                    standing.Add(place);
+                }
+            }
+
+            places.AddRange(standing);
+            foreach (SeatCandidate seat in seats)
+            {
+                double? facing = seat.Surface.BackDegrees is double back ? (back + 180.0) % 360.0 : finder.FacingToFloor(seat);
+                StageRoomPlace place = facing is double value ? finder.Sit(seat, value, null) : null;
+                if (place != null)
+                {
+                    places.Add(place);
+                }
+            }
+
+            Debug.Log($"[Airi] The room has {places.Count} places{(places.Count > 0 ? $": {string.Join(", ", places)}" : string.Empty)}.");
+            return places;
+        }
+
+        /// <summary>
+        /// Measures the screen of a part with the name of a screen: its largest flat and upright surface. A static batch
+        /// in the player hides the mesh, so the import measures it here.
+        ///
+        /// Returns:
+        /// - The screen, or null when the part has no such surface, for example the stand of a monitor.
+        /// </summary>
+        private static StageRoomScreen MeasureScreen(MeshRenderer renderer)
+        {
+            Mesh mesh = renderer.GetComponent<MeshFilter>().sharedMesh;
+            StagePoint[] points = mesh.vertices
+                .Select(vertex => renderer.transform.TransformPoint(vertex))
+                .Select(point => new StagePoint(point.x, point.y, point.z))
+                .ToArray();
+            Material[] materials = renderer.sharedMaterials;
+            StageRoomScreen best = Enumerable.Range(0, mesh.subMeshCount)
+                .Where(index => index < materials.Length && materials[index] != null)
+                .Select(index => StageScreenSurface.Measure(renderer.name, materials[index].name, points, mesh.GetTriangles(index)))
+                .Where(screen => screen != null)
+                .OrderByDescending(screen => screen.Width * screen.Height)
+                .FirstOrDefault();
+            if (best == null)
+            {
+                Debug.Log($"[Airi] {renderer.name} has the name of a screen, but no flat and upright surface of {StageScreenSurface.SmallestArea} m² or more.");
+            }
+
+            return best;
+        }
+
+        /// <summary>
+        /// Measures the seat of a group of parts. Temporary colliders on the parts take the rays down, and only these
+        /// colliders count, so a table over a chair does not hide its seat. The colliders leave before the scene is saved.
+        ///
+        /// Returns:
+        /// - The seat, or null when the group has no seat surface. The log gives the cause.
+        /// </summary>
+        private static SeatCandidate MeasureSeat(List<GameObject> group, float floorY)
+        {
+            string name = group.Select(part => part.name).OrderBy(part => part, StringComparer.Ordinal).First();
+            var colliders = new List<MeshCollider>();
+            try
+            {
+                Bounds bounds = group[0].GetComponent<Renderer>().bounds;
+                foreach (GameObject part in group)
+                {
+                    bounds.Encapsulate(part.GetComponent<Renderer>().bounds);
+                    var probe = new GameObject("Airi Seat Probe");
+                    probe.transform.SetParent(part.transform, false);
+                    MeshCollider collider = probe.AddComponent<MeshCollider>();
+                    collider.sharedMesh = part.GetComponent<MeshFilter>().sharedMesh;
+                    colliders.Add(collider);
+                }
+
+                Physics.SyncTransforms();
+                float cell = (float)StageSeatSearch.CellSize;
+                int countX = Mathf.CeilToInt(bounds.size.x / cell);
+                int countZ = Mathf.CeilToInt(bounds.size.z / cell);
+                var heights = new double[countX * countZ];
+                var upward = new bool[countX * countZ];
+                for (int z = 0; z < countZ; z++)
+                {
+                    for (int x = 0; x < countX; x++)
+                    {
+                        var ray = new Ray(new Vector3(bounds.min.x + ((x + 0.5f) * cell), bounds.max.y + 0.1f, bounds.min.z + ((z + 0.5f) * cell)), Vector3.down);
+                        RaycastHit? first = null;
+                        foreach (MeshCollider collider in colliders)
+                        {
+                            if (collider.Raycast(ray, out RaycastHit hit, bounds.size.y + 0.2f) && (first == null || hit.distance < first.Value.distance))
+                            {
+                                first = hit;
+                            }
+                        }
+
+                        heights[x + (z * countX)] = first?.point.y ?? double.NaN;
+                        upward[x + (z * countX)] = first != null && first.Value.normal.y >= 0.7f;
+                    }
+                }
+
+                var grid = new StageHeightGrid(bounds.min.x, bounds.min.z, cell, countX, countZ, heights, upward);
+                StageSeatSurface surface = StageSeatSearch.FindSurface(grid, floorY);
+                if (surface == null)
+                {
+                    Debug.Log($"[Airi] No place for {name}: it has no flat seat of {StageSeatSearch.SeatWidth} m between {StageSeatSearch.LowestSeat} m and {StageSeatSearch.HighestSeat} m above the floor.");
+                    return null;
+                }
+
+                return new SeatCandidate { Name = name, Grid = grid, Surface = surface };
+            }
+            finally
+            {
+                foreach (MeshCollider collider in colliders)
+                {
+                    UnityEngine.Object.DestroyImmediate(collider.gameObject);
+                }
+            }
+        }
+
+        private static double Square(double value) => value * value;
+
+        /// <summary>A seat that the import found, before it has a stand point.</summary>
+        private sealed class SeatCandidate
+        {
+            public string Name;
+            public StageHeightGrid Grid;
+            public StageSeatSurface Surface;
+        }
+
+        /// <summary>Finds the stand points of places on the NavMesh of the room.</summary>
+        private sealed class PlaceFinder
+        {
+            /// <summary>A stand point lies at most this far from its seat, or from its spot in front of a screen.</summary>
+            private const float Reach = 1.2f;
+
+            /// <summary>She stands at least this far in front of a screen, and as far as the screen is wide.</summary>
+            private const float NearestView = 0.8f;
+
+            /// <summary>A seat without a back faces the open floor, the nearest floor within this distance.</summary>
+            private const float FloorSearch = 3f;
+
+            private readonly Vector3 _start;
+            private readonly StageRoomManifest _room;
+            private readonly NavMeshPath _path = new NavMeshPath();
+
+            public PlaceFinder(Vector3 start, StageRoomManifest room)
+            {
+                _start = start;
+                _room = room;
+            }
+
+            /// <summary>Makes a place to sit on a seat in a facing, with a screen or without one. Null when she cannot reach it.</summary>
+            public StageRoomPlace Sit(SeatCandidate seat, double facing, StageRoomScreen screen)
+            {
+                StagePoint front = StageSeatSearch.FrontEdge(seat.Grid, seat.Surface, facing);
+                Vector3? stand = Nearest(new Vector3((float)front.X, (float)_room.StandY, (float)front.Z), Reach, 0.1f);
+                string label = screen != null ? $"{screen.ObjectName} with the seat {seat.Name}" : seat.Name;
+                if (stand == null || !_room.Box.Contains(front.X, front.Y, front.Z))
+                {
+                    Debug.Log($"[Airi] No place for {label}: no point of the floor within {Reach} m of its seat is reachable.");
+                    return null;
+                }
+
+                Debug.Log($"[Airi] Place {label}: seat {front.Y - _room.StandY:F2} m above the floor, facing {facing:F0} degrees, stand at {stand.Value.ToString("F2")}.");
+                return new StageRoomPlace(screen?.ObjectName ?? seat.Name, screen != null ? StageRoomPlaceRole.Screen : StageRoomPlaceRole.Seat, ToPoint(stand.Value), facing, front, screen);
+            }
+
+            /// <summary>Makes a place to stand in front of a screen. Null when she cannot reach it.</summary>
+            public StageRoomPlace Watch(StageRoomScreen screen)
+            {
+                double radians = screen.FacingDegrees * Math.PI / 180.0;
+                float distance = Mathf.Max(NearestView, (float)screen.Width);
+                var spot = new Vector3((float)(screen.Center.X + (Math.Sin(radians) * distance)), (float)_room.StandY, (float)(screen.Center.Z + (Math.Cos(radians) * distance)));
+                Vector3? stand = Nearest(spot, Reach, 0.1f);
+                if (stand == null)
+                {
+                    Debug.Log($"[Airi] No place for {screen.ObjectName}: no point of the floor within {Reach} m of its front is reachable.");
+                    return null;
+                }
+
+                double facing = StageSeatSearch.FacingOf(screen.Center.X - stand.Value.x, screen.Center.Z - stand.Value.z);
+                Debug.Log($"[Airi] Place {screen.ObjectName}: a screen to watch standing, facing {facing:F0} degrees, stand at {stand.Value.ToString("F2")}.");
+                return new StageRoomPlace(screen.ObjectName, StageRoomPlaceRole.Screen, ToPoint(stand.Value), facing, null, screen);
+            }
+
+            /// <summary>The facing from the middle of a seat to the nearest floor that she reaches. Null when no such floor is near.</summary>
+            public double? FacingToFloor(SeatCandidate seat)
+            {
+                Vector3? floor = Nearest(new Vector3((float)seat.Surface.CenterX, (float)_room.StandY, (float)seat.Surface.CenterZ), FloorSearch, 0.2f);
+                if (floor == null)
+                {
+                    Debug.Log($"[Airi] No place for {seat.Name}: no floor within {FloorSearch} m is reachable.");
+                    return null;
+                }
+
+                return StageSeatSearch.FacingOf(floor.Value.x - seat.Surface.CenterX, floor.Value.z - seat.Surface.CenterZ);
+            }
+
+            /// <summary>
+            /// Finds the point of the NavMesh nearest to a spot on the floor, on the floor of the stand point of the room,
+            /// that a path from that stand point reaches. The nearest point of the NavMesh can lie on an island, so the
+            /// search tests points on a grid around the spot, nearest first.
+            /// </summary>
+            private Vector3? Nearest(Vector3 spot, float reach, float step)
+            {
+                var hits = new List<Vector3>();
+                for (float x = -reach; x <= reach + 0.001f; x += step)
+                {
+                    for (float z = -reach; z <= reach + 0.001f; z += step)
+                    {
+                        if ((x * x) + (z * z) <= reach * reach
+                            && NavMesh.SamplePosition(spot + new Vector3(x, 0f, z), out NavMeshHit hit, 0.25f, NavMesh.AllAreas)
+                            && Mathf.Abs(hit.position.y - _start.y) <= StageRoomManifest.SameFloor)
+                        {
+                            hits.Add(hit.position);
+                        }
+                    }
+                }
+
+                foreach (Vector3 hit in hits.OrderBy(point => Square(point.x - spot.x) + Square(point.z - spot.z)))
+                {
+                    if (Square(hit.x - spot.x) + Square(hit.z - spot.z) > reach * reach)
+                    {
+                        break;
+                    }
+
+                    if (_room.Box.Contains(hit.x, hit.y, hit.z)
+                        && NavMesh.CalculatePath(_start, hit, NavMesh.AllAreas, _path)
+                        && _path.status == NavMeshPathStatus.PathComplete)
+                    {
+                        return hit;
+                    }
+                }
+
+                return null;
+            }
+
+            private static StagePoint ToPoint(Vector3 point) => new StagePoint(point.x, point.y, point.z);
         }
 
         /// <summary>Adds a surface that collects the render meshes inside the box of the room, with a margin of 0.5 m.</summary>
@@ -1002,16 +1342,20 @@ namespace Airi.Stage.Editor
             return open;
         }
 
-        /// <summary>Puts doors whose bounds touch, with a gap of up to 0.1 m, into one group.</summary>
-        private static List<List<GameObject>> GroupTouching(GameObject[] doors)
+        /// <summary>
+        /// Puts parts whose bounds touch, with a gap of up to 0.05 m, into one group, for example the panels of a sliding
+        /// door or the cushions of a sofa.
+        /// </summary>
+        private static List<List<GameObject>> GroupTouching(GameObject[] parts)
         {
             var groups = new List<List<GameObject>>();
-            foreach (GameObject door in doors)
+            foreach (GameObject part in parts)
             {
-                Bounds bounds = door.GetComponent<Renderer>().bounds;
+                // Expand adds the amount to the size, so each side moves by half of it.
+                Bounds bounds = part.GetComponent<Renderer>().bounds;
                 bounds.Expand(0.1f);
                 List<List<GameObject>> touching = groups.Where(group => group.Any(other => bounds.Intersects(other.GetComponent<Renderer>().bounds))).ToList();
-                var merged = new List<GameObject> { door };
+                var merged = new List<GameObject> { part };
                 foreach (List<GameObject> group in touching)
                 {
                     merged.AddRange(group);
