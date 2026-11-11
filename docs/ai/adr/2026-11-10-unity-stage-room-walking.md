@@ -182,7 +182,7 @@ Each step starts after the owner approves its plan.
 | The build of the player removes `NavMeshSurface`. | The NavMesh does not load. | `StageRoom` uses the type. Check the log of the player in W1-1. |
 | The bake of a world gives gaps in the NavMesh. | Some destinations cannot be reached. | The plan selects only reachable points. W1-1 measures the share. |
 | The camera shakes in a narrow corridor. | An unsteady view. | Smooth the camera, and check in captures. In W1-4, a corridor gives a cut, and the captures showed no shake. |
-| A PMX model walks differently from a VRM model. | Wrong legs on PMX models. | The repository has no PMX model. Check with the models of the owner. |
+| A PMX model walks differently from a VRM model. | Wrong legs on PMX models. | The repository has no PMX model. Check with the models of the owner. After W1-4, two PMX models of the owner walked through 2LDK with correct legs. They turned to the camera, and their hair and skirts stayed calm. The image measure of the foot slip did not work on them, and by eye their feet did not slide. |
 
 ## Sources
 
