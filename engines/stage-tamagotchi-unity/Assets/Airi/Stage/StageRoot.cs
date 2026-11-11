@@ -66,6 +66,9 @@ namespace Airi.Stage
         /// <summary>The last attention of the host: true for the viewer. Only a walking character acts on it.</summary>
         private bool _attention;
 
+        /// <summary>The light that only the character receives in a room, or null without a room.</summary>
+        private StageCharacterLight _characterLight;
+
         /// <summary>The number of the newest scene. An older scene drops its model when it finishes.</summary>
         private int _newestScene;
 
@@ -114,11 +117,15 @@ namespace Airi.Stage
             await ConnectAsync();
         }
 
-        /// <summary>Puts the avatars into the room. The room has its own lights, so the light of the stage would light the avatar twice.</summary>
+        /// <summary>
+        /// Puts the avatars into the room. The light of the stage would light the room too, so it goes off. A world bakes
+        /// its lights, so the character gets a light of her own instead.
+        /// </summary>
         private void PrepareRoom()
         {
             _room.PlaceAvatars(transform);
             _light.enabled = false;
+            _characterLight = new StageCharacterLight(transform);
             _camera.clearFlags = CameraClearFlags.Skybox;
             _camera.fieldOfView = StageRoom.FieldOfView;
             _grade.PrepareRoom();
@@ -317,6 +324,9 @@ namespace Airi.Stage
             _character.LookAt(attending ? camera : (Vector3?)null, _avatarRoot);
             _character.Tick(Time.deltaTime);
             _output.Follow(_avatarRoot.position - _framedAt);
+
+            // The camera moved in the line above, so the light comes from its side of this frame.
+            _characterLight?.Tick(Time.deltaTime, _avatarRoot.position, _camera.transform);
         }
 
         private async Task ApplySceneAsync(SceneApplyMessage scene)
@@ -344,6 +354,7 @@ namespace Airi.Stage
                 _character.ShowAvatar(host);
                 if (_room != null)
                 {
+                    StageCharacterLight.Mark(_avatarRoot);
                     _look.sharedProfile = _grade.IsActive ? _grade.Profile : scene.Format == "pmx" ? _mmdLook : _vrmLook;
                 }
                 else if (_grade.IsActive)

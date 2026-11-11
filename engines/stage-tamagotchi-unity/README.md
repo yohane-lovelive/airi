@@ -70,6 +70,8 @@ The import also opens the doors that cut off a room, so the character can walk i
 
 The import takes only data files. It removes the scripts of the VRChat SDK, moves the materials to URP, and keeps the baked light. It also bakes the walkable area of the room, a NavMesh, for the walk of the character. The [ADR](../../docs/ai/adr/2026-11-06-unity-stage-sidecar.md) lists each step.
 
+In a room, the character gets a light of her own from the side of the camera, because a world bakes its lights. Only the character receives it. If you imported a room before this light came, import it again. Otherwise the light also brightens the room.
+
 ## Convert the Walk Clip
 
 The walk of the character is `Assets/StreamingAssets/AiriMotions/walk.vrma`. It is the clip `Walk_Loop` of the [Universal Animation Library](https://quaternius.com/packs/universalanimationlibrary.html) by Quaternius. Its license is CC0, so the repository keeps the file.

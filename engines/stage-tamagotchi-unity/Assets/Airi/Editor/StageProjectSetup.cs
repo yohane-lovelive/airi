@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
+using Airi.Stage.Core;
 using lilToon;
 using Mmd.Rendering.Universal;
 using UnityEditor;
@@ -50,6 +51,7 @@ namespace Airi.Stage.Editor
         {
             ApplyPlayerSettings();
             ApplyNavMeshAgent();
+            ApplyRenderingLayers();
             UniversalRenderPipelineAsset pipeline = CreateRenderPipeline();
             GraphicsSettings.defaultRenderPipeline = pipeline;
             QualitySettings.renderPipeline = pipeline;
@@ -112,6 +114,23 @@ namespace Airi.Stage.Editor
             settings.ApplyModifiedPropertiesWithoutUndo();
         }
 
+        /// <summary>
+        /// Names the rendering layer of the character light. URP passes only layers with a name to the shaders, so
+        /// without a name the light reaches no renderer that checks layers.
+        /// </summary>
+        private static void ApplyRenderingLayers()
+        {
+            var tags = new SerializedObject(AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/TagManager.asset")[0]);
+            SerializedProperty layers = tags.FindProperty("m_RenderingLayers");
+            if (layers.arraySize <= CharacterLight.RenderingLayer)
+            {
+                layers.arraySize = CharacterLight.RenderingLayer + 1;
+            }
+
+            layers.GetArrayElementAtIndex(CharacterLight.RenderingLayer).stringValue = CharacterLight.RenderingLayerName;
+            tags.ApplyModifiedPropertiesWithoutUndo();
+        }
+
         private static UniversalRenderPipelineAsset CreateRenderPipeline()
         {
             Directory.CreateDirectory(SettingsFolder);
@@ -167,6 +186,10 @@ namespace Airi.Stage.Editor
             serialized.FindProperty("m_MainLightShadowmapResolution").intValue = 4096;
             serialized.FindProperty("m_ColorGradingMode").intValue = (int)ColorGradingMode.HighDynamicRange;
             serialized.FindProperty("m_ColorGradingLutSize").intValue = 64;
+
+            // A room bakes its lights, so the stage adds a light that only the character receives. URP limits a light
+            // to some rendering layers only with this setting. See StageCharacterLight.
+            serialized.FindProperty("m_SupportsLightLayers").boolValue = true;
             serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 

@@ -43,6 +43,7 @@ public static partial class Program
         TestFraming();
         TestCameraRig();
         TestCameraFollow();
+        TestCharacterLight();
         TestRoom();
         TestWander();
         TestGaze();
