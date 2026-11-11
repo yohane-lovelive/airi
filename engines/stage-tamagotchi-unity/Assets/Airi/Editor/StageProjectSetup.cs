@@ -115,8 +115,8 @@ namespace Airi.Stage.Editor
         }
 
         /// <summary>
-        /// Names the rendering layer of the character light. URP passes only layers with a name to the shaders, so
-        /// without a name the light reaches no renderer that checks layers.
+        /// Names the rendering layer of the character light and the physics layer of the furniture boxes. URP passes only
+        /// rendering layers with a name to the shaders, so without a name the light reaches no renderer that checks layers.
         /// </summary>
         private static void ApplyRenderingLayers()
         {
@@ -128,6 +128,10 @@ namespace Airi.Stage.Editor
             }
 
             layers.GetArrayElementAtIndex(CharacterLight.RenderingLayer).stringValue = CharacterLight.RenderingLayerName;
+
+            // The boxes on the furniture of a room use a physics layer of their own. The name tells a reader of the project
+            // why the layer is in use.
+            tags.FindProperty("layers").GetArrayElementAtIndex(StageCameraFollow.FurnitureLayer).stringValue = StageCameraFollow.FurnitureLayerName;
             tags.ApplyModifiedPropertiesWithoutUndo();
         }
 

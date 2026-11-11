@@ -91,6 +91,7 @@ namespace Airi.Stage
                 Scene scene = SceneManager.GetSceneByPath(scenes[0]);
                 room.CheckNavMesh(scene);
                 room.BlockClosedDoors(scene);
+                room.BoxFurniture(scene);
                 return room;
             }
             catch (Exception error) when (!(error is OperationCanceledException))
@@ -180,6 +181,59 @@ namespace Airi.Stage
             }
 
             Debug.Log($"[Airi] Room {Manifest.Name}: {blocked} doors without a collider got one for the camera.");
+        }
+
+        /// <summary>
+        /// Puts a box around each piece of furniture on the floor, so the camera can see when a sofa or a table hides her
+        /// body. A world gives no collider to most furniture. The boxes are on their own physics layer, which only the
+        /// check of the body uses, so the camera does not stop in front of furniture as in front of a wall.
+        ///
+        /// A box follows the bounds of the renderer, so it also fills the space under a table. A camera then sees her
+        /// legs there as hidden, and it prefers another side, which a viewer does not mind.
+        /// </summary>
+        private void BoxFurniture(Scene scene)
+        {
+            const float SmallestSize = 0.3f;
+            const float LargestSize = 3f;
+            const float HighestFoot = 0.4f;
+            const float HighestTop = 2.2f;
+
+            var parent = new GameObject("Airi Furniture Boxes");
+            SceneManager.MoveGameObjectToScene(parent, scene);
+            for (int layer = 0; layer < 32; layer++)
+            {
+                // The boxes never take part in a collision, for example with the physics bodies of an MMD model.
+                Physics.IgnoreLayerCollision(StageCameraFollow.FurnitureLayer, layer);
+            }
+
+            float floor = (float)Manifest.StandY;
+            StageRoomBox box = Manifest.Box;
+            int boxed = 0;
+            foreach (MeshRenderer renderer in scene.GetRootGameObjects().SelectMany(root => root.GetComponentsInChildren<MeshRenderer>()))
+            {
+                Bounds bounds = renderer.bounds;
+                Vector3 size = bounds.size;
+                bool furniture = renderer.enabled
+                    && renderer.GetComponent<Collider>() == null
+                    && !StageRoomDoors.IsDoorName(renderer.name)
+                    && box.Contains(bounds.center.x, box.MinY, bounds.center.z)
+                    && size.y >= SmallestSize
+                    && Mathf.Max(size.x, size.z) <= LargestSize
+                    && bounds.min.y <= floor + HighestFoot
+                    && bounds.max.y <= floor + HighestTop;
+                if (!furniture)
+                {
+                    continue;
+                }
+
+                var boxObject = new GameObject(renderer.name) { layer = StageCameraFollow.FurnitureLayer };
+                boxObject.transform.SetParent(parent.transform, false);
+                boxObject.transform.position = bounds.center;
+                boxObject.AddComponent<BoxCollider>().size = size;
+                boxed++;
+            }
+
+            Debug.Log($"[Airi] Room {Manifest.Name}: {boxed} pieces of furniture can hide the character from the camera.");
         }
 
         /// <summary>Moves the root of the avatars to the stand point, and turns it to the facing of the room.</summary>

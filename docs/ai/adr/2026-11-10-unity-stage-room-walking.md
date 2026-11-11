@@ -45,6 +45,7 @@ The doors of a world are closed meshes, so a closed door cuts its room out of th
 - A new room can show a door further in. So the search runs at most three rounds.
 - `room.json` lists the open doors in `openDoors`. An earlier list stays through the next import, so the owner can edit it once.
 - A hidden door does not swing or slide. The doorway is empty. The baked light and the reflections still hold the closed door.
+- Captures of each open doorway of 2LDK from both sides found one trace: the half-open `Door.011` left its shadow on the floor. The other four doorways showed none. Only a new bake of the light removes such a shadow.
 
 The first test used the side of each door: reachable floor on one side, and floor that the stand point does not reach on the other. The panels of a sliding door and closets on the back of a room broke this test. So the import measures the floor that each group adds.
 
@@ -142,6 +143,9 @@ The captures showed only her hips and hands when she stood at a wall, because no
 - It takes the middle of a span of turns with at least 90% of the distance. A wide span wins, and then the span nearest to the camera.
 - A turn of up to 45 degrees swings, at most 90 degrees each second. A larger turn cuts, as between two cameras. A swing through a corridor faces its walls.
 - When the angle of the owner has room again for 1 second, the camera returns to it.
+- Furniture also counts. When the room loads, each piece of furniture on the floor gets a box on the physics layer `AiriFurniture`. For each turn, lines from the camera to five points of her body count the points that a box hides.
+- One hidden point, often an ankle behind a low table, does not move the camera. Two or more make the side cramped, as a near wall does. The wall cast ignores these boxes, so the camera never stops in front of a sofa.
+- In eight walks of 75 seconds in 2LDK, this cut the time with two or more hidden points from 2.6% to 0.6%. The time with a near camera did not grow.
 
 In the last captures of W1-4, two VRM samples walked for 70 seconds each in 2LDK. No wall stood between the camera and her. A sofa or a table can still stand in front of her, because furniture has no collider.
 
@@ -171,7 +175,7 @@ Each step starts after the owner approves its plan.
 - No stairs. The destinations stay on the floor of the stand point.
 - No doors that open and close. The import opens each door that cuts off floor, once, and the door stays open.
 - No avoidance of objects that move, because nothing else moves in the room.
-- No furniture stops the camera. Only walls, floors, and doors do.
+- No furniture stops the camera. Only walls, floors, and doors do. Furniture only makes the camera prefer a side where her body shows.
 - No attention from the microphone. W1 reads only the thinking state and the speaking state.
 
 ## Risks

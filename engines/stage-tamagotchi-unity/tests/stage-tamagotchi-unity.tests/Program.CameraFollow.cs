@@ -11,6 +11,19 @@ public static partial class Program
         TestCameraPoseAtDistance();
         TestCameraSwing();
         TestCameraSwingChoices();
+        TestCameraRoomOfBody();
+    }
+
+    private static void TestCameraRoomOfBody()
+    {
+        CheckNear(StageCameraFollow.RoomOf(0.95, 0), 0.95, 1e-9, "with the whole body in view, the distance decides");
+        CheckNear(StageCameraFollow.RoomOf(0.4, 0), 0.4, 1e-9, "a near wall still cramps the side");
+
+        double oneHidden = StageCameraFollow.RoomOf(1, 1);
+        Check(oneHidden >= StageCameraFollow.CrampedShare && oneHidden < StageCameraFollow.ClearShare, $"one hidden point neither swings nor counts as clear: {oneHidden}");
+
+        Check(StageCameraFollow.RoomOf(1, 2) < StageCameraFollow.CrampedShare, "two hidden points cramp the side");
+        Check(StageCameraFollow.RoomOf(1, 5) < StageCameraFollow.CrampedShare, "a hidden body cramps the side");
     }
 
     private static void SwingFor(StageCameraFollow follow, double seconds, Func<double, double> roomAt, bool held = false)

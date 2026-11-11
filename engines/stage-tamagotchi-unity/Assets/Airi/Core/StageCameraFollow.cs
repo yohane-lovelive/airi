@@ -44,8 +44,34 @@ namespace Airi.Stage.Core
         /// </summary>
         public const double CutDegrees = 45;
 
+        /// <summary>
+        /// The physics layer of the boxes that the stage puts on the furniture of a room. Only the check of the body uses it,
+        /// so the camera does not stop in front of a sofa as in front of a wall. The project setup names it.
+        /// </summary>
+        public const int FurnitureLayer = 30;
+
+        public const string FurnitureLayerName = "AiriFurniture";
+
+        /// <summary>The heights of the points of her body that the camera must see, as shares of her height from the feet.</summary>
+        public static readonly double[] BodyPointShares = { 0.05, 0.28, 0.5, 0.72, 0.92 };
+
         /// <summary>Without a clear side, another side must be this much better, so two similar sides do not trade places.</summary>
         private const double BetterShare = 0.1;
+
+        /// <summary>
+        /// Gives the room of a camera turn for <see cref="Swing"/>, from the free distance and the points of her body that
+        /// furniture hides.
+        ///
+        /// - No hidden point: the room is the distance share.
+        /// - One hidden point, often an ankle behind a low table: the camera does not swing for it, but a search prefers
+        ///   a side with none.
+        /// - More hidden points, for example both legs behind a sofa: the side is cramped, as a wall too near.
+        /// </summary>
+        public static double RoomOf(double distanceShare, int hiddenBodyPoints)
+        {
+            double view = hiddenBodyPoints <= 0 ? 1 : hiddenBodyPoints == 1 ? (CrampedShare + ClearShare) / 2 : CrampedShare - 0.1;
+            return Math.Min(distanceShare, view);
+        }
 
         private double _swingGoal;
         private double _ownerClearSeconds;

@@ -18,8 +18,8 @@ namespace Airi.Stage
     /// argument <c>--airi-camera=</c> fixes the camera instead, so a capture has no saved camera and no stray click in it.
     ///
     /// In a room, a sphere cast from the target to the camera finds the first wall, and the camera stops in front of
-    /// it. When a wall leaves too little room, the camera swings around her to a side with room. Without a room, nothing
-    /// can stand between them, so the camera stays as the rig places it.
+    /// it. When a wall leaves too little room, or furniture hides most of her legs, the camera swings around her to a
+    /// side with room. Without a room, nothing can stand between them, so the camera stays as the rig places it.
     /// </summary>
     public sealed class WindowOutput : IStageOutput
     {
@@ -43,6 +43,11 @@ namespace Airi.Stage
         /// plane does not cut into a wall.
         /// </summary>
         private const float WallProbeRadius = 0.15f;
+
+        /// <summary>The furniture boxes of a room stop no camera. They only tell which points of her body hide.</summary>
+        private const int FurnitureMask = 1 << StageCameraFollow.FurnitureLayer;
+
+        private const int WallMask = Physics.DefaultRaycastLayers & ~FurnitureMask;
 
         private readonly Camera _camera;
         private readonly StageCameraRig _rig;
@@ -295,7 +300,29 @@ namespace Airi.Stage
         private double RoomAt(StageCameraFrame frame, double turnDegrees, double framed)
         {
             StageCameraPose pose = _rig.Resolve(frame, turnDegrees);
-            return framed > 0 ? Math.Min(pose.Distance, FreeDistance(pose)) / framed : 1;
+            double distance = Math.Min(pose.Distance, FreeDistance(pose));
+            StageCameraPose placed = pose.AtDistance(distance);
+            var camera = new Vector3((float)placed.X, (float)placed.Y, (float)placed.Z);
+            return StageCameraFollow.RoomOf(framed > 0 ? distance / framed : 1, HiddenBodyPoints(frame, camera));
+        }
+
+        /// <summary>
+        /// Counts the points of her body that furniture hides from a camera at <paramref name="camera"/>. The points stand
+        /// on the vertical line through the center of the avatar.
+        /// </summary>
+        private static int HiddenBodyPoints(in StageCameraFrame frame, Vector3 camera)
+        {
+            int hidden = 0;
+            foreach (double share in StageCameraFollow.BodyPointShares)
+            {
+                var point = new Vector3((float)frame.CenterX, (float)(frame.FeetY + (frame.Height * share)), (float)frame.CenterZ);
+                if (Physics.Linecast(camera, point, FurnitureMask, QueryTriggerInteraction.Ignore))
+                {
+                    hidden++;
+                }
+            }
+
+            return hidden;
         }
 
         /// <summary>
@@ -318,7 +345,7 @@ namespace Airi.Stage
             // setting changes only for this cast.
             bool hitsBackfaces = Physics.queriesHitBackfaces;
             Physics.queriesHitBackfaces = true;
-            int count = Physics.SphereCastNonAlloc(target, WallProbeRadius, toCamera / framed, _hits, framed, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+            int count = Physics.SphereCastNonAlloc(target, WallProbeRadius, toCamera / framed, _hits, framed, WallMask, QueryTriggerInteraction.Ignore);
             Physics.queriesHitBackfaces = hitsBackfaces;
             float free = framed;
             for (int index = 0; index < count; index++)
