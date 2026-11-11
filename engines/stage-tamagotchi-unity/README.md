@@ -55,7 +55,7 @@ In a room, the camera stops in front of walls and doors. When a wall leaves too 
 
 At a place with a screen, for example the desk, the camera moves to a view of the character and the screen. The mouse moves this view in the same way. Keys 1, 2, and 3 or a double click return to your camera until she leaves the place.
 
-The desk of the commentary gets a second monitor and a webcam. While she sits there, the second monitor shows her face from the front. During a commentary, she looks into the webcam for each line.
+The desk of the commentary gets a second monitor and a webcam. While she sits there, the second monitor shows her face from the front. During a commentary, she looks into the webcam for each line, and the first monitor shows the game. The frames of the game stay in memory.
 
 ## Import a Room
 

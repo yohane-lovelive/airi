@@ -217,6 +217,21 @@ namespace Airi.Stage.Core
         }
     }
 
+    /// <summary>
+    /// One frame of the game for the screen of the room, during a commentary. The sidecar shows it and keeps it in memory
+    /// only, so it never reaches the disk.
+    /// </summary>
+    public sealed class RoomScreenMessage : HostMessage
+    {
+        /// <summary>The bytes of a JPEG.</summary>
+        public readonly byte[] Image;
+
+        public RoomScreenMessage(byte[] image)
+        {
+            Image = image;
+        }
+    }
+
     /// <summary>Electron main stops the sidecar. The sidecar exits by itself.</summary>
     public sealed class ShutdownMessage : HostMessage
     {

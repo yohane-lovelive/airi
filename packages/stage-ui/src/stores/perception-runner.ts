@@ -12,7 +12,7 @@ import { defineStore } from 'pinia'
 import { onScopeDispose, watch } from 'vue'
 
 import { exclusionMatch } from '../libs/perception/exclusion'
-import { FRAME_LIMITS, FrameRing } from '../libs/perception/frame-ring'
+import { FRAME_LIMITS, FrameRing, SCREEN_FRAME_LIMITS } from '../libs/perception/frame-ring'
 import { windowOfApp } from '../libs/perception/screen-source'
 import { FrameEncoder } from '../workers/frame-encoder'
 import { Ticker } from '../workers/ticker'
@@ -43,6 +43,9 @@ const TARGET_CHECK_INTERVAL_MS = 5_000
  * - The decision turn of the initiative runner reads the frames and the events.
  * - While the owner asks for it, the desktop app records each frame of the ring, the screen events, and the owner
  *   messages to the disk for replay evaluation. Excluded frames are not recorded, and a stop of the capture stops it.
+ * - While a listener of the screen frames waits and a commentary watches its window, a second ticker takes 8 smaller
+ *   frames each second for the screen of a sidecar room. It takes them only while the last tick saw the window in view,
+ *   so the rules of the ring hold. These frames stay out of the ring and out of a recording.
  *
  * Use when:
  * - An app starts its renderer. Call `initialize` once with the synced Pinia runtime and the screen source of the app.
@@ -54,6 +57,9 @@ export const usePerceptionRunnerStore = defineStore('perception-runner', () => {
   const ring = new FrameRing()
   const encoder = new FrameEncoder()
   const ticker = new Ticker(FRAME_LIMITS.intervalMs, () => void sample())
+  const screenTicker = new Ticker(SCREEN_FRAME_LIMITS.intervalMs, () => void sampleScreen())
+  const screenListeners = new Set<(image: Blob) => void>()
+  let screenSampling = false
   let leadership: SyncedPiniaRuntime | undefined
   let source: ScreenSource | undefined
   let stopLeadershipListener: (() => void) | undefined
@@ -182,6 +188,7 @@ export const usePerceptionRunnerStore = defineStore('perception-runner', () => {
 
   function stopCapture() {
     ticker.stop()
+    screenTicker.stop()
     for (const track of stream?.getTracks() ?? [])
       track.stop()
     stream = undefined
@@ -243,6 +250,7 @@ export const usePerceptionRunnerStore = defineStore('perception-runner', () => {
       video = element
       excluded = 0
       ticker.start()
+      syncScreenTicker()
       syncRecording()
     }
     catch (error) {
@@ -339,6 +347,43 @@ export const usePerceptionRunnerStore = defineStore('perception-runner', () => {
     finally {
       sampling = false
       publish()
+    }
+  }
+
+  /** Whether the watched window is in view now, as {@link targetInView} tells the other stores. */
+  function inView() {
+    return Boolean(stream) && !excludedNow && (!source?.foreground || targetInFront)
+  }
+
+  /** Runs the screen ticker while a listener waits and a commentary watches its window. */
+  function syncScreenTicker() {
+    if (screenListeners.size && stream && target)
+      screenTicker.start()
+    else
+      screenTicker.stop()
+  }
+
+  /**
+   * Takes one frame for the screen of a sidecar room. The tick of the ring checks the window in front, so this frame
+   * comes only while that check saw the watched window in view. One frame is in work at a time.
+   */
+  async function sampleScreen() {
+    if (screenSampling || !target || !video || !inView() || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA)
+      return
+    screenSampling = true
+    try {
+      const image = await encoder.encodeScreen(await createImageBitmap(video))
+      // A pause, a lock, or the end of the commentary during the encode drops the frame.
+      if (!stream || !target)
+        return
+      for (const listener of screenListeners)
+        listener(image)
+    }
+    catch (error) {
+      console.warn('[perception] Failed to take a screen frame:', errorMessageFrom(error))
+    }
+    finally {
+      screenSampling = false
     }
   }
 
@@ -445,7 +490,19 @@ export const usePerceptionRunnerStore = defineStore('perception-runner', () => {
      * Whether frames of the watched window come in now. Capture must run, and the window in front must not be excluded.
      * A device that cannot tell the window in front captures only what the owner shared, so that counts as in view.
      */
-    targetInView: () => Boolean(stream) && !excludedNow && (!source?.foreground || targetInFront),
+    targetInView: inView,
+    /**
+     * Calls the listener with each frame for the screen of a sidecar room, 8 each second, while a commentary watches
+     * its window and the window is in view. Returns a function that removes it.
+     */
+    onScreenFrame: (listener: (image: Blob) => void) => {
+      screenListeners.add(listener)
+      syncScreenTicker()
+      return () => {
+        screenListeners.delete(listener)
+        syncScreenTicker()
+      }
+    },
     /** Calls the listener with each batch of new screen events. Returns a function that removes it. */
     onEvents: (listener: (events: readonly ScreenEvent[]) => void) => {
       eventListeners.add(listener)

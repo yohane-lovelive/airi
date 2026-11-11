@@ -358,6 +358,7 @@ describe('createUnityStageManager', () => {
       || message.type === 'host.character.frame'
       || message.type === 'host.character.attention'
       || message.type === 'host.character.activity'
+      || message.type === 'host.room.screen'
       || (message.type === 'host.character.gesture' && message.payload?.kind === 'keys'))
 
     it('forwards each signal of the protocol fixtures as it is', async () => {
@@ -368,7 +369,11 @@ describe('createUnityStageManager', () => {
         manager.sendSignal(signal)
 
       await vi.waitFor(() => expect(received()).toHaveLength(signals.length))
-      expect(received()).toEqual(signals)
+
+      // The fake sidecar keeps only the length of a frame of the room screen, so no frame reaches the disk.
+      expect(received()).toEqual(signals.map(signal => signal.type === 'host.room.screen'
+        ? { type: signal.type, payload: { imageLength: signal.payload?.image?.length ?? 0 } }
+        : signal))
     })
 
     it('drops an invalid signal and keeps the connection', async () => {

@@ -2,6 +2,7 @@ export {
   HostMessageSchema,
   parseHostMessage,
   parseSidecarMessage,
+  ROOM_SCREEN_MAX_LENGTH,
   SidecarMessageSchema,
 } from './protocol'
 

@@ -126,6 +126,7 @@ Player モードでは、ホストは `-force-d3d12-single-pso-disk-cache` も�
 | `host.character.frame` | `mouth`（A、E、I、O、U）、`bones`（spine、chest、neck、head）、`eyes` | 毎秒 30 回 |
 | `host.character.attention` | `target`：`viewer` か `none` | 変わったとき。新しく `running` になったときにも送り直す。[歩行の ADR](2026-11-10-unity-stage-room-walking.ja-JP.md) で足す。 |
 | `host.character.activity` | `activity`：`watching-screen` か `none` | 変わったとき。新しく `running` になったときにも送り直す。[場所の ADR](2026-11-11-unity-stage-room-places-commentary.ja-JP.md) で足す。 |
+| `host.room.screen` | `image`：base64 の JPEG | 実況の間、見ている窓が見えているとき、毎秒 8 枚。[場所の ADR](2026-11-11-unity-stage-room-places-commentary.ja-JP.md) で足す。 |
 | `host.shutdown` | なし | 停止時 |
 
 サイドカーからホストへ:

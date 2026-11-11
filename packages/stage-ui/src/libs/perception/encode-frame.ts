@@ -2,7 +2,7 @@ import type { CapturedFrame } from './frame-ring'
 
 import { contactSheetLayout } from '@proj-airi/stage-shared/perception'
 
-import { FRAME_LIMITS } from './frame-ring'
+import { FRAME_LIMITS, SCREEN_FRAME_LIMITS } from './frame-ring'
 
 /**
  * Turns one bitmap into a captured frame: a scaled JPEG and a small grayscale thumbnail. It closes the bitmap.
@@ -29,6 +29,24 @@ export async function encodeFrame(bitmap: ImageBitmap, at: number): Promise<Capt
       thumbnail[index] = Math.round(0.299 * data[offset] + 0.587 * data[offset + 1] + 0.114 * data[offset + 2])
     }
     return { at, image, width, height, thumbnail }
+  }
+  finally {
+    bitmap.close()
+  }
+}
+
+/**
+ * Turns one bitmap into a frame for the screen of a sidecar room: a JPEG scaled down to
+ * {@link SCREEN_FRAME_LIMITS.maxLongSide} pixels on its long side, with no thumbnail. It closes the bitmap.
+ */
+export async function encodeScreenFrame(bitmap: ImageBitmap): Promise<Blob> {
+  try {
+    const scale = Math.min(1, SCREEN_FRAME_LIMITS.maxLongSide / Math.max(bitmap.width, bitmap.height))
+    const width = Math.max(1, Math.round(bitmap.width * scale))
+    const height = Math.max(1, Math.round(bitmap.height * scale))
+    const canvas = new OffscreenCanvas(width, height)
+    canvas.getContext('2d')!.drawImage(bitmap, 0, 0, width, height)
+    return await canvas.convertToBlob({ type: 'image/jpeg', quality: SCREEN_FRAME_LIMITS.jpegQuality })
   }
   finally {
     bitmap.close()

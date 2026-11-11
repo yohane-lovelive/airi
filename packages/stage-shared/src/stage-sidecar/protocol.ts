@@ -5,6 +5,7 @@ import {
   check,
   finite,
   literal,
+  maxLength,
   maxValue,
   minLength,
   minValue,
@@ -13,6 +14,7 @@ import {
   optional,
   picklist,
   pipe,
+  regex,
   safeParse,
   strictObject,
   string,
@@ -111,6 +113,21 @@ const characterActivitySchema = strictObject({
   activity: picklist(['watching-screen', 'none']),
 })
 
+/**
+ * The longest frame of the room screen, in characters of base64. It holds about 1.5 MB of JPEG. A frame of 960 pixels
+ * on its long side is far smaller.
+ */
+export const ROOM_SCREEN_MAX_LENGTH = 2_000_000
+
+/**
+ * One frame of the game for the screen of the room, during a commentary. The renderer takes it from the capture of
+ * perception, so the rules of perception hold. The frame stays in memory, and the sidecar does not write it to disk.
+ */
+const roomScreenSchema = strictObject({
+  /** A JPEG in base64, with no `data:` prefix. */
+  image: pipe(string(), nonEmpty(), maxLength(ROOM_SCREEN_MAX_LENGTH), regex(/^[\d+/a-z]+={0,2}$/i)),
+})
+
 /** What Electron main sends to a display sidecar. A sidecar answers an invalid message with `character.error`. */
 export const HostMessageSchema = variant('type', [
   strictObject({
@@ -153,6 +170,10 @@ export const HostMessageSchema = variant('type', [
   strictObject({
     type: literal('host.character.activity'),
     payload: characterActivitySchema,
+  }),
+  strictObject({
+    type: literal('host.room.screen'),
+    payload: roomScreenSchema,
   }),
   strictObject({
     type: literal('host.shutdown'),

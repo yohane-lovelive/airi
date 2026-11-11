@@ -47,6 +47,7 @@ export type UnityStageSignal
     | { type: 'host.character.frame', payload: CharacterFrame }
     | { type: 'host.character.attention', payload: { target: CharacterAttentionTarget } }
     | { type: 'host.character.activity', payload: { activity: CharacterActivity } }
+    | { type: 'host.room.screen', payload: { image: string } }
 
 export const unityStageStart = defineInvokeEventa<ElectronStageSidecarStatus>('eventa:invoke:unity-stage:start')
 export const unityStageStop = defineInvokeEventa<ElectronStageSidecarStatus>('eventa:invoke:unity-stage:stop')

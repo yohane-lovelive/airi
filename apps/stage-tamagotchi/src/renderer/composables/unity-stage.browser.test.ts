@@ -262,6 +262,16 @@ describe('the Unity stage in the renderer', () => {
       expect(signals[1]).toEqual({ type: 'host.character.activity', payload: { activity: 'watching-screen' } })
     })
 
+    it('sends a frame of the room screen in a form that the protocol accepts', async () => {
+      const { sidecar } = await mount(useUnityStageBridge)
+
+      sidecar.sendScreen('/9j/4AAQ')
+
+      await vi.waitFor(() => expect(signals).toHaveLength(1))
+      expect(signals[0]).toEqual({ type: 'host.room.screen', payload: { image: '/9j/4AAQ' } })
+      expect(() => parseHostMessage(signals[0])).not.toThrow()
+    })
+
     it('does not send an ended activity to a sidecar that comes back', async () => {
       const { sidecar } = await mount(useUnityStageBridge)
       emitStatus(statusOf('running'))

@@ -19,6 +19,8 @@ export interface StageSidecarOutput {
   setAttention: (target: CharacterAttentionTarget) => void
   /** Called only when the activity changes. A new sidecar has no activity, so the output sends the last one again. */
   setActivity: (activity: CharacterActivity) => void
+  /** Sends one frame of a commentary, a JPEG in base64, for the screen of the room. A late frame has no value. */
+  sendScreen: (image: string) => void
 }
 
 /**
@@ -39,5 +41,6 @@ export const useStageSidecarStore = defineStore('stage-sidecar', () => {
     sendFrame: (frame: CharacterFrame) => output?.sendFrame(frame),
     setAttention: (target: CharacterAttentionTarget) => output?.setAttention(target),
     setActivity: (activity: CharacterActivity) => output?.setActivity(activity),
+    sendScreen: (image: string) => output?.sendScreen(image),
   }
 })

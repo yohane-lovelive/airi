@@ -90,6 +90,13 @@ namespace Airi.Stage
             _look.Apply(loaded.GetComponentsInChildren<Renderer>(), AvatarMaterialFormat.Vrm, _lookMaterials);
 
             ReadExpressions(loaded);
+
+            // A sit moves her head about 0.4 m from its place at rest, and the bounds of a skinned mesh stay at rest. A
+            // narrow view, for example the film of the webcam, then culls the face. So each mesh follows its bones.
+            if (loaded.TryGetComponent(out RuntimeGltfInstance instance))
+            {
+                instance.EnableUpdateWhenOffscreen();
+            }
             ITPoseProvider tPose = loaded.Runtime.ControlRig;
             _restHips = tPose.GetWorldTransform(HumanBodyBones.Hips).Value.Translation;
             _restHeadHeight = tPose.GetWorldTransform(HumanBodyBones.Head).Value.Translation.y;

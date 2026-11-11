@@ -28,6 +28,17 @@ export const FRAME_LIMITS = {
 } as const
 
 /**
+ * Limits of the frames that a display sidecar shows on a screen of its room during a commentary. They stay out of the
+ * ring, and only the local sidecar gets them.
+ */
+export const SCREEN_FRAME_LIMITS = {
+  /** 8 frames each second, so the game moves on a small screen. */
+  intervalMs: 125,
+  maxLongSide: 960,
+  jpegQuality: 0.7,
+} as const
+
+/**
  * The frames of the last minute, oldest first.
  *
  * Use when:

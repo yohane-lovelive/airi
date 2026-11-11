@@ -85,7 +85,7 @@ public static partial class Program
         }
 
         // The TypeScript test checks that the fixtures cover every type of the schema.
-        Check(seen.Count == 8, $"host message types in the fixtures: {seen.Count}");
+        Check(seen.Count == 9, $"host message types in the fixtures: {seen.Count}");
     }
 
     /// <summary>Compares each parsed field with the fixture, so no field gets lost on the way.</summary>
@@ -127,6 +127,10 @@ public static partial class Program
                 break;
             case CharacterActivityMessage activity:
                 Check(activity.WatchingScreen == ((string)payload["activity"] == "watching-screen"), "activity");
+                break;
+            case RoomScreenMessage screen:
+                Check(screen.Image.Length > 2 && screen.Image[0] == 0xFF && screen.Image[1] == 0xD8, "the screen image is a JPEG");
+                Check(Convert.ToBase64String(screen.Image) == (string)payload["image"], "the screen image keeps its bytes");
                 break;
             case ShutdownMessage:
                 Check(payload == null, "shutdown has no payload");

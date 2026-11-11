@@ -99,6 +99,8 @@ namespace Airi.Stage.Core
                     return ParseAttention(payload);
                 case "host.character.activity":
                     return ParseActivity(payload);
+                case "host.room.screen":
+                    return ParseRoomScreen(payload);
                 default:
                     throw new StageProtocolException($"Unknown host message type: {type}");
             }
@@ -273,6 +275,28 @@ namespace Airi.Stage.Core
                     return new CharacterAttentionMessage(false);
                 default:
                     throw new StageProtocolException($"Unknown attention target: {target}");
+            }
+        }
+
+        /// <summary>The longest frame of the room screen, in characters of base64, as the TypeScript schema allows.</summary>
+        public const int RoomScreenMaxLength = 2_000_000;
+
+        private static RoomScreenMessage ParseRoomScreen(JObject payload)
+        {
+            RequireOnlyFields(payload, "image");
+            string image = ReadText(payload, "image");
+            if (image.Length > RoomScreenMaxLength)
+            {
+                throw new StageProtocolException($"The screen image has {image.Length} characters, and the limit is {RoomScreenMaxLength}.");
+            }
+
+            try
+            {
+                return new RoomScreenMessage(Convert.FromBase64String(image));
+            }
+            catch (FormatException)
+            {
+                throw new StageProtocolException("The screen image is no base64.");
             }
         }
 

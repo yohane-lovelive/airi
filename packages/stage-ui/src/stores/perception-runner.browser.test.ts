@@ -9,7 +9,7 @@ import { createSyncedPiniaPlugin } from 'pinia-plugin-synced'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createApp } from 'vue'
 
-import { FRAME_LIMITS } from '../libs/perception/frame-ring'
+import { FRAME_LIMITS, SCREEN_FRAME_LIMITS } from '../libs/perception/frame-ring'
 import { usePerceptionStore } from './perception'
 import { usePerceptionRunnerStore } from './perception-runner'
 import { usePerceptionStatusStore } from './perception-status'
@@ -202,6 +202,42 @@ describe('usePerceptionRunnerStore', { timeout: 60_000 }, () => {
 
     open = false
     await expect.poll(() => closed, { timeout: 15_000 }).toEqual(['Game'])
+  })
+
+  it('gives screen frames for a sidecar only during a commentary, while the watched window is in view', async () => {
+    let window: ForegroundWindow = { title: 'Match', app: 'Game' }
+    const screen = canvasSource({ foreground: () => window })
+    const { runner, perception, status } = await createLeader(screen.source)
+    const images: Blob[] = []
+    const stop = runner.onScreenFrame(image => images.push(image))
+    perception.enabled = true
+    await expect.poll(() => runner.frames().length, { timeout: 15_000 }).toBeGreaterThan(0)
+    await new Promise(resolve => setTimeout(resolve, 600))
+    expect(images).toHaveLength(0)
+
+    runner.setTarget('Game')
+    await expect.poll(() => images.length, { timeout: 15_000 }).toBeGreaterThan(3)
+    expect(images[0].type).toBe('image/jpeg')
+    const bitmap = await createImageBitmap(images[0])
+    expect(Math.max(bitmap.width, bitmap.height)).toBeLessThanOrEqual(SCREEN_FRAME_LIMITS.maxLongSide)
+    bitmap.close()
+
+    // The frames come more often than the frames of the ring.
+    await expect.poll(() => images.length - runner.frames().length, { timeout: 15_000 }).toBeGreaterThan(3)
+
+    window = { title: 'Vault', app: 'Bitwarden' }
+    await expect.poll(() => status.status.excludedNow, { timeout: 15_000 }).toBe(true)
+    const excludedAt = images.length
+    await new Promise(resolve => setTimeout(resolve, 800))
+    expect(images.length).toBeLessThanOrEqual(excludedAt + 1)
+
+    window = { title: 'Match', app: 'Game' }
+    await expect.poll(() => images.length, { timeout: 15_000 }).toBeGreaterThan(excludedAt + 2)
+
+    stop()
+    const stoppedAt = images.length
+    await new Promise(resolve => setTimeout(resolve, 800))
+    expect(images.length).toBeLessThanOrEqual(stoppedAt + 1)
   })
 
   it('records the frames of the ring and owner messages while asked, skips excluded frames, and stops on a pause', async () => {

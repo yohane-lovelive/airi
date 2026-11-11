@@ -44,7 +44,11 @@ function send(type, payload) {
   socket.send(JSON.stringify({ type, payload }))
 }
 
-function record(message) {
+function record(received) {
+  // A frame of the room screen shows the window of a game, and it must not reach the disk. Only its length stays.
+  const message = received.type === 'host.room.screen'
+    ? { type: received.type, payload: { imageLength: received.payload?.image?.length ?? 0 } }
+    : received
   if (logPath) {
     appendFileSync(logPath, `${JSON.stringify(message)}\n`)
     return

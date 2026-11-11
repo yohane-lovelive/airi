@@ -126,6 +126,7 @@ Host to sidecar:
 | `host.character.frame` | `mouth` (A, E, I, O, U), `bones` (spine, chest, neck, head), `eyes` | 30 each second |
 | `host.character.attention` | `target`: `viewer` or `none` | On a change, and again on a new `running` status. The [walking ADR](2026-11-10-unity-stage-room-walking.md) adds it. |
 | `host.character.activity` | `activity`: `watching-screen` or `none` | On a change, and again on a new `running` status. The [ADR of the places](2026-11-11-unity-stage-room-places-commentary.md) adds it. |
+| `host.room.screen` | `image`: a JPEG in base64 | 8 each second during a commentary, while the watched window is in view. The [ADR of the places](2026-11-11-unity-stage-room-places-commentary.md) adds it. |
 | `host.shutdown` | None | On a stop |
 
 Sidecar to host:

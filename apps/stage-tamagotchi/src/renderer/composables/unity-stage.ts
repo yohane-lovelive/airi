@@ -134,6 +134,9 @@ export function useUnityStageBridge() {
       activity = next
       sendActivity()
     },
+    sendScreen(image) {
+      context.value.emit(unityStageSignal, { type: 'host.room.screen', payload: { image } })
+    },
   })
 
   async function sendIdle() {

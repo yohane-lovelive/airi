@@ -35,6 +35,7 @@ import StageRenderError from './stage-render-error.vue'
 
 import { useStageSidecarAttention } from '../../composables/stage-sidecar-attention'
 import { useStageSidecarFrames } from '../../composables/stage-sidecar-frames'
+import { useStageSidecarScreen } from '../../composables/stage-sidecar-screen'
 // import { useDuckDb } from '../../composables/use-duck-db'
 import { Emotion, EMOTION_EmotionMotionName_value, EMOTION_VRMExpressionName_value, EmotionThinkMotionName } from '../../constants/emotions'
 import { live2dMotionMagicProfiles, useLive2DMotionMagic, useLive2DMotionMagicSettings } from '../../features/motions/live2d'
@@ -51,6 +52,7 @@ import { useAiriCardStore } from '../../stores/modules/airi-card'
 import { useSpeechStore } from '../../stores/modules/speech'
 import { useMotionGenerationStore } from '../../stores/motion-generation'
 import { useMotionLibraryStore } from '../../stores/motion-library'
+import { usePerceptionRunnerStore } from '../../stores/perception-runner'
 import { useSettingsPresenceBubble } from '../../stores/presence-bubble'
 import { useSettings } from '../../stores/settings'
 import { useSettingsStageModel } from '../../stores/settings/stage-model'
@@ -513,13 +515,21 @@ useStageSidecarFrames({
 // A commentary ends at its time limit, so the activity checks the clock each second.
 const missionsStore = useMissionsStore()
 const missionClock = useTimestamp({ interval: 1000 })
+const isCommenting = () => missionsStore.commentaryAt(missionClock.value) !== undefined
 useStageSidecarAttention({
   active: () => stageModelRenderer.value === 'unity',
   isThinking: () => presenceBubble.value.thinking,
   isSpeaking: () => nowSpeaking.value,
-  isCommenting: () => missionsStore.commentaryAt(missionClock.value) !== undefined,
+  isCommenting,
   send: target => stageSidecar.setAttention(target),
   sendActivity: activity => stageSidecar.setActivity(activity),
+})
+// During a commentary, the game also shows on the monitor of the room.
+const perceptionRunner = usePerceptionRunnerStore()
+useStageSidecarScreen({
+  active: () => stageModelRenderer.value === 'unity' && isCommenting(),
+  subscribe: listener => perceptionRunner.onScreenFrame(listener),
+  send: image => stageSidecar.sendScreen(image),
 })
 // setTargetAtTime smooths slider drags into the gain, so volume changes do not click.
 watch(speechVolume, (volume) => {

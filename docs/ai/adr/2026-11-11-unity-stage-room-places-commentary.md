@@ -205,6 +205,22 @@ The transport of the frames:
 | Binary messages | The socket carries the raw JPEG. | A third less data, but a second message format, and new paths in the socket code of both sides. |
 | Files on the disk | Electron writes each frame, as it writes the idle clip. | Images of the screen on the disk break the rule of perception. |
 
+W2-4 builds it this way. It adds two points above: the check of the window comes from the ticks of the ring, and a plate covers the screen.
+
+- A second ticker of the perception runner takes 8 frames each second. It runs while a listener waits and a commentary watches its window.
+- It takes a frame only while the last tick of the ring saw the watched window in view. So it asks for the window in front no more often.
+- That check can be 0.5 seconds late. The capture holds only the watched window, so a late check shows no other window.
+- The worker of the frame encoder scales each frame to 960 pixels and encodes it as JPEG of quality 0.7. The page thread keeps its frame rate.
+- `useStageSidecarScreen` sends a frame only while a sidecar draws her and a commentary runs. It drops a frame that comes while the last one is in work.
+- The fake sidecar keeps only the length of a frame in its log, so no frame reaches the disk.
+- Unity puts a black plate and the image a few millimeters in front of the first screen of the screen place. `StageScreenFit` keeps the shape of the image.
+- The material of the world stays, because its UVs are unknown. So the fallback of the risk became the way.
+- In 2LDK, a test feed of 960x540 showed on the monitor of the desk at about 8 frames each second.
+- The decode took 1.5 ms on average and 2.8 ms at most. After the end of the feed, the monitor showed its own picture again after 3 seconds.
+- In the app, the owner asked for a commentary of a card game. The monitor of the desk showed the game at 80 frames in each 10 seconds.
+- The decode took about 2 ms on average and 3.3 ms at most. Twice the owner put another window in front, and the monitor showed its own picture after 3 seconds.
+- During the commentary, with the webcam and the game, the mean frame time was 7.7 ms. Without them it was 5.6 ms.
+
 ### The camera at a place
 
 While she is at a place with a screen, the camera shows both her and the screen.
@@ -263,7 +279,13 @@ W2-6 builds it this way.
 - The furniture cannot move, so the stage adds the monitor. It has a dark frame, a screen of 0.55 m, and a pole down to the desk.
 - `StageWebcamRig` gives three places: beside the first monitor on her right, on her left, each turned 25 degrees toward her, and above it.
 - A place counts only when no part of the room up to 3 m touches it. In 2LDK, speakers stand on both sides, so the monitor stands above.
-- The webcam stands 0.03 m above the top edge of the first screen, and 0.04 m toward her. It films 0.6 m around her neck.
+- The body of the webcam stands 0.03 m above the top edge of the first screen, and 0.04 m toward her.
+- A webcam there looked down at her steeply, and the film showed mostly her head. The owner asked for her face from the front.
+- The room is virtual, so the film now comes from a camera 0.8 m in front of her head. It stands at the height of her eyes and films 0.6 m around her neck.
+- This camera can stand past the first screen. Its near plane then lies 0.05 m past the screen, so the monitor does not hide her.
+- For each line of a commentary, she looks into this camera, so the film shows her eyes toward the viewer.
+- A skinned mesh of a VRM model kept its bounds at rest. When she sat, the narrow film culled her face and showed the inside of her hair.
+- So each skinned mesh of a VRM model now updates its bounds, through `EnableUpdateWhenOffscreen` of UniGLTF. A PMX model was right before.
 - A camera of URP renders into a texture of 512x288. The screen uses an unlit material of URP, so the light of the room does not change the film.
 - `setup:project` writes this material into `Resources`, so a build keeps its shader. W2-4 can use the same material for the game.
 - The light moves to the side of the webcam in 1.2 seconds, as the camera moves to its shot.

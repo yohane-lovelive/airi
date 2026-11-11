@@ -12,6 +12,26 @@ public static partial class Program
         TestPlaceShotAdjust();
         TestPlaceShotBlend();
         TestWebcamRig();
+        TestScreenFit();
+    }
+
+    private static void TestScreenFit()
+    {
+        // The monitor of 2LDK is 0.909 m by 0.511 m.
+        (double width, double height) = StageScreenFit.Fit(1920, 1080, 0.909, 0.511);
+        CheckNear(height, 0.511, 1e-9, "a film of 16:9 fills the height of a screen of the same shape");
+        Check(width <= 0.909 + 1e-9, "a film of 16:9 stays inside the width");
+
+        (width, height) = StageScreenFit.Fit(800, 600, 0.909, 0.511);
+        CheckNear(height, 0.511, 1e-9, "a film of 4:3 fills the height");
+        CheckNear(width, 0.511 * 4 / 3, 1e-9, "a film of 4:3 leaves black bars at the sides");
+
+        (width, height) = StageScreenFit.Fit(1920, 600, 0.909, 0.511);
+        CheckNear(width, 0.909, 1e-9, "a wide film fills the width");
+        CheckNear(height, 0.909 * 600 / 1920, 1e-9, "a wide film leaves black bars above and below");
+
+        (width, height) = StageScreenFit.Fit(0, 0, 0.909, 0.511);
+        CheckNear(width, 0.909, 1e-9, "an image with no size fills the screen");
     }
 
     private static void TestWebcamRig()
@@ -53,6 +73,26 @@ public static partial class Program
         // At 0.71 m from her neck, the webcam needs about 46 degrees for her head and her shoulders.
         double fov = StageWebcamRig.FieldOfView(webcam, new StagePoint(0, 1.1, -0.7));
         CheckNear(fov, 2 * Math.Atan(0.3 / Math.Sqrt((0.26 * 0.26) + (0.66 * 0.66))) * 180.0 / Math.PI, 1e-6, "the lens holds her head and her shoulders");
+
+        // Her head is 0.65 m from the screen, so the camera of the film stands 0.15 m past the screen.
+        var head = new StagePoint(0, 0.95, -0.65);
+        StagePoint front = StageWebcamRig.FrontCamera(head, first);
+        CheckNear(front.X, 0, 1e-9, "the camera of the film stands in front of her face");
+        CheckNear(front.Z, -0.65 + StageWebcamRig.FrontDistance, 1e-9, "the camera of the film stands on the line to the screen");
+        CheckNear(front.Y, 0.95 + StageWebcamRig.EyeLift, 1e-9, "the camera of the film stands at the height of her eyes");
+        StagePoint aim = StageWebcamRig.FilmedCenter(head);
+        double viewLength = Math.Sqrt(((aim.Y - front.Y) * (aim.Y - front.Y)) + ((aim.Z - front.Z) * (aim.Z - front.Z)));
+        double expectedNear = (0.15 / ((front.Z - aim.Z) / viewLength)) + StageWebcamRig.ScreenClearance;
+        CheckNear(StageWebcamRig.NearClip(front, aim, first), expectedNear, 1e-6, "the near plane cuts the screen between the camera and her");
+
+        // A head far from the screen puts the camera between her and the screen, and nothing needs a cut.
+        var far = new StagePoint(0, 0.95, -1.2);
+        StagePoint between = StageWebcamRig.FrontCamera(far, first);
+        CheckNear(StageWebcamRig.NearClip(between, StageWebcamRig.FilmedCenter(far), first), StageWebcamRig.NearestNear, 1e-9, "a camera before the screen keeps the nearest near plane");
+
+        // A head right at the screen center films along the facing of the screen.
+        StagePoint level = StageWebcamRig.FrontCamera(new StagePoint(0, 0.95, 0), first);
+        CheckNear(level.Z, StageWebcamRig.FrontDistance, 1e-9, "a head at the screen center gives a camera away from the face of the screen");
 
         StagePlaceSubject withSecond = DeskSubject().WithSecondScreen(above);
         Check(StagePlaceShot.PointsOf(withSecond).Length == 10, "the shot also holds the corners of the second screen");

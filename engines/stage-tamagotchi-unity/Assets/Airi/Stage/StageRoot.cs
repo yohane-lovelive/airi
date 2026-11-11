@@ -68,6 +68,9 @@ namespace Airi.Stage
         /// <summary>The second monitor and the webcam at the desk of the commentary, or null.</summary>
         private StageWebcam _webcam;
 
+        /// <summary>The game of a commentary on the first screen of the screen place, or null.</summary>
+        private StageGameScreen _gameScreen;
+
         /// <summary>The last attention of the host: true for the viewer. Only a walking character acts on it.</summary>
         private bool _attention;
 
@@ -121,6 +124,7 @@ namespace Airi.Stage
                 _ = _character.SetWalkAsync(Path.Combine(motions, StageWalk.FileName));
                 _ = _character.SetSeatAsync(motions);
                 _webcam = StageWebcam.Create(_room, _walker.ScreenPlace, transform);
+                _gameScreen = StageGameScreen.Create(_walker.ScreenPlace, transform);
             }
 
             await ConnectAsync();
@@ -331,6 +335,10 @@ namespace Airi.Stage
                     _attention = attention.ToViewer;
                     Debug.Log($"[Airi] Attention: {(attention.ToViewer ? "viewer" : "none")}.");
                     break;
+                case RoomScreenMessage screen:
+                    // Electron sends frames only during a commentary. Without a screen place, they go nowhere.
+                    _gameScreen?.Show(screen.Image);
+                    break;
                 case CharacterActivityMessage activity:
                     Debug.Log($"[Airi] Activity: {(activity.WatchingScreen ? "watching-screen" : "none")}.");
                     if (_walker != null)
@@ -340,6 +348,11 @@ namespace Airi.Stage
                     else if (activity.WatchingScreen)
                     {
                         Debug.Log("[Airi] The character does not walk, so she does not go to a screen.");
+                    }
+
+                    if (!activity.WatchingScreen)
+                    {
+                        _gameScreen?.Hide();
                     }
 
                     break;
@@ -366,6 +379,8 @@ namespace Airi.Stage
             bool attending = _attention && _walker != null;
             Vector3 camera = _camera.transform.position;
             _walker?.Tick(Time.deltaTime, attending, camera);
+
+            _gameScreen?.Tick();
 
             // The webcam films her while she sits at its desk.
             StagePlaceSubject? subject = _walker?.PlaceSubject;
