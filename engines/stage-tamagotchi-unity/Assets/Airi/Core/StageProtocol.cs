@@ -97,6 +97,8 @@ namespace Airi.Stage.Core
                     return ParseFrame(payload);
                 case "host.character.attention":
                     return ParseAttention(payload);
+                case "host.character.activity":
+                    return ParseActivity(payload);
                 default:
                     throw new StageProtocolException($"Unknown host message type: {type}");
             }
@@ -271,6 +273,21 @@ namespace Airi.Stage.Core
                     return new CharacterAttentionMessage(false);
                 default:
                     throw new StageProtocolException($"Unknown attention target: {target}");
+            }
+        }
+
+        private static CharacterActivityMessage ParseActivity(JObject payload)
+        {
+            RequireOnlyFields(payload, "activity");
+            string activity = ReadText(payload, "activity");
+            switch (activity)
+            {
+                case "watching-screen":
+                    return new CharacterActivityMessage(true);
+                case "none":
+                    return new CharacterActivityMessage(false);
+                default:
+                    throw new StageProtocolException($"Unknown activity: {activity}");
             }
         }
 

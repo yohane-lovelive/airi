@@ -127,6 +127,18 @@
       }
     },
     {
+      "type": "host.character.activity",
+      "payload": {
+        "activity": "watching-screen"
+      }
+    },
+    {
+      "type": "host.character.activity",
+      "payload": {
+        "activity": "none"
+      }
+    },
+    {
       "type": "host.shutdown"
     }
   ],
@@ -478,6 +490,25 @@
         "payload": {
           "target": "viewer",
           "seconds": 15
+        }
+      }
+    },
+    {
+      "reason": "unknown activity",
+      "message": {
+        "type": "host.character.activity",
+        "payload": {
+          "activity": "sleeping"
+        }
+      }
+    },
+    {
+      "reason": "extra field in an activity",
+      "message": {
+        "type": "host.character.activity",
+        "payload": {
+          "activity": "watching-screen",
+          "place": "desk"
         }
       }
     }

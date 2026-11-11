@@ -92,10 +92,11 @@ namespace Airi.Stage.Core
     /// Decides where the character goes in a room: she rests, then walks to a new place, and so on. One rest in three
     /// goes to a place of the room. There she sits on its seat, or she stands and faces it. When the host asks for the
     /// attention of the viewer, she stops, and the plan waits until the host releases her. While she sits, she stays on
-    /// the seat, and only her upper body turns.
+    /// the seat, and only her upper body turns. During a commentary, she watches the screen of the first screen place,
+    /// see <see cref="SetWatchingScreen"/>.
     ///
-    /// State: the state, the time in it, the length of the rest or the sit, the destination, and the place. It has no
-    /// Unity reference, so <c>dotnet</c> tests it.
+    /// State: the state, the time in it, the length of the rest or the sit, the destination, the place, and the
+    /// activity. It has no Unity reference, so <c>dotnet</c> tests it.
     /// </summary>
     public sealed class WanderPlan
     {
@@ -123,6 +124,14 @@ namespace Airi.Stage.Core
         private int _lastPlace = -1;
         private int _askedPlace = -1;
 
+        /// <summary>The first place with the role screen, or -1. The activity of watching a screen goes there.</summary>
+        private readonly int _screenPlace = -1;
+
+        private bool _watching;
+
+        /// <summary>The activity ended, and the next frame ends what it started.</summary>
+        private bool _endActivity;
+
         /// <param name="random">Gives a number from 0 to 1. A test gives fixed numbers.</param>
         /// <param name="places">The places of the room, or null for a room without a list.</param>
         public WanderPlan(IWanderRoom room, Func<double> random, IReadOnlyList<StageRoomPlace> places = null)
@@ -130,8 +139,28 @@ namespace Airi.Stage.Core
             _room = room;
             _random = random;
             _places = places ?? Array.Empty<StageRoomPlace>();
+            for (int index = 0; index < _places.Count && _screenPlace < 0; index++)
+            {
+                if (_places[index].Role == StageRoomPlaceRole.Screen)
+                {
+                    _screenPlace = index;
+                }
+            }
+
             StartRest();
         }
+
+        /// <summary>The place where she watches a screen during a commentary, or null in a room without a screen place.</summary>
+        public StageRoomPlace ScreenPlace => _screenPlace >= 0 ? _places[_screenPlace] : null;
+
+        /// <summary>Whether the activity of watching a screen goes on.</summary>
+        public bool WatchingScreen => _watching;
+
+        /// <summary>
+        /// Whether she watches the screen of her place now: the activity goes on, and she sits or stands at its place.
+        /// The stage then aims her head and her eyes at the screen.
+        /// </summary>
+        public bool LooksAtScreen => _watching && _place == _screenPlace && (State == WanderState.Sit || State == WanderState.Rest);
 
         public WanderState State { get; private set; }
 
@@ -161,6 +190,29 @@ namespace Airi.Stage.Core
             return false;
         }
 
+        /// <summary>
+        /// Starts or ends the activity of watching a screen, for a commentary.
+        ///
+        /// - On a start, she goes to <see cref="ScreenPlace"/>. She gets up first from another seat. There she sits or
+        ///   stands as long as the activity goes on. Rests and random walks stop, and an attention turns only her upper
+        ///   body.
+        /// - On an end, she gets up, or she stops her walk to the screen, and the walk through the room goes on.
+        ///
+        /// Returns:
+        /// - False for a start in a room without a screen place. The plan then stays as it is.
+        /// </summary>
+        public bool SetWatchingScreen(bool watching)
+        {
+            if (watching && _screenPlace < 0)
+            {
+                return false;
+            }
+
+            _endActivity = _watching && !watching;
+            _watching = watching;
+            return true;
+        }
+
         /// <summary>Ends a walk, a sit, or an attention at once, for example for a new model. She rests.</summary>
         public void Interrupt()
         {
@@ -182,6 +234,14 @@ namespace Airi.Stage.Core
         public WanderChange Update(double deltaSeconds, bool arrived, bool attention)
         {
             _elapsed += deltaSeconds;
+            WanderChange activityChange = FollowActivity();
+            if (activityChange != WanderChange.None)
+            {
+                return activityChange;
+            }
+
+            // During the activity, an attention turns only her upper body. So she does not stop for it.
+            bool stops = attention && !_watching;
             switch (State)
             {
                 case WanderState.Attend:
@@ -194,7 +254,7 @@ namespace Airi.Stage.Core
                     return WanderChange.EndAttend;
 
                 case WanderState.Walk:
-                    if (attention)
+                    if (stops)
                     {
                         return StartAttend();
                     }
@@ -226,15 +286,13 @@ namespace Airi.Stage.Core
                     return WanderChange.SitDown;
 
                 case WanderState.Sit:
-                    // She does not get up while she talks to the viewer.
-                    if (_elapsed < _sitSeconds || attention)
+                    // She does not get up while she talks to the viewer, or while she watches the screen.
+                    if (_elapsed < _sitSeconds || attention || _watching)
                     {
                         return WanderChange.None;
                     }
 
-                    State = WanderState.Leave;
-                    _elapsed = 0;
-                    return WanderChange.StandUp;
+                    return StartLeave();
 
                 case WanderState.Leave:
                     if (!arrived && _elapsed < WalkLimitSeconds)
@@ -249,12 +307,13 @@ namespace Airi.Stage.Core
                     return WanderChange.EndSit;
 
                 default:
-                    if (attention)
+                    if (stops)
                     {
                         return StartAttend();
                     }
 
-                    if (_elapsed < _restSeconds)
+                    // During the activity, she rests only at the screen place, and as long as the activity goes on.
+                    if (_elapsed < _restSeconds || _watching)
                     {
                         return WanderChange.None;
                     }
@@ -320,6 +379,59 @@ namespace Airi.Stage.Core
 
             place = free[Math.Min(free.Count - 1, (int)(_random() * free.Count))];
             return true;
+        }
+
+        /// <summary>
+        /// Acts on a start or an end of the activity. During the activity, she goes to the screen place from anywhere
+        /// else, and from another seat she gets up first.
+        ///
+        /// Returns:
+        /// - The change of this frame, or <see cref="WanderChange.None"/> when the usual rules go on.
+        /// </summary>
+        private WanderChange FollowActivity()
+        {
+            if (_endActivity)
+            {
+                _endActivity = false;
+                switch (State)
+                {
+                    case WanderState.Approach:
+                    case WanderState.Sit:
+                        return StartLeave();
+                    case WanderState.Walk:
+                        LeavePlace();
+                        StartRest();
+                        return WanderChange.EndWalk;
+                    case WanderState.Rest when _place >= 0:
+                        // She stood at the screen, so the next walk starts at once.
+                        _restSeconds = 0;
+                        break;
+                }
+
+                return WanderChange.None;
+            }
+
+            if (!_watching || (_place == _screenPlace && State != WanderState.Attend) || State == WanderState.Leave)
+            {
+                return WanderChange.None;
+            }
+
+            if (State == WanderState.Approach || State == WanderState.Sit)
+            {
+                return StartLeave();
+            }
+
+            LeavePlace();
+            _place = _screenPlace;
+            return StartWalk(_places[_screenPlace].Stand);
+        }
+
+        /// <summary>Gets her up from a seat, or out of the step to it, and back to the stand point.</summary>
+        private WanderChange StartLeave()
+        {
+            State = WanderState.Leave;
+            _elapsed = 0;
+            return WanderChange.StandUp;
         }
 
         private WanderChange StartWalk(StagePoint destination)

@@ -327,6 +327,18 @@ namespace Airi.Stage
                     _attention = attention.ToViewer;
                     Debug.Log($"[Airi] Attention: {(attention.ToViewer ? "viewer" : "none")}.");
                     break;
+                case CharacterActivityMessage activity:
+                    Debug.Log($"[Airi] Activity: {(activity.WatchingScreen ? "watching-screen" : "none")}.");
+                    if (_walker != null)
+                    {
+                        _walker.SetActivity(activity.WatchingScreen);
+                    }
+                    else if (activity.WatchingScreen)
+                    {
+                        Debug.Log("[Airi] The character does not walk, so she does not go to a screen.");
+                    }
+
+                    break;
                 default:
                     break;
             }
@@ -350,7 +362,7 @@ namespace Airi.Stage
             bool attending = _attention && _walker != null;
             Vector3 camera = _camera.transform.position;
             _walker?.Tick(Time.deltaTime, attending, camera);
-            _character.LookAt(attending ? camera : (Vector3?)null, _avatarRoot);
+            _character.LookAt(_walker?.GazeTarget(attending, camera), _avatarRoot);
             _character.Tick(Time.deltaTime);
 
             // When she sits, her head moves down and back with her hips, so the target of the camera moves too.

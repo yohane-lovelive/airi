@@ -1,5 +1,5 @@
 import type { GestureClipSource } from '@proj-airi/stage-shared/body-motion'
-import type { CharacterAttentionTarget, CharacterFrame } from '@proj-airi/stage-shared/stage-sidecar'
+import type { CharacterActivity, CharacterAttentionTarget, CharacterFrame } from '@proj-airi/stage-shared/stage-sidecar'
 
 import { defineStore } from 'pinia'
 
@@ -17,6 +17,8 @@ export interface StageSidecarOutput {
   sendFrame: (frame: CharacterFrame) => void
   /** Called only when the target changes. A new sidecar has no target, so the output sends the last one again. */
   setAttention: (target: CharacterAttentionTarget) => void
+  /** Called only when the activity changes. A new sidecar has no activity, so the output sends the last one again. */
+  setActivity: (activity: CharacterActivity) => void
 }
 
 /**
@@ -36,5 +38,6 @@ export const useStageSidecarStore = defineStore('stage-sidecar', () => {
     playGesture: async (source: GestureClipSource) => await output?.playGesture(source) ?? false,
     sendFrame: (frame: CharacterFrame) => output?.sendFrame(frame),
     setAttention: (target: CharacterAttentionTarget) => output?.setAttention(target),
+    setActivity: (activity: CharacterActivity) => output?.setActivity(activity),
   }
 })

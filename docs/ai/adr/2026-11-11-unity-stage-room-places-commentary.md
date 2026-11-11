@@ -138,7 +138,7 @@ W2-2 builds it this way. It changes three points above: the move of the hips, th
 The protocol gets one host message, `host.character.activity`, with the payload `{ "activity": "watching-screen" }` or `{ "activity": "none" }`.
 
 - The activity is `watching-screen` while a commentary mission runs. Otherwise it is `none`.
-- A composable of `stage-ui` decides it from `commentaryAt` of the missions store, as `useStageSidecarAttention` decides the attention.
+- `useStageSidecarAttention` of `stage-ui` decides it from `commentaryAt` of the missions store, together with the attention.
 - Electron sends it when it changes. A new `running` status of the sidecar sends it again, as it does for the idle and the attention.
 - On `watching-screen`, Unity takes the first place with the role `screen`. She walks there, sits or stands, and watches the screen.
 - On `none`, she stands up, and the walk through the room continues.
@@ -159,6 +159,24 @@ During the activity, she watches the game, and she turns to the camera only for 
 - During a commentary, the renderer gives `viewer` only while AIRI speaks, and for 2 seconds after that.
 - Thinking does not count during a commentary. Most of its turns start from the screen, not from the owner.
 - This changes the release of 15 seconds of W1-3, only during a commentary. Outside a commentary, the attention stays as before.
+
+W2-3 builds it this way. It changes one point above: one composable decides the activity and the attention.
+
+- The rule of the attention depends on the activity. For example, a release of 15 seconds becomes a release of 2 seconds when a commentary starts.
+- So `useStageSidecarAttention` decides both. Two composables must share this state.
+- A commentary ends at its time limit, so `Stage.vue` checks `commentaryAt` each second.
+- A start of the activity ends a rest, a walk, or an attention at once, and she walks to the screen place.
+- From another seat, she gets up first. From a step to another seat, she steps back first.
+- At a seat of the screen place, she sits as long as the activity goes on. At a screen without a seat, she stands as long.
+- The end of the activity gets her up. A walk to the screen stops, and a stand at a screen ends its rest.
+- During the activity, her body does not turn for the viewer. Her spine takes its share of the turn, as while she sits.
+- `WanderPlan.LooksAtScreen` tells when she watches. She then sits or stands at the screen place, and the attention is `none`.
+- In 2LDK, a test message sent her to the desk at once. She sat, and watched the monitor.
+- A `viewer` turned her face to the camera over her shoulder, and a release turned it back to the monitor.
+- She sat 52 seconds, until the end of the activity. Then she got up at once and walked on.
+- In the app, the owner asked for a commentary, with a PMX model of the owner. She walked to the desk and sat at the monitor.
+- For each line, her face turned to the camera. After each line, it turned back to the monitor. When the commentary ended, she got up and walked on.
+- The owner stopped a commentary and started a new one. So `none` and `watching-screen` came within 9 seconds, and she turned back to the desk.
 
 ### The game on the monitor of the room
 

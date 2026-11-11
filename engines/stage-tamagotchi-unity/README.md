@@ -38,7 +38,7 @@ The player reads these variables from the environment of AIRI. Set them before y
 | `AIRI_UNITY_STAGE_GRADE=backlit`, `live`, or `cinema` | `--airi-grade=...` | Sets the light and the camera effects. |
 | `AIRI_UNITY_STAGE_ROOM=<folder>` | `--airi-room=<folder>` | Shows the character in an imported room. |
 | `AIRI_UNITY_STAGE_DISPLAY=<number>` | `--airi-display=<number>` | Moves the window to a display, for example a second monitor beside a game. The player log lists the numbers. |
-| `AIRI_UNITY_STAGE_WANDER=1` | `--airi-wander` | Lets the character walk through the room. It needs a room with a NavMesh. While AIRI thinks or speaks, and for 15 seconds after that, she stops and turns to the camera. One rest in three goes to a place of the room, where she sits or stands. |
+| `AIRI_UNITY_STAGE_WANDER=1` | `--airi-wander` | Lets the character walk through the room. It needs a room with a NavMesh. While AIRI thinks or speaks, and for 15 seconds after that, she stops and turns to the camera. One rest in three goes to a place of the room, where she sits or stands. During a commentary, she watches the first screen place of the room. Then only her upper body turns, while AIRI speaks and for 2 seconds after that. |
 | `AIRI_UNITY_STAGE_PLACE=<name>` | `--airi-place=<name>` | Sends the walking character to a place of `room.json` after her first rest, for example for a check of a seat. |
 
 Move the camera with the mouse in the Unity window:

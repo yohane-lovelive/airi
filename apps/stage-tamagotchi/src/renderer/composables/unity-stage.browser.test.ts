@@ -238,6 +238,46 @@ describe('the Unity stage in the renderer', () => {
       expect(signals).toHaveLength(2)
     })
 
+    it('sends an activity in a form that the protocol accepts', async () => {
+      const { sidecar } = await mount(useUnityStageBridge)
+
+      sidecar.setActivity('watching-screen')
+
+      await vi.waitFor(() => expect(signals).toHaveLength(1))
+      expect(signals[0]).toEqual({ type: 'host.character.activity', payload: { activity: 'watching-screen' } })
+      expect(() => parseHostMessage(signals[0])).not.toThrow()
+    })
+
+    it('sends a watching-screen activity again to a sidecar that comes back', async () => {
+      const { sidecar } = await mount(useUnityStageBridge)
+      emitStatus(statusOf('running'))
+      sidecar.setActivity('watching-screen')
+      await vi.waitFor(() => expect(signals).toHaveLength(1))
+
+      emitStatus(statusOf('starting'))
+      await nextTick()
+      emitStatus(statusOf('running'))
+
+      await vi.waitFor(() => expect(signals).toHaveLength(2))
+      expect(signals[1]).toEqual({ type: 'host.character.activity', payload: { activity: 'watching-screen' } })
+    })
+
+    it('does not send an ended activity to a sidecar that comes back', async () => {
+      const { sidecar } = await mount(useUnityStageBridge)
+      emitStatus(statusOf('running'))
+      sidecar.setActivity('watching-screen')
+      sidecar.setActivity('none')
+      await vi.waitFor(() => expect(signals).toHaveLength(2))
+
+      emitStatus(statusOf('starting'))
+      await nextTick()
+      emitStatus(statusOf('running'))
+      await nextTick()
+      await new Promise(resolve => setTimeout(resolve, 50))
+
+      expect(signals).toHaveLength(2)
+    })
+
     it.each(BUILT_IN_GESTURES.map(gesture => [gesture.id, gesture] as const))('sends the built-in gesture %s in a form that the protocol accepts', async (id, gesture) => {
       const { sidecar } = await mount(useUnityStageBridge)
 

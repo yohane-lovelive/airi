@@ -1,5 +1,5 @@
 import type { GestureClipSource } from '@proj-airi/stage-shared/body-motion'
-import type { CharacterAttentionTarget } from '@proj-airi/stage-shared/stage-sidecar'
+import type { CharacterActivity, CharacterAttentionTarget } from '@proj-airi/stage-shared/stage-sidecar'
 import type { DisplayModel } from '@proj-airi/stage-ui/stores/display-models'
 
 import type { ElectronStageSidecarStatus } from '../../shared/eventa'
@@ -55,9 +55,9 @@ export function syncUnityStageRenderer(
  * It lives on the page that owns the stage, not in Settings. So a change of the character reaches the sidecar while
  * Settings is closed.
  *
- * Owned state: the output of `useStageSidecarStore`, the last known status of the sidecar, and the last attention target.
- * All end with the scope of the page. A new `running` status sends the idle, the model, and a `viewer` attention again,
- * because a new sidecar has none of them.
+ * Owned state: the output of `useStageSidecarStore`, the last known status of the sidecar, the last attention target,
+ * and the last activity. All end with the scope of the page. A new `running` status sends the idle, the model, a
+ * `viewer` attention, and a `watching-screen` activity again, because a new sidecar has none of them.
  */
 export function useUnityStageBridge() {
   const { t } = useI18n()
@@ -79,8 +79,15 @@ export function useUnityStageBridge() {
   /** The renderer sends only changes, so this copy lets a new sidecar learn the current target. */
   let attention: CharacterAttentionTarget = 'none'
 
+  /** The same for the activity. */
+  let activity: CharacterActivity = 'none'
+
   function sendAttention() {
     context.value.emit(unityStageSignal, { type: 'host.character.attention', payload: { target: attention } })
+  }
+
+  function sendActivity() {
+    context.value.emit(unityStageSignal, { type: 'host.character.activity', payload: { activity } })
   }
 
   async function playGesture(source: GestureClipSource) {
@@ -122,6 +129,10 @@ export function useUnityStageBridge() {
     setAttention(target) {
       attention = target
       sendAttention()
+    },
+    setActivity(next) {
+      activity = next
+      sendActivity()
     },
   })
 
@@ -212,9 +223,11 @@ export function useUnityStageBridge() {
     sidecarState.value = status.state
     syncUnityStageRenderer(settingsStore, status)
 
-    // A new sidecar starts with `none`, so only `viewer` needs to go again.
+    // A new sidecar starts with `none`, so only `viewer` and `watching-screen` need to go again.
     if (started && attention === 'viewer')
       sendAttention()
+    if (started && activity === 'watching-screen')
+      sendActivity()
   }
 
   const disposeStatusListener = context.value.on(unityStageStatusChanged, (event) => {

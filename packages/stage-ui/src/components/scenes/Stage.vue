@@ -22,7 +22,7 @@ import { ThreeScene, useModelStore as useThreeModelStore } from '@proj-airi/stag
 import { animations } from '@proj-airi/stage-ui-three/assets/vrm'
 import { createQueue } from '@proj-airi/stream-kit'
 import { Callout } from '@proj-airi/ui'
-import { useBroadcastChannel, useEventListener } from '@vueuse/core'
+import { useBroadcastChannel, useEventListener, useTimestamp } from '@vueuse/core'
 // import { createTransformers } from '@xsai-transformers/embed'
 // import embedWorkerURL from '@xsai-transformers/embed/worker?worker&url'
 // import { embed } from '@xsai/embed'
@@ -46,6 +46,7 @@ import { useBackgroundStore } from '../../stores/background'
 import { useChatStore } from '../../stores/chat'
 import { useChatSessionStore } from '../../stores/chat/session-store'
 import { useSharedLive2DExpressionPreview } from '../../stores/live2d'
+import { useMissionsStore } from '../../stores/missions'
 import { useAiriCardStore } from '../../stores/modules/airi-card'
 import { useSpeechStore } from '../../stores/modules/speech'
 import { useMotionGenerationStore } from '../../stores/motion-generation'
@@ -509,10 +510,16 @@ useStageSidecarFrames({
   isBodyMotionEnabled: () => bodyMotionEnabled.value,
   send: frame => stageSidecar.sendFrame(frame),
 })
+// A commentary ends at its time limit, so the activity checks the clock each second.
+const missionsStore = useMissionsStore()
+const missionClock = useTimestamp({ interval: 1000 })
 useStageSidecarAttention({
   active: () => stageModelRenderer.value === 'unity',
-  isEngaged: () => presenceBubble.value.thinking || nowSpeaking.value,
+  isThinking: () => presenceBubble.value.thinking,
+  isSpeaking: () => nowSpeaking.value,
+  isCommenting: () => missionsStore.commentaryAt(missionClock.value) !== undefined,
   send: target => stageSidecar.setAttention(target),
+  sendActivity: activity => stageSidecar.setActivity(activity),
 })
 // setTargetAtTime smooths slider drags into the gain, so volume changes do not click.
 watch(speechVolume, (volume) => {

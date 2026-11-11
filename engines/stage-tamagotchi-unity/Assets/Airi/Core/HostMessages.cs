@@ -199,6 +199,24 @@ namespace Airi.Stage.Core
         }
     }
 
+    /// <summary>
+    /// What the character does. The sidecar keeps the last value until the next message, and a new sidecar starts with
+    /// <c>none</c>. The room of the sidecar decides where she does it.
+    /// </summary>
+    public sealed class CharacterActivityMessage : HostMessage
+    {
+        /// <summary>
+        /// True for <c>watching-screen</c>: a commentary runs, and she goes to a screen of the room to watch it. False for
+        /// <c>none</c>: she returns to her own activity.
+        /// </summary>
+        public readonly bool WatchingScreen;
+
+        public CharacterActivityMessage(bool watchingScreen)
+        {
+            WatchingScreen = watchingScreen;
+        }
+    }
+
     /// <summary>Electron main stops the sidecar. The sidecar exits by itself.</summary>
     public sealed class ShutdownMessage : HostMessage
     {

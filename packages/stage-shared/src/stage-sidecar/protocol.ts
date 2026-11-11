@@ -100,6 +100,17 @@ const characterAttentionSchema = strictObject({
   target: picklist(['viewer', 'none']),
 })
 
+/**
+ * What the character does. The renderer decides it, and the sidecar decides where in its room she does it. The sidecar
+ * keeps the last value until the next message.
+ *
+ * - `watching-screen`: a commentary runs. She goes to a screen of the room and watches it.
+ * - `none`: she returns to her own activity, for example a walk through the room.
+ */
+const characterActivitySchema = strictObject({
+  activity: picklist(['watching-screen', 'none']),
+})
+
 /** What Electron main sends to a display sidecar. A sidecar answers an invalid message with `character.error`. */
 export const HostMessageSchema = variant('type', [
   strictObject({
@@ -138,6 +149,10 @@ export const HostMessageSchema = variant('type', [
   strictObject({
     type: literal('host.character.attention'),
     payload: characterAttentionSchema,
+  }),
+  strictObject({
+    type: literal('host.character.activity'),
+    payload: characterActivitySchema,
   }),
   strictObject({
     type: literal('host.shutdown'),
@@ -183,6 +198,7 @@ export type SidecarMessage = InferOutput<typeof SidecarMessageSchema>
 export type CharacterGesture = InferOutput<typeof characterGestureSchema>
 export type CharacterFrame = InferOutput<typeof characterFrameSchema>
 export type CharacterAttentionTarget = InferOutput<typeof characterAttentionSchema>['target']
+export type CharacterActivity = InferOutput<typeof characterActivitySchema>['activity']
 
 /**
  * Parses a message for a sidecar.

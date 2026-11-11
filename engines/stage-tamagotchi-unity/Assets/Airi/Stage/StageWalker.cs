@@ -148,6 +148,39 @@ namespace Airi.Stage
         /// <inheritdoc/>
         public bool CanSit => _character.CanSit;
 
+        /// <summary>Starts or ends the activity of watching a screen. <see cref="WanderPlan.SetWatchingScreen"/> gives the rules.</summary>
+        public void SetActivity(bool watchingScreen)
+        {
+            if (!_plan.SetWatchingScreen(watchingScreen))
+            {
+                Debug.LogWarning("[Airi] The room has no screen place, so the character does not watch a screen.");
+                return;
+            }
+
+            if (watchingScreen)
+            {
+                Debug.Log($"[Airi] Watch the screen of {_plan.ScreenPlace.Name}.");
+            }
+        }
+
+        /// <summary>
+        /// Gives the point for her head and her eyes: the camera during an attention, or the screen of her place while
+        /// she watches it.
+        ///
+        /// Returns:
+        /// - The point, or null to let the head and the eyes follow the clips.
+        /// </summary>
+        public Vector3? GazeTarget(bool attention, Vector3 camera)
+        {
+            if (attention)
+            {
+                return camera;
+            }
+
+            StageRoomScreen screen = _plan.Place?.Screen;
+            return _plan.LooksAtScreen && screen != null ? ToVector(screen.Center) : (Vector3?)null;
+        }
+
         /// <summary>
         /// Advances the plan, moves the character, and gives the walk its speed. It runs once each frame.
         /// </summary>
@@ -249,8 +282,9 @@ namespace Airi.Stage
                 }
             }
 
+            // During the activity, she does not stop for the viewer, so only her upper body turns.
             bool offNavMesh = _plan.State == WanderState.Approach || _plan.State == WanderState.Sit || _plan.State == WanderState.Leave;
-            _character.SetBodyFixed(offNavMesh);
+            _character.SetBodyFixed(offNavMesh || _plan.WatchingScreen);
             _character.SetTalking(attention && _plan.State == WanderState.Sit);
             _character.Move(_agent.enabled ? _agent.velocity.magnitude : _stepSpeed);
         }

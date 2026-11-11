@@ -357,6 +357,7 @@ describe('createUnityStageManager', () => {
       message.type === 'host.character.expression'
       || message.type === 'host.character.frame'
       || message.type === 'host.character.attention'
+      || message.type === 'host.character.activity'
       || (message.type === 'host.character.gesture' && message.payload?.kind === 'keys'))
 
     it('forwards each signal of the protocol fixtures as it is', async () => {
