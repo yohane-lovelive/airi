@@ -95,7 +95,7 @@ function describeMission(mission: MissionInstance) {
   if (mission.template === 'small-talk')
     return `- ${mission.id}: small-talk${mission.values.solo ? ' (solo)' : ''}, until ${formatTimePrefix(mission.values.endsAt).trim()}`
   if (mission.template === 'commentary')
-    return `- ${mission.id}: commentary on ${mission.values.app}, until ${formatTimePrefix(mission.values.endsAt).trim()} or until the window closes`
+    return `- ${mission.id}: commentary on ${mission.values.app}, until ${formatTimePrefix(mission.values.endsAt).trim()} or until no window of the app is open for 5 minutes`
   if (mission.template === 'watch')
     return `- ${mission.id}: watch "${mission.values.condition}" in ${mission.values.app} (${mission.values.region}), until ${formatTimePrefix(mission.values.endsAt).trim()}`
   const repeat = describeRepeat(mission.values.repeat)

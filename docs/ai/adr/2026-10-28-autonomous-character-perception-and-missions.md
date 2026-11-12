@@ -322,12 +322,26 @@ A new event can interrupt the current speech. These rules keep the speech cohere
 Step 3-5a built commentary and interruptions as follows.
 
 - **Start.** The model starts the `commentary` template with `builtIn_startMission`: the app of the window to watch, empty for the app in front, and 5 to 180 minutes, 60 by default. Code refuses it while autonomous speech or screen perception is off, and while another foreground mission runs.
-- **Target window.** The desktop captures the front window of the app only. `get-windows` lists the open windows, and their Windows handle names the window source of `desktopCapturer`. Frames pause while the app is not in front. On the web, the shared window is the target.
-- **End.** The commentary ends when its window closes, as the ADR says, with the reason `target-closed`. The capture track ends, or a check every 5 seconds finds no window. It also ends when the owner says stop, on a request for quiet, and at its time limit. The time limit is a guard that the ADR did not name. Time away does not end it, because the owner can watch a video without input.
+- **Target window.** The desktop captures one window of the app only. `get-windows` lists the open windows, and their Windows handle names the window source of `desktopCapturer`. Frames pause while the captured window is not in front. On the web, the shared window is the target.
+- **End.** The commentary ends with the reason `target-closed` when no window of its app is open. The capture follows the windows of the app, as the change of 2026-11-12 below tells. It also ends when the owner says stop, on a request for quiet, and at its time limit. The time limit is a guard that the ADR did not name. Time away does not end it, because the owner can watch a video without input.
 - **Pace.** The policy switches to its commentary mode. Its interval follows the screen activity: 2 times on a still screen down to 0.5 times on a moving one, from the 45 seconds of the mode.
 - **Images.** While a commentary runs, its own budget replaces the normal one, 120 images each hour by default. A commentary turn sends two frames at most. The usage purpose is `commentary`.
 - **Interruptions.** An event of 0.8 or more that is 0.3 above the event of the current line interrupts the line. Below 0.95, the playing clip, one sentence, ends first, and the rest is dropped. From 0.95, the line stops at once with the fade of the voice controller. Another interruption waits 15 seconds. The timeline notes the cut line.
 - `stopAfterCurrent` of the playback groups in `pipelines-audio`, and `afterCurrentClip` of the voice controller and the speech bus, let the current sentence end.
+
+A live check on 2026-11-12 ran a commentary of League of Legends. The game opens a new window for each match, and it shows its lobby in another window. The commentary ended with its first match, so the next match had no commentary. This changes the end rule of this ADR: a commentary now follows its app, not one window.
+
+- Another window of the app that stays in front for 2 seconds takes the capture. The window in front and the captured window have the same handle, so the runner can tell them apart.
+- Until the capture moves, the frames of the app do not count, because they show the old window.
+- When the captured window closes, the runner looks for another window of the app every 3 seconds. Without one for 5 minutes, the commentary ends with `target-closed`.
+- While the runner looks, the commentary sees nothing, so it does not speak.
+- A watch uses the same capture, so it follows the windows of its app in the same way.
+
+A second live check on 2026-11-13 ran one commentary through the end of a match.
+
+- At the end of the match, the runner started to look for another window, as planned. But 2 minutes later, no lobby window of the game was open. An earlier match showed the lobby 78 seconds after its end. The first grace time of 60 seconds was too short, so it is now 5 minutes.
+- Twice, the owner asked for commentary after an earlier one ended, and the model did not start one. It answered that it did not see the screen. The template now says that the character sees the screen only while a commentary runs. It also tells the model to start a new commentary when none runs.
+- The commentary spoke 5 lines in about 6 minutes. A turn took 20 to 77 seconds before the voice, and running turns took half of the time. Each call to `mimo-v2.6-pro` sent about 25,600 input tokens with 2 images. It returned 441 to 3,756 output tokens for a line of one or two sentences, so the model spent the time on reasoning.
 
 ### Timeline and scene state
 
@@ -370,7 +384,7 @@ The building blocks:
 - **Trigger:** a time, a screen condition, an app start, or a request from the owner.
 - **Lens:** the target window, a region of interest, and what to look for.
 - **Speech style:** the mode, `mustSpeak`, and the length of one line.
-- **End rule:** after one run, when the target window closes, when a condition holds, or at a time limit.
+- **End rule:** after one run, when the target app has no open window, when a condition holds, or at a time limit.
 
 A template is a recipe with a `mission` block. It uses the keywords, the approval, the proposals, the storage, and the Settings page of recipes.
 A recipe runs in the background without a voice. A mission runs in the foreground with a voice, so it has its own run path.
@@ -380,7 +394,7 @@ The built-in templates:
 | Template | Trigger | Lens | Speech style | End rule |
 | --- | --- | --- | --- | --- |
 | `reminder` | A time | None | `mustSpeak` | After one run |
-| `commentary` | Owner request | Target window | Commentary mode | When the target window closes |
+| `commentary` | Owner request | Target window | Commentary mode | When no window of the target app is open for 5 minutes |
 | `watch` | A screen condition | Target window and region | `mustSpeak` | When the condition holds |
 | `small-talk` | Owner request, or a quiet owner nearby | None | Idle mode, more often | When the owner leaves, says stop, or at a time limit |
 | `greeting` | App start | None | Normal | After one run |
@@ -416,7 +430,7 @@ Step 3-5b built the `watch` template as follows.
 - **One at a time.** One watch runs at a time, so the capture has one target. A watch is a background mission, so it runs beside small talk or commentary. A commentary keeps the capture, and the watch then checks only while its app is in front.
 - **Check turn.** The watch runner checks at once, then on a change of 0.03 in the region of the thumbnails, at most every 10 seconds, and at least every 60 seconds. It sends a crop of 512 pixels at most to the chat model of the conversation, outside the conversation, with the usage purpose `watch`. The model answers with `report_watch`, and the call stops after the answer. Each check counts one image in the image budget, and checks wait while the budget is empty.
 - **Yes.** A "yes" sends a `mustSpeak` notice with the reminder fallbacks: one more try, then a fixed text. The watch ends as `done` with the reason `condition`, and the timeline notes it.
-- **End.** The watch also ends when its window closes, when the owner stops it, and at its time limit. The time limit is a guard that the ADR did not name.
+- **End.** The watch also ends when no window of its app is open for 5 minutes. It ends when the owner stops it, and at its time limit. The time limit is a guard that the ADR did not name.
 - IndexedDB keeps the instances on the device, one record for each instance, in the shape of the recipe records.
 - The renderer leader checks the clock.
 
@@ -885,4 +899,5 @@ The owner asked for this work between the steps. It is not in the step table, bu
 ## Open work
 
 - Choose the native module for the capture of one process with the owner. It waits with game audio, step 5-1.
+- Make commentary turns faster. On 2026-11-12, a match of about 16 minutes got only 4 turns, and the pace of the settings gives 10 to 40. The check of 2026-11-13 found long reasoning of the screen model. With its default request form, the OpenAI-compatible provider sends no reasoning field. The reasoning level of autonomous speech then does not reach the server.
 - [The idea notes](../context/autonomy-ideas.md) keep the features that the owner held for later. On 2026-11-04 the owner held the CORS solution for the production web build there, and chose to leave a realtime API out of a later ADR for now.

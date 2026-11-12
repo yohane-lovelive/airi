@@ -197,7 +197,7 @@ export const MISSION_TEMPLATES: readonly MissionTemplate[] = [
   },
   {
     name: 'commentary',
-    description: 'Watch one window, for example a game or a video, and comment on it in short lines, when the owner asks for it. It ends when the window closes, at its time limit, or when the owner asks to stop or for quiet.',
+    description: 'Watch the window of one app, for example a game or a video, and comment on it in short lines, when the owner asks. You see the screen only while a commentary runs. When the owner asks for commentary and none runs, start one, also after an earlier one ended. It follows the next window of the app, for example the next match. It ends at its time limit, or when the owner asks to stop or for quiet. It also ends when no window of the app is open for 5 minutes.',
     values: '{ "app": the app of the window to watch, "" for the app in front, "minutes": 5-180, 60 when the owner names no time }',
   },
   {

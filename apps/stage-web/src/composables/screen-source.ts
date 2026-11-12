@@ -28,6 +28,6 @@ export function createPageScreenSource(): ScreenSource {
   return {
     supported: canShareScreen(),
     needsGesture: true,
-    start: () => navigator.mediaDevices.getDisplayMedia(options),
+    start: async () => ({ stream: await navigator.mediaDevices.getDisplayMedia(options) }),
   }
 }

@@ -108,7 +108,8 @@ const LASTING_WAIT_REASONS: readonly InitiativeWaitReason[] = ['quiet-hours', 'o
  * - While perception runs, code writes timeline notes: app switches, owner messages, and mission starts and ends. A
  *   drive turn with the screen gives the timeline of the conversation to the model, which adds notes with markers.
  * - Commentary that the owner asked for switches the policy to its commentary mode, with a pace that follows the screen
- *   activity. The perception runner then captures the window of its app. When that window closes, the commentary ends.
+ *   activity. The perception runner then captures the window of its app, and it follows the next window of the app.
+ *   When no window of the app is open for 5 minutes, the commentary ends.
  *   A very large screen event interrupts the commentary line that plays: the sentence ends first, or the largest events
  *   cut it at once. The timeline notes the cut line.
  * - The open intentions add drive, and the situation block lists them. The owner's temporary changes, for example a

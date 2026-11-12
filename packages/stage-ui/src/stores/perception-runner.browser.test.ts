@@ -17,7 +17,10 @@ import { usePerceptionStatusStore } from './perception-status'
 const contexts: Array<{ pinia: ReturnType<typeof createPinia>, runtime: SyncedPiniaRuntime }> = []
 const timers: ReturnType<typeof setInterval>[] = []
 
-/** A screen that is a canvas. Its stream is live, so the runner takes real frames from it. */
+/**
+ * A screen that is a canvas. Its stream is live, so the runner takes real frames from it. A capture of an app takes the
+ * window that the runner names, or else the window in front, as the desktop does.
+ */
 function canvasSource(options: { foreground?: () => ForegroundWindow, needsGesture?: boolean, steady?: boolean, windowOpen?: () => boolean } = {}) {
   const canvas = document.createElement('canvas')
   canvas.width = 320
@@ -30,10 +33,11 @@ function canvasSource(options: { foreground?: () => ForegroundWindow, needsGestu
   const source: ScreenSource = {
     supported: true,
     needsGesture: options.needsGesture ?? false,
-    start: vi.fn(async () => {
+    start: vi.fn(async (start?: { app?: string, windowId?: number }) => {
       const stream = canvas.captureStream(10)
       streams.push(stream)
-      return stream
+      const windowId = start?.app ? start.windowId ?? options.foreground?.().id : undefined
+      return { stream, ...(windowId !== undefined ? { windowId } : {}) }
     }),
     ...(options.foreground ? { foreground: async () => options.foreground!() } : {}),
     ...(options.windowOpen ? { windowOpen: async () => options.windowOpen!() } : {}),
@@ -83,6 +87,7 @@ describe('usePerceptionRunnerStore', { timeout: 60_000 }, () => {
   })
 
   afterEach(() => {
+    vi.useRealTimers()
     for (const timer of timers.splice(0))
       clearInterval(timer)
     for (const context of contexts.splice(0)) {
@@ -158,6 +163,7 @@ describe('usePerceptionRunnerStore', { timeout: 60_000 }, () => {
 
     // A share that the owner stops in the browser ends the track. `stop` fires no event, so the test dispatches it.
     const [track] = screen.streams[0].getVideoTracks()
+    expect(screen.source.start).toHaveLastResolvedWith({ stream: screen.streams[0] })
     track.stop()
     track.dispatchEvent(new Event('ended'))
     await expect.poll(() => status.status.state).toBe('ended')
@@ -177,8 +183,8 @@ describe('usePerceptionRunnerStore', { timeout: 60_000 }, () => {
     await expect.poll(() => status.status.events).toHaveLength(1)
   })
 
-  it('captures the target window of a commentary, sees it only in front, and reports its close', async () => {
-    let window: ForegroundWindow = { title: 'Match', app: 'Game' }
+  it('captures the target window of a commentary, sees it only in front, and reports its close after the grace time', async () => {
+    let window: ForegroundWindow = { id: 1, title: 'Match', app: 'Game' }
     let open = true
     const screen = canvasSource({ foreground: () => window, windowOpen: () => open })
     const { runner, perception, status } = await createLeader(screen.source)
@@ -193,15 +199,76 @@ describe('usePerceptionRunnerStore', { timeout: 60_000 }, () => {
     await expect.poll(() => status.status, { timeout: 15_000 }).toMatchObject({ target: 'Game', targetInFront: true })
     expect(runner.targetInView()).toBe(true)
 
-    window = { title: 'Notes', app: 'Editor' }
+    window = { id: 2, title: 'Notes', app: 'Editor' }
     const before = runner.frames().length
     await expect.poll(() => status.status.targetInFront, { timeout: 15_000 }).toBe(false)
     expect(runner.targetInView()).toBe(false)
     await new Promise(resolve => setTimeout(resolve, 1_200))
     expect(runner.frames().length).toBeLessThanOrEqual(before + 1)
 
+    // A game can open its next window soon, so the target waits for the grace time before it counts as closed.
     open = false
+    await expect.poll(() => runner.running(), { timeout: 15_000 }).toBe(false)
+    await new Promise(resolve => setTimeout(resolve, 3_500))
+    expect(closed).toEqual([])
+
+    // The grace time is 5 minutes. Only the clock moves past it, and the search ticks stay real.
+    vi.useFakeTimers({ toFake: ['Date'], now: Date.now() + 10 * 60_000 })
     await expect.poll(() => closed, { timeout: 15_000 }).toEqual(['Game'])
+  })
+
+  it('moves the capture to another window of the target app that stays in front, and keeps the commentary', async () => {
+    let window: ForegroundWindow = { id: 1, title: 'Lobby', app: 'Game' }
+    const screen = canvasSource({ foreground: () => window, windowOpen: () => true })
+    const { runner, perception, status } = await createLeader(screen.source)
+    const closed: string[] = []
+    runner.onTargetClosed(app => closed.push(app))
+    perception.enabled = true
+    await expect.poll(() => status.status.state, { timeout: 15_000 }).toBe('running')
+    runner.setTarget('Game')
+    await expect.poll(() => runner.targetInView(), { timeout: 15_000 }).toBe(true)
+
+    // The next match opens a new window. Until the capture moves, the frames show the lobby, so they do not count.
+    window = { id: 2, title: 'Match', app: 'Game' }
+    await new Promise(resolve => setTimeout(resolve, 1_000))
+    expect(runner.targetInView()).toBe(false)
+    expect(screen.source.start).not.toHaveBeenCalledWith({ app: 'Game', windowId: 2 })
+
+    await expect.poll(() => screen.source.start, { timeout: 15_000 }).toHaveBeenLastCalledWith({ app: 'Game', windowId: 2 })
+    await expect.poll(() => runner.targetInView(), { timeout: 15_000 }).toBe(true)
+    await expect.poll(() => runner.frames().length, { timeout: 15_000 }).toBeGreaterThan(0)
+    expect(screen.source.start).toHaveBeenCalledTimes(3)
+    expect(closed).toEqual([])
+  })
+
+  it('looks for another window of the target app after its window closes, and captures it', async () => {
+    let window: ForegroundWindow = { id: 1, title: 'Match', app: 'Game' }
+    let open = true
+    const screen = canvasSource({ foreground: () => window, windowOpen: () => open })
+    const { runner, perception, status } = await createLeader(screen.source)
+    const closed: string[] = []
+    runner.onTargetClosed(app => closed.push(app))
+    perception.enabled = true
+    await expect.poll(() => status.status.state, { timeout: 15_000 }).toBe('running')
+    runner.setTarget('Game')
+    await expect.poll(() => runner.frames().length, { timeout: 15_000 }).toBeGreaterThan(0)
+
+    // The match ends: its window closes, and the lobby opens a few seconds later.
+    open = false
+    const [track] = screen.streams.at(-1)!.getVideoTracks()
+    track.stop()
+    track.dispatchEvent(new Event('ended'))
+    await expect.poll(() => runner.running()).toBe(false)
+    expect(runner.targetInView()).toBe(false)
+    await new Promise(resolve => setTimeout(resolve, 1_000))
+    window = { id: 2, title: 'Lobby', app: 'Game' }
+    open = true
+
+    await expect.poll(() => runner.frames().length, { timeout: 15_000 }).toBeGreaterThan(0)
+    expect(runner.targetInView()).toBe(true)
+    expect(screen.source.start).toHaveBeenLastCalledWith({ app: 'Game' })
+    expect(screen.source.start).toHaveLastResolvedWith({ stream: screen.streams.at(-1), windowId: 2 })
+    expect(closed).toEqual([])
   })
 
   it('gives screen frames for a sidecar only during a commentary, while the watched window is in view', async () => {

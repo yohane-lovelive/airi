@@ -1,6 +1,6 @@
 import type { createContext } from '@moeru/eventa/adapters/electron/main'
 
-import type { ForegroundWindowInfo, OpenWindowInfo } from '../../../shared/eventa'
+import type { DesktopWindowInfo } from '../../../shared/eventa'
 
 import { useLogg } from '@guiiai/logg'
 import { defineInvokeHandler } from '@moeru/eventa'
@@ -21,14 +21,14 @@ export function createForegroundWindowService(params: { context: ReturnType<type
   // Perception asks twice a second, so a broken reader logs once.
   let warned = false
 
-  defineInvokeHandler(params.context, electronForegroundWindow, async (): Promise<ForegroundWindowInfo | undefined> => {
+  defineInvokeHandler(params.context, electronForegroundWindow, async (): Promise<DesktopWindowInfo | undefined> => {
     try {
       reader ??= import('get-windows')
       const { activeWindow } = await reader
       const window = await activeWindow({ accessibilityPermission: false, screenRecordingPermission: false })
       if (!window)
         return undefined
-      return { title: window.title, app: window.owner.name, path: window.owner.path }
+      return { id: window.id, title: window.title, app: window.owner.name, path: window.owner.path }
     }
     catch (error) {
       if (!warned)
@@ -38,7 +38,7 @@ export function createForegroundWindowService(params: { context: ReturnType<type
     }
   })
 
-  defineInvokeHandler(params.context, electronOpenWindows, async (): Promise<OpenWindowInfo[]> => {
+  defineInvokeHandler(params.context, electronOpenWindows, async (): Promise<DesktopWindowInfo[]> => {
     try {
       reader ??= import('get-windows')
       const { openWindows } = await reader

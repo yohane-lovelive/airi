@@ -1,5 +1,10 @@
 /** The window in front, as the device reports it. */
 export interface ForegroundWindow {
+  /**
+   * The handle of the window, where the device tells it. The window of a capture has the same number, so a commentary
+   * can tell another window of its app from its own.
+   */
+  readonly id?: number
   readonly title: string
   /** The name of the app, for example "Google Chrome". */
   readonly app: string

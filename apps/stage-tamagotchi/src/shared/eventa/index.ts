@@ -43,20 +43,21 @@ export const electronOpenEditor = defineInvokeEventa<void>('eventa:invoke:electr
 export const electronOpenSettings = defineInvokeEventa<void, { route?: string }>('eventa:invoke:electron:windows:settings:open')
 /** Seconds since the last keyboard or mouse input on the whole system, from `powerMonitor.getSystemIdleTime()`. */
 export const electronSystemIdleSeconds = defineInvokeEventa<number>('eventa:invoke:electron:power-monitor:system-idle-seconds')
-/** The window in front on the whole system: its title, and the name and path of its app. Screen perception skips excluded windows with it. */
-export interface ForegroundWindowInfo {
+/** One window on the whole system: its handle, its title, and the name and path of its app. */
+export interface DesktopWindowInfo {
+  /** On Windows, the window handle. The window sources of `desktopCapturer` name the same number. */
+  id: number
   title: string
   app: string
   path: string
 }
-/** The window in front, from `get-windows`. Undefined when the system tells no window, for example on Wayland. */
-export const electronForegroundWindow = defineInvokeEventa<ForegroundWindowInfo | undefined>('eventa:invoke:electron:foreground-window')
-/** One open window. On Windows, `id` is the window handle, which the window sources of `desktopCapturer` also name. */
-export interface OpenWindowInfo extends ForegroundWindowInfo {
-  id: number
-}
+/**
+ * The window in front, from `get-windows`. Undefined when the system tells no window, for example on Wayland.
+ * Screen perception skips excluded windows with it, and a commentary follows the window of its app with it.
+ */
+export const electronForegroundWindow = defineInvokeEventa<DesktopWindowInfo | undefined>('eventa:invoke:electron:foreground-window')
 /** The open windows, front to back, from `get-windows`. Commentary finds its target window with it. */
-export const electronOpenWindows = defineInvokeEventa<OpenWindowInfo[]>('eventa:invoke:electron:open-windows')
+export const electronOpenWindows = defineInvokeEventa<DesktopWindowInfo[]>('eventa:invoke:electron:open-windows')
 /** One frame of a screen recording: the JPEG bytes, the base64 grayscale thumbnail, and the app in front. */
 export interface PerceptionRecordedFrame {
   at: number

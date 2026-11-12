@@ -23,8 +23,24 @@ import { usePerceptionStatusStore } from './perception-status'
 const PUBLISH_INTERVAL_MS = 1_000
 /** The status keeps this many recent screen events for the inspector. */
 const RECENT_EVENT_COUNT = 20
-/** While a target window is set, the runner checks this often that the window is still open. */
-const TARGET_CHECK_INTERVAL_MS = 5_000
+/**
+ * How a commentary keeps the window of its app. A game can open a new window for each match, and it can show its lobby
+ * in another window between matches. A live check on 2026-11-12 with League of Legends found a commentary that ended
+ * with its first match, so the capture now follows the windows of the app.
+ */
+const TARGET_WINDOW_LIMITS = {
+  /** While a target window is set, the runner checks this often that a window of the app is still open. */
+  checkIntervalMs: 5_000,
+  /** Another window of the app must stay in front this long, and the capture then moves to it. */
+  followHoldMs: 2_000,
+  /** After the window closed, the runner looks for another window of the app this often. */
+  searchIntervalMs: 3_000,
+  /**
+   * After the window closed, the runner looks this long. Only then the target counts as closed. A live check on
+   * 2026-11-13 found no lobby window of League of Legends 2 minutes after a match, so 60 seconds was too short.
+   */
+  lostGraceMs: 5 * 60_000,
+}
 
 /**
  * Captures the screen on the renderer leader and keeps the frames of the last minute in memory.
@@ -38,8 +54,10 @@ const TARGET_CHECK_INTERVAL_MS = 5_000
  * - When the shared screen or window goes away, the capture ends, and the owner starts it again.
  * - The screen detectors read each frame and its app in front. They give screen events and an activity level. A skipped
  *   frame makes them settle again, so the change around an excluded window is no event.
- * - A commentary sets a target app. The desktop then captures the front window of that app only, and it takes frames
- *   only while that app is in front. When the window closes, the target-closed listeners hear it.
+ * - A commentary sets a target app. The desktop then captures one window of that app, and it takes frames only while
+ *   that window is in front. Another window of the app that stays in front for 2 seconds takes the capture. When the
+ *   window closes, the runner looks for another window of the app for 5 minutes. Only then the target-closed
+ *   listeners hear it.
  * - The decision turn of the initiative runner reads the frames and the events.
  * - While the owner asks for it, the desktop app records each frame of the ring, the screen events, and the owner
  *   messages to the disk for replay evaluation. Excluded frames are not recorded, and a stop of the capture stops it.
@@ -83,9 +101,17 @@ export const usePerceptionRunnerStore = defineStore('perception-runner', () => {
   const eventListeners = new Set<(events: readonly ScreenEvent[]) => void>()
   /** The app whose window a commentary watches. Undefined captures the whole display. */
   let target: string | undefined
-  /** Whether the target app was in front at the last tick. */
+  /** Whether the captured window of the target app was in front at the last tick. */
   let targetInFront = false
   let lastTargetCheckAt = 0
+  /** The handle of the captured window of the target, where the source tells it. */
+  let capturedWindowId: number | undefined
+  /** Another window of the target app in front, and since when. The capture moves to it after the hold time. */
+  let otherInFront: { id: number, since: number } | undefined
+  /** Since when no window of the target is captured, after its window closed. Undefined while one is captured. */
+  let lostSince: number | undefined
+  let searching = false
+  const searchTicker = new Ticker(TARGET_WINDOW_LIMITS.searchIntervalMs, () => void search())
   const targetClosedListeners = new Set<(app: string) => void>()
   let recorder: PerceptionRecorderSink | undefined
   /** The recording that runs now. Writes go one after another, so the frames stay in order. */
@@ -202,6 +228,8 @@ export const usePerceptionRunnerStore = defineStore('perception-runner', () => {
     excludedNow = false
     foregroundApp = undefined
     targetInFront = false
+    capturedWindowId = undefined
+    otherInFront = undefined
   }
 
   /** Tells the listeners that the window of the target closed. */
@@ -210,33 +238,40 @@ export const usePerceptionRunnerStore = defineStore('perception-runner', () => {
       listener(app)
   }
 
-  async function start() {
+  /**
+   * Starts the capture: the display, or one window of the target app.
+   *
+   * @param windowId The window of the target app to capture. Without it, the source takes the front window of the app.
+   */
+  async function start(windowId?: number) {
     if (!source || starting || stream)
       return
     starting = true
     publish(true)
     try {
       const watched = target
-      const next = await source.start(watched ? { app: watched } : undefined)
-      if (!wanted()) {
-        for (const track of next.getTracks())
+      const next = await source.start(watched ? { app: watched, ...(windowId !== undefined ? { windowId } : {}) } : undefined)
+      if (!wanted() || target !== watched) {
+        for (const track of next.stream.getTracks())
           track.stop()
+        // A new target came during the start, so the capture starts again for it.
+        if (target !== watched)
+          queueMicrotask(sync)
         return
       }
       const element = document.createElement('video')
       element.muted = true
-      element.srcObject = next
+      element.srcObject = next.stream
       // `play` resolves only after the first frame, and a still screen can be slow to send one. Each tick checks that
       // the video has a frame, so the start does not wait here.
       element.play().catch(error => console.warn('[perception] Failed to play the capture:', errorMessageFrom(error)))
-      for (const track of next.getVideoTracks()) {
+      for (const track of next.stream.getVideoTracks()) {
         track.addEventListener('ended', () => {
-          if (stream !== next)
+          if (stream !== next.stream)
             return
-          // The window of a commentary closed. The commentary ends, and the display capture comes back.
+          // The window of a commentary closed. A game can open its next window soon, so the runner looks for one.
           if (watched) {
-            stopCapture()
-            closeTarget(watched)
+            loseTarget()
             return
           }
           ended = true
@@ -246,8 +281,9 @@ export const usePerceptionRunnerStore = defineStore('perception-runner', () => {
           publish(true)
         }, { once: true })
       }
-      stream = next
+      stream = next.stream
       video = element
+      capturedWindowId = next.windowId
       excluded = 0
       ticker.start()
       syncScreenTicker()
@@ -274,9 +310,70 @@ export const usePerceptionRunnerStore = defineStore('perception-runner', () => {
       publish(true)
       return
     }
-    if (!stream && !ended && !failure && !source?.needsGesture)
+    // While the window of the target is lost, only the search starts the capture again.
+    if (!stream && !ended && !failure && lostSince === undefined && !source?.needsGesture)
       void start()
     publish(true)
+  }
+
+  /**
+   * The window of the target closed. The capture stops, and the runner looks for another window of the app until the
+   * grace time ends. A source that cannot list the windows, for example the web, ends the target at once.
+   */
+  function loseTarget() {
+    const lost = target
+    stopCapture()
+    if (!lost)
+      return
+    if (!source?.windowOpen) {
+      closeTarget(lost)
+      return
+    }
+    lostSince = Date.now()
+    console.info(`[perception] The window of ${lost} closed. The capture looks for another window of it for ${TARGET_WINDOW_LIMITS.lostGraceMs / 60_000} min.`)
+    searchTicker.start()
+    publish(true)
+  }
+
+  /** Looks for a window of the lost target. A found window takes the capture, and the end of the grace time ends the target. */
+  async function search() {
+    if (searching || !target || lostSince === undefined || !source?.windowOpen || !wanted())
+      return
+    searching = true
+    try {
+      const lost = target
+      const open = await source.windowOpen(lost)
+      if (target !== lost || lostSince === undefined)
+        return
+      if (open) {
+        console.info(`[perception] Another window of ${lost} is open after ${Math.round((Date.now() - lostSince) / 1_000)} s, so the capture takes it.`)
+        stopSearch()
+        await start()
+        return
+      }
+      if (Date.now() - lostSince >= TARGET_WINDOW_LIMITS.lostGraceMs) {
+        stopSearch()
+        closeTarget(lost)
+      }
+    }
+    catch (error) {
+      console.warn('[perception] Failed to look for the window of the target:', errorMessageFrom(error))
+    }
+    finally {
+      searching = false
+    }
+  }
+
+  function stopSearch() {
+    searchTicker.stop()
+    lostSince = undefined
+  }
+
+  /** Moves the capture to another window of the target app. The commentary goes on. */
+  function follow(windowId: number) {
+    console.info(`[perception] Another window of ${target} stayed in front, so the capture moves to it.`)
+    stopCapture()
+    void start(windowId)
   }
 
   /** Takes one frame, unless the window in front matches the exclusion list. */
@@ -286,12 +383,10 @@ export const usePerceptionRunnerStore = defineStore('perception-runner', () => {
     sampling = true
     try {
       const at = Date.now()
-      if (target && source.windowOpen && at - lastTargetCheckAt >= TARGET_CHECK_INTERVAL_MS) {
+      if (target && source.windowOpen && at - lastTargetCheckAt >= TARGET_WINDOW_LIMITS.checkIntervalMs) {
         lastTargetCheckAt = at
         if (!await source.windowOpen(target)) {
-          const closed = target
-          stopCapture()
-          closeTarget(closed)
+          loseTarget()
           return
         }
       }
@@ -304,8 +399,21 @@ export const usePerceptionRunnerStore = defineStore('perception-runner', () => {
           detector.skip(at)
           return
         }
-        // A commentary sees its window only while the owner has it in front, as the ADR asks.
-        targetInFront = Boolean(target && window && windowOfApp(window, target))
+        // A commentary sees its window only while the owner has it in front, as the ADR asks. Another window of the app,
+        // for example the next match of a game, is not the captured window. Until the capture moves, frames show the old one.
+        const appInFront = Boolean(target && window && windowOfApp(window, target))
+        const otherId = appInFront && window?.id !== undefined && capturedWindowId !== undefined && window.id !== capturedWindowId ? window.id : undefined
+        targetInFront = appInFront && otherId === undefined
+        if (otherId === undefined) {
+          otherInFront = undefined
+        }
+        else if (otherInFront?.id !== otherId) {
+          otherInFront = { id: otherId, since: at }
+        }
+        else if (at - otherInFront.since >= TARGET_WINDOW_LIMITS.followHoldMs) {
+          follow(otherId)
+          return
+        }
         if (target && !targetInFront) {
           detector.skip(at)
           return
@@ -428,6 +536,7 @@ export const usePerceptionRunnerStore = defineStore('perception-runner', () => {
     lastTargetCheckAt = Date.now()
     ended = false
     failure = undefined
+    stopSearch()
     if (stream || video)
       stopCapture()
     sync()
@@ -467,6 +576,7 @@ export const usePerceptionRunnerStore = defineStore('perception-runner', () => {
     stopLeadershipListener = undefined
     stopInterruptListener?.()
     stopInterruptListener = undefined
+    stopSearch()
     stopCapture()
     encoder.dispose()
     leadership = undefined
@@ -508,7 +618,10 @@ export const usePerceptionRunnerStore = defineStore('perception-runner', () => {
       eventListeners.add(listener)
       return () => eventListeners.delete(listener)
     },
-    /** Calls the listener when the window of the target app closes. Returns a function that removes it. */
+    /**
+     * Calls the listener when no window of the target app is open, 5 minutes after its window closed. Returns a
+     * function that removes it.
+     */
     onTargetClosed: (listener: (app: string) => void) => {
       targetClosedListeners.add(listener)
       return () => targetClosedListeners.delete(listener)
