@@ -772,6 +772,7 @@ Step 5-0 built the reasoning level as follows.
 - The owner chooses a reasoning level: the provider default, off, low, medium, or high. Replies to the owner and autonomous speech have a level each, and autonomous speech follows the replies by default. The ADR fixed commentary at `low`, and the owner asked for a setting instead.
 - A request carries an effort with `enabled`. A provider with effort levels sends it, and a provider with only on and off treats every effort as on, so the definitions of the other providers did not change.
 - The OpenAI-compatible provider has a field for the form of the request: nothing, the `thinking` switch, or `reasoning_effort`. Compatible servers differ, and an unknown field can fail a request, so the default sends nothing.
+- On 2026-11-13, the owner found no such field on the settings page of the provider. Only the newer page of the provider catalog showed it, and the settings menu does not lead there. The field stayed at nothing, so the reasoning level in the consciousness settings never reached the server. The part that shows the protocol now also shows this field for each provider that defines it.
 - The old switch of the settings read on as `medium` and off as `off`, which send the same requests. A notice in the code removes this read later.
 
 Step 5-4a built the length of a line as follows.
