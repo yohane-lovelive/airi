@@ -11,8 +11,12 @@ import { clearSherpawModelAssets } from '../libs/providers/providers/sherpaw/mod
 import { useChatStore } from '../stores/chat'
 import { useChatSessionStore } from '../stores/chat/session-store'
 import { useDisplayModelsStore } from '../stores/display-models'
+import { useHistorySummaryStore } from '../stores/history-summary'
+import { useInitiativeStore } from '../stores/initiative'
+import { useIntentionsStore } from '../stores/intentions'
 import { useMcpStore } from '../stores/mcp'
 import { useMemoryStore } from '../stores/memory'
+import { useMissionsStore } from '../stores/missions'
 import { useAiriCardStore } from '../stores/modules/airi-card'
 import { useConsciousnessStore } from '../stores/modules/consciousness'
 import { useConsciousnessSettingsStore } from '../stores/modules/consciousness-settings'
@@ -25,9 +29,12 @@ import { useSpeechStore } from '../stores/modules/speech'
 import { useTwitterStore } from '../stores/modules/twitter'
 import { useWebSearchStore } from '../stores/modules/web-search'
 import { useOnboardingStore } from '../stores/onboarding'
+import { usePerceptionStore } from '../stores/perception'
 import { useProviderStore } from '../stores/providers/provider'
 import { useRecipesStore } from '../stores/recipes'
 import { useSettings, useSettingsAudioDevice } from '../stores/settings'
+import { useTimelineStore } from '../stores/timeline'
+import { useUsageStore } from '../stores/usage'
 import { useVoiceprintStore } from '../stores/voiceprint'
 
 export function useDataMaintenance() {
@@ -57,6 +64,13 @@ export function useDataMaintenance() {
   const airiCardStore = useAiriCardStore()
   const memoryStore = useMemoryStore()
   const recipesStore = useRecipesStore()
+  const missionsStore = useMissionsStore()
+  const initiativeStore = useInitiativeStore()
+  const perceptionStore = usePerceptionStore()
+  const timelineStore = useTimelineStore()
+  const intentionsStore = useIntentionsStore()
+  const historySummaryStore = useHistorySummaryStore()
+  const usageStore = useUsageStore()
   const voiceprintStore = useVoiceprintStore()
 
   async function deleteAllModels() {
@@ -88,6 +102,13 @@ export function useDataMaintenance() {
       // Memories and recipes hold what the character learned about the owner.
       () => memoryStore.resetState(),
       () => recipesStore.resetState(),
+      () => missionsStore.resetState(),
+      () => initiativeStore.resetState(),
+      () => perceptionStore.resetState(),
+      () => timelineStore.resetState(),
+      () => intentionsStore.resetState(),
+      () => historySummaryStore.resetState(),
+      () => usageStore.resetState(),
     ].map(reset => Promise.resolve().then(reset)))
     const failure = results.find(result => result.status === 'rejected')
     if (failure)

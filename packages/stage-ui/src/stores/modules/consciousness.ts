@@ -1,12 +1,14 @@
 import type {} from 'pinia-plugin-synced'
 
+import type { ReasoningUse } from './consciousness-settings'
+
 import { useLocalStorageManualReset } from '@proj-airi/stage-shared/composables'
 import { refManualReset } from '@vueuse/core'
 import { defineStore } from 'pinia'
 import { computed, watch } from 'vue'
 
 import { useProviderStore } from '../providers/provider'
-import { useConsciousnessSettingsStore } from './consciousness-settings'
+import { chatRequestOptionsOf, useConsciousnessSettingsStore } from './consciousness-settings'
 
 export const useConsciousnessStore = defineStore('consciousness', () => {
   const providersStore = useProviderStore()
@@ -131,8 +133,10 @@ export const useConsciousnessStore = defineStore('consciousness', () => {
    *
    * `model` is the model of the request. A chat turn passes the model of the session character,
    * which can differ from the selection of this store.
+   * `use` selects the reasoning level of the turn. Autonomous turns, for example small talk and commentary,
+   * can have a level of their own.
    */
-  async function getChatProviderInstance(provider: string, model: string) {
+  async function getChatProviderInstance(provider: string, model: string, use: ReasoningUse = 'reply') {
     const requestModel = providersStore.getModelsForProvider(provider).find(candidate => candidate.id === model)
     const useProviderReasoningDefault = isOpenRouterProvider(provider)
       && (!requestModel || requestModel.reasoning?.mandatory === true)
@@ -142,9 +146,7 @@ export const useConsciousnessStore = defineStore('consciousness', () => {
       return providersStore.getChatProviderInstance(provider)
     }
 
-    return providersStore.getChatProviderInstance(provider, {
-      reasoning: settingsStore.reasoning ? 'enabled' : 'disabled',
-    })
+    return providersStore.getChatProviderInstance(provider, chatRequestOptionsOf(settingsStore.levelFor(use)))
   }
 
   const configured = computed(() => {

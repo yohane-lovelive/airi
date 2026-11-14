@@ -4,7 +4,7 @@ import type {} from 'pinia-plugin-synced'
 import type { ChatSendOutboxEntry } from '../../database/repos/chat-sessions.repo'
 import type { ChatWsClient, CloudChatMapper } from '../../libs/chat-sync'
 import type { ChatHistoryItem } from '../../types/chat'
-import type { ChatSessionMeta, ChatSessionRecord, ChatSessionsExport, ChatSessionsIndex, ChatSessionTask, StoredVoiceInterruption } from '../../types/chat-session'
+import type { ChatHistorySummary, ChatSessionMeta, ChatSessionRecord, ChatSessionsExport, ChatSessionsIndex, ChatSessionTask, StoredVoiceInterruption } from '../../types/chat-session'
 
 import { errorMessageFrom } from '@moeru/std'
 import { cloneDeep } from 'es-toolkit'
@@ -1854,6 +1854,19 @@ export const useChatSessionStore = defineStore('chat-session', () => {
   }
 
   /**
+   * Stores the summary of the older messages, or removes it with `undefined`. Resolves to whether the session exists.
+   * The summary stays in the session meta on the device.
+   */
+  async function setSessionHistorySummary(sessionId: string, summary: ChatHistorySummary | undefined) {
+    if (!sessionMetas.value[sessionId] || !await loadSession(sessionId))
+      return false
+    const { historySummary: _old, ...meta } = sessionMetas.value[sessionId]
+    sessionMetas.value[sessionId] = summary ? { ...meta, historySummary: summary } : meta
+    await persistSession(sessionId)
+    return true
+  }
+
+  /**
    * Deletes a hidden session, such as a finished background task.
    * Unlike {@link deleteSession}, it never moves a character's selected conversation and never creates a replacement, because nobody selects a hidden session.
    */
@@ -2076,6 +2089,7 @@ export const useChatSessionStore = defineStore('chat-session', () => {
     createSession,
     ensureBoundSession,
     setSessionTask,
+    setSessionHistorySummary,
     deleteHiddenSession,
     loadSession,
     refreshSession,
@@ -2118,6 +2132,7 @@ export const useChatSessionStore = defineStore('chat-session', () => {
       'renameSession',
       'resetAllSessions',
       'setSessionTask',
+      'setSessionHistorySummary',
       'deleteHiddenSession',
     ],
     state: true,

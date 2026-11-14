@@ -35,6 +35,10 @@ The active chat and vision provider routes live under `/settings/providers`. The
 
 The character card page shows an alert while a shared pronunciation has no character. The alert links to the wake words page.
 
+## Motion settings
+
+`/settings/modules/motions` lists the gestures of the motion library. The owner turns each gesture on or off, plays a preview on the stage of the main window, imports a `.vrma` file, and removes an imported clip. The owner also keeps or removes each generated clip. In the desktop app, the page sets the address and the token of Text-To-VRMA, the switch of generation, and the clips for each day.
+
 ## Settings search
 
 The settings home searches the settings pages, the settings on them, and the runtime items that a page lists.

@@ -1,0 +1,591 @@
+#nullable enable
+
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using UnityEngine;
+using Mmd.Rendering;
+
+namespace Mmd.UnityIntegration
+{
+    internal static class MmdUnityFrameApplier
+    {
+        public static void ApplyFrame(MmdUnityModelInstance instance, MmdEvaluatedFrame frame)
+        {
+            if (instance == null)
+            {
+                throw new ArgumentNullException(nameof(instance));
+            }
+
+            if (frame == null)
+            {
+                throw new ArgumentNullException(nameof(frame));
+            }
+
+            if (frame.bones == null)
+            {
+                throw new ArgumentException("Evaluated frame bones are required.", nameof(frame));
+            }
+
+            ValidateSupportedMorphPlayback(instance);
+            ApplyBonePoses(instance, frame.bones);
+            ApplyMorphsCore(instance, frame, null, groupMorphsResolvedExternally: false);
+        }
+
+        internal static void ApplyBonePoses(
+            MmdUnityModelInstance instance,
+            IReadOnlyList<MmdEvaluatedBonePose> bonePoses,
+            Func<MmdEvaluatedBonePose, bool>? predicate = null)
+        {
+            if (instance == null)
+            {
+                throw new ArgumentNullException(nameof(instance));
+            }
+
+            if (bonePoses == null)
+            {
+                throw new ArgumentNullException(nameof(bonePoses));
+            }
+
+            foreach (MmdEvaluatedBonePose bonePose in bonePoses)
+            {
+                if (bonePose == null)
+                {
+                    throw new ArgumentException("Evaluated frame bone entries must not be null.", nameof(bonePoses));
+                }
+
+                if (predicate != null && !predicate(bonePose))
+                {
+                    continue;
+                }
+
+                int slot = bonePose.index;
+                if (slot < 0 || slot >= instance.BoneTransforms.Length)
+                {
+                    throw new ArgumentException($"Evaluated bone index {slot} has no Unity bone transform.", nameof(bonePoses));
+                }
+
+                Transform boneTransform = instance.BoneTransforms[slot];
+                Vector3 translationDelta = ToUnityPosition(ValidateVector3(bonePose.localPosition, slot, "localPosition"));
+                boneTransform.localPosition = instance.BindLocalPositions[slot] + translationDelta * instance.ImportScale;
+                boneTransform.localRotation = instance.BindLocalRotations[slot] * ToUnityRotation(ValidateQuaternion(bonePose.localRotation, slot));
+                boneTransform.localScale = ToUnityScale(ValidateVector3(bonePose.localScale, slot, "localScale"));
+            }
+        }
+
+        internal static void ApplyMorphs(MmdUnityModelInstance instance, MmdEvaluatedFrame frame)
+        {
+            ValidateSupportedMorphPlayback(instance);
+            ApplyMorphsCore(instance, frame, null, groupMorphsResolvedExternally: false);
+        }
+
+        /// <summary>
+        /// Applies morph weights to the instance. When <paramref name="groupMorphsResolvedExternally"/>
+        /// is true the caller (e.g. the native fast runtime) has ALREADY expanded group morph weights
+        /// into their member morphs, so group expansion is skipped here to avoid double-applying each
+        /// group's contribution. Flip morphs are still resolved because the native runtime does not
+        /// expand them.
+        /// </summary>
+        internal static void ApplyMorphs(
+            MmdUnityModelInstance instance,
+            MmdEvaluatedFrame frame,
+            bool groupMorphsResolvedExternally)
+        {
+            ValidateSupportedMorphPlayback(instance);
+            ApplyMorphsCore(instance, frame, null, groupMorphsResolvedExternally);
+        }
+
+        internal static MmdUnityMorphApplyTimingSummary ApplyMorphsWithTiming(MmdUnityModelInstance instance, MmdEvaluatedFrame frame)
+        {
+            return ApplyMorphsWithTiming(instance, frame, groupMorphsResolvedExternally: false);
+        }
+
+        internal static MmdUnityMorphApplyTimingSummary ApplyMorphsWithTiming(
+            MmdUnityModelInstance instance,
+            MmdEvaluatedFrame frame,
+            bool groupMorphsResolvedExternally)
+        {
+            var timing = new MmdUnityMorphApplyTimingSummary();
+            ValidateSupportedMorphPlayback(instance);
+            ApplyMorphsCore(instance, frame, timing, groupMorphsResolvedExternally);
+            return timing;
+        }
+
+        private static readonly List<MmdGroupMorphDescriptor> EmptyGroupMorphs = new();
+
+        internal static void ValidateSupportedMorphPlayback(MmdUnityModelInstance instance)
+        {
+            if (instance == null)
+            {
+                throw new ArgumentNullException(nameof(instance));
+            }
+
+            MmdRenderingDescriptor descriptor = instance.RenderingDescriptor;
+            if (descriptor.uvMorphs != null && descriptor.uvMorphs.Count > 0)
+            {
+                throw new NotSupportedException(
+                    "Unity playback does not support UV morphs. Remove UV morphs from the playback model.");
+            }
+
+            int vertexMorphCount = descriptor.vertexMorphs?.Count ?? 0;
+            if (vertexMorphCount == 0)
+            {
+                return;
+            }
+
+            if (instance.SkinnedMeshRenderer == null ||
+                instance.VertexMorphBlendShapes.Count != vertexMorphCount)
+            {
+                throw new NotSupportedException(
+                    "Unity playback requires every vertex morph to be imported as a BlendShape; " +
+                    "CPU mesh vertex morph fallback is not supported.");
+            }
+        }
+
+        private static void ApplyMorphsCore(
+            MmdUnityModelInstance instance,
+            MmdEvaluatedFrame frame,
+            MmdUnityMorphApplyTimingSummary? timing,
+            bool groupMorphsResolvedExternally)
+        {
+            MmdRenderingDescriptor descriptor = instance.RenderingDescriptor;
+            IReadOnlyList<MmdMeshVertexDescriptor>? vertices = descriptor.vertices;
+            IReadOnlyList<MmdVertexMorphDescriptor>? vertexMorphs = descriptor.vertexMorphs;
+            IReadOnlyList<MmdGroupMorphDescriptor>? groupMorphs = descriptor.groupMorphs;
+            IReadOnlyList<MmdMorphDescriptorBuilder.MmdMaterialMorphDescriptor>? materialMorphs = descriptor.materialMorphs;
+            IReadOnlyList<MmdMorphDescriptorBuilder.MmdFlipMorphDescriptor>? flipMorphs = descriptor.flipMorphs;
+            if (timing != null)
+            {
+                timing.vertexCount = vertices?.Count ?? 0;
+                timing.morphWeightCount = frame.morphs?.Count ?? 0;
+            }
+
+            long totalStart = timing != null ? Stopwatch.GetTimestamp() : 0L;
+            bool hasVertexMorphs = vertexMorphs != null && vertexMorphs.Count > 0;
+            bool hasMaterialMorphs = materialMorphs != null && materialMorphs.Count > 0;
+            bool hasAnyMorph = hasVertexMorphs || hasMaterialMorphs;
+            if (timing != null)
+            {
+                timing.hasVertexMorphs = hasVertexMorphs;
+                timing.hasTextureUvMorphs = false;
+                timing.hasMaterialMorphs = hasMaterialMorphs;
+                timing.hasAnyMorph = hasAnyMorph;
+            }
+
+            if (!hasAnyMorph)
+            {
+                if (timing != null)
+                {
+                    timing.totalMs = ToMilliseconds(Stopwatch.GetTimestamp() - totalStart);
+                }
+
+                return;
+            }
+
+            if (frame.morphs == null)
+            {
+                throw new ArgumentException("Evaluated frame morph weights are required when morph descriptors exist.", nameof(frame));
+            }
+
+            long stageStart = timing != null ? Stopwatch.GetTimestamp() : 0L;
+            Dictionary<string, float> morphWeightMap = BuildMorphWeightMap(frame);
+            if (timing != null)
+            {
+                timing.buildWeightMapMs = ToMilliseconds(Stopwatch.GetTimestamp() - stageStart);
+                timing.nonZeroMorphWeightCount = CountNonZeroWeights(morphWeightMap);
+            }
+
+            stageStart = timing != null ? Stopwatch.GetTimestamp() : 0L;
+            IReadOnlyList<MmdGroupMorphDescriptor> groupMorphsForResolve = groupMorphsResolvedExternally
+                ? EmptyGroupMorphs
+                : (groupMorphs ?? EmptyGroupMorphs);
+            IReadOnlyDictionary<string, float> resolvedWeights = MmdCompositeMorphWeightResolver.Resolve(
+                morphWeightMap,
+                groupMorphsForResolve,
+                flipMorphs ?? Array.Empty<MmdMorphDescriptorBuilder.MmdFlipMorphDescriptor>());
+            if (timing != null)
+            {
+                timing.resolveCompositeWeightsMs = ToMilliseconds(Stopwatch.GetTimestamp() - stageStart);
+                timing.resolvedWeightCount = resolvedWeights.Count;
+                timing.nonZeroResolvedWeightCount = CountNonZeroWeights(resolvedWeights);
+            }
+
+            SkinnedMeshRenderer? blendShapeRenderer = hasVertexMorphs && instance.VertexMorphBlendShapes.Count > 0
+                ? instance.SkinnedMeshRenderer
+                : null;
+
+            if (hasMaterialMorphs)
+            {
+                stageStart = timing != null ? Stopwatch.GetTimestamp() : 0L;
+                long materialMorphAllocatedBefore = timing != null
+                    ? GC.GetAllocatedBytesForCurrentThread()
+                    : 0L;
+                bool materialMorphEvaluatorSkipped;
+                ApplyMaterialMorphs(instance, descriptor, resolvedWeights, out materialMorphEvaluatorSkipped);
+                if (timing != null)
+                {
+                    timing.materialMorphApplyMs = ToMilliseconds(Stopwatch.GetTimestamp() - stageStart);
+                    timing.materialMorphEvaluatorSkipped = materialMorphEvaluatorSkipped;
+                    timing.materialMorphAllocatedBytes = Math.Max(
+                        0L,
+                        GC.GetAllocatedBytesForCurrentThread() - materialMorphAllocatedBefore);
+                }
+            }
+
+            if (blendShapeRenderer != null)
+            {
+                stageStart = timing != null ? Stopwatch.GetTimestamp() : 0L;
+                foreach (MmdUnityVertexMorphBlendShapeBinding binding in instance.VertexMorphBlendShapes)
+                {
+                    float resolvedWeight = resolvedWeights.TryGetValue(binding.MorphName, out float w) ? w : 0f;
+                    if (!IsFinite(resolvedWeight))
+                    {
+                        throw new InvalidOperationException($"BlendShape morph weight must be finite: {binding.MorphName}");
+                    }
+
+                    blendShapeRenderer.SetBlendShapeWeight(binding.BlendShapeIndex, resolvedWeight * 100f);
+                }
+
+                if (timing != null)
+                {
+                    timing.setBlendShapeWeightMs = ToMilliseconds(Stopwatch.GetTimestamp() - stageStart);
+                    timing.blendShapePathUsed = true;
+                }
+
+                if (timing != null)
+                {
+                    timing.localBoundsSkipped = true;
+                }
+
+                if (timing != null)
+                {
+                    timing.totalMs = ToMilliseconds(Stopwatch.GetTimestamp() - totalStart);
+                }
+
+                return;
+            }
+
+            if (!hasVertexMorphs)
+            {
+                if (timing != null)
+                {
+                    timing.totalMs = ToMilliseconds(Stopwatch.GetTimestamp() - totalStart);
+                }
+
+                return;
+            }
+
+            throw new InvalidOperationException("Validated vertex morph playback did not resolve a BlendShape renderer.");
+        }
+
+        private static void ApplyMaterialMorphs(
+            MmdUnityModelInstance instance,
+            MmdRenderingDescriptor descriptor,
+            IReadOnlyDictionary<string, float> resolvedWeights,
+            out bool evaluatorSkipped)
+        {
+            IReadOnlyList<MmdMaterialDescriptor> materials = descriptor.materials
+                ?? throw new InvalidOperationException("Rendering descriptor materials are required for material morph evaluation.");
+            IReadOnlyList<MmdMorphDescriptorBuilder.MmdMaterialMorphDescriptor> materialMorphs = descriptor.materialMorphs
+                ?? throw new InvalidOperationException("Rendering descriptor material morphs are required for material morph evaluation.");
+            bool hasNonZeroMaterialMorphWeight = false;
+            for (int i = 0; i < materialMorphs.Count; i++)
+            {
+                MmdMorphDescriptorBuilder.MmdMaterialMorphDescriptor morph = materialMorphs[i];
+                if (morph == null || string.IsNullOrWhiteSpace(morph.morphName))
+                {
+                    continue;
+                }
+
+                if (!resolvedWeights.TryGetValue(morph.morphName, out float weight))
+                {
+                    continue;
+                }
+
+                if (!IsFinite(weight))
+                {
+                    throw new InvalidOperationException(
+                        $"Material morph weight must be finite: {morph.morphName}");
+                }
+
+                if (weight != 0.0f)
+                {
+                    hasNonZeroMaterialMorphWeight = true;
+                }
+            }
+
+            evaluatorSkipped = !hasNonZeroMaterialMorphWeight;
+            IReadOnlyList<MmdMaterialDescriptor> modifiedDescriptors = evaluatorSkipped
+                ? materials
+                : MmdMaterialMorphEvaluator.ApplyMaterialMorphs(
+                    materials,
+                    materialMorphs,
+                    resolvedWeights);
+
+            for (int i = 0; i < instance.Materials.Length && i < modifiedDescriptors.Count; i++)
+            {
+                MmdMaterialDescriptor modified = modifiedDescriptors[i];
+                Material material = instance.Materials[i];
+                if (material == null)
+                {
+                    continue;
+                }
+
+                MmdMaterialRenderingTargets targets = i < instance.MaterialRenderingTargets.Length
+                    ? instance.MaterialRenderingTargets[i]
+                    : MmdMaterialRenderingTargets.BuiltIn;
+                if (!targets.SupportsMaterialMorphs)
+                {
+                    continue;
+                }
+
+                // Diffuse color with alpha.
+                Color diffuse = ToUnityColor(modified.diffuseColor, modified.alpha, Color.white);
+                if (HasMaterialProperty(material, targets.BaseColorProperty) &&
+                    material.GetColor(targets.BaseColorProperty) != diffuse)
+                {
+                    material.SetColor(targets.BaseColorProperty, diffuse);
+                    instance.RecordMaterialMorphPropertyWrite();
+                }
+
+                // Ambient color.
+                Color ambient = ToUnityColor(modified.ambientColor, 1.0f, new Color(0.25f, 0.25f, 0.25f, 1.0f));
+                if (HasMaterialProperty(material, targets.AmbientColorProperty) &&
+                    material.GetColor(targets.AmbientColorProperty) != ambient)
+                {
+                    material.SetColor(targets.AmbientColorProperty, ambient);
+                    instance.RecordMaterialMorphPropertyWrite();
+                }
+
+                // Edge color with alpha.
+                float edgeAlpha = modified.edgeColor != null && modified.edgeColor.Length > 3
+                    ? modified.edgeColor[3]
+                    : 1.0f;
+                Color edge = ToUnityColor(modified.edgeColor, edgeAlpha, Color.black);
+                if (HasMaterialProperty(material, targets.OutlineColorProperty) &&
+                    material.GetColor(targets.OutlineColorProperty) != edge)
+                {
+                    material.SetColor(targets.OutlineColorProperty, edge);
+                    instance.RecordMaterialMorphPropertyWrite();
+                }
+
+                // Edge width matches initial creation: the raw PMX edgeSize is the screen-space
+                // pixel width consumed by the outline shader (no object-space scale). A material
+                // with the draw-edge flag off collapses to zero so no silhouette ring appears.
+                float outlineWidth = modified.drawEdgeFlag ? modified.edgeSize : 0.0f;
+                if (HasMaterialProperty(material, targets.OutlineWidthProperty) &&
+                    material.GetFloat(targets.OutlineWidthProperty) != outlineWidth)
+                {
+                    material.SetFloat(targets.OutlineWidthProperty, outlineWidth);
+                    instance.RecordMaterialMorphPropertyWrite();
+                }
+
+                // BaseColor already carries the resolved diffuse alpha. Color is a separate
+                // compatibility target: preserve its RGB and update only its alpha when needed.
+                if (HasMaterialProperty(material, targets.ColorProperty))
+                {
+                    Color c = material.GetColor(targets.ColorProperty);
+                    if (c.a != modified.alpha)
+                    {
+                        c.a = modified.alpha;
+                        material.SetColor(targets.ColorProperty, c);
+                        instance.RecordMaterialMorphPropertyWrite();
+                    }
+                }
+
+                if (HasMaterialProperty(material, targets.AlphaProperty) &&
+                    material.GetFloat(targets.AlphaProperty) != modified.alpha)
+                {
+                    material.SetFloat(targets.AlphaProperty, modified.alpha);
+                    instance.RecordMaterialMorphPropertyWrite();
+                }
+            }
+        }
+
+        private static bool HasMaterialProperty(Material material, string propertyName)
+        {
+            return !string.IsNullOrWhiteSpace(propertyName) && material.HasProperty(propertyName);
+        }
+
+        private static Color ToUnityColor(float[]? values, float alpha, Color fallback)
+        {
+            if (values == null)
+            {
+                return fallback;
+            }
+
+            float r = values.Length > 0 && float.IsFinite(values[0]) ? Mathf.Clamp01(values[0]) : fallback.r;
+            float g = values.Length > 1 && float.IsFinite(values[1]) ? Mathf.Clamp01(values[1]) : fallback.g;
+            float b = values.Length > 2 && float.IsFinite(values[2]) ? Mathf.Clamp01(values[2]) : fallback.b;
+            float a = float.IsFinite(alpha) ? Mathf.Clamp01(alpha) : fallback.a;
+            return new Color(r, g, b, a);
+        }
+
+        private static Dictionary<string, float> BuildMorphWeightMap(MmdEvaluatedFrame frame)
+        {
+            var result = new Dictionary<string, float>(frame.morphs.Count, StringComparer.Ordinal);
+            for (int i = 0; i < frame.morphs.Count; i++)
+            {
+                MmdEvaluatedMorphWeight morph = frame.morphs[i];
+                if (morph == null)
+                {
+                    throw new ArgumentException($"Evaluated morph entry {i} must not be null.", nameof(frame));
+                }
+
+                if (string.IsNullOrWhiteSpace(morph.name))
+                {
+                    throw new ArgumentException($"Evaluated morph entry {i} name is required.", nameof(frame));
+                }
+
+                if (result.ContainsKey(morph.name))
+                {
+                    throw new ArgumentException($"Duplicate evaluated morph weight: {morph.name}", nameof(frame));
+                }
+
+                result[morph.name] = morph.weight;
+            }
+
+            return result;
+        }
+
+        private static int CountNonZeroWeights(IReadOnlyDictionary<string, float> weights)
+        {
+            int count = 0;
+            foreach (float weight in weights.Values)
+            {
+                if (weight != 0.0f)
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        private static double ToMilliseconds(long ticks)
+        {
+            return ticks * 1000.0 / Stopwatch.Frequency;
+        }
+
+        private static float[] ValidateVector3(float[] values, int boneIndex, string field)
+        {
+            if (values == null || values.Length < 3)
+            {
+                throw new ArgumentException($"Evaluated bone {boneIndex} {field} must contain at least 3 values.");
+            }
+
+            if (!IsFinite(values[0]) || !IsFinite(values[1]) || !IsFinite(values[2]))
+            {
+                throw new ArgumentException($"Evaluated bone {boneIndex} {field} contains a non-finite value.");
+            }
+
+            return values;
+        }
+
+        private static float[] ValidateMorphedVector3(float[] values, int vertexIndex, string field)
+        {
+            if (values == null || values.Length < 3)
+            {
+                throw new ArgumentException($"Morphed vertex {vertexIndex} {field} must contain at least 3 values.");
+            }
+
+            if (!IsFinite(values[0]) || !IsFinite(values[1]) || !IsFinite(values[2]))
+            {
+                throw new ArgumentException($"Morphed vertex {vertexIndex} {field} contains a non-finite value.");
+            }
+
+            return values;
+        }
+
+        private static float[] ValidateMorphedVector2(float[] values, int vertexIndex, string field)
+        {
+            if (values == null || values.Length < 2)
+            {
+                throw new ArgumentException($"Morphed vertex {vertexIndex} {field} must contain at least 2 values.");
+            }
+
+            if (!IsFinite(values[0]) || !IsFinite(values[1]))
+            {
+                throw new ArgumentException($"Morphed vertex {vertexIndex} {field} contains a non-finite value.");
+            }
+
+            return values;
+        }
+
+        private static float[] ValidateQuaternion(float[] values, int boneIndex)
+        {
+            if (values == null || values.Length < 4)
+            {
+                throw new ArgumentException($"Evaluated bone {boneIndex} localRotation must contain at least 4 values.");
+            }
+
+            if (!IsFinite(values[0]) || !IsFinite(values[1]) || !IsFinite(values[2]) || !IsFinite(values[3]))
+            {
+                throw new ArgumentException($"Evaluated bone {boneIndex} localRotation contains a non-finite value.");
+            }
+
+            return values;
+        }
+
+        private static Vector3 ToUnityPosition(float[] position)
+        {
+            return ToUnityPosition(position, importScale: 1.0f);
+        }
+
+        private static Vector3 ToUnityPosition(float[] position, float importScale)
+        {
+            float scale = (float.IsFinite(importScale) && importScale > 0.0f) ? importScale : 1.0f;
+            return MmdCoordinateSpace.MmdToUnityPosition(
+                new Vector3(position[0], position[1], position[2]),
+                scale);
+        }
+
+        private static Quaternion ToUnityRotation(float[] rotation)
+        {
+            return MmdCoordinateSpace.MmdToUnityRotation(
+                new Quaternion(rotation[0], rotation[1], rotation[2], rotation[3]));
+        }
+
+        private static Vector3 ToUnityScale(float[] scale)
+        {
+            return new Vector3(scale[0], scale[1], scale[2]);
+        }
+
+        private static bool IsFinite(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
+        }
+    }
+
+    [Serializable]
+    internal sealed class MmdUnityMorphApplyTimingSummary
+    {
+        public bool hasAnyMorph;
+        public bool hasVertexMorphs;
+        public bool hasTextureUvMorphs;
+        public bool hasMaterialMorphs;
+        public bool meshUploadRequired;
+        public bool blendShapePathUsed;
+        public int vertexCount;
+        public int morphWeightCount;
+        public int resolvedWeightCount;
+        public int nonZeroMorphWeightCount;
+        public int nonZeroResolvedWeightCount;
+        public double totalMs;
+        public double buildWeightMapMs;
+        public double resolveCompositeWeightsMs;
+        public double vertexMorphEvalMs;
+        public double textureUvMorphEvalMs;
+        public double materialMorphApplyMs;
+        public bool materialMorphEvaluatorSkipped;
+        public long materialMorphAllocatedBytes;
+        public double unityBufferBuildMs;
+        public double setBlendShapeWeightMs;
+        public double setVerticesMs;
+        public double setUvsMs;
+        public double recalculateBoundsMs;
+        public double localBoundsAssignMs;
+        public bool localBoundsAssigned;
+        public bool localBoundsSkipped;
+    }
+}

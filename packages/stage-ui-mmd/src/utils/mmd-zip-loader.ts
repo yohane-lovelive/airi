@@ -57,6 +57,29 @@ function modelFormatOf(path: string): MMDModelFormat | undefined {
   return undefined
 }
 
+const strictUtf8 = new TextDecoder('utf-8', { fatal: true })
+const shiftJis = new TextDecoder('shift_jis')
+
+/**
+ * Decodes a ZIP entry name that has no UTF-8 flag.
+ *
+ * JSZip calls this only for such names. Japanese tools and older Windows write them in Shift_JIS, and a UTF-8 read
+ * turns every Japanese character into U+FFFD. A name that is valid UTF-8 stays UTF-8, and any other name is read as
+ * Shift_JIS. Pass it as the `decodeFileName` option of `JSZip.loadAsync`.
+ *
+ * @example
+ * decodeZipFileName(new Uint8Array([0x8C, 0x8B])) // => '結'
+ */
+export function decodeZipFileName(bytes: string[] | Uint8Array): string {
+  const data = bytes instanceof Uint8Array ? bytes : Uint8Array.from(bytes, char => char.charCodeAt(0))
+  try {
+    return strictUtf8.decode(data)
+  }
+  catch {
+    return shiftJis.decode(data)
+  }
+}
+
 /** Detects every PMX/PMD model file inside a zip's entry list. */
 export function detectMMDVariants(paths: string[]): MMDModelVariant[] {
   const variants: MMDModelVariant[] = []
@@ -112,7 +135,7 @@ function createUrlModifier(blobUrls: Record<string, string>): UrlModifier {
  */
 export async function loadMMDZip(file: File | Blob | ArrayBuffer): Promise<MMDLoadedAssets> {
   const zip = new JSZip()
-  const archive = await zip.loadAsync(file)
+  const archive = await zip.loadAsync(file, { decodeFileName: decodeZipFileName })
 
   const paths = Object.keys(archive.files).filter(name => !archive.files[name].dir)
   const variants = detectMMDVariants(paths)

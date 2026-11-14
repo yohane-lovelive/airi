@@ -39,6 +39,10 @@ vi.mock('../database/storage', async (importOriginal) => {
   })
   return { ...await importOriginal<typeof import('../database/storage')>(), storage }
 })
+// These repos keep their records in IndexedDB too.
+vi.mock('../database/repos/usage.repo')
+vi.mock('../database/repos/timeline.repo')
+vi.mock('../database/repos/motions.repo')
 
 const cloudModel: CloudDisplayModel = {
   id: 'display-model-cloud',

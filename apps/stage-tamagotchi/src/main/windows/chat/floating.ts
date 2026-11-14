@@ -67,6 +67,13 @@ interface FloatingChatWindow {
   setCovered: (covered: boolean) => void
 }
 
+/**
+ * Longest wait, in milliseconds, for the renderer to report the hidden content after a move to the other side starts.
+ * The fold animation takes 380 ms. A page that reloads or stops drawing during the move never reports it, and the chat
+ * would stay shown and empty.
+ */
+const RELOCATION_TIMEOUT_MS = 1000
+
 /** Every edge and corner of a chat that shares none with the main window. */
 const allResizeEdges: ResizeDirection[] = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']
 
@@ -95,6 +102,7 @@ function attachedResizeEdges(layout: AttachedChatLayout): ResizeDirection[] {
  * - `relocating` is `true` while the chat moves to the other side of the main
  *   window. The renderer folds the content toward the character, the window
  *   moves while the content is hidden, and the content unfolds on the new side.
+ *   The move finishes without the renderer after {@link RELOCATION_TIMEOUT_MS}.
  * - `slide` animates a change of the vertical anchor, which does not cross
  *   the character.
  * - The window itself is created on the first open and destroyed on a switch
@@ -118,6 +126,8 @@ export function setupFloatingChatWindow(params: {
   let folded = true
   let layout: AttachedChatLayout = { ...preferredAttachedChatLayout }
   let relocating = false
+  /** Finishes a move that the renderer never reports. Present while `relocating` waits for the renderer. */
+  let relocationTimeout: ReturnType<typeof setTimeout> | undefined
   /** The chat window's own always-on-top state, as its `always-on-top-changed` events report it. */
   let pinned = false
   /** `true` while the main window covers its display. The chat hides then, and shows again after unless folded. */
@@ -219,8 +229,14 @@ export function setupFloatingChatWindow(params: {
     })
   }
 
-  function finishRelocation(main: BrowserWindow, target: BrowserWindow) {
+  function stopRelocation() {
     relocating = false
+    clearTimeout(relocationTimeout)
+    relocationTimeout = undefined
+  }
+
+  function finishRelocation(main: BrowserWindow, target: BrowserWindow) {
+    stopRelocation()
     const mainBounds = main.getBounds()
     // The main window may have moved on while the content folded.
     layout = chooseAttachedChatLayout(mainBounds, boundsOf(target), screen.getDisplayMatching(mainBounds).workArea, layout)
@@ -254,8 +270,14 @@ export function setupFloatingChatWindow(params: {
       relocating = true
       emitState()
       // A renderer that cannot animate would never report the content hidden.
-      if (isRendererUnavailable(target))
+      if (isRendererUnavailable(target)) {
         finishRelocation(main, target)
+        return
+      }
+      relocationTimeout = setTimeout(() => {
+        if (relocating && !target.isDestroyed() && !main.isDestroyed())
+          finishRelocation(main, target)
+      }, RELOCATION_TIMEOUT_MS)
       return
     }
 
@@ -473,7 +495,7 @@ export function setupFloatingChatWindow(params: {
       if (context === targetContext) {
         context = undefined
         setFolded(true)
-        relocating = false
+        stopRelocation()
         pinned = false
       }
     })
@@ -483,7 +505,7 @@ export function setupFloatingChatWindow(params: {
       // A fold wins over a relocation: the next open places the chat anyway.
       // An unfold that overtook the animation leaves the window shown.
       if (folded) {
-        relocating = false
+        stopRelocation()
         target.hide()
         return
       }

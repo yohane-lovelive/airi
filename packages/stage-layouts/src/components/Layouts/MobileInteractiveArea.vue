@@ -7,6 +7,7 @@ import { CharacterSwitcherDrawer, ChatBackgroundTasks, ChatHistory } from '@proj
 import { ChatComposerAddMenu, ChatComposerVoiceInput, ChatImageAttachmentPreview, ChatProviderSetupCallout, ChatReplyPreview, ChatSessionsDrawer, useChatImages, useStartVoiceCall, VoiceCallCapsule, VoicePresence } from '@proj-airi/stage-ui/components/scenarios/chat'
 import { ModelPlacementPanel, ModelPlacementSurface } from '@proj-airi/stage-ui/components/scenarios/settings/model-settings'
 import { useAnalytics, useAudioAnalyzer } from '@proj-airi/stage-ui/composables'
+import { useOwnerTypingReport } from '@proj-airi/stage-ui/composables/use-owner-typing-report'
 import { useAudioContext } from '@proj-airi/stage-ui/stores/audio'
 import { useAuthStore } from '@proj-airi/stage-ui/stores/auth'
 import { useChatStore } from '@proj-airi/stage-ui/stores/chat'
@@ -65,6 +66,7 @@ const {
   replyTarget,
   selectReply,
 } = composer
+useOwnerTypingReport(messageInput, isComposing)
 const { addFiles, selectFiles, error: imageError, pending: pendingImages } = useChatImages(composer, () => activeSessionId.value)
 const imageInput = useTemplateRef<HTMLInputElement>('imageInput')
 /** A recording bar or the walkie-talkie bar covers the input bubble, so the text is hidden under it. */

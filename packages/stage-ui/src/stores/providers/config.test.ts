@@ -2,7 +2,7 @@ import type { InferenceServiceProvider } from '../../libs/providers/types'
 
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createApp, nextTick } from 'vue'
+import { createApp, nextTick, toRaw } from 'vue'
 
 import { useSyncPreferencesStore } from '../sync-preferences'
 import { useProviderConfigStore } from './config'
@@ -497,6 +497,26 @@ describe('provider config store', () => {
     expect(store.getProviderConfig(localProvider.id)).toEqual({
       apiKey: 'sk-test',
       baseUrl: 'https://example.com/v1/',
+    })
+  })
+
+  it('keeps nested fields cloneable after a patch', async () => {
+    const store = installStore()
+    store.providers[localProvider.id] = {
+      ...localProvider,
+      config: { voiceSettings: { speed: 1 } },
+    }
+
+    await store.patchProviderConfig(localProvider.id, { referenceVoices: [{ clips: [], id: 'a', name: 'A' }] })
+    await store.patchProviderConfig(localProvider.id, { baseUrl: 'http://localhost:8088/v1/' })
+    await store.setProviderModel(localProvider.id, 'irodori-tts')
+
+    // The speech module clones the config before each synthesis.
+    expect(structuredClone(toRaw(store.getProviderConfig(localProvider.id)))).toEqual({
+      baseUrl: 'http://localhost:8088/v1/',
+      model: 'irodori-tts',
+      referenceVoices: [{ clips: [], id: 'a', name: 'A' }],
+      voiceSettings: { speed: 1 },
     })
   })
 

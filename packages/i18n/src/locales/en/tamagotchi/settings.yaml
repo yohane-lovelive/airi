@@ -28,6 +28,12 @@ pages:
   models:
     godot-stage-error:
       title: Godot Stage error
+    unity-stage:
+      back: Back to Built-in Stage
+      cancel-waiting: Waiting for the Unity Editor. Select to cancel.
+      error-title: Unity Stage error
+      switch: Switch to Unity Stage (Experimental)
+      unsupported-model: Unity Stage shows only VRM and PMX models. Select another model.
   modules:
     mcp-server:
       description: Connect and manage MCP server and tools
@@ -83,6 +89,119 @@ devtools:
   pages:
     context-flow:
       title: Context Flow
+    perception-recorder:
+      title: Screen Recorder
+      description: Record the screen that the character sees, for replay evaluation
+      intro: A developer tool. It writes each frame that screen perception takes, the app in front, the screen events, and the times of your messages to a folder on this device. Recordings never leave the device. Excluded windows are not recorded.
+      unsupported: Only the desktop app can record the screen.
+      needs-perception: Turn screen perception on and let it run, then start a recording.
+      start: Start recording
+      stop: Stop recording
+      open-folder: Open the folder
+      recording: 'Recording: {count} frames'
+      limits: A recording stops by itself after 20 minutes or 1 GB. A pause of perception, a screen lock, or the end of the share also stops it.
+      recordings: Recordings
+      summary: '{frames} frames · {minutes} min · {size} MB'
+      now: recording now
+      delete: Delete the recording
+      empty: No recordings yet.
+    initiative-inspector:
+      title: Autonomous Speech Inspector
+      description: See why the character talks on its own or stays quiet
+      intro: The values of the autonomous speech policy, from the main window each second while this page is open.
+      status:
+        off: Autonomous speech is off.
+        waiting: Waiting for values from the main window.
+      reasons:
+        owner-active: Waiting while you type or speak
+        speech-playing: Waiting while speech plays
+        turn-running: A turn runs now
+        no-view: The commentary cannot see its window now
+        quiet-hours: Quiet hours
+        owner-quiet: Quiet, because you asked
+        daily-budget: The tries of today are used up
+        refractory: Resting after a turn
+        below-threshold: The drive is below the threshold
+        ready: Ready to talk
+      mode: 'Mode: {mode}'
+      turn: 'Trigger: {trigger} · speech type: {type}'
+      graph: Drive and threshold over time
+      drive: Drive
+      threshold: Threshold
+      last-minutes: Last {count} minutes
+      jitter-note: '* The next decision draws the random part of the threshold.'
+      parts:
+        pressure: Event pressure
+        boredom: Boredom
+        intention: Intentions
+      inner:
+        energy: Energy
+        mood: Mood
+        curiosity: Curiosity
+      pace:
+        title: Pace
+        unanswered: 'Lines without your reaction: {count} (interval ×{factor})'
+        budget: 'Tries today: {turns} of {limit}'
+        refractory: 'Rest left: {seconds} s'
+        recent-types: 'Recent speech types: {types}'
+        follow-up: 'Next: {kind} in {seconds} s (continuations: {count})'
+      intentions: Open intentions
+      missions: Active missions
+      until: until {time}
+      none: None.
+      usage-today: Tokens today
+      device-floor:
+        title: Device floor
+        'off': Not in use. Turn on Memory sync to let one device speak at a time.
+        held: This device holds the floor, so it speaks on its own.
+        other: 'Another device holds the floor ({id}), so this device stays quiet.'
+        unknown: The server did not answer, so this device speaks as before.
+      memory-recall:
+        title: Memory recall
+        none: No memories were recalled since the app started.
+        last: '{count} memories for a message of {chars} characters, {mode}, at {time}'
+        modes:
+          meaning: by meaning on the server
+          characters: by shared words on this device
+      rhythm:
+        present: The owner is at the device.
+        away: 'The owner is away since {time}.'
+        greeting: 'Last greeting: {time}'
+        welcome-back: 'Last welcome back: {time}'
+      timeline:
+        title: Screen timeline of this chat
+        clear: Clear
+        scene: 'Current scene: {text}'
+        summary: 'Earlier: {text}'
+        sources:
+          code: by the app
+          model: by the character
+      screen:
+        title: Screen
+        activity: 'Screen activity: {value}'
+        target: 'Watching the window of {app}'
+        target-hidden: 'Waiting: the window of {app} is not in front'
+        events: Recent screen events
+        salience: 'salience {value}'
+        familiar: familiar screen
+        types:
+          scene-change: 'Scene change in {app}'
+          app-switch: 'Switch to {app}'
+          still: 'Still screen in {app}'
+      topics:
+        title: Topics
+        thread: 'Current topic: {topic} ({count} lines, heat {heat})'
+        thread-cold: 'Current topic: {topic} ({count} lines, heat {heat}). It is cold, so the next turn asks for a new topic.'
+        no-thread: No autonomous lines in the recent days.
+        seeds: 'Ideas of the last turn: {seeds}'
+        compared-by:
+          vectors: Topics compared by meaning on the server
+          characters: Topics compared by shared words on this device
+        recalled-memory: 'Memory offered to the last recall turn: {id}'
+        variety: 'Variety of today ({count} lines)'
+        distinct: 'Distinct phrases (distinct-2): {value}'
+        entropy: 'Speech type spread (entropy): {value}'
+        similarity: 'Similarity of consecutive topics: {value}'
     presence-bubble:
       title: Presence Bubble
       description: Drive the bubble above the character and watch it in the main window

@@ -6,7 +6,7 @@ Shared audio-pipeline orchestration for AIRI. The package owns input sharing, ca
 
 - Sharing one audio source between recording, transcription, and detectors.
 - Building and scheduling speech playback pipelines.
-- Parsing streaming-control events.
+- Parsing streaming-control events. The ACT parser fixes the brackets of an object that a model closed wrongly, and drops a payload that it cannot fix.
 
 ## Do not use it for
 
@@ -53,7 +53,7 @@ A finished capture reports its interval. An observer finishes when the source en
 ## Playback ownership
 
 `Playback.openGroup()` creates an independent queue. Groups can play concurrently.
-`finish()` drains one group. `stop({ fadeMs })` closes admission, discards queued clips, and waits for actual silence.
+`finish()` drains one group. `stop({ fadeMs })` closes admission, discards queued clips, and waits for actual silence. `stopAfterCurrent()` closes admission and discards queued clips, but lets the playing clip end on its own, for example at the end of its sentence.
 A cancelled clip does not cancel other clips in its group.
 
 The driver owns the audio clock. `playback.nowMs()` reads it.

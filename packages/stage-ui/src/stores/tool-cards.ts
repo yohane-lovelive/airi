@@ -165,7 +165,7 @@ const useToolCardsStateStore = defineStore('tool-cards-state', () => {
     // An MCP tool runs through the proxy tool, whose description is about the proxy, so an MCP card has none.
     const description = request.key === request.toolName ? tool?.function.description : undefined
     const agent = createToolCardAgent({
-      generateText: generateText({ providerId, model }),
+      generateText: generateText({ providerId, model }, 'tool-card'),
       validate: program => problemsOfProgram(program, { key: request.key, data: request.data }),
       // The model searches the icons that it names, so a card never guesses one.
       tools: await createSearchIconsTool(),

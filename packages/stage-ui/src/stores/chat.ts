@@ -5,6 +5,8 @@ import type { TraceSpan } from '@proj-airi/trace-kit'
 import type { Message } from '@xsai/shared-chat'
 import type { SyncedPiniaRuntime } from 'pinia-plugin-synced'
 
+import type { MemoryRecallResult } from '../libs/memory-recall'
+import type { UsagePurpose } from '../libs/usage'
 import type { ChatHistoryItem, ChatToolReference } from '../types/chat'
 import type { ChatSessionTaskStatus, StoredVoiceInterruption } from '../types/chat-session'
 import type { ToolCallRerunPayload } from './tool-call-rerun'
@@ -30,6 +32,10 @@ import { useChatVision } from '../composables/vision/use-chat-vision'
 import { useVisionInference } from '../composables/vision/use-vision-inference'
 import { chatAssetIdFrom, inlineConversationAssets, storeChatAttachments } from '../libs/chat-assets'
 import { extractMessageText, isCloudSyncableMessage } from '../libs/chat-sync'
+import { INITIATIVE_SOURCE } from '../libs/initiative/conversation'
+import { MEMORY_INDEX_LIMIT, MEMORY_INDEX_LIMIT_WITH_RECALL } from '../libs/memory-index'
+import { composeRecalledMemories, newestUserText, withRecalledMemories } from '../libs/memory-recall'
+import { composeOwnerProfilePrompt } from '../libs/memory-work'
 import { syncedRoles } from '../libs/pinia/synced-context'
 import { createChatAnalyticsHooks, getProviderMode } from '../libs/product-signals/events/chat'
 import {
@@ -37,14 +43,19 @@ import {
   AIRI_CHAT_ROUND_ID_HEADER,
   AIRI_CHAT_SESSION_ID_HEADER,
 } from '../libs/product-signals/headers'
+import { promptPartSizes } from '../libs/prompt-parts'
 import { getSpeechBusContext, voiceGenerationEnded } from '../services/speech/bus'
 import { composeDrawCardPrompt, createDrawCardTool, DRAW_CARD_TOOL_NAME, drawCardContent } from '../tools/draw-card'
+import { createIntentionTools, createTalkLevelTool } from '../tools/initiative'
 import { createJudgeRecipeTool, judgmentSkillText } from '../tools/judge-recipe'
 import { composeMemoryPrompt, createMemoryTools } from '../tools/memory'
+import { createMissionTools } from '../tools/missions'
+import { createPerformMotionTool } from '../tools/perform-motion'
 import { createProposeRecipeTool } from '../tools/propose-recipe'
 import { createSearchIconsTool } from '../tools/search-icons'
 import { createUseRecipeTool } from '../tools/use-recipe'
 import { createWakeWordTool } from '../tools/wake-words'
+import { webSearchRefusalOf } from '../tools/web-search'
 import { useLLM } from './ai/chat-llm/llm'
 import { resolveLlmTools } from './ai/chat-llm/tool-resolver'
 import { useLlmToolsStore } from './ai/chat-llm/tools'
@@ -53,19 +64,34 @@ import { useAuthStore } from './auth'
 import { createMinecraftContext, createRuntimePromptContext, createUserAccountContext } from './chat/context-providers'
 import { useChatContextStore } from './chat/context-store'
 import { describeChatImages, replaceToolResultImages } from './chat/image-projection'
-import { composeRecipeSpacePrompt, composeSystemPrompt } from './chat/prompt-recipe'
+import { composeRecipeSpacePrompt, composeReplyLengthPrompt, composeSharedPastPrompt, composeSystemPrompt } from './chat/prompt-recipe'
 import { staysLocal } from './chat/session-locality'
 import { useChatSessionStore } from './chat/session-store'
 import { useChatStreamStore } from './chat/stream-store'
 import { useContextObservabilityStore } from './devtools/context-observability'
+import { useHistorySummaryStore } from './history-summary'
+import { useInitiativeStore } from './initiative'
+import { useIntentionsStore } from './intentions'
 import { useMemoryStore } from './memory'
+import { useMemoryRecallStore } from './memory-recall'
+import { useMemorySyncStore } from './memory-sync'
+import { useMissionsStore } from './missions'
 import { useAiriCardStore } from './modules/airi-card'
 import { useAutonomousArtistryStore } from './modules/artistry-autonomous'
 import { useConsciousnessStore } from './modules/consciousness'
+import { useConsciousnessSettingsStore } from './modules/consciousness-settings'
 import { useHearingStore } from './modules/hearing'
+import { useSpeechStore } from './modules/speech'
 import { useStickersStore } from './modules/stickers'
 import { useWebSearchStore } from './modules/web-search'
+import { useMotionGenerationStore } from './motion-generation'
+import { useMotionLibraryStore } from './motion-library'
+import { useOwnerProfileStore } from './owner-profile'
+import { usePerceptionStore } from './perception'
+import { usePerceptionRunnerStore } from './perception-runner'
 import { useRecipesStore } from './recipes'
+import { useSettingsStageModel } from './settings/stage-model'
+import { useTimelineStore } from './timeline'
 import { executeToolCallRerun } from './tool-call-rerun'
 import { useToolCardsStore } from './tool-cards'
 import { useWakeWordsStore } from './wake-words'
@@ -273,8 +299,9 @@ export const useChatStore = defineStore('chat', () => {
   // tool resolver that would otherwise be the first to create this store runs after
   // the system prompt is composed, which would expose web_search on the first turn
   // without its paired prompt-injection defense.
-  useWebSearchStore()
+  const webSearch = useWebSearchStore()
   const consciousnessStore = useConsciousnessStore()
+  const consciousnessSettings = useConsciousnessSettingsStore()
   const chatVision = useChatVision()
   const artistryAutonomousStore = useAutonomousArtistryStore()
   const { activeProvider } = storeToRefs(consciousnessStore)
@@ -282,8 +309,23 @@ export const useChatStore = defineStore('chat', () => {
   const chatStream = useChatStreamStore()
   const chatContext = useChatContextStore()
   const cardStore = useAiriCardStore()
+  const historySummary = useHistorySummaryStore()
+  /** The count of messages that the summary stood for in the last request of each session, for its IO trace. */
+  const summarizedCounts = new Map<string, number>()
   const recipes = useRecipesStore()
   const memory = useMemoryStore()
+  const memorySync = useMemorySyncStore()
+  const memoryRecall = useMemoryRecallStore()
+  const ownerProfile = useOwnerProfileStore()
+  const missions = useMissionsStore()
+  const motionLibrary = useMotionLibraryStore()
+  const motionGeneration = useMotionGenerationStore()
+  const stageModel = useSettingsStageModel()
+  const initiative = useInitiativeStore()
+  const intentions = useIntentionsStore()
+  const timeline = useTimelineStore()
+  const perception = usePerceptionStore()
+  const perceptionRunner = usePerceptionRunnerStore()
 
   /** The persona of a session. A session without one uses the selected card. */
   function personaOf(sessionId: string) {
@@ -296,11 +338,21 @@ export const useChatStore = defineStore('chat', () => {
    * A recipe's own session adds the recipe's steps after the identity. They stay the same there, so its prefix stays cacheable.
    * The first request and every later model step read it, so a card edit reaches the next step.
    */
+  function memoryIndexOf(persona: string) {
+    // Recall by meaning brings the older entries with the owner message, so a short index does. The setting decides it,
+    // not each answer of the server, so the cached system prompt stays the same.
+    return memory.indexFor(persona, memorySync.active ? MEMORY_INDEX_LIMIT_WITH_RECALL : MEMORY_INDEX_LIMIT)
+  }
+
   function sessionSystemPrompt(sessionId: string) {
     const persona = personaOf(sessionId)
     const identity = composeSystemPrompt(cardStore.getSystemPrompt(persona))
-      + (memory.enabled ? composeMemoryPrompt(memory.indexFor(persona)) : '')
+      + (memory.enabled ? composeMemoryPrompt(memoryIndexOf(persona)) : '')
+      // The profile is about the owner, so only the owner's own conversations hold it. It changes only after memory work.
+      + (memory.enabled && ownerProfile.enabled && isOwnerSession(sessionId) ? composeOwnerProfilePrompt(ownerProfile.profile?.text ?? '') : '')
       + (drawsCards(sessionId) ? composeDrawCardPrompt() : '')
+      + composeReplyLengthPrompt(consciousnessSettings.replyLength)
+      + composeSharedPastPrompt()
     const recipeId = chatSession.sessionMetas[sessionId]?.recipeId
     const recipe = recipeId ? recipes.recipes.find(entry => entry.id === recipeId) : undefined
     return recipe ? identity + composeRecipeSpacePrompt(recipe) : identity
@@ -420,23 +472,57 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   /**
-   * Tells a conversation about finished background work. The main agent reads the notice and decides what to say, or stays quiet.
+   * Tells a conversation about work outside it, for example a finished background task or a due reminder.
+   * The main agent reads the notice and decides what to say, or stays quiet. With `mustSpeak`, it is asked to speak.
+   * With `reply`, the run speaks that fixed text and makes no model call. With `transient`, history keeps only the reply.
+   * `attachments` go with the notice, for example frames of the screen. A transient notice keeps them out of history.
    * Only the owner's own conversation gets a notice, so background results never reach a scene.
+   * `messageId` names the turn, so the caller can cancel it with `cancelTurn`.
+   *
+   * Resolves to `spoke` when a reply with content was stored, `silent` when none was, `failed` when the send failed, and
+   * `skipped` for a conversation that is not the owner's.
    */
-  async function notifyConversation(sessionId: string, notice: { source: string, text: string }) {
+  async function notifyConversation(
+    sessionId: string,
+    notice: { source: string, text: string, mustSpeak?: boolean, reply?: string, transient?: boolean, attachments?: ChatAttachment[], anchor?: { text: string, image: string } },
+    messageId?: string,
+  ): Promise<'spoke' | 'silent' | 'failed' | 'skipped'> {
     if (!isOwnerSession(sessionId))
-      return
+      return 'skipped'
     try {
-      await executeSend({ sessionId, text: notice.text }, { notice: { source: notice.source } })
+      const { text, attachments, ...options } = notice
+      const result = await executeSend({ sessionId, text, ...(messageId ? { messageId } : {}), ...(attachments?.length ? { attachments } : {}) }, { notice: options })
+      return result.messages.some(message => message.role === 'assistant') ? 'spoke' : 'silent'
     }
     catch (error) {
       console.warn('[chat] Failed to deliver a notice:', errorMessageFrom(error))
+      return 'failed'
     }
   }
 
   /** Whether a session is a background task's own space. */
   function isTaskSession(sessionId: string) {
     return Boolean(chatSession.sessionMetas[sessionId]?.recipeId)
+  }
+
+  /** The purposes of turns that the character starts on its own: idle speech, small talk, commentary, and missions. */
+  const AUTONOMOUS_PURPOSES: readonly UsagePurpose[] = ['initiative', 'commentary', 'mission']
+
+  /** Why a send runs, for the usage records. A notice tells its purpose by its source. */
+  function usagePurposeOf(sessionId: string, notice?: { source: string }): UsagePurpose {
+    if (isTaskSession(sessionId))
+      return 'task'
+    if (!isOwnerSession(sessionId))
+      return 'scene'
+    if (!notice)
+      return 'owner-reply'
+    if (notice.source === INITIATIVE_SOURCE)
+      return missions.commentaryAt(Date.now()) ? 'commentary' : 'initiative'
+    if (notice.source.startsWith('mission:'))
+      return 'mission'
+    if (notice.source.startsWith('recipe:'))
+      return 'task'
+    return 'other'
   }
 
   /**
@@ -576,6 +662,15 @@ export const useChatStore = defineStore('chat', () => {
     return llmToolsStore.tools.map(tool => ({ name: tool.function.name }))
   }
 
+  /**
+   * Whether a running turn answers an owner message. The turn id is the id of its user message. A stored notice has a
+   * `notice`, and a transient notice is never stored, so neither one counts.
+   */
+  function answersOwnerMessage(sessionId: string, turnId: string) {
+    const message = chatSession.getSessionMessagesIfLoaded(sessionId)?.find(entry => entry.id === turnId)
+    return message?.role === 'user' && !message.notice
+  }
+
   /** Whether a send answers the owner's own message in the owner's conversation: not a notice, a scene, or a task. */
   function isOwnerSend(payload: ChatSendPayload, extra: HostSendOptions) {
     return !extra.notice && isOwnerSession(payload.sessionId) && !isTaskSession(payload.sessionId)
@@ -642,7 +737,11 @@ export const useChatStore = defineStore('chat', () => {
     const persona = personaOf(sessionId)
     const sourceTools = async () => [
       ...(typeof tools === 'function' ? await tools() ?? [] : tools ?? []),
-      ...memory.enabled ? await createMemoryTools({ read: id => memory.read(id, persona), write: entry => memory.write(entry, persona), forget: id => memory.forget(id, persona) }) : [],
+      // This copy takes the place of the plain tool of the resolver, because a later tool wins over one with the same name.
+      ...(webSearch.configured
+        ? await webSearch.createTools(() => webSearchRefusalOfTurn(sessionId, correlation.turnId))
+        : []),
+      ...memory.enabled ? await createMemoryTools({ read: id => memory.read(id, persona), search: async query => (await memoryRecall.recall(query, persona)).entries, write: entry => memory.write(entry, persona), forget: id => memory.forget(id, persona) }) : [],
     ]
     // A recipe's own session runs only that recipe. It cannot start recipes, save them, or choose silence.
     if (isTaskSession(sessionId))
@@ -654,6 +753,66 @@ export const useChatStore = defineStore('chat', () => {
       ...(ownerOnly ? await createUseRecipeTool({ recipes: () => recipes.recipes, start: (recipe, task) => startRecipe(recipe, { parentSessionId: sessionId, task }) }) : []),
       // The owner can turn proposals off. Every proposal waits for the owner's approval.
       ...(ownerOnly && recipes.proposalsEnabled ? await createProposeRecipeTool({ propose: recipe => recipes.propose(recipe) }) : []),
+      // A mission speaks to the owner later, so only the owner's own conversation starts one. The owner can turn missions
+      // off, and an app without a mission runner offers no tools.
+      ...(ownerOnly && missions.enabled && missions.supported
+        ? await createMissionTools({
+            missions: () => missions.missions,
+            addReminder: request => missions.addReminder(request, sessionId),
+            // Small talk speaks through autonomous turns, so it needs them on.
+            addSmallTalk: async (request) => {
+              if (!initiative.enabled || !initiative.supported)
+                return { ok: false, reason: 'Autonomous speech is off. The owner can turn it on in Settings > Modules > Autonomous speech.' }
+              // Solo talk without a voice only spends tokens on text that nobody listens to.
+              if (request.solo && (!useSpeechStore().enabled || ['', 'speech-noop'].includes(cardStore.getModules(persona).speech.provider)))
+                return { ok: false, reason: 'Solo talk needs a voice, and speech is off. The owner can choose a voice in Settings > Modules > Speech.' }
+              return missions.addSmallTalk(request, sessionId)
+            },
+            // Commentary watches the screen and speaks through autonomous turns, so it needs both on.
+            addCommentary: async (request) => {
+              if (!initiative.enabled || !initiative.supported)
+                return { ok: false, reason: 'Autonomous speech is off. The owner can turn it on in Settings > Modules > Autonomous speech.' }
+              if (!perception.enabled || !perception.supported)
+                return { ok: false, reason: 'Screen perception is off. The owner can turn it on in Settings > Modules > Screen perception.' }
+              return missions.addCommentary(request, sessionId, perceptionRunner.foregroundApp())
+            },
+            // A watch checks the screen, so it needs screen perception on.
+            addWatch: async request => perception.enabled && perception.supported
+              ? missions.addWatch(request, sessionId, perceptionRunner.foregroundApp())
+              : { ok: false, reason: 'Screen perception is off. The owner can turn it on in Settings > Modules > Screen perception.' },
+            stop: id => missions.stop(id),
+          })
+        : []),
+      // Intentions and the talk level shape autonomous speech, so only an app that runs it offers them.
+      ...(ownerOnly && initiative.enabled && initiative.supported
+        ? [
+            ...await createIntentionTools({
+              open: () => intentions.openAt(Date.now()),
+              add: request => intentions.add(request),
+              finish: id => intentions.finish(id),
+            }),
+            ...await createTalkLevelTool({
+              answersOwner: () => answersOwnerMessage(sessionId, correlation.turnId),
+              apply: async (request) => {
+                const result = initiative.applyTalkRequest(request)
+                // A request for quiet also ends small talk or commentary. One that waits out a quiet time would surprise the owner.
+                if (result.ok && request.kind === 'quiet')
+                  await missions.endForeground('quiet')
+                return result
+              },
+            }),
+          ]
+        : []),
+      // Only a VRM or MMD model plays the gestures of the motion library.
+      ...(ownerOnly && (stageModel.stageModelRenderer === 'vrm' || stageModel.stageModelRenderer === 'mmd')
+        ? await createPerformMotionTool({
+            match: (motion) => {
+              const entry = motionLibrary.choose(motion)
+              return entry && entry.name
+            },
+            generate: motion => motionGeneration.requestForOwner(motion),
+          })
+        : []),
       // Cards show in the owner's own chat only. A scene, such as a Discord channel, gets text. A card names its icons
       // from a search, so the model never guesses an icon name.
       ...(drawsCards(sessionId) ? [...await createDrawCardTool(), ...await createSearchIconsTool()] : []),
@@ -690,6 +849,14 @@ export const useChatStore = defineStore('chat', () => {
 
     // Stored messages reference their images and recordings. The provider request carries the bytes.
     context = await inlineConversationAssets(context)
+
+    // The memories that fit the owner message go with it for this request only. A notice recalls nothing yet.
+    let recalled: MemoryRecallResult | undefined
+    const query = newestUserText(context)
+    if (memory.enabled && correlation && query && usagePurposeOfTurn(correlation.conversationId, correlation.turnId) === 'owner-reply') {
+      recalled = await memoryRecall.recall(query, personaOf(correlation.conversationId))
+      context = withRecalledMemories(context, composeRecalledMemories(recalled))
+    }
 
     // NOTICE:
     // These image decisions read the model of the first step and hold for the stream.
@@ -855,6 +1022,22 @@ export const useChatStore = defineStore('chat', () => {
         [AgentAttributes.LLMInputMessageRoles]: providerMessages.map(message => message.role),
       },
     })
+    const parts = promptPartSizes(providerContext)
+    llmSpan.update({
+      [AgentAttributes.LLMPromptSystemChars]: parts.systemChars,
+      [AgentAttributes.LLMPromptMemoryIndexChars]: correlation && memory.enabled ? memoryIndexOf(personaOf(correlation.conversationId)).length : 0,
+      ...(recalled
+        ? {
+            [AgentAttributes.LLMPromptMemoryRecallMode]: recalled.mode,
+            [AgentAttributes.LLMPromptMemoryRecallQueryChars]: query.length,
+            [AgentAttributes.LLMPromptMemoryRecalledIds]: recalled.entries.map(entry => entry.id),
+          }
+        : {}),
+      [AgentAttributes.LLMPromptSummaryChars]: parts.summaryChars,
+      [AgentAttributes.LLMPromptSummarizedMessages]: correlation ? summarizedCounts.get(correlation.conversationId) ?? 0 : 0,
+      [AgentAttributes.LLMPromptHistoryTurns]: parts.historyTurns,
+      [AgentAttributes.LLMPromptHistoryChars]: parts.historyChars,
+    })
     const llmRequestTs = sink.now()
     let llmTtftMs: number | undefined
     let llmError: unknown
@@ -871,6 +1054,7 @@ export const useChatStore = defineStore('chat', () => {
     try {
       await llmStore.stream(model, chatProvider, providerContext, {
         ...options,
+        purpose: correlation ? usagePurposeOfTurn(correlation.conversationId, correlation.turnId) : undefined,
         tools: withRunTools(options?.tools, options?.requestCorrelation),
         prepareStringContent: prepareTextOnlyAudioContext,
         headers: requestHeaders(options?.providerId),
@@ -1075,6 +1259,12 @@ export const useChatStore = defineStore('chat', () => {
     // Identity follows the session's persona at request time, so a card switch never rewrites another session.
     getSystemPrompt: sessionSystemPrompt,
     getContextWindow: sessionId => cardStore.getCard(personaOf(sessionId))?.extensions.airi.contextWindow ?? -1,
+    // A long conversation sends a summary and its recent messages. The stored history stays whole.
+    projectHistory: (sessionId, messages) => {
+      const projected = historySummary.project(sessionId, messages)
+      summarizedCounts.set(sessionId, projected.coveredCount)
+      return projected
+    },
     runtimeContextProviders: [
       () => createRuntimePromptContext(runtimePrompt.value),
       createMinecraftContext,
@@ -1116,6 +1306,12 @@ export const useChatStore = defineStore('chat', () => {
         })
       }
     },
+    // The character notes the screen with markers. They go to the timeline of the conversation on this device.
+    onTimelineMarker: ({ sessionId, kind, text }) => {
+      const at = Date.now()
+      void (kind === 'note' ? timeline.addNotes(sessionId, [{ at, text, source: 'model' }]) : timeline.setScene(sessionId, text, at))
+        .catch(error => console.warn('[chat] Failed to keep a timeline marker:', errorMessageFrom(error)))
+    },
     onAssistantMessageAppended: ({ sessionId, message, roundId }) => {
       const source = chatSession.getSessionMessages(sessionId).find(message => message.role === 'user' && message.id === roundId)
       if (source && isCloudSyncableMessage(source) && isCloudSyncableMessage(message) && message.id && syncsToCloud(sessionId)) {
@@ -1155,9 +1351,24 @@ export const useChatStore = defineStore('chat', () => {
   // One request owns preparation and generation. Cancellation cannot miss asynchronous startup.
   const requests = new Map<string, {
     sessionId: string
+    /** Why the send runs. The model calls of its turn record their usage under it. */
+    purpose: UsagePurpose
+    /** A notice brought images of the screen to this turn. */
+    readsScreen?: boolean
     abort: AbortController
     request: ReturnType<typeof runtime.submit>
   }>()
+
+  /** Why a turn that this window runs cannot search the web now. */
+  function webSearchRefusalOfTurn(sessionId: string, turnId: string) {
+    const turn = requests.get(JSON.stringify([sessionId, turnId]))
+    return webSearchRefusalOf({ readsScreen: turn?.readsScreen, autonomous: Boolean(turn && AUTONOMOUS_PURPOSES.includes(turn.purpose)) }, webSearch.takeAutonomousSearch)
+  }
+
+  /** The purpose of a turn that this window runs. */
+  function usagePurposeOfTurn(sessionId: string, turnId: string) {
+    return requests.get(JSON.stringify([sessionId, turnId]))?.purpose
+  }
 
   /** Whether this window runs a request of the session. */
   function hasLocalRequest(sessionId: string) {
@@ -1205,9 +1416,10 @@ export const useChatStore = defineStore('chat', () => {
       accepted: prepared.then(value => value.accepted),
       done: prepared.then(value => value.done),
     }
-    requests.set(key, { sessionId, abort, request })
+    requests.set(key, { sessionId, purpose: usagePurposeOf(sessionId, options.notice), abort, request })
     void request.accepted.catch(() => {})
     void request.done.finally(() => requests.delete(key)).catch(() => {})
+    void request.done.then(() => historySummary.summarize(sessionId)).catch(() => {})
     return request.done
   }
 
@@ -1279,6 +1491,11 @@ export const useChatStore = defineStore('chat', () => {
   /** Options that only the host sets: a background recipe task, a notice, and what keyword-matched recipes gave the message. */
   type HostSendOptions = Pick<ChatOrchestratorSendOptions, 'background' | 'notice' | 'skills'>
 
+  /** Whether a notice brings images of the screen to this send. The owner's own attachments do not count. */
+  function noticeReadsScreen(payload: ChatSendPayload, extra: HostSendOptions) {
+    return Boolean(extra.notice && (payload.attachments?.length || extra.notice.anchor))
+  }
+
   /**
    * Freeze request settings before asynchronous provider and session startup.
    * `invoked` holds the recipes that this message invoked by keyword.
@@ -1297,7 +1514,15 @@ export const useChatStore = defineStore('chat', () => {
     if (!characterId)
       throw new Error('The target session has no character')
 
-    const { provider: providerId, model: modelId } = cardStore.getModules(characterId).consciousness
+    // A call with images of the screen uses the screen model of the owner. It follows the card when the owner names none.
+    const readsScreen = noticeReadsScreen(payload, extra)
+    const selectionOfTurn = () => {
+      const selection = cardStore.getModules(characterId).consciousness
+      return readsScreen ? perception.modelOfScreenCall(selection) : selection
+    }
+    const { provider: providerId, model: modelId } = selectionOfTurn()
+    // Autonomous speech can reason less than a reply, so its turns ask for the level of autonomous speech.
+    const reasoningUse = AUTONOMOUS_PURPOSES.includes(usagePurposeOf(payload.sessionId, extra.notice)) ? 'autonomous' : 'reply'
 
     const temperature = payload.temperature ?? consciousnessStore.activeTemperature
     const topP = payload.topP ?? consciousnessStore.activeTopP
@@ -1319,7 +1544,7 @@ export const useChatStore = defineStore('chat', () => {
     const stickers = await stickersStore.selectCatalogForReply()
     signal.throwIfAborted()
 
-    const chatProvider = await consciousnessStore.getChatProviderInstance(providerId, modelId)
+    const chatProvider = await consciousnessStore.getChatProviderInstance(providerId, modelId, reasoningUse)
     signal.throwIfAborted()
 
     if (!chatProvider)
@@ -1332,11 +1557,11 @@ export const useChatStore = defineStore('chat', () => {
      * A tool step that edits the character changes the next request. Card selection does not.
      */
     const resolveStep = async () => {
-      const selection = cardStore.getModules(characterId).consciousness
+      const selection = selectionOfTurn()
       if (!isChatSelectionReady(selection.provider, selection.model))
         throw new Error('No chat provider or model configured for this character')
 
-      const stepProvider = await consciousnessStore.getChatProviderInstance(selection.provider, selection.model)
+      const stepProvider = await consciousnessStore.getChatProviderInstance(selection.provider, selection.model, reasoningUse)
       if (!stepProvider)
         throw new Error(`Failed to resolve chat provider "${selection.provider}"`)
 
@@ -1353,13 +1578,15 @@ export const useChatStore = defineStore('chat', () => {
     return {
       providerId,
       supportsAudioInput: await supportsAudioInput(providerId, modelId, chatProvider.generation(modelId)),
-      supportsVisionInput: selectedModel?.metadata?.abilities?.vision === true,
+      // The vision module decides with the same choice, so a model that reads images gets them and no description.
+      supportsVisionInput: consciousnessSettings.readsImages(providerId, modelId, selectedModel?.metadata?.abilities?.vision),
       resolveStep,
       signal,
       model: modelId,
       chatProvider,
       messageId: payload.messageId,
-      attachments: await storeChatAttachments(payload.attachments, payload.sessionId),
+      // A transient notice is never stored, so its attachments, for example frames of the screen, stay off the disk too.
+      attachments: extra.notice?.transient ? payload.attachments : await storeChatAttachments(payload.attachments, payload.sessionId),
       input: payload.input,
       replyToMessageId: payload.replyToMessageId,
       toolReferences: payload.tools,
@@ -1411,9 +1638,11 @@ export const useChatStore = defineStore('chat', () => {
         void startRecipe(recipe, { parentSessionId: payload.sessionId, task: `The owner said: ${payload.text}` })
     }).catch(() => {})
 
-    requests.set(key, { sessionId: payload.sessionId, abort, request })
+    requests.set(key, { sessionId: payload.sessionId, purpose: usagePurposeOf(payload.sessionId, extra.notice), readsScreen: noticeReadsScreen(payload, extra), abort, request })
     void request.accepted.catch(() => {})
     void request.done.finally(() => requests.delete(key)).catch(() => {})
+    // A finished send can push the recent history past its limits. The summary runs in the background.
+    void request.done.then(() => historySummary.summarize(payload.sessionId)).catch(() => {})
 
     return request
   }
@@ -1568,6 +1797,7 @@ export const useChatStore = defineStore('chat', () => {
     for (const sessionId of sessionIds) {
       failedImageReads.delete(sessionId)
       await cancelPendingSends(sessionId)
+      await timeline.clear(sessionId)
     }
     return chatSession.deleteSessions(sessionIds)
   }
@@ -1651,6 +1881,7 @@ export const useChatStore = defineStore('chat', () => {
     cancelPendingSends,
     getPendingQueuedSendSnapshot,
     openTurnSpan,
+    personaOf,
 
     clearHooks: runtime.hooks.clearHooks,
 

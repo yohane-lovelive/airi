@@ -1,5 +1,7 @@
 import type { Emotion } from '../constants/emotions'
 import type { MorphSlot } from '../constants/morphs'
+import type { MMDGraphicsAdjustments, MMDGraphicsQuality } from '../utils/mmd-graphics'
+import type { MMDRenderMode, MMDSurfaceKind, MMDSurfaceOverride } from '../utils/mmd-pbr'
 
 import indexedDbDriver from 'unstorage/drivers/indexedb'
 
@@ -11,6 +13,7 @@ import { createStorage } from 'unstorage'
 import { ref, watch } from 'vue'
 
 import { EMOTION_ACTION_NAME } from '../constants/actions'
+import { DEFAULT_MMD_GRAPHICS_ADJUSTMENTS } from '../utils/mmd-graphics'
 import { supportedControl, useMMDViewControl } from './view-control'
 
 type BroadcastChannelEvents
@@ -54,6 +57,8 @@ export interface MMDMaterialDescriptor {
   label: string
   /** Order index within the model. */
   index: number
+  /** The kind guessed from the names and the bone weights, before the owner's changes. */
+  kind: MMDSurfaceKind
 }
 
 const MOTION_STORAGE_PREFIX = 'mmd-motion-'
@@ -132,6 +137,8 @@ export const useMMD = defineStore('mmd', () => {
    * - `none`   — no tracking; idle saccades only
    */
   const gazeMode = useLocalStorageManualReset<MMDGazeMode>('settings/mmd/gaze-mode', 'mouse')
+  /** Breath, sway, a neck that follows the gaze, and nods, over the idle motion. Off by default. */
+  const bodyMotionEnabled = useLocalStorageManualReset<boolean>('settings/mmd/body-motion', false)
 
   // === Scene: camera ===
   /** Vertical field of view in degrees. */
@@ -156,6 +163,25 @@ export const useMMD = defineStore('mmd', () => {
   const albedoGlow = useLocalStorageManualReset<number>('settings/mmd/albedo-glow', 0.45)
   /** Device-pixel-ratio multiplier for render resolution. */
   const renderScale = useLocalStorageManualReset<number>('settings/mmd/render-scale', 1)
+  /** Post-processing preset. Off by default, so the scene looks as before until the owner opts in. */
+  const graphicsQuality = useLocalStorageManualReset<MMDGraphicsQuality>('settings/mmd/graphics/quality', 'off')
+  /** The owner's adjustments on top of the preset. */
+  const graphicsAdjustments = useLocalStorageManualReset<MMDGraphicsAdjustments>(
+    'settings/mmd/graphics/adjustments',
+    () => ({ ...DEFAULT_MMD_GRAPHICS_ADJUSTMENTS }),
+    { mergeDefaults: true },
+  )
+  /** How the model is shaded. Toon by default, as the model author made it. */
+  const renderMode = useLocalStorageManualReset<MMDRenderMode>('settings/mmd/graphics/render-mode', 'toon')
+  /**
+   * The owner's changes to the guessed material kinds and PBR values, by model ID, then by material index.
+   * The index follows the order of `availableMaterials`. One name can cover the face skin and the clothes, so names do
+   * not work as keys.
+   */
+  const materialSurfaces = useLocalStorageManualReset<Record<string, Record<string, MMDSurfaceOverride>>>(
+    'settings/mmd/graphics/material-surfaces',
+    () => ({}),
+  )
 
   // === Animation ===
   /** Name of the persistent idle motion; empty means none/static. */
@@ -273,6 +299,7 @@ export const useMMD = defineStore('mmd', () => {
     grantEnabled.reset()
     physicsGravity.reset()
     gazeMode.reset()
+    bodyMotionEnabled.reset()
     cameraFov.reset()
     ambientColor.reset()
     ambientIntensity.reset()
@@ -281,6 +308,10 @@ export const useMMD = defineStore('mmd', () => {
     directionalPosition.reset()
     albedoGlow.reset()
     renderScale.reset()
+    graphicsQuality.reset()
+    graphicsAdjustments.reset()
+    renderMode.reset()
+    materialSurfaces.reset()
     idleMotionName.reset()
     void clearMotions()
     oneShotAction.value = undefined
@@ -302,6 +333,7 @@ export const useMMD = defineStore('mmd', () => {
     grantEnabled,
     physicsGravity,
     gazeMode,
+    bodyMotionEnabled,
 
     cameraFov,
     ambientColor,
@@ -311,6 +343,10 @@ export const useMMD = defineStore('mmd', () => {
     directionalPosition,
     albedoGlow,
     renderScale,
+    graphicsQuality,
+    graphicsAdjustments,
+    renderMode,
+    materialSurfaces,
 
     idleMotionName,
     availableMotions,

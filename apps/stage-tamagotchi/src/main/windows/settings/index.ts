@@ -3,6 +3,8 @@ import type { ServerChannel } from '../../services/airi/channel-server'
 import type { GodotStageManager } from '../../services/airi/godot-stage'
 import type { IOTraceRecordingService } from '../../services/airi/io-trace-recording'
 import type { McpManager } from '../../services/airi/mcp-servers'
+import type { PerceptionRecorderService } from '../../services/airi/perception-recorder'
+import type { UnityStageManager } from '../../services/airi/unity-stage'
 import type { AutoUpdater } from '../../services/electron/auto-updater'
 import type { GlobalShortcutService } from '../../services/electron/global-shortcut'
 import type { DevtoolsWindowManager } from '../devtools'
@@ -42,11 +44,13 @@ export function setupSettingsWindowReusableFunc(params: {
   onWindowCreated?: (window: BrowserWindow) => void
   serverChannel: ServerChannel
   godotStageManager: GodotStageManager
+  unityStageManager: UnityStageManager
   mcpManager: McpManager
   i18n: I18n
   globalShortcut: GlobalShortcutService
   spotlightWindow: SpotlightWindowManager
   ioTraceRecording: IOTraceRecordingService
+  perceptionRecorder: PerceptionRecorderService
 }): SettingsWindowManager {
   const defaultRoute = '/settings'
   let currentRoute = defaultRoute
@@ -82,11 +86,13 @@ export function setupSettingsWindowReusableFunc(params: {
       getMainWindow: params.getMainWindow,
       serverChannel: params.serverChannel,
       godotStageManager: params.godotStageManager,
+      unityStageManager: params.unityStageManager,
       mcpManager: params.mcpManager,
       i18n: params.i18n,
       globalShortcut: params.globalShortcut,
       spotlightWindow: params.spotlightWindow,
       ioTraceRecording: params.ioTraceRecording,
+      perceptionRecorder: params.perceptionRecorder,
     })
     // The Developer page asks for the devtools of the main window. The workspace window shows the same page and opens
     // its own devtools instead, so this handler is not in `setupSettingsWindowInvokes`.

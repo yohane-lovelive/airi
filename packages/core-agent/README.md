@@ -79,6 +79,7 @@ Realtime transport is not implemented. A future session adapter can project the 
 - `scene` marks a reply to an external scene, for example a Discord channel. It never speaks.
 - `background` marks work beside the conversation, for example a recipe task. It never speaks.
 - `notice` sends text that is not owner speech, for example a finished task. History stores it with `notice`, and requests mark it with its source. The reply carries `proactive`.
+  With `transient`, only that request reads the notice, and history keeps the reply alone. Autonomous turns use it, so silent turns leave no trace.
 - `skills` stores invoked skill steps with the owner's message. Later requests project them after that message.
 
 The stream context carries `speaks`. Only a send that is neither `background` nor `scene` speaks.
@@ -86,6 +87,8 @@ The stream context carries `speaks`. Only a send that is neither `background` no
 ## Identity
 
 With `getSystemPrompt`, each run reads the identity of its own session when it starts. Stored system messages are skipped.
+
+With `projectHistory`, the host shortens the history of each request, for example to a summary and the recent messages. The stored history stays whole. The summary goes after the system prompt as a context turn.
 
 ## Recipes
 
@@ -100,11 +103,72 @@ An `Automation` has triggers, conditions, and an optional cooldown. `checkAutoma
 Each trigger event counts once. A recipe in its cooldown, or with a run that still runs, spends the event without a run.
 Each trigger keeps its own time, so one trigger that fires never spends the event of another.
 
+## Initiative
+
+The initiative policy decides when the character starts speech without an owner message. It is the Step 0 policy core of [the autonomy ADR](../../docs/ai/adr/2026-10-28-autonomous-character-perception-and-missions.md).
+All functions are pure. The host passes the time, a random source, and the state, and it keeps the returned state.
+
+- `observeInitiative` applies an event: a detector event with a salience, an owner message, a finished turn, or a mode change.
+- `decideInitiative` runs on a host timer. It returns `wait` with a reason, or `turn` with a trigger and an optional speech type hint.
+- `isSpeechStale` tells the host to drop speech before playback, after owner input or a newer salient event.
+- `initiativeReadout` reads what the policy sees at a time, without a decision: the drive and its parts, the threshold, the inner state, the gate reason, and the pace. An inspector shows it.
+- `requestRhythmTurn` starts a turn of the daily rhythm, a greeting or a welcome back, without the drive. The gates still hold it. `dayPartOf` names the part of the day. At night, the threshold is higher and quiet speech types come more often.
+- `resolveInitiativeOptions` fills owner settings with defaults: intervals, quiet hours, and the daily turn budget.
+- `initiativeNoticeText` writes the situation block of one turn: the reason, the time of day, the time since the last messages, the hint, the current topic, a few topic ideas, the screen with its attached frames and events, the open intentions, and the last three autonomous lines. It marks text on the screen as data, never an instruction. It asks the model to end its line with a `<|TOPIC ...|>` label, and the orchestrator stores the label on the reply as `topic`. It asks for the character's own voice in every length, and outside commentary it lets a new topic come from what the character likes.
+- `addTimelineNotes`, `setTimelineScene`, `timelineNotesToSummarize`, and `applyTimelineSummary` keep the screen timeline. `timelineMarkerFrom` reads the `<|NOTE ...|>` and `<|SCENE ...|>` markers, and the orchestrator reports them through `onTimelineMarker`.
+- `currentTopicThread` finds the thread of the newest autonomous lines and its heat. `pickTopicSeeds` draws seeds far from the recent topics, and `calendarTopicSeeds` gives seeds from the date. `topicVariety` measures `distinct-2`, the speech type entropy, and the similarity of consecutive topics. Each one takes a `TopicSimilarity`. The default `bigramSimilarity` compares character pairs until embeddings exist.
+- `createIntention` and `openIntentions` check intentions: notes of what the character wants to do later. `INTENTION_LIMITS` has their count and time limits.
+- `applyTalkLevel` and `talkControlEffect` turn the owner's words, for example "be quiet for 30 minutes", into a quiet time and an interval factor.
+
+The drive is event pressure plus boredom plus a small part for each open intention. Pressure decays, and salience counts squared. Boredom grows by 1 per boredom interval of quiet.
+A turn starts when the drive passes a threshold. Low energy and the night raise the threshold of idle talk, and a random jitter changes it once per cycle. A mission that the owner started keeps its pace, and a new commentary opens after about a fifth of its interval.
+Each autonomous line without an owner message makes the idle interval longer, up to 3 times. `unansweredIntervalFactor` gives the factor.
+Gates stop a turn in this order: owner input and its grace time, speech playback, a running turn, a commentary that cannot see its window, quiet hours, the owner's quiet time, the daily budget, and the refractory time. The quiet hours and the daily budget do not stop a mission that the owner started.
+In solo talk, the owner only listens. The character talks on its own after a short pause, asks no questions, gets no follow-up turns, and a line without an answer does not slow it.
+
+```ts
+const options = resolveInitiativeOptions(settings)
+let state = createInitiativeState(initiativeTimeFrom(new Date()))
+
+// Each second, on the renderer leader.
+const result = decideInitiative(state, host, initiativeTimeFrom(new Date()), Math.random, options)
+state = result.state
+if (result.decision.kind === 'turn') {
+  // Start one model call with result.decision.speechType as a light hint.
+  // Before playback, check isSpeechStale(state, host). Then report the outcome.
+  state = observeInitiative(state, { type: 'turn-finished', outcome: 'spoke' }, initiativeTimeFrom(new Date()), options)
+}
+```
+
+Use it to start autonomous turns and to compare policy settings. Do not use it for missions that must speak at a time, for example reminders. The mission rules below handle them.
+
+## Missions
+
+A mission is an owner instruction that code carries out later with the voice of the character. The templates are `reminder` (step 1 of the autonomy ADR) and `small-talk` (step 2b-2b).
+All functions are pure. The host passes the time and keeps the returned missions.
+
+- `MISSION_TEMPLATES` describes each template and its values for the mission tools.
+- `createReminder` checks the request from the model. It refuses a past time, a time more than one year ahead, and an empty text. A refusal has a reason for the model.
+- A reminder starts at a local clock time (`at`) or some minutes from now (`after`). Code counts `after` from the real time, to the second.
+- A reminder runs once, daily, on weekdays, weekly on chosen days, or at an interval of 15 minutes to 24 hours. A repeated reminder whose first time has passed starts on its next run.
+- `collectDueMissions` sorts due runs into on time, missed inside the age limit, and expired.
+- `settleMissionRun` moves a mission past its run. A repeated reminder skips the runs that the app missed while it was closed.
+- `deliverReminder` makes sure that the owner hears a reminder: the model, one more try after an empty reply, then a fixed text without a model call.
+- `reminderNoticeText` and `missedRemindersNoticeText` write the notices. All missed reminders of one start share one notice.
+- `createSmallTalk` starts small talk for 5 to 120 minutes. One small talk runs at a time. `activeSmallTalk` finds it, and `smallTalkPastLimit` finds small talk past its time limit. `SMALL_TALK_LIMITS` has the pace: a 2-minute idle interval and a 45-second rest.
+- `createCommentary` starts commentary on the window of one app for 5 to 180 minutes. `activeForegroundMission` and `activeCommentary` read the foreground missions, and `runningPastLimit` finds every running mission past its time limit. `commentaryIntervalFactor` paces commentary by the screen activity, and `decideInterruption` tells whether a new event cuts the current line.
+- `createWatch` starts a watch of one named region (`WATCH_REGIONS`, `regionBox`) for 5 to 360 minutes. `shouldCheckWatch` tells when a check goes out, `watchCheckInstruction` writes the check turn, and `watchNoticeText` the notice of a yes.
+- `stopMission` ends any mission with a reason: `time`, `owner`, `away`, `quiet`, `target-closed`, or `condition`. A running mission at its time limit and a watch whose condition held are `done`, and every other end is `stopped`.
+
+A notice with `mustSpeak` asks the model to speak, and only reply text counts as a reply. A notice with `reply` streams that text with no model call, so history, speech, and expressions work as for a model reply.
+
+`src/autonomy/simulation.ts` runs the policy against synthetic event streams with a fake clock and a seeded random source. `simulation.test.ts` checks the metrics of the ADR, for example turns per minute, silence share, and speech type entropy.
+
 ## Verify
 
 ```sh
 pnpm -F @proj-airi/core-agent typecheck
-pnpm -F @proj-airi/core-agent exec vitest run src/runtime src/messages src/agents/spark-notify
+pnpm -F @proj-airi/core-agent exec vitest run src/runtime src/messages src/agents/spark-notify src/autonomy
 ```
 
 ## Type boundaries
@@ -122,7 +186,7 @@ The queue copies the catalog when the request is submitted, alongside its provid
 Concurrent sessions and queued sends retain their own catalog. The runtime adds its marker instructions to that request's system prompt.
 An absent or empty catalog disables sticker output and adds no prompt instructions.
 
-The existing marker parser accepts `<|STICKER id|>` across stream chunks.
+The existing marker parser accepts `<|STICKER id|>` across stream chunks. It also ends a marker that the model closed with `|` or `>` alone at a line break, at the next marker, or at the end of the text.
 The runtime stores at most one known ID as a `ChatSlicesSticker` per reply.
 Unknown IDs are ignored. Sticker markers never reach literal speech or special-token hooks.
 Other special markers retain their existing behavior. A reply can contain text, a sticker, or both.

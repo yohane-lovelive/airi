@@ -10,6 +10,9 @@ import type { LlmUsage, StreamEvent, StreamOptions } from '../types/llm'
 
 import { createQueue } from '@proj-airi/stream-kit'
 
+import { nextFromMarker } from '../autonomy/next-marker'
+import { TIMELINE_LIMITS, timelineMarkerFrom } from '../autonomy/timeline'
+import { topicFromMarker } from '../autonomy/topics'
 import { chatMessagesToTurns } from '../messages/chat-completions'
 import { formatTimePrefix } from '../messages/datetime-prefix'
 import { renderConversationPreview } from '../messages/preview'
@@ -178,6 +181,29 @@ export interface ChatOrchestratorSendOptions {
   notice?: {
     /** What sent the notice, for the reply's trace. */
     source: string
+    /**
+     * The owner must hear about the notice now, for example a reminder. The request asks the model to speak instead of
+     * allowing silence. Only reply text counts as a reply, because a tool call or a sticker cannot be spoken.
+     * A reply without text still stores nothing, so the host can see it and try again.
+     */
+    mustSpeak?: boolean
+    /**
+     * A fixed reply. The run makes no model call and streams this text as the reply, so history, speech, and expressions
+     * work as for a model reply. The host uses it when the model cannot speak a `mustSpeak` notice.
+     */
+    reply?: string
+    /**
+     * The notice reaches this request only, and history never stores it. A reply is still stored as a proactive message.
+     * The host uses it for frequent notices, for example autonomous turns, so silent turns leave no trace in history.
+     */
+    transient?: boolean
+    /**
+     * An image that stays the same for many requests, for example the anchor frame of a screen scene. It goes after
+     * the system prompt and the history summary, so the start of each request stays the same and the provider can
+     * cache it.
+     * Only this request gets it, and history never stores it.
+     */
+    anchor?: { text: string, image: string }
   }
 }
 
@@ -333,6 +359,12 @@ export interface ChatOrchestratorRuntimeDeps {
    * `-1` keeps all history. `0` sends only current input. System messages are exempt.
    */
   getContextWindow?: (sessionId: string) => number | undefined
+  /**
+   * Shortens the history of one request, for example to a summary and the recent messages. Stored history stays whole.
+   * It returns the messages to send, and a summary of the older messages that it left out.
+   * It gets the history after the turn limit of `getContextWindow`.
+   */
+  projectHistory?: (sessionId: string, messages: ChatHistoryItem[]) => { messages: ChatHistoryItem[], summary?: string }
   /** Runtime context providers ingested immediately before prompt composition. */
   runtimeContextProviders?: Array<() => ContextMessage | null | undefined>
   /**
@@ -445,6 +477,11 @@ export interface ChatOrchestratorRuntimeDeps {
     message: StreamingAssistantMessage
     messageText: string
   }) => void
+  /**
+   * Called with each `<|NOTE ...|>` or `<|SCENE ...|>` marker of visible speech, at most two notes for each reply.
+   * A reply that stays silent still reports its markers, so the character can note the screen without a word.
+   */
+  onTimelineMarker?: (event: { sessionId: string, turnId: string, kind: 'note' | 'scene', text: string }) => void
   /** Called after user turn persistence, before provider prompt composition. */
   onUserTurnReady?: (event: {
     sessionId: string
@@ -502,6 +539,14 @@ async function waitForProvider(work: Promise<unknown>, signal: AbortSignal) {
   }
   finally {
     signal.removeEventListener('abort', abort)
+  }
+}
+
+/** A stream that gives a fixed reply as one text chunk, with no model call. */
+function streamFixedReply(text: string): ChatOrchestratorLLMPort['stream'] {
+  return async (_model, _chatProvider, _context, options) => {
+    await options?.onStreamEvent?.({ type: 'text-delta', text })
+    await options?.onStreamEvent?.({ type: 'finish' })
   }
 }
 
@@ -862,6 +907,7 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
         delete streamingMessageContext.message.replyToMessageId
 
       // A notice is stored with its source, so later requests still know it, and none read it as owner speech.
+      // A transient notice is not stored, so only this request reads it.
       const userMessage = {
         role: 'user' as const,
         content: finalContent,
@@ -873,7 +919,9 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
         ...(audioTranscripts?.some(Boolean) ? { audioTranscripts } : {}),
         ...(options.notice ? { notice: { source: options.notice.source } } : {}),
       }
-      const receipt = await deps.session.commitUserMessage(sessionId, userMessage)
+      const receipt = options.notice?.transient
+        ? { status: 'inserted' as const, messageId: roundId }
+        : await deps.session.commitUserMessage(sessionId, userMessage)
       accepted.resolve({ sessionId, messageId: receipt.messageId })
       if (receipt.status === 'existing' || shouldAbort()) {
         resetForegroundStream(sessionId)
@@ -895,7 +943,8 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
         })
       }
 
-      const sessionMessagesForSend = deps.session.getSessionMessages(sessionId)
+      const storedMessages = deps.session.getSessionMessages(sessionId)
+      const sessionMessagesForSend = options.notice?.transient ? [...storedMessages, userMessage] : storedMessages
       deps.onUserTurnReady?.({
         sessionId,
         messageText: sendingMessage,
@@ -908,6 +957,7 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
       let speechStarted = false
       const stickers = options.stickers
       let stickerEmitted = false
+      let timelineNotes = 0
 
       const parser = useLlmmarkerParser({
         onLiteral: async (literal) => {
@@ -970,14 +1020,41 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
             return
           }
 
+          if (/^<\|(?:NOTE|SCENE)\b/.test(special)) {
+            // Timeline markers are data for code, like a topic label. They never reach speech or plugins.
+            const marker = categorizer.filterToSpeech(special, streamPosition) ? timelineMarkerFrom(special) : undefined
+            if (marker && (marker.kind === 'scene' || timelineNotes < TIMELINE_LIMITS.maxModelNotesPerTurn)) {
+              if (marker.kind === 'note')
+                timelineNotes += 1
+              deps.onTimelineMarker?.({ sessionId, turnId: streamingMessageContext.turnId, ...marker })
+            }
+            return
+          }
+
+          if (/^<\|NEXT\b/.test(special)) {
+            // What the model wants after the reply is data for code, like a topic label. The last marker counts.
+            const next = categorizer.filterToSpeech(special, streamPosition) ? nextFromMarker(special) : undefined
+            if (next)
+              buildingMessage.next = next
+            return
+          }
+
+          if (/^<\|TOPIC\b/.test(special)) {
+            // A topic label is data for code, like a sticker. Only the first label of visible speech counts.
+            const topic = categorizer.filterToSpeech(special, streamPosition) ? topicFromMarker(special) : undefined
+            if (topic && !buildingMessage.topic)
+              buildingMessage.topic = topic
+            return
+          }
+
           await hooks.emitTokenSpecialHooks(special, streamingMessageContext)
         },
         onEnd: async (fullText) => {
           if (shouldAbort())
             return
 
-          // Strip only sticker markers, including the escaped form accepted by the parser.
-          const speechText = fullText.replace(/<(?:\||\{'\|'\})STICKER\b[\s\S]*?(?:(?:\||\{'\|'\})>|$)/g, '')
+          // Strip only sticker, topic, next, and timeline markers, including the escaped form accepted by the parser.
+          const speechText = fullText.replace(/<(?:\||\{'\|'\})(?:STICKER|TOPIC|NEXT|NOTE|SCENE)\b[\s\S]*?(?:(?:\||\{'\|'\})>|$)/g, '')
           const finalCategorization = categorizeResponse(speechText, activeProvider)
 
           const reasoningContentField = buildingMessage.categorization?.reasoning?.trim()
@@ -1030,12 +1107,16 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
         deps.getSystemPrompt ? sessionMessagesForSend.filter(message => message.role !== 'system') : sessionMessagesForSend,
         deps.getContextWindow?.(sessionId),
       )
-      const context = buildContext(history)
+      const projectedHistory: { messages: ChatHistoryItem[], summary?: string } = deps.projectHistory?.(sessionId, history) ?? { messages: history }
+      const context = buildContext(projectedHistory.messages)
       // The stored notice ends the history. Only this request tells the model that it can stay quiet about it.
       if (options.notice) {
         const lastTurn = context.turns.at(-1)
+        const instruction = options.notice.mustSpeak
+          ? '\n[Tell the owner about this notice now, in your own words. Do not stay quiet.]'
+          : '\n[Speak about this notice only if it fits now, or stay quiet.]'
         if (lastTurn?.type === 'user')
-          lastTurn.content.push({ type: 'text', text: '\n[Speak about this notice only if it fits now, or stay quiet.]' })
+          lastTurn.content.push({ type: 'text', text: instruction })
       }
       if (systemPrompt?.trim())
         context.turns.unshift({ id: 'system-identity', type: 'system', authority: 'system', content: [{ type: 'text', text: systemPrompt }] })
@@ -1055,6 +1136,27 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
           systemMessage.content.push({ type: 'text', text: `\n\n${systemPromptSupplement}` })
         else
           context.turns.unshift({ id: 'system-supplement', type: 'system', authority: 'system', content: [{ type: 'text', text: systemPromptSupplement }] })
+      }
+      // The anchor goes right after the system prompt. The summary below lands before it, because the summary changes
+      // less often. Both stay the same across requests, so the cached prefix of the provider can hold them.
+      const anchor = options.notice?.anchor
+      if (anchor) {
+        const firstHistoryIndex = context.turns.findIndex(turn => turn.type !== 'system' || turn.authority !== 'system')
+        context.turns.splice(firstHistoryIndex < 0 ? context.turns.length : firstHistoryIndex, 0, {
+          id: 'notice-anchor',
+          type: 'user',
+          content: [{ type: 'tagged-text', tag: 'app-context', text: anchor.text }, { type: 'image', url: anchor.image }],
+        })
+      }
+      // The summary stands for the left-out messages, so it comes after the system prompt and before the recent history.
+      if (projectedHistory.summary?.trim()) {
+        const firstHistoryIndex = context.turns.findIndex(turn => turn.type !== 'system' || turn.authority !== 'system')
+        context.turns.splice(firstHistoryIndex < 0 ? context.turns.length : firstHistoryIndex, 0, {
+          id: 'history-summary',
+          type: 'system',
+          authority: 'context',
+          content: [{ type: 'summary', text: projectedHistory.summary }],
+        })
       }
 
       const contextsSnapshot = deps.context.snapshot()
@@ -1104,7 +1206,9 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
       })
 
       const resolveOwnerStep = options.resolveStep
-      await waitForProvider(deps.llm.stream(options.model, options.chatProvider, context, {
+      const fixedReply = options.notice?.reply
+      const stream = fixedReply === undefined ? deps.llm.stream : streamFixedReply(fixedReply)
+      await waitForProvider(stream(options.model, options.chatProvider, context, {
         headers,
         providerId: activeProvider,
         // A resolved prompt replaces the composed system message, so it must carry the same supplement.
@@ -1280,10 +1384,9 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
       }
 
       // A notice lets the conversation stay quiet. Only rendered text, stickers, cards, and tool calls count as a reply.
-      const hasVisibleReply = buildingMessage.slices.some(slice => slice.type === 'sticker'
-        || slice.type === 'card'
-        || slice.type === 'tool-call'
-        || (slice.type === 'text' && Boolean(slice.text.trim())))
+      // A notice that must speak counts text only, because the owner must hear it.
+      const hasVisibleReply = buildingMessage.slices.some(slice => (slice.type === 'text' && Boolean(slice.text.trim()))
+        || (!options.notice?.mustSpeak && (slice.type === 'sticker' || slice.type === 'card' || slice.type === 'tool-call')))
       const silent = Boolean(options.notice) && !hasVisibleReply
       if (!silent && !shouldAbort() && (buildingMessage.slices.length > 0 || generatedTurn?.rounds.length)) {
         const finalAssistant = buildingMessage

@@ -62,6 +62,23 @@ export const AgentAttributes = {
   LLMInputMessageCount: 'llm.input_message_count',
   LLMInputMessageRoles: 'llm.input_message_roles',
   LLMInputUserMessageCount: 'llm.input_user_message_count',
+  /** The characters of the system prompt: the persona, the memory index, and the format rules. */
+  LLMPromptSystemChars: 'llm.prompt.system_chars',
+  /** The characters of the memory index inside the system prompt. */
+  LLMPromptMemoryIndexChars: 'llm.prompt.memory_index_chars',
+  /** How the memories that go with the owner message were found: `meaning` on the server, or `characters` on the device. */
+  LLMPromptMemoryRecallMode: 'llm.prompt.memory_recall_mode',
+  /** The characters of the owner message that the recall searched with. */
+  LLMPromptMemoryRecallQueryChars: 'llm.prompt.memory_recall_query_chars',
+  /** The ids of the recalled memories, best first. */
+  LLMPromptMemoryRecalledIds: 'llm.prompt.memory_recalled_ids',
+  /** The characters of the summary of the older messages. 0 without a summary. */
+  LLMPromptSummaryChars: 'llm.prompt.summary_chars',
+  /** The count of stored messages that the summary stands for. */
+  LLMPromptSummarizedMessages: 'llm.prompt.summarized_messages',
+  /** The turns after the system prompt and the summary, and their serialized characters. */
+  LLMPromptHistoryTurns: 'llm.prompt.history_turns',
+  LLMPromptHistoryChars: 'llm.prompt.history_chars',
   LLMOutputChunkCount: 'llm.output_chunk_count',
   LLMOutputChunkLengths: 'llm.output_chunk_lengths',
   LLMTextLength: 'llm.text_length',

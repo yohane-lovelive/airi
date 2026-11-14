@@ -35,7 +35,10 @@ import {
 } from '../../shared/eventa'
 import { useChatDraftHandover } from '../composables/use-chat-draft-handover'
 import { dismissOverlays, useChatFloatingClickThrough } from '../composables/use-chat-floating-click-through'
+import { useHideDevToolsButton } from '../composables/use-hide-dev-tools-button'
 import { useControlsIslandStore } from '../stores/controls-island'
+
+useHideDevToolsButton()
 
 const panel = useTemplateRef<HTMLElement>('panel')
 
@@ -61,9 +64,6 @@ const stopStateChanged = getElectronEventaContext().on(electronChatFloatingState
     state.value = event.body
 })
 onScopeDispose(stopStateChanged)
-onMounted(async () => {
-  state.value = await getState()
-})
 
 useChatDraftHandover(interactiveArea)
 
@@ -99,6 +99,14 @@ const { hitTest } = useChatFloatingClickThrough({
 // The content stays mounted while it is hidden, so a fold or a move to the
 // other side keeps the unsent draft, attachments and reply target.
 const contentShown = computed(() => !state.value.folded && !state.value.relocating)
+onMounted(async () => {
+  state.value = await getState()
+  // A page that loads during a fold or a move starts with its content hidden. It plays no fold animation, so it
+  // reports the hidden content here. Without the report, the window stayed shown and empty beside the character.
+  if (!contentShown.value)
+    void reportContentHidden()
+})
+
 // Menus and dialogs close as the content hides, so they neither stay on
 // screen during the fold nor come back with the next unfold.
 watch(contentShown, (shown) => {

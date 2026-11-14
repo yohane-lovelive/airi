@@ -146,6 +146,9 @@ chat:
     cloud-badge: クラウドに同期しました
     new-chat-fallback: 新しいチャット
     delete: 会話を削除
+unity-stage:
+  title: Unity ステージ（実験的）
+  running: キャラクターは Unity のウィンドウに表示されています。
 render-error:
   title: '{renderer} でこのモデルを描画できませんでした'
   description: モデルは選択されていますが、ステージに表示できませんでした。
@@ -278,3 +281,12 @@ status:
   sign-in-unconfirmed: セッションを確認できませんでした。もう一度ログインしてください。
   dismiss: 閉じる
   configure-hearing: 設定で聴覚のプロバイダーを選択し、設定してください。
+perception:
+  pause: 画面の知覚を一時停止
+  resume: 画面の知覚を再開
+  start: 画面の知覚を開始
+  recording: 画面を録画中です。クリックで知覚を一時停止し、録画を止めます。
+missions:
+  fixed-reminder: 'リマインド: {text}'
+  fixed-watch: '見張り: {condition}'
+  notification-title: AIRI からのリマインド

@@ -1,5 +1,6 @@
 import { JUDGE_RECIPE_TOOL_NAME } from './judge-recipe'
 import { FORGET_MEMORY_TOOL_NAME, READ_MEMORY_TOOL_NAME, WRITE_MEMORY_TOOL_NAME } from './memory'
+import { PERFORM_MOTION_TOOL_NAME } from './perform-motion'
 import { PROPOSE_RECIPE_TOOL_NAME } from './propose-recipe'
 import { SEARCH_ICONS_TOOL_NAME } from './search-icons'
 import { USE_RECIPE_TOOL_NAME } from './use-recipe'
@@ -28,6 +29,8 @@ export const TOOL_ICONS = {
   spark: 'i-tabler:send',
   /** A search, for example of the icons that a card names. */
   search: 'i-tabler:search',
+  /** The gestures of the motion library on a VRM or MMD model. */
+  motion: 'i-tabler:run',
   /** Every tool that an MCP server provides. */
   mcp: 'i-tabler:server',
   /** Every tool of the skills feature that has no kind of its own. */
@@ -46,6 +49,7 @@ const SEND_TOOL_ICONS: Record<string, string> = {
   [FORGET_MEMORY_TOOL_NAME]: TOOL_ICONS.memory,
   configure_wake_words: TOOL_ICONS.wakeWords,
   [SEARCH_ICONS_TOOL_NAME]: TOOL_ICONS.search,
+  [PERFORM_MOTION_TOOL_NAME]: TOOL_ICONS.motion,
   builtIn_mcpListTools: TOOL_ICONS.mcp,
   builtIn_mcpCallTool: TOOL_ICONS.mcp,
   builtIn_emitSparkCommand: TOOL_ICONS.spark,

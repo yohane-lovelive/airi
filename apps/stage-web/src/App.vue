@@ -5,10 +5,16 @@ import { useStartupResourceTimeout } from '@proj-airi/stage-ui/composables/use-s
 import { usePiniaSynced } from '@proj-airi/stage-ui/libs/pinia'
 import { initializeAnalytics, isAnalyticsAvailableInBuild } from '@proj-airi/stage-ui/libs/product-signals'
 import { useAuthStore } from '@proj-airi/stage-ui/stores/auth'
+import { useAutonomySyncStore } from '@proj-airi/stage-ui/stores/autonomy-sync'
 import { useCharacterOrchestratorStore } from '@proj-airi/stage-ui/stores/character'
 import { useChatStore } from '@proj-airi/stage-ui/stores/chat'
+import { useDeviceFloorStore } from '@proj-airi/stage-ui/stores/device-floor'
 import { useDevicePermissionsStore } from '@proj-airi/stage-ui/stores/device-permissions'
 import { useDisplayModelsStore } from '@proj-airi/stage-ui/stores/display-models'
+import { useInitiativeRunnerStore } from '@proj-airi/stage-ui/stores/initiative-runner'
+import { useMemorySyncStore } from '@proj-airi/stage-ui/stores/memory-sync'
+import { useMemoryWorkStore } from '@proj-airi/stage-ui/stores/memory-work'
+import { useMissionRunnerStore } from '@proj-airi/stage-ui/stores/mission-runner'
 import { useModsServerChannelStore } from '@proj-airi/stage-ui/stores/mods/api/channel-server'
 import { useContextBridgeStore } from '@proj-airi/stage-ui/stores/mods/api/context-bridge'
 import { useAiriCardStore } from '@proj-airi/stage-ui/stores/modules/airi-card'
@@ -18,9 +24,12 @@ import { useHearingStore } from '@proj-airi/stage-ui/stores/modules/hearing'
 import { useSpeechStore } from '@proj-airi/stage-ui/stores/modules/speech'
 import { useVisionStore } from '@proj-airi/stage-ui/stores/modules/vision'
 import { useOnboardingStore } from '@proj-airi/stage-ui/stores/onboarding'
+import { usePerceptionRunnerStore } from '@proj-airi/stage-ui/stores/perception-runner'
 import { useSettings, useSettingsAudioDevice } from '@proj-airi/stage-ui/stores/settings'
+import { useSettingsSyncStore } from '@proj-airi/stage-ui/stores/settings-sync'
 import { useSettingsStageModel } from '@proj-airi/stage-ui/stores/settings/stage-model'
 import { useStartupResourcesStore } from '@proj-airi/stage-ui/stores/startup-resources'
+import { useWatchRunnerStore } from '@proj-airi/stage-ui/stores/watch-runner'
 import { ErrorBoundary, useTheme } from '@proj-airi/ui'
 import { StageTransitionGroup } from '@proj-airi/ui-transitions'
 import { storeToRefs } from 'pinia'
@@ -32,6 +41,8 @@ import { toast, Toaster } from 'vue-sonner'
 import PerformanceOverlay from './components/Devtools/PerformanceOverlay.vue'
 
 import { useDevicePermissions } from './composables/device-permissions'
+import { usePageOwnerPresence } from './composables/owner-presence'
+import { createPageScreenSource } from './composables/screen-source'
 import { usePWAStore } from './stores/pwa'
 
 usePWAStore()
@@ -51,6 +62,16 @@ const chatStore = useChatStore()
 const syncedPinia = usePiniaSynced()
 const serverChannelStore = useModsServerChannelStore()
 const characterOrchestratorStore = useCharacterOrchestratorStore()
+const missionRunnerStore = useMissionRunnerStore()
+const initiativeRunnerStore = useInitiativeRunnerStore()
+const ownerPresence = usePageOwnerPresence()
+const perceptionRunnerStore = usePerceptionRunnerStore()
+const watchRunnerStore = useWatchRunnerStore()
+const settingsSyncStore = useSettingsSyncStore()
+const memorySyncStore = useMemorySyncStore()
+const deviceFloorStore = useDeviceFloorStore()
+const autonomySyncStore = useAutonomySyncStore()
+const memoryWorkStore = useMemoryWorkStore()
 const settingsAudioDeviceStore = useSettingsAudioDevice()
 const { showingSetup } = storeToRefs(onboardingStore)
 const { isDark } = useTheme()
@@ -154,6 +175,15 @@ async function loadStartup() {
       void serverChannelStore.initialize({ possibleEvents: ['ui:configure'] }).catch(error => console.error('Mods server initialization failed:', error))
       contextBridgeStore.initialize()
       characterOrchestratorStore.initialize(syncedPinia)
+      missionRunnerStore.initialize(syncedPinia)
+      initiativeRunnerStore.initialize(syncedPinia, ownerPresence)
+      perceptionRunnerStore.initialize(syncedPinia, createPageScreenSource())
+      watchRunnerStore.initialize(syncedPinia)
+      settingsSyncStore.initialize(syncedPinia)
+      memorySyncStore.initialize(syncedPinia)
+      deviceFloorStore.initialize(syncedPinia)
+      autonomySyncStore.initialize(syncedPinia)
+      memoryWorkStore.initialize(syncedPinia)
     })
     await startup.run('modelData', () => displayModelsStore.loadDisplayModelsFromIndexedDB())
     await startup.run('modelSelection', () => settingsStore.initializeStageModel())

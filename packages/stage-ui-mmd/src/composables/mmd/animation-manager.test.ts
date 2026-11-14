@@ -4,8 +4,11 @@ import type { AnimationMixer } from 'three'
 import { MMD, PmxObject } from '@moeru/three-mmd'
 import {
   AnimationClip,
+  Bone,
   BufferGeometry,
   MeshBasicMaterial,
+  Quaternion,
+  QuaternionKeyframeTrack,
   Skeleton,
   SkinnedMesh,
   Vector3,
@@ -51,10 +54,20 @@ class RecordingMMD extends MMD {
   mixer?: AnimationMixer
   updates: MMDUpdateOptions[] = []
 
-  constructor() {
+  constructor(boneNames: string[] = []) {
     const mesh = new SkinnedMesh(new BufferGeometry(), new MeshBasicMaterial())
-    mesh.bind(new Skeleton())
+    const bones = boneNames.map((name) => {
+      const bone = new Bone()
+      bone.name = name
+      mesh.add(bone)
+      return bone
+    })
+    mesh.bind(new Skeleton(bones))
     super(createPmx(), mesh)
+  }
+
+  bone(name: string) {
+    return this.mesh.skeleton.bones.find(bone => bone.name === name)!
   }
 
   override setPhysics(_createPhysics: PhysicsFactory): void {
@@ -124,5 +137,43 @@ describe('createMMDAnimationManager', () => {
     const gestureAction = mmd.mixer?.existingAction(gesture)
     expect(idleAction?.isRunning()).toBe(true)
     expect(gestureAction?.isRunning()).toBe(false)
+  })
+
+  it('plays a gesture over the parts that it moves, and gives them back to the idle when it ends', async () => {
+    const mmd = new RecordingMMD(['頭', '左腕'])
+    const manager = createMMDAnimationManager(mmd)
+    const turn = (angle: number) => new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), angle)
+    const hold = (bone: string, angle: number, duration: number) =>
+      new QuaternionKeyframeTrack(`.bones[${bone}].quaternion`, [0, duration], [...turn(angle).toArray(), ...turn(angle).toArray()])
+    const idle = new AnimationClip('idle', 2, [hold('頭', 0.1, 2), hold('左腕', 0.3, 2)])
+    const nod = new AnimationClip('nod', 0.5, [hold('頭', 0.6, 0.5)])
+    const angleOf = (bone: string) => 2 * Math.acos(Math.min(1, Math.abs(mmd.bone(bone).quaternion.w)))
+
+    manager.registerClip('idle', idle)
+    await manager.init()
+    manager.setIdleMotion('idle', 0)
+    manager.update(0.1)
+    expect(angleOf('頭')).toBeCloseTo(0.1, 5)
+
+    expect(manager.playGesture(nod, 0)).toBe(true)
+    manager.update(0.1)
+    expect(angleOf('頭')).toBeCloseTo(0.6, 5)
+    expect(angleOf('左腕')).toBeCloseTo(0.3, 5)
+
+    manager.update(0.6)
+    manager.update(0.1)
+    expect(angleOf('頭')).toBeCloseTo(0.1, 5)
+    expect(angleOf('左腕')).toBeCloseTo(0.3, 5)
+  })
+
+  it('skips a gesture while a motion of the whole body plays', async () => {
+    const mmd = new RecordingMMD(['頭'])
+    const manager = createMMDAnimationManager(mmd)
+    manager.registerClip('dance', new AnimationClip('dance', 5, []))
+    await manager.init()
+
+    manager.playAction('dance', { crossfade: 0 })
+
+    expect(manager.playGesture(new AnimationClip('nod', 0.5, [new QuaternionKeyframeTrack('.bones[頭].quaternion', [0], [0, 0, 0, 1])]))).toBe(false)
   })
 })

@@ -1,5 +1,7 @@
 import type { Recipe } from '@proj-airi/core-agent'
 
+import type { ReplyLength } from '../modules/consciousness-settings'
+
 /** Format rules that the chat renderer needs from every reply. */
 export const CHAT_FORMAT_RULES = `${[
   // Only listed languages load in the renderer, so every code block names its language.
@@ -19,6 +21,29 @@ export const CHAT_FORMAT_RULES = `${[
  */
 export function composeSystemPrompt(identity: string) {
   return CHAT_FORMAT_RULES + identity
+}
+
+const REPLY_LENGTH_TEXT: Record<Exclude<ReplyLength, 'free'>, string> = {
+  auto: 'When you answer the owner, match the length of your reply to the owner\'s message. A greeting, thanks, or a short remark gets one or two sentences. A question or a story gets a few sentences. Write more only when the owner asks you to explain or to tell more.',
+  short: 'When you answer the owner, use one or two sentences, unless the owner asks for more.',
+  normal: 'When you answer the owner, use two to four sentences, unless the owner asks for more.',
+  long: 'When you answer the owner, take the room that the topic needs.',
+}
+
+/**
+ * The length instruction of replies to the owner. It changes only when the owner changes the setting, so the cached
+ * prefix stays. Autonomous lines get their own length in their notice.
+ */
+export function composeReplyLengthPrompt(length: ReplyLength) {
+  return length === 'free' ? '' : `\n\n${REPLY_LENGTH_TEXT[length]}`
+}
+
+/**
+ * The rule against made-up shared history. A live check on 2026-11-05 heard a character tell of a night with the owner
+ * that never happened. The character's own lore stays free. The text is fixed, so the cached prefix stays.
+ */
+export function composeSharedPastPrompt() {
+  return '\n\nTell of what happened between you and the owner, or on this computer, only from your memories, this conversation, or the screen. Do not make up other past events with the owner. Your own lore and stories as a character are fine.'
 }
 
 /**

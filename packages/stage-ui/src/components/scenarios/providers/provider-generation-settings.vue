@@ -39,9 +39,13 @@ const schema = computedAsync<Record<string, z.ZodType> | undefined>(async (onCan
 
 const protocolField = computed(() => schema.value?.api)
 const searchField = computed(() => schema.value?.webSearch)
-const protocolOptions = computed(() => {
+// Only some providers define how a server reads a reasoning level, for example OpenAI-compatible servers.
+const reasoningField = computed(() => schema.value?.reasoningControl)
+
+/** The string options in the metadata of a select field. */
+function optionsOf(field: z.ZodType | undefined) {
   const options: { label: string, value: string }[] = []
-  const metadata = protocolField.value?.meta()
+  const metadata = field?.meta()
   if (Array.isArray(metadata?.options)) {
     for (const option of metadata.options as unknown[]) {
       if (option && typeof option === 'object' && 'label' in option && 'value' in option && typeof option.label === 'string' && typeof option.value === 'string')
@@ -49,11 +53,24 @@ const protocolOptions = computed(() => {
     }
   }
   return options
-})
-const protocol = computed(() => {
-  const parsed = protocolField.value?.safeParse(store.getProviderConfig(props.providerId)?.api)
+}
+
+/** The text of a field in its metadata, for a field whose label comes from its provider. */
+function textOf(field: z.ZodType | undefined, key: 'labelLocalized' | 'descriptionLocalized') {
+  const value = field?.meta()?.[key]
+  return typeof value === 'string' ? value : ''
+}
+
+/** The saved value of a string field, or its default when nothing is saved. */
+function stringValueOf(field: z.ZodType | undefined, key: string) {
+  const parsed = field?.safeParse(store.getProviderConfig(props.providerId)?.[key])
   return parsed?.success && typeof parsed.data === 'string' ? parsed.data : ''
-})
+}
+
+const protocolOptions = computed(() => optionsOf(protocolField.value))
+const protocol = computed(() => stringValueOf(protocolField.value, 'api'))
+const reasoningOptions = computed(() => optionsOf(reasoningField.value))
+const reasoningControl = computed(() => stringValueOf(reasoningField.value, 'reasoningControl'))
 const webSearch = computed(() => {
   const parsed = searchField.value?.safeParse(store.getProviderConfig(props.providerId)?.webSearch)
   return parsed?.success === true && parsed.data === true
@@ -63,8 +80,8 @@ const webSearch = computed(() => {
  * Triggering workflow:
  * Combobox/Checkbox `update:modelValue` -> {@link setField} -> {@link store.patchProviderConfig}.
  */
-async function setField(...[key, value]: ['api', string | undefined] | ['webSearch', boolean]) {
-  // Clearing the combobox does not select a protocol. Keep the current choice.
+async function setField(...[key, value]: ['api' | 'reasoningControl', string | undefined] | ['webSearch', boolean]) {
+  // Clearing the combobox does not select an option. Keep the current choice.
   if (value === undefined)
     return
   // Apply only the changed field on the leader. The action ignores a provider
@@ -85,6 +102,15 @@ async function setField(...[key, value]: ['api', string | undefined] | ['webSear
     :label="t('settings.pages.providers.catalog.edit.config.common.fields.field.api-protocol.label')"
     :description="t('settings.pages.providers.catalog.edit.config.common.fields.field.api-protocol.description')"
     @update:model-value="setField('api', $event)"
+  />
+  <FieldCombobox
+    v-if="reasoningField"
+    layout="vertical"
+    :model-value="reasoningControl"
+    :options="reasoningOptions"
+    :label="textOf(reasoningField, 'labelLocalized')"
+    :description="textOf(reasoningField, 'descriptionLocalized')"
+    @update:model-value="setField('reasoningControl', $event)"
   />
   <FieldCheckbox
     v-if="searchField"

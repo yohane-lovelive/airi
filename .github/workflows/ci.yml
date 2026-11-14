@@ -49,6 +49,7 @@ jobs:
       markdown: ${{ steps.detect.outputs.markdown }}
       skip_heavy: ${{ steps.detect.outputs.skip_heavy }}
       godot: ${{ steps.detect.outputs.godot }}
+      unity: ${{ steps.detect.outputs.unity }}
       swift: ${{ steps.detect.outputs.swift }}
       lockfile: ${{ steps.detect.outputs.lockfile }}
     steps:
@@ -62,7 +63,7 @@ jobs:
           CHANGED_FILES: ${{ github.event.pull_request.changed_files }}
           HEAD_LABEL: ${{ github.event.pull_request.head.label }}
         run: |
-          docs_only=false godot=true swift=true lockfile=true markdown='[]'
+          docs_only=false godot=true unity=true swift=true lockfile=true markdown='[]'
 
           if [ "$EVENT_NAME" = pull_request ]; then
             files_json=$(gh api --paginate --slurp "repos/$REPOSITORY/pulls/$PR_NUMBER/files" | jq 'add')
@@ -81,6 +82,7 @@ jobs:
               # This file controls the jobs below, so a change here runs all of them.
               if ! grep -qE '^\.github/(workflows/ci\.yml|actions/)' <<<"$paths"; then
                 grep -q '^engines/stage-tamagotchi-godot/' <<<"$paths" || godot=false
+                grep -q '^engines/stage-tamagotchi-unity/' <<<"$paths" || unity=false
                 grep -q '^apps/stage-pocket/' <<<"$paths" || swift=false
                 grep -q '^pnpm-lock\.yaml$' <<<"$paths" || lockfile=false
               fi
@@ -99,6 +101,7 @@ jobs:
             echo "markdown=$markdown"
             echo "skip_heavy=$skip_heavy"
             echo "godot=$godot"
+            echo "unity=$unity"
             echo "swift=$swift"
             echo "lockfile=$lockfile"
           } | tee -a "$GITHUB_OUTPUT"
@@ -111,9 +114,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      # Setup .NET for Godot C# linting
+      # Setup .NET for Godot and Unity C# linting
       - name: Setup .NET
-        if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.godot != 'false'
+        if: needs.changes.outputs.docs_only != 'true' && (needs.changes.outputs.godot != 'false' || needs.changes.outputs.unity != 'false')
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
@@ -123,6 +126,17 @@ jobs:
         if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.godot != 'false'
         working-directory: ./engines/stage-tamagotchi-godot
         run: dotnet format stage-tamagotchi-godot.slnx --verify-no-changes
+
+      # Lint and test the Unity Core. It needs no Unity install or license.
+      - name: Lint Unity Core C#
+        if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.unity != 'false'
+        working-directory: ./engines/stage-tamagotchi-unity
+        run: dotnet format stage-tamagotchi-unity.slnx --verify-no-changes
+
+      - name: Test Unity Core C#
+        if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.unity != 'false'
+        working-directory: ./engines/stage-tamagotchi-unity
+        run: dotnet run --project ./tests/stage-tamagotchi-unity.tests/stage-tamagotchi-unity.tests.csproj
 
       - name: Lint Swift
         if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.swift != 'false'

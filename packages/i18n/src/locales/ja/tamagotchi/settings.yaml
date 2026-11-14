@@ -22,6 +22,13 @@ spotlight:
     prefix: '問題が発生しました: {message}'
     shortcutRegistrationFailed: '問題が発生しました: Spotlight ショートカットを登録できませんでした。'
 pages:
+  models:
+    unity-stage:
+      back: 標準のステージに戻す
+      cancel-waiting: Unity Editor を待っています。選択するとキャンセルします。
+      error-title: Unity ステージのエラー
+      switch: Unity ステージに切り替える（実験的）
+      unsupported-model: Unity ステージは VRM と PMX のモデルのみ表示できます。別のモデルを選択してください。
   modules:
     mcp-server:
       description: MCPサーバーとツールの接続と管理
@@ -77,6 +84,119 @@ devtools:
   pages:
     context-flow:
       title: コンテキストのフロー
+    perception-recorder:
+      title: 画面の録画
+      description: キャラクターが見る画面を、リプレイ評価のために録画します
+      intro: 開発者向けのツールです。画面の知覚が取った各フレーム、前面のアプリ、画面の出来事、あなたのメッセージの時刻を、この端末のフォルダーに書きます。録画は端末から出ません。除外したウィンドウは録画しません。
+      unsupported: 画面を録画できるのはデスクトップアプリだけです。
+      needs-perception: 画面の知覚をオンにして動かしてから、録画を始めてください。
+      start: 録画を開始
+      stop: 録画を停止
+      open-folder: フォルダーを開く
+      recording: '録画中: {count} フレーム'
+      limits: 録画は 20 分か 1 GB で自動で止まります。知覚の一時停止、画面のロック、共有の終わりでも止まります。
+      recordings: 録画
+      summary: '{frames} フレーム · {minutes} 分 · {size} MB'
+      now: 録画中
+      delete: 録画を削除
+      empty: まだ録画はありません。
+    initiative-inspector:
+      title: 自律発話インスペクター
+      description: キャラクターが自分から話す理由と、黙っている理由を表示します
+      intro: このページを開いている間、メインウィンドウから毎秒、自律発話のポリシーの値を受け取って表示します。
+      status:
+        off: 自律発話はオフです。
+        waiting: メインウィンドウからの値を待っています。
+      reasons:
+        owner-active: あなたの入力中または発話中なので待機中
+        speech-playing: 読み上げ中なので待機中
+        turn-running: ターンを実行中
+        no-view: 実況のウィンドウが見えていない
+        quiet-hours: 静かな時間帯
+        owner-quiet: 頼まれたので静かにしている
+        daily-budget: 今日の回数を使い切った
+        refractory: ターンの後の休み
+        below-threshold: 欲求がしきい値より低い
+        ready: 話せる状態
+      mode: 'モード: {mode}'
+      turn: 'きっかけ: {trigger} · 発話タイプ: {type}'
+      graph: 欲求としきい値の推移
+      drive: 欲求
+      threshold: しきい値
+      last-minutes: 直近 {count} 分
+      jitter-note: '* しきい値のランダムな部分は、次の判断で決まります。'
+      parts:
+        pressure: イベントの圧力
+        boredom: 退屈
+        intention: 意図
+      inner:
+        energy: エネルギー
+        mood: 気分
+        curiosity: 好奇心
+      pace:
+        title: ペース
+        unanswered: 'あなたの反応がない発話: {count} 回（間隔 ×{factor}）'
+        budget: '今日の回数: {turns} / {limit}'
+        refractory: '休みの残り: {seconds} 秒'
+        recent-types: '最近の発話タイプ: {types}'
+        follow-up: '次: {seconds} 秒後に {kind}（続き: {count} 回）'
+      intentions: 開いている意図
+      missions: 実行中のミッション
+      until: '{time} まで'
+      none: なし。
+      usage-today: 今日のトークン量
+      device-floor:
+        title: 話す端末
+        'off': 使っていません。記憶の同期をオンにすると、一度に 1 台だけが話します。
+        held: この端末が話す権利を持っているので、自分から話します。
+        other: '別の端末（{id}）が話す権利を持っているので、この端末は黙っています。'
+        unknown: サーバーが応答しなかったので、この端末はこれまでどおり話します。
+      memory-recall:
+        title: 記憶の想起
+        none: アプリの起動後、まだ記憶を想起していません。
+        last: '{time} に、{chars} 文字のメッセージで {count} 件の記憶を{mode}想起しました'
+        modes:
+          meaning: サーバーで意味から
+          characters: この端末で共通の言葉から
+      rhythm:
+        present: オーナーは端末の前にいます。
+        away: 'オーナーは {time} から離席中です。'
+        greeting: '最後のあいさつ: {time}'
+        welcome-back: '最後のおかえり: {time}'
+      timeline:
+        title: この会話の画面のタイムライン
+        clear: 消去
+        scene: '今のシーン: {text}'
+        summary: 'それまで: {text}'
+        sources:
+          code: アプリが記録
+          model: キャラクターが記録
+      screen:
+        title: 画面
+        activity: '画面の動き: {value}'
+        target: '{app} のウィンドウを見ています'
+        target-hidden: '待機中: {app} のウィンドウが前面にありません'
+        events: 最近の画面の出来事
+        salience: '顕著度 {value}'
+        familiar: 見慣れた画面
+        types:
+          scene-change: '{app} で場面が変わりました'
+          app-switch: '{app} に切り替わりました'
+          still: '{app} の画面が長く止まっています'
+      topics:
+        title: 話題
+        thread: '今の話題: {topic}（{count} 行、熱 {heat}）'
+        thread-cold: '今の話題: {topic}（{count} 行、熱 {heat}）。冷えたので、次のターンで新しい話題を頼みます。'
+        no-thread: 最近の数日に、自律発話はありません。
+        seeds: '前のターンの話題の種: {seeds}'
+        compared-by:
+          vectors: 話題をサーバーで意味から比べています
+          characters: 話題をこの端末で共通の言葉から比べています
+        recalled-memory: '前の recall ターンに渡した記憶: {id}'
+        variety: '今日の多様性（{count} 行）'
+        distinct: '言い回しの重複のなさ（distinct-2）: {value}'
+        entropy: '発話タイプのばらつき（エントロピー）: {value}'
+        similarity: '続く話題どうしの近さ: {value}'
     presence-bubble:
       title: プレゼンスバブル
       description: キャラクターの頭上のバブルを操作し、メインウィンドウで確認します

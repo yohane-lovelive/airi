@@ -1,0 +1,23 @@
+{
+  "name": "Airi.Stage",
+  "rootNamespace": "Airi.Stage",
+  "references": [
+    "Airi.Stage.Core",
+    "Mmd.Runtime",
+    "Unity.AI.Navigation",
+    "UniGLTF",
+    "UniGLTF.Utils",
+    "VRM10",
+    "Unity.RenderPipelines.Core.Runtime",
+    "Unity.RenderPipelines.Universal.Runtime"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

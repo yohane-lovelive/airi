@@ -41,7 +41,7 @@ export function useVoiceEndJudge() {
       },
     })
     return runInTraceSpan(span, signal, async () => {
-      const agent = createVoiceEndJudgeAgent({ generateText: textModel.generateText(selection) })
+      const agent = createVoiceEndJudgeAgent({ generateText: textModel.generateText(selection, 'voice-assist') })
       const judgement = await agent.judge(transcript, context, signal)
       span.update({
         [ATTR_DECISION_VERDICT]: judgement,

@@ -1,0 +1,32 @@
+# Unity generates these folders.
+/Library/
+/Temp/
+/Logs/
+/UserSettings/
+/MemoryCaptures/
+/Build/
+/Builds/
+
+# Unity generates its own solution at the project root. The solution of the Core tests is committed.
+/*.csproj
+/*.sln
+
+# .NET build artifacts
+bin/
+obj/
+
+# Sony does not give the plugin under the license of this repository. Each developer imports it.
+/Assets/SRDisplayUnityPlugin/
+/Assets/SRDisplayUnityPlugin.meta
+
+# Developer-provided local models.
+/Assets/Airi/Fixtures/
+/Assets/Airi/Fixtures.meta
+
+# Rooms that a developer imports from local packages. Their licenses forbid redistribution.
+/Assets/LocalRooms/
+/Assets/LocalRooms.meta
+
+# Model files of motions that the motion import reads. Only the converted clips go into Git.
+/Assets/LocalMotions/
+/Assets/LocalMotions.meta

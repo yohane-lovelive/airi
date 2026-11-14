@@ -8,7 +8,7 @@ import type { StageModelRenderer } from '../../../../stores/settings/stage-model
  */
 export const MODEL_PICKER_SEARCH_KEY = 'display-model-picker'
 
-export type ModelSettingsRuntimeRenderer = 'disabled' | 'live2d' | 'vrm' | 'spine' | 'tachie' | 'mmd' | 'godot'
+export type ModelSettingsRuntimeRenderer = 'disabled' | 'live2d' | 'vrm' | 'spine' | 'tachie' | 'mmd' | 'godot' | 'unity'
 export type ModelSettingsRuntimePhase = 'pending' | 'loading' | 'binding' | 'mounted' | 'no-model' | 'error'
 
 export interface ModelSettingsRuntimeSnapshot {
@@ -87,6 +87,10 @@ export function resolveModelSettingsPanelRenderer(options: {
 }): ModelSettingsRuntimeRenderer {
   if (options.settingsRenderer === 'godot')
     return 'godot'
+
+  // The Unity stage has no controls in this panel, so no settings of a built-in renderer show for it.
+  if (options.settingsRenderer === 'unity')
+    return 'unity'
 
   return options.runtimeRenderer
 }

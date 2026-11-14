@@ -5,6 +5,7 @@ import type { CaptionChannelEvent, PresenceBubbleState } from '@proj-airi/stage-
 import type { VrmInteractionTarget } from '@proj-airi/stage-ui-three'
 
 import type { EmotionPayload } from '../../constants/emotions'
+import type { MotionEntry } from '../../stores/motion-library'
 
 import { defineInvokeHandler } from '@moeru/eventa'
 import { errorMessageFrom, sleep } from '@moeru/std'
@@ -17,20 +18,24 @@ import { createLive2D, Live2DScene, useLive2dParams, useSettingsLive2d } from '@
 import { MMDScene } from '@proj-airi/stage-ui-mmd'
 import { SpineScene } from '@proj-airi/stage-ui-spine'
 import { TachieScene } from '@proj-airi/stage-ui-tachie'
-import { ThreeScene } from '@proj-airi/stage-ui-three'
+import { ThreeScene, useModelStore as useThreeModelStore } from '@proj-airi/stage-ui-three'
 import { animations } from '@proj-airi/stage-ui-three/assets/vrm'
 import { createQueue } from '@proj-airi/stream-kit'
 import { Callout } from '@proj-airi/ui'
-import { useBroadcastChannel, useEventListener } from '@vueuse/core'
+import { useBroadcastChannel, useEventListener, useTimestamp } from '@vueuse/core'
 // import { createTransformers } from '@xsai-transformers/embed'
 // import embedWorkerURL from '@xsai-transformers/embed/worker?worker&url'
 // import { embed } from '@xsai/embed'
 import { storeToRefs } from 'pinia'
 import { computed, nextTick, onUnmounted, ref, shallowRef, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import StageAvatarModelMissing from './stage-avatar-model-missing.vue'
 import StageRenderError from './stage-render-error.vue'
 
+import { useStageSidecarAttention } from '../../composables/stage-sidecar-attention'
+import { useStageSidecarFrames } from '../../composables/stage-sidecar-frames'
+import { useStageSidecarScreen } from '../../composables/stage-sidecar-screen'
 // import { useDuckDb } from '../../composables/use-duck-db'
 import { Emotion, EMOTION_EmotionMotionName_value, EMOTION_VRMExpressionName_value, EmotionThinkMotionName } from '../../constants/emotions'
 import { useLive2DStageMotionMagic } from '../../features/motions/live2d/use-live2d-stage-motion-magic'
@@ -44,12 +49,17 @@ import { useAvatarTouchStore } from '../../stores/character/avatar-touch'
 import { useChatStore } from '../../stores/chat'
 import { useChatSessionStore } from '../../stores/chat/session-store'
 import { useSharedLive2DExpressionPreview } from '../../stores/live2d'
+import { useMissionsStore } from '../../stores/missions'
 import { useAiriCardStore } from '../../stores/modules/airi-card'
 import { useSpeechStore } from '../../stores/modules/speech'
+import { useMotionGenerationStore } from '../../stores/motion-generation'
+import { useMotionLibraryStore } from '../../stores/motion-library'
+import { usePerceptionRunnerStore } from '../../stores/perception-runner'
 import { useSettingsPresenceBubble } from '../../stores/presence-bubble'
 import { useSettings } from '../../stores/settings'
 import { useSettingsStageModel } from '../../stores/settings/stage-model'
 import { useSpeechOutputControlStore } from '../../stores/speech-output-control'
+import { useStageSidecarStore } from '../../stores/stage-sidecar'
 import { useVoiceStore } from '../../stores/voice'
 
 const props = withDefaults(defineProps<{
@@ -80,6 +90,8 @@ const spineSceneRef = ref<InstanceType<typeof SpineScene>>()
 const tachieSceneRef = ref<InstanceType<typeof TachieScene>>()
 const mmdSceneRef = ref<InstanceType<typeof MMDScene>>()
 
+const { t } = useI18n()
+const stageSidecar = useStageSidecarStore()
 const settingsStore = useSettings()
 const {
   stageModelRenderer,
@@ -262,7 +274,11 @@ const live2d = createLive2D({
 })
 useSharedLive2DExpressionPreview(live2d, selectedCharacterId, () => selectedAvatarModel.value?.id)
 
-const emotionsQueue = createQueue<EmotionPayload>({
+/**
+ * `gestureSeconds`: a gesture of the motion library plays for the same marker. The expression lasts as long, and MMD
+ * plays no mapped motion besides it.
+ */
+const emotionsQueue = createQueue<EmotionPayload & { gestureSeconds?: number }>({
   handlers: [
     async (ctx) => {
       if (stageModelRenderer.value === 'vrm') {
@@ -271,7 +287,8 @@ const emotionsQueue = createQueue<EmotionPayload>({
         if (!value)
           return
 
-        await vrmViewerRef.value!.setExpression(value, ctx.data.intensity)
+        const holdMs = ctx.data.gestureSeconds ? ctx.data.gestureSeconds * 1000 : undefined
+        await vrmViewerRef.value!.setExpression(value, ctx.data.intensity, holdMs)
       }
       else if (stageModelRenderer.value === 'live2d') {
         currentMotion.value = { group: EMOTION_EmotionMotionName_value[ctx.data.name] }
@@ -283,13 +300,78 @@ const emotionsQueue = createQueue<EmotionPayload>({
         tachieSceneRef.value?.setEmotion(ctx.data.name, ctx.data.intensity)
       }
       else if (stageModelRenderer.value === 'mmd') {
-        mmdSceneRef.value?.setEmotion(ctx.data.name, ctx.data.intensity)
+        const holdMs = ctx.data.gestureSeconds ? ctx.data.gestureSeconds * 1000 : undefined
+        mmdSceneRef.value?.setEmotion(ctx.data.name, ctx.data.intensity, !ctx.data.gestureSeconds, holdMs)
+      }
+      else if (stageModelRenderer.value === 'unity') {
+        // The sidecar owns the tables of VRM and MMD models. An MMD model shows emotions that a VRM model has no
+        // expression for, so the name must stay as it is here.
+        stageSidecar.setExpression(ctx.data.name, ctx.data.intensity, ctx.data.gestureSeconds ? ctx.data.gestureSeconds * 1000 : undefined)
       }
     },
   ],
 })
 
 const streamingControl = useLlmStreamingControlStore()
+const motionLibrary = useMotionLibraryStore()
+const motionGeneration = useMotionGenerationStore()
+// A generation waits for the end of a chat turn, so it does not slow the reply.
+watch(chatSending, sending => motionGeneration.setBusy(sending), { immediate: true })
+
+/** The clips of the motion library play on these renderers. */
+const playsLibraryMotion = computed(() => stageModelRenderer.value === 'vrm' || stageModelRenderer.value === 'mmd' || stageModelRenderer.value === 'unity')
+
+/**
+ * Plays a clip of the motion library on a VRM or MMD model, or on a sidecar. Without an emotion in the marker, a VRM
+ * model also plays the expression tracks of an imported clip.
+ *
+ * @returns whether the clip plays.
+ */
+async function playLibraryEntry(entry: MotionEntry, withExpressions: boolean) {
+  const source = await motionLibrary.sourceOf(entry)
+  if (!source)
+    return false
+  if (stageModelRenderer.value === 'unity')
+    return await stageSidecar.playGesture(source)
+  const played = stageModelRenderer.value === 'vrm'
+    ? await vrmViewerRef.value?.playGesture(source, { withExpressions })
+    : await mmdSceneRef.value?.playGesture(source)
+  return !!played
+}
+
+/**
+ * Plays the gesture of the motion library that fits the free-text `motion` of an `ACT` marker.
+ *
+ * @returns the length of the gesture in seconds, or undefined when none plays.
+ */
+async function playLibraryGesture(motion: string, withExpressions: boolean) {
+  await motionLibrary.ready()
+  const entry = motionLibrary.choose(motion)
+  if (!entry) {
+    // Only the emotion plays now. The generated clip plays the next time that a marker asks for the motion.
+    motionGeneration.request(motion)
+    return undefined
+  }
+  if (!await playLibraryEntry(entry, withExpressions))
+    return undefined
+  void motionLibrary.recordUse(entry.id)
+  return entry.duration
+}
+
+// A clip that the owner asked for plays when the generator gives it.
+watch(() => motionGeneration.playRequest, async (request) => {
+  await motionLibrary.ready()
+  const entry = request && motionLibrary.entries.find(candidate => candidate.id === request.id)
+  if (entry && playsLibraryMotion.value && await playLibraryEntry(entry, true))
+    void motionLibrary.recordUse(entry.id)
+})
+
+// The preview of Settings plays here. It counts no use, because the owner, not the model, chose it.
+watch(() => motionLibrary.previewRequest, (request) => {
+  const entry = request && motionLibrary.entries.find(candidate => candidate.id === request.id)
+  if (entry && playsLibraryMotion.value)
+    void playLibraryEntry(entry, true)
+})
 
 function toStageEmotionPayload(payload: { name: string, intensity: number }): EmotionPayload | undefined {
   switch (payload.name) {
@@ -320,6 +402,10 @@ chatHookCleanups.push(streamingControl.onSignal(async (signal) => {
   if (signal.type === 'act') {
     const act = normalizeActPayload(signal.payload)
     let explicitLive2DMotion = false
+    let gestureSeconds: number | undefined
+
+    if (act.motion && playsLibraryMotion.value)
+      gestureSeconds = await playLibraryGesture(act.motion, !act.emotion)
 
     if (stageModelRenderer.value === 'live2d') {
       if (act.motion) {
@@ -342,7 +428,7 @@ chatHookCleanups.push(streamingControl.onSignal(async (signal) => {
 
       // eslint-disable-next-line no-console
       console.debug('emotion detected', emotion)
-      emotionsQueue.enqueue(emotion)
+      emotionsQueue.enqueue({ ...emotion, gestureSeconds })
     }
     return
   }
@@ -390,6 +476,35 @@ const speechDestination = audioContext.createGain()
 speechDestination.connect(audioContext.destination)
 /** Connects a renderer node, for example the VRM or MMD lip sync worklet, to the played speech. */
 const connectSpeech = (node: AudioNode) => voice.connectSpeechNode(node)
+const { bodyMotionEnabled } = storeToRefs(useThreeModelStore())
+useStageSidecarFrames({
+  active: () => stageModelRenderer.value === 'unity',
+  audioContext,
+  connectSpeech,
+  isSpeaking: () => nowSpeaking.value,
+  isThinking: () => presenceBubble.value.thinking,
+  isBodyMotionEnabled: () => bodyMotionEnabled.value,
+  send: frame => stageSidecar.sendFrame(frame),
+})
+// A commentary ends at its time limit, so the activity checks the clock each second.
+const missionsStore = useMissionsStore()
+const missionClock = useTimestamp({ interval: 1000 })
+const isCommenting = () => missionsStore.commentaryAt(missionClock.value) !== undefined
+useStageSidecarAttention({
+  active: () => stageModelRenderer.value === 'unity',
+  isThinking: () => presenceBubble.value.thinking,
+  isSpeaking: () => nowSpeaking.value,
+  isCommenting,
+  send: target => stageSidecar.setAttention(target),
+  sendActivity: activity => stageSidecar.setActivity(activity),
+})
+// During a commentary, the game also shows on the monitor of the room.
+const perceptionRunner = usePerceptionRunnerStore()
+useStageSidecarScreen({
+  active: () => stageModelRenderer.value === 'unity' && isCommenting(),
+  subscribe: listener => perceptionRunner.onScreenFrame(listener),
+  send: image => stageSidecar.sendScreen(image),
+})
 // setTargetAtTime smooths slider drags into the gain, so volume changes do not click.
 watch(speechVolume, (volume) => {
   speechDestination.gain.setTargetAtTime(volume, audioContext.currentTime, 0.05)
@@ -612,7 +727,7 @@ useEventListener(['click', 'touchstart', 'keydown'], resumeAudioContextOnInterac
 // })
 
 watch([stageModelRenderer, () => props.paused], ([renderer]) => {
-  if (renderer === 'godot') {
+  if (renderer === 'godot' || renderer === 'unity') {
     componentState.value = 'mounted'
   }
 
@@ -685,6 +800,9 @@ defineExpose({
   setExpression: async (expression: string, intensity = 1) => {
     if (stageModelRenderer.value === 'vrm') {
       await vrmViewerRef.value?.setExpression(expression, intensity)
+    }
+    else if (stageModelRenderer.value === 'unity') {
+      stageSidecar.setExpression(expression, intensity)
     }
   },
 })
@@ -781,6 +899,8 @@ defineExpose({
         :enable-orbit-controls="props.enableOrbitControls"
         :audio-context="audioContext"
         :connect-speech="connectSpeech"
+        :default-idle-animation-url="animations.idleLoop.toString()"
+        :thinking="presenceBubble.thinking"
         @error="reportStageRenderError"
       />
       <div
@@ -800,6 +920,26 @@ defineExpose({
         >
           <Callout label="Godot Stage (Experimental)">
             <p>Godot Stage (experimental) is running...</p>
+          </Callout>
+        </div>
+      </div>
+      <div
+        v-if="stageModelRenderer === 'unity'"
+        :class="[
+          'h-full w-full',
+          'flex items-center justify-center',
+          'px-4 py-6',
+        ]"
+      >
+        <div
+          :class="[
+            'w-96 max-w-full',
+            'min-h-32',
+            'flex items-center justify-center',
+          ]"
+        >
+          <Callout :label="t('stage.unity-stage.title')">
+            <p>{{ t('stage.unity-stage.running') }}</p>
           </Callout>
         </div>
       </div>

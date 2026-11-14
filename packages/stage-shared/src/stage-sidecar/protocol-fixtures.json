@@ -1,0 +1,680 @@
+{
+  "hostMessages": [
+    {
+      "type": "host.scene.apply",
+      "payload": {
+        "format": "vrm",
+        "modelId": "model-1",
+        "name": "Test model",
+        "path": "C:/stage/models/model-1/test.vrm"
+      }
+    },
+    {
+      "type": "host.scene.apply",
+      "payload": {
+        "format": "pmx",
+        "modelId": "model-2",
+        "name": "MMD model",
+        "path": "C:/stage/models/model-2/mmd.pmx"
+      }
+    },
+    {
+      "type": "host.character.idle",
+      "payload": {
+        "path": "C:/stage/clips/idle.vrma"
+      }
+    },
+    {
+      "type": "host.character.expression",
+      "payload": {
+        "name": "happy",
+        "intensity": 0.75,
+        "holdMs": 2500
+      }
+    },
+    {
+      "type": "host.character.expression",
+      "payload": {
+        "name": "neutral",
+        "intensity": 1
+      }
+    },
+    {
+      "type": "host.character.gesture",
+      "payload": {
+        "kind": "keys",
+        "id": "wave",
+        "part": "upper",
+        "duration": 1.5,
+        "tracks": [
+          {
+            "bone": "rightUpperArm",
+            "times": [
+              0,
+              1.5
+            ],
+            "values": [
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0.5,
+              0.5
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "host.character.gesture",
+      "payload": {
+        "kind": "vrma",
+        "id": "dance",
+        "part": "full",
+        "path": "C:/stage/clips/dance.vrma"
+      }
+    },
+    {
+      "type": "host.character.frame",
+      "payload": {
+        "mouth": {
+          "A": 0.5,
+          "E": 0,
+          "I": 0.25,
+          "O": 0,
+          "U": 1
+        },
+        "bones": {
+          "spine": {
+            "x": 0.01,
+            "y": 0,
+            "z": 0
+          },
+          "chest": {
+            "x": 0.02,
+            "y": 0,
+            "z": 0
+          },
+          "neck": {
+            "x": 0,
+            "y": 0.1,
+            "z": 0
+          },
+          "head": {
+            "x": 0,
+            "y": 0.2,
+            "z": 0.015
+          }
+        },
+        "eyes": {
+          "yaw": 0.25,
+          "pitch": -0.125
+        }
+      }
+    },
+    {
+      "type": "host.character.attention",
+      "payload": {
+        "target": "viewer"
+      }
+    },
+    {
+      "type": "host.character.attention",
+      "payload": {
+        "target": "none"
+      }
+    },
+    {
+      "type": "host.character.activity",
+      "payload": {
+        "activity": "watching-screen"
+      }
+    },
+    {
+      "type": "host.character.activity",
+      "payload": {
+        "activity": "none"
+      }
+    },
+    {
+      "type": "host.room.screen",
+      "payload": {
+        "image": "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoHBwYIDAoMDAsKCwsNDhIQDQ4RDgsLEBYQERMUFRUVDA8XGBYUGBIUFRT/2wBDAQMEBAUEBQkFBQkUDQsNFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBT/wAARCAAJABADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDgqKKK/o0/Aj//2Q=="
+      }
+    },
+    {
+      "type": "host.shutdown"
+    }
+  ],
+  "sidecarMessages": [
+    {
+      "type": "stage.ready"
+    },
+    {
+      "type": "stage.fatal",
+      "payload": {
+        "message": "The URP asset is missing."
+      }
+    },
+    {
+      "type": "scene.applied",
+      "payload": {
+        "modelId": "model-1",
+        "avatarBounds": {
+          "center": {
+            "x": 0,
+            "y": 0.75,
+            "z": 0
+          },
+          "size": {
+            "x": 0.5,
+            "y": 1.5,
+            "z": 0.25
+          },
+          "maxDimension": 1.5
+        }
+      }
+    },
+    {
+      "type": "scene.error",
+      "payload": {
+        "message": "The file is not a VRM model."
+      }
+    },
+    {
+      "type": "character.error",
+      "payload": {
+        "message": "Unknown bone.",
+        "type": "host.character.gesture"
+      }
+    }
+  ],
+  "invalidHostMessages": [
+    {
+      "reason": "unknown type",
+      "message": {
+        "type": "host.unknown"
+      }
+    },
+    {
+      "reason": "no type",
+      "message": {
+        "payload": {
+          "path": "a"
+        }
+      }
+    },
+    {
+      "reason": "unsupported model format",
+      "message": {
+        "type": "host.scene.apply",
+        "payload": {
+          "format": "fbx",
+          "modelId": "a",
+          "name": "a",
+          "path": "a"
+        }
+      }
+    },
+    {
+      "reason": "empty path",
+      "message": {
+        "type": "host.character.idle",
+        "payload": {
+          "path": ""
+        }
+      }
+    },
+    {
+      "reason": "extra field",
+      "message": {
+        "type": "host.character.idle",
+        "payload": {
+          "path": "a",
+          "loop": true
+        }
+      }
+    },
+    {
+      "reason": "extra field in the envelope",
+      "message": {
+        "type": "host.shutdown",
+        "payload": {}
+      }
+    },
+    {
+      "reason": "intensity over 1",
+      "message": {
+        "type": "host.character.expression",
+        "payload": {
+          "name": "happy",
+          "intensity": 1.5
+        }
+      }
+    },
+    {
+      "reason": "intensity as text",
+      "message": {
+        "type": "host.character.expression",
+        "payload": {
+          "name": "happy",
+          "intensity": "1"
+        }
+      }
+    },
+    {
+      "reason": "hold of zero",
+      "message": {
+        "type": "host.character.expression",
+        "payload": {
+          "name": "happy",
+          "intensity": 1,
+          "holdMs": 0
+        }
+      }
+    },
+    {
+      "reason": "unknown gesture kind",
+      "message": {
+        "type": "host.character.gesture",
+        "payload": {
+          "kind": "bvh",
+          "id": "a",
+          "part": "upper",
+          "path": "a"
+        }
+      }
+    },
+    {
+      "reason": "keys for the full body",
+      "message": {
+        "type": "host.character.gesture",
+        "payload": {
+          "kind": "keys",
+          "id": "a",
+          "part": "full",
+          "duration": 1,
+          "tracks": [
+            {
+              "bone": "head",
+              "times": [
+                0
+              ],
+              "values": [
+                0,
+                0,
+                0,
+                1
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "reason": "no tracks",
+      "message": {
+        "type": "host.character.gesture",
+        "payload": {
+          "kind": "keys",
+          "id": "a",
+          "part": "upper",
+          "duration": 1,
+          "tracks": []
+        }
+      }
+    },
+    {
+      "reason": "three values for one time",
+      "message": {
+        "type": "host.character.gesture",
+        "payload": {
+          "kind": "keys",
+          "id": "a",
+          "part": "upper",
+          "duration": 1,
+          "tracks": [
+            {
+              "bone": "head",
+              "times": [
+                0
+              ],
+              "values": [
+                0,
+                0,
+                1
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "reason": "negative key time",
+      "message": {
+        "type": "host.character.gesture",
+        "payload": {
+          "kind": "keys",
+          "id": "a",
+          "part": "upper",
+          "duration": 1,
+          "tracks": [
+            {
+              "bone": "head",
+              "times": [
+                -1
+              ],
+              "values": [
+                0,
+                0,
+                0,
+                1
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "reason": "duration of zero",
+      "message": {
+        "type": "host.character.gesture",
+        "payload": {
+          "kind": "keys",
+          "id": "a",
+          "part": "upper",
+          "duration": 0,
+          "tracks": [
+            {
+              "bone": "head",
+              "times": [
+                0
+              ],
+              "values": [
+                0,
+                0,
+                0,
+                1
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "reason": "mouth weight under 0",
+      "message": {
+        "type": "host.character.frame",
+        "payload": {
+          "mouth": {
+            "A": -0.5,
+            "E": 0,
+            "I": 0,
+            "O": 0,
+            "U": 0
+          },
+          "bones": {
+            "spine": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "chest": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "neck": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "head": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            }
+          },
+          "eyes": {
+            "yaw": 0,
+            "pitch": 0
+          }
+        }
+      }
+    },
+    {
+      "reason": "no head bone",
+      "message": {
+        "type": "host.character.frame",
+        "payload": {
+          "mouth": {
+            "A": 0,
+            "E": 0,
+            "I": 0,
+            "O": 0,
+            "U": 0
+          },
+          "bones": {
+            "spine": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "chest": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "neck": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            }
+          },
+          "eyes": {
+            "yaw": 0,
+            "pitch": 0
+          }
+        }
+      }
+    },
+    {
+      "reason": "unknown attention target",
+      "message": {
+        "type": "host.character.attention",
+        "payload": {
+          "target": "camera"
+        }
+      }
+    },
+    {
+      "reason": "extra field in an attention",
+      "message": {
+        "type": "host.character.attention",
+        "payload": {
+          "target": "viewer",
+          "seconds": 15
+        }
+      }
+    },
+    {
+      "reason": "unknown activity",
+      "message": {
+        "type": "host.character.activity",
+        "payload": {
+          "activity": "sleeping"
+        }
+      }
+    },
+    {
+      "reason": "extra field in an activity",
+      "message": {
+        "type": "host.character.activity",
+        "payload": {
+          "activity": "watching-screen",
+          "place": "desk"
+        }
+      }
+    },
+    {
+      "reason": "empty screen image",
+      "message": {
+        "type": "host.room.screen",
+        "payload": {
+          "image": ""
+        }
+      }
+    },
+    {
+      "reason": "screen image that is no base64",
+      "message": {
+        "type": "host.room.screen",
+        "payload": {
+          "image": "data:image/jpeg;base64,/9j/"
+        }
+      }
+    },
+    {
+      "reason": "extra field in a screen frame",
+      "message": {
+        "type": "host.room.screen",
+        "payload": {
+          "image": "/9j/",
+          "width": 960
+        }
+      }
+    }
+  ],
+  "invalidSidecarMessages": [
+    {
+      "reason": "unknown type",
+      "message": {
+        "type": "stage.unknown"
+      }
+    },
+    {
+      "reason": "no message",
+      "message": {
+        "type": "stage.fatal",
+        "payload": {}
+      }
+    },
+    {
+      "reason": "no bounds",
+      "message": {
+        "type": "scene.applied",
+        "payload": {
+          "modelId": "a"
+        }
+      }
+    },
+    {
+      "reason": "no failed type",
+      "message": {
+        "type": "character.error",
+        "payload": {
+          "message": "a"
+        }
+      }
+    }
+  ],
+  "rotations": [
+    {
+      "euler": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "quaternion": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "unity": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "euler": {
+        "x": 0.5,
+        "y": 0,
+        "z": 0
+      },
+      "quaternion": [
+        0.247403959,
+        0,
+        0,
+        0.968912422
+      ],
+      "unity": [
+        0.247403959,
+        0,
+        0,
+        0.968912422
+      ]
+    },
+    {
+      "euler": {
+        "x": 0,
+        "y": 0.8,
+        "z": 0
+      },
+      "quaternion": [
+        0,
+        0.389418342,
+        0,
+        0.921060994
+      ],
+      "unity": [
+        0,
+        -0.389418342,
+        0,
+        0.921060994
+      ]
+    },
+    {
+      "euler": {
+        "x": 0,
+        "y": 0,
+        "z": -1.2
+      },
+      "quaternion": [
+        0,
+        0,
+        -0.564642473,
+        0.825335615
+      ],
+      "unity": [
+        0,
+        0,
+        0.564642473,
+        0.825335615
+      ]
+    },
+    {
+      "euler": {
+        "x": 0.1,
+        "y": -0.2,
+        "z": 0.3
+      },
+      "quaternion": [
+        0.034270799,
+        -0.106020511,
+        0.143572175,
+        0.983347443
+      ],
+      "unity": [
+        0.034270799,
+        0.106020511,
+        -0.143572175,
+        0.983347443
+      ]
+    }
+  ]
+}

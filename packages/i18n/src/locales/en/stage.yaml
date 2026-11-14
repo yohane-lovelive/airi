@@ -280,6 +280,9 @@ avatar-model-missing:
   unavailable-title: This model is not on this device
   description: Select a model to show {name} on the Stage.
   select: Select model
+unity-stage:
+  title: Unity Stage (Experimental)
+  running: The character shows in the Unity window.
 render-error:
   title: '{renderer} could not render this model'
   description: The model is selected, but the Stage could not display it.
@@ -451,3 +454,12 @@ notifications:
       title: Renewal payment failed
       body: We will retry on {retryAt}. Update your payment method to keep {plan}.
       body-no-retry: Update your payment method to keep {plan}.
+perception:
+  pause: Pause screen perception
+  resume: Resume screen perception
+  start: Start screen perception
+  recording: Recording the screen. Click to pause perception and stop the recording.
+missions:
+  fixed-reminder: 'Reminder: {text}'
+  fixed-watch: 'Watch: {condition}'
+  notification-title: Reminder from AIRI

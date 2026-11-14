@@ -16,6 +16,7 @@ import ControlButtonTooltip from './control-button-tooltip.vue'
 import ControlButton from './control-button.vue'
 import ControlsIslandChatButton from './controls-island-chat-button.vue'
 import ControlsIslandMenu from './controls-island-menu.vue'
+import ControlsIslandPerception from './controls-island-perception.vue'
 import IndicatorMicVolume from './indicator-mic-volume.vue'
 
 import {
@@ -265,6 +266,9 @@ const startDraggingWindow = !isLinux() ? defineInvoke(context.value, electronSta
       </ControlButtonTooltip>
 
       <ControlsIslandChatButton :button-style="buttonStyle" :icon-class="iconClass" />
+
+      <!-- Shows only while screen perception is on. -->
+      <ControlsIslandPerception :button-style="buttonStyle" :icon-class="iconClass" />
 
       <ControlsIslandMenu
         v-model:open="menuOpen"

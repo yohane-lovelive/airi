@@ -8,6 +8,7 @@ import { MMDScene } from '@proj-airi/stage-ui-mmd'
 import { SpineScene } from '@proj-airi/stage-ui-spine'
 import { TachieScene } from '@proj-airi/stage-ui-tachie'
 import { ThreeScene, useModelStore } from '@proj-airi/stage-ui-three'
+import { animations } from '@proj-airi/stage-ui-three/assets/vrm'
 import { useMouse } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
 import { computed, ref, watch } from 'vue'
@@ -184,10 +185,10 @@ const runtimeSnapshot = computed<ModelSettingsRuntimeSnapshot>(() => {
     })
   }
 
-  if (stageModelRenderer.value === 'godot') {
+  if (stageModelRenderer.value === 'godot' || stageModelRenderer.value === 'unity') {
     return createEmptyModelSettingsRuntimeSnapshot({
       ownerInstanceId: vrmPreviewStageInstanceId,
-      renderer: 'godot',
+      renderer: stageModelRenderer.value,
       phase: hasModel ? 'mounted' : 'no-model',
       controlsLocked: false,
       previewAvailable: false,
@@ -259,6 +260,7 @@ const cursorPosition = computed(() => ({
         :model-id="stageModelSelected"
         :cursor-position="cursorPosition"
         :enable-orbit-controls="true"
+        :default-idle-animation-url="animations.idleLoop.toString()"
       />
     </div>
   </template>

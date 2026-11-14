@@ -38,6 +38,57 @@ describe('useWebSearchStore', () => {
     })
   })
 
+  describe('the mcp service', () => {
+    it('needs no key, only the runtime of the desktop app and a tool name', () => {
+      const store = useWebSearchStore()
+      store.enabled = true
+      store.provider = 'mcp'
+      expect(store.configured).toBe(false)
+      expect(store.mcpSearchServer).toBeUndefined()
+
+      store.setMcpCallTool(async () => ({}))
+      expect(store.configured).toBe(true)
+      expect(store.mcpSearchServer).toBe('ddg-search')
+
+      store.mcpToolName = ' '
+      expect(store.configured).toBe(false)
+    })
+
+    it('names no server for another service, so the MCP proxy tools reach them all', () => {
+      const store = useWebSearchStore()
+      store.enabled = true
+      store.provider = 'tavily'
+      store.apiKey = 'key'
+      store.setMcpCallTool(async () => ({}))
+
+      expect(store.mcpSearchServer).toBeUndefined()
+    })
+  })
+
+  describe('searches of lines that the character starts', () => {
+    it('counts them per local day, and stops at the limit of the owner', () => {
+      const store = useWebSearchStore()
+      store.autonomousPerDay = 2
+      const day = new Date(2026, 10, 5, 12).getTime()
+
+      expect(store.autonomousSearchesLeft(day)).toBe(2)
+      expect(store.takeAutonomousSearch(day)).toBe(true)
+      expect(store.takeAutonomousSearch(day)).toBe(true)
+      expect(store.takeAutonomousSearch(day)).toBe(false)
+      expect(store.autonomousSearchesUsed(day)).toBe(2)
+
+      const nextDay = new Date(2026, 10, 6, 0, 1).getTime()
+      expect(store.autonomousSearchesLeft(nextDay)).toBe(2)
+    })
+
+    it('allows none at a limit of zero', () => {
+      const store = useWebSearchStore()
+      store.autonomousPerDay = 0
+
+      expect(store.takeAutonomousSearch()).toBe(false)
+    })
+  })
+
   describe('toolset-prompt watcher', () => {
     it('uses only the selected service key and updates prompt availability on switching', async () => {
       const store = useWebSearchStore()

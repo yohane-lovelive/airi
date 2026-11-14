@@ -42,6 +42,54 @@ export const electronOpenMainDevtools = defineInvokeEventa('eventa:invoke:electr
 export const electronCenterMainWindow = defineInvokeEventa<Rectangle>('eventa:invoke:electron:windows:main:center')
 export const electronOpenEditor = defineInvokeEventa<void>('eventa:invoke:electron:windows:editor:open')
 export const electronOpenSettings = defineInvokeEventa<void, { route?: string }>('eventa:invoke:electron:windows:settings:open')
+/** Seconds since the last keyboard or mouse input on the whole system, from `powerMonitor.getSystemIdleTime()`. */
+export const electronSystemIdleSeconds = defineInvokeEventa<number>('eventa:invoke:electron:power-monitor:system-idle-seconds')
+/** One window on the whole system: its handle, its title, and the name and path of its app. */
+export interface DesktopWindowInfo {
+  /** On Windows, the window handle. The window sources of `desktopCapturer` name the same number. */
+  id: number
+  title: string
+  app: string
+  path: string
+}
+/**
+ * The window in front, from `get-windows`. Undefined when the system tells no window, for example on Wayland.
+ * Screen perception skips excluded windows with it, and a commentary follows the window of its app with it.
+ */
+export const electronForegroundWindow = defineInvokeEventa<DesktopWindowInfo | undefined>('eventa:invoke:electron:foreground-window')
+/** The open windows, front to back, from `get-windows`. Commentary finds its target window with it. */
+export const electronOpenWindows = defineInvokeEventa<DesktopWindowInfo[]>('eventa:invoke:electron:open-windows')
+/** One frame of a screen recording: the JPEG bytes, the base64 grayscale thumbnail, and the app in front. */
+export interface PerceptionRecordedFrame {
+  at: number
+  image: Uint8Array
+  thumbnail: string
+  app?: string
+}
+/** One line of `events.jsonl` in a screen recording: a screen event, or an owner message without its text. */
+export type PerceptionRecordedEvent
+  = | { kind: 'screen', at: number, type: string, salience: number, app?: string }
+    | { kind: 'owner-message', at: number }
+/** One screen recording on the device. */
+export interface PerceptionRecordingInfo {
+  id: string
+  startedAt: number
+  endedAt?: number
+  frames: number
+  bytes: number
+  /** Whether it records now. */
+  recording: boolean
+}
+/** The screen recorder of replay evaluation. Only the desktop app has it, and recordings never leave the device. */
+export const electronPerceptionRecorder = {
+  start: defineInvokeEventa<PerceptionRecordingInfo>('eventa:invoke:electron:perception-recorder:start'),
+  appendFrame: defineInvokeEventa<{ stopped?: 'time' | 'size' | 'not-recording' }, { id: string, frame: PerceptionRecordedFrame }>('eventa:invoke:electron:perception-recorder:append-frame'),
+  appendEvents: defineInvokeEventa<void, { id: string, events: PerceptionRecordedEvent[] }>('eventa:invoke:electron:perception-recorder:append-events'),
+  stop: defineInvokeEventa<PerceptionRecordingInfo | undefined>('eventa:invoke:electron:perception-recorder:stop'),
+  list: defineInvokeEventa<PerceptionRecordingInfo[]>('eventa:invoke:electron:perception-recorder:list'),
+  remove: defineInvokeEventa<boolean, { id: string }>('eventa:invoke:electron:perception-recorder:remove'),
+  openFolder: defineInvokeEventa<void>('eventa:invoke:electron:perception-recorder:open-folder'),
+}
 /**
  * What the fullscreen mode shows on the right, in either window that hosts it.
  *
@@ -706,28 +754,31 @@ export const electronAppIconSet = defineInvokeEventa<boolean, boolean>('eventa:i
  */
 export const electronErrorReportingSet = defineInvokeEventa<void, boolean>('eventa:invoke:electron:error-reporting:set')
 
-export type ElectronGodotStageState = 'stopped' | 'starting' | 'running' | 'stopping' | 'error'
+export type ElectronStageSidecarState = 'stopped' | 'starting' | 'running' | 'stopping' | 'error'
 
 /**
- * Snapshot of the Godot sidecar lifecycle owned by Electron main.
+ * Snapshot of a display sidecar lifecycle owned by Electron main.
  *
  * Use when:
- * - Renderer windows need to reflect whether the external Godot window is available
+ * - Renderer windows need to reflect whether the external window of the sidecar is available
  * - Settings or stage pages need lifecycle feedback after start/stop actions
  *
  * Expects:
- * - `pid` is only set while the Godot child process exists
+ * - `pid` is only set while the child process exists. An attached sidecar has no child process.
  * - `lastError` is present for the most recent lifecycle or scene-apply failure
  *
  * Returns:
  * - N/A
  */
-export interface ElectronGodotStageStatus {
-  state: ElectronGodotStageState
+export interface ElectronStageSidecarStatus {
+  state: ElectronStageSidecarState
   pid: number | null
   lastError?: string
   updatedAt: number
 }
+
+export type ElectronGodotStageState = ElectronStageSidecarState
+export type ElectronGodotStageStatus = ElectronStageSidecarStatus
 
 /**
  * Serialized scene input payload forwarded from renderer to Electron main.

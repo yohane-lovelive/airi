@@ -224,7 +224,7 @@ model-select:
     support-status: >
       Click {select-button} to select or import models.
       Currently, {zip} (for Live2D and Spine models), {vrm} (for VRM models),
-      and {mmd} (for MMD models, zipped with their textures) are supported.
+      and {mmd} (for MMD models, as the model folder or a ZIP of it) are supported.
     model-type-example: >
       Neuro-sama uses 2D model driven by framework developed by Live2D Inc,
       while Grok Ani (in Grok Companion) uses 3D model driven by VRM / MMD open formats.
@@ -234,6 +234,15 @@ model-select:
     select: Pick
     import: Import
     remove: Remove
+    mmd:
+      folder: MMD folder
+      model-only: This file has no textures, so the model would show blank. Import the model folder with "MMD folder", or a ZIP of the folder.
+      no-model: No .pmx or .pmd model was found.
+      failed: 'Could not import the MMD model: {error}'
+      choose-variant:
+        title: Choose a model
+        description: This folder has more than one model. Choose the one to import.
+        cancel: Cancel
     sync:
       upload: Upload to cloud
       delete-cloud: Delete from cloud
@@ -626,6 +635,7 @@ pages:
       description: Description
       behavior: Behavior
       greetings: Greetings (one per line)
+      message_examples: Example dialogues
       settings: Settings
       version: Version
       model: Character model
@@ -663,6 +673,8 @@ pages:
         scenario: What are the surroundings ? What is the current situation ?
         greetings_field: Greetings
         greetings: How your character should say "hello" ?
+        message_examples: "Short dialogues that show how your character talks. Start each line with {'{{'}char{'}}'}: or {'{{'}user{'}}'}:, and leave an empty line between dialogues. The character reads them as examples, not as past talk."
+        message_examples_placeholder: "{'{{'}user{'}}'}: Let's play a game!\n{'{{'}char{'}}'}: Okay, I won't lose!"
         systemprompt: Explain here to the AI LLM how it should answer when prompted.
         posthistoryinstructions: Place here anything the AI LLM should read after the messages history.
         context_window: 'Turn limit, including the current turn. Each turn contains your message and the assistant reply, including tool calls. Consecutive messages from the same role stay together. Leave empty for All. Use 0 to send only your current message. When exceeded, the newest 90% of the limit is retained, rounded up to whole turns. Saved chats stay intact.'
@@ -726,6 +738,34 @@ pages:
     import_invalid_file: Card package file is invalid
     upload: Upload
     upload_desc: Click or drag an AIRI card package to import
+  usage:
+    title: Usage
+    description: How many tokens each kind of model call used on this device
+    intro: Tokens that the provider reported for each model call on this device, sorted by why the call ran. The provider site shows the exact cost.
+    periods:
+      today: Today
+      last-30-days: Last 30 days
+    tokens: '{count} tokens'
+    details: 'In {input} · Out {output} · {calls} calls · {images} images'
+    unreported: '{count} without a report'
+    empty: No model calls yet.
+    purposes:
+      owner-reply: Replies to you
+      initiative: Autonomous speech
+      commentary: Commentary
+      watch: Watch checks
+      mission: Missions
+      task: Background tasks
+      scene: Replies to other people
+      vision: Image descriptions
+      voice-assist: Voice input help
+      tool-card: Tool cards
+      artistry: Artistry
+      history-summary: History summaries
+      memory: Memory work
+      timeline: Screen timeline summaries
+      motion: Motion generation
+      other: Other
   memory:
     description: Where memories got stored, and organized
     title: Memory
@@ -1005,7 +1045,37 @@ pages:
             title: Model options
             thinking:
               label: Thinking
+              description: How much the model reasons before a reply. More reasoning takes longer.
+              autonomous-label: Thinking of autonomous speech
+              autonomous-description: The reasoning of small talk, commentary, and idle speech. Less reasoning makes the character answer the screen sooner.
+              levels:
+                same: Same as replies
+                default: Provider default
+                'off': 'Off'
+                low: Low
+                medium: Medium
+                high: High
               required-description: This model requires Thinking.
+            reply-length:
+              label: Reply length
+              description: How long the replies to your messages are. Autonomous speech has its own length.
+              options:
+                auto: Match my message
+                short: Short, 1 or 2 sentences
+                normal: Normal, 2 to 4 sentences
+                long: Long, as the topic needs
+                free: No instruction
+            image-input:
+              label: Image input
+              description: Whether this model reads images itself. When it does not, the vision module describes each image first, which takes several seconds. Many model lists leave this out, for example on OpenAI-compatible servers.
+              catalog:
+                reads: reads images
+                no-images: no images
+                unknown: not listed
+              options:
+                catalog: 'Model list ({catalog})'
+                reads: Reads images
+                no-images: No images
               provider-default-description: AIRI has no reasoning settings for this model. OpenRouter applies its default.
       title: Consciousness
     description: Thinking, vision, speech synthesis, gaming, etc.
@@ -1217,10 +1287,202 @@ pages:
             verbose-json-unsupported: >-
               Your provider did not return verbose_json segments. Confidence
               filtering had no effect on the last transcription.
+    initiative:
+      title: Autonomous speech
+      description: The character starts to talk on its own now and then
+      enable: Let the character talk on its own
+      enable-description: Without your message, the character sometimes starts to talk in the open chat. Each try is one model call, also when the character stays quiet. When you speak or send a message, the try stops.
+      idle-interval: Talk interval
+      idle-interval-description: When nothing else happens, the character talks about this often. The real gaps vary.
+      minutes: '{count} min'
+      daily-turn-budget: Tries per day
+      daily-turn-budget-description: The most model calls for autonomous speech in one day.
+      small-talk-interval: Small talk interval
+      small-talk-interval-description: While small talk runs and you stay quiet, the character talks about this often.
+      solo-pause: Pause in solo talk
+      solo-pause-description: In solo talk, the character talks on its own like a radio. Ask for it in the chat, for example "keep talking by yourself". This is the pause between lines, from the end of the voice.
+      commentary-interval: Commentary interval
+      commentary-interval-description: While commentary runs, the character talks about this often on a calm screen. A busy screen makes the gaps shorter.
+      seconds: '{count} s'
+      quiet-hours: Use quiet hours
+      quiet-hours-description: In this time, the character does not start to talk. It still answers you.
+      quiet-hours-start: Start
+      quiet-hours-end: End
+      greeting: Greet me when the app starts
+      greeting-description: When the open chat has been quiet for 3 hours or more, the character greets you to fit the time of day.
+      welcome-back: Welcome me back
+      welcome-back-description: When you come back after 30 minutes or more away, the character says a few words. The desktop app counts input in any app, and the web app counts input in this page.
+      talk-changes: Changes from your words
+      talk-changes-description: 'You can ask in chat, for example "be quiet for 30 minutes" or "you can talk more". A lasting change moves the talk interval above.'
+      talk-changes-empty: No changes for a time now.
+      quiet-until: Quiet until {time}
+      interval-until: Talk interval ×{factor} until {time}
+      reset-talk-changes: Reset
+    motions:
+      title: Motions
+      description: Gestures that the character plays with its words on VRM and MMD models
+      intro: The character chooses a gesture for the motion of each ACT token. A gesture that you turn off leaves the prompt and does not play.
+      clips: Gestures
+      source:
+        built-in: Built-in
+        imported: Imported
+        generated: Generated
+      not-kept: Not kept yet
+      keep: Keep {name}
+      seconds: '{count} s'
+      uses: Used {count} times
+      preview: Play {name} on the stage
+      preview-note: The preview plays on the stage of the main window.
+      remove: Remove {name}
+      import:
+        title: Import a .vrma file
+        file: File
+        file-description: A VRM Animation file. A clip that moves the legs replaces the whole idle while it plays.
+        description: Description
+        description-hint: What the motion shows, in one sentence. The prompt lists it.
+        tags: Tags
+        tags-hint: Words for the motion, separated by commas, for example "dance, 踊る".
+        submit: Import
+        no-animation: The file holds no VRM animation.
+      generator:
+        title: Generate missing motions
+        intro: When the motion of an ACT token matches no gesture, Text-To-VRMA on this PC makes a clip. Only the emotion plays at first, and the clip plays the next time. The legs and the hips stay still.
+        desktop-only: Motion generation works in the desktop app. It calls Text-To-VRMA on the same PC.
+        enable: Generate missing motions
+        enable-description: A generation runs after the reply ends, one at a time. Keep or remove each new clip in the list above.
+        address: Address
+        address-description: The address of the local HTTP API of Text-To-VRMA. Only an address of this PC works.
+        token: Access token
+        token-description: The token that Text-To-VRMA shows under its local HTTP API settings. It stays on this PC and does not sync.
+        token-saved: A token is stored. Leave the field empty to keep it.
+        save: Save
+        check: Test connection
+        check-ok: Text-To-VRMA answered.
+        failed: The request failed.
+        daily-limit: Clips per day
+        daily-limit-description: The most clips in one day. A generation uses the GPU of this PC.
+        used-today: '{count} of {limit} today'
+        last-error: 'Last failure: {message}'
+    missions:
+      title: Missions
+      description: Reminders and other tasks that the character does for you
+      enable: Use missions
+      enable-description: When you ask, the character sets a reminder and tells you at that time, or keeps you company with small talk for a while. Small talk needs Autonomous speech on. When this is off, no mission runs. In the web app, allow notifications to see reminders while speech is off.
+      missed-age-limit: Missed reminders to tell
+      missed-age-limit-description: If the app was closed when a reminder came due, the character tells you after the next start. An older reminder only shows as missed.
+      hours: '{count} h'
+      active: Active
+      ended: Ended
+      clear-ended: Clear
+      empty: No active missions. Ask the character for a reminder, for example "Remind me to take my medicine at 6 PM", or for small talk, for example "Talk with me for a while".
+      next: 'Next: {time}'
+      stop: 'Stop {name}'
+      repeat:
+        once: Once
+        daily: Every day
+        weekdays: Weekdays
+        weekly: 'Every week: {days}'
+        interval-hours: 'Every {count} h'
+        interval-minutes: 'Every {count} min'
+      status:
+        scheduled: Scheduled
+        running: Running
+        done: Done
+        stopped: Stopped
+        missed: Missed
+      small-talk:
+        name: Small talk
+        solo-name: Solo talk
+        minutes: '{count} min'
+        until: 'Until {time}'
+      commentary:
+        name: 'Commentary on {app}'
+      watch:
+        name: 'Watch {app}: {condition}'
+        last-seen: 'last check: {text}'
+        regions:
+          full: whole window
+          top: top
+          bottom: bottom
+          left: left
+          right: right
+          center: center
+          top-left: top left
+          top-right: top right
+          bottom-left: bottom left
+          bottom-right: bottom right
+      end-reason:
+        time: time is up
+        owner: you stopped it
+        away: you left
+        quiet: you asked for quiet
+        target-closed: the window closed
+        condition: the condition held
+    perception:
+      title: Screen perception
+      description: The character sees your screen
+      unsupported: Screen perception does not run in this app. It runs in the desktop app and in the web app on a computer.
+      enable: Let the character see the screen
+      enable-description: The app keeps the last minute of your screen in memory only, never on the disk. When the character decides whether to talk, it sends up to three frames to the provider of your chat model. The chat model must accept images. An eye button on the stage shows that perception runs, and one click pauses it.
+      paused: Paused
+      paused-description: Nothing is captured while perception is paused. The pause holds after a restart.
+      start: Start
+      images-per-hour: Images each hour
+      images-per-hour-description: The most frames that go to the model in one hour. When half is used, each turn sends one frame, and screen events push less. When all is used, the character talks without seeing the screen.
+      images-sent: 'Images sent in the last hour: {used} of {limit}'
+      frame-policy: Frame policy (developer)
+      frame-policy-description: How a turn picks the frames that it sends. The replay evaluation in evals/autonomy-replay compares them on your recordings. Keep the default unless you test.
+      frame-policies:
+        fresh-keyframes: Newest frame and key frames (default)
+        contact-sheet: Contact sheet, one image of up to six tiles
+        scene-anchor: Scene anchor near the start, then the newest frames
+        scene-anchor+contact-sheet: Scene anchor and a contact sheet
+      screen-model:
+        provider: Model for the screen
+        provider-description: The model of each call that sends images of the screen, for example commentary, idle speech with images, and watch checks. It speaks in the voice of the card. Replies to you keep the model of the card.
+        same-as-card: Same as the model of the card
+        model: Model
+        needs-model: Choose a model. Until then, these calls use the model of the card.
+        no-images: This model does not read images, so the vision module describes each frame first, which takes several seconds. If it can read images, change the image input above.
+      commentary-images-per-hour: Images each hour during commentary
+      commentary-images-per-hour-description: Commentary talks often, so it has its own budget. While a commentary runs, this limit replaces the one above. Each commentary turn sends two frames at most.
+      states:
+        off: Perception is off.
+        paused: Perception is paused.
+        needs-share: Choose a window or a tab to share.
+        starting: The capture starts.
+        running: The character sees the screen.
+        interrupted: The screen is locked, or the device sleeps.
+        ended: The shared screen or window went away.
+        failed: The capture could not start.
+      frames: 'Frames in memory: {count} ({size} MB)'
+      foreground: 'App in front: {app}'
+      excluded-now: skipped by the exclusion list
+      excluded: 'Frames skipped by the exclusion list: {count}'
+      exclusions: Exclusion list
+      exclusions-description: One app name or word of a window title on each line. While a matching window is in front, no frame is taken. Case does not count, and an English entry matches whole words only.
+      web-share: The web app cannot tell the window in front, so the exclusion list does not work. Share one window or one tab, not the whole screen.
     memory-long-term:
       description: Long-term memory specific settings and management
       enable: Use long-term memory
       enable-description: The character remembers what you talk about. When this is off, it remembers nothing.
+      work:
+        enable: Write memories from finished conversations
+        enable-description: After 20 quiet minutes, the chat model of the character reads the last part of the conversation and saves the lasting facts. Then it merges memories that say the same thing. Each pass is one or two model calls. Off by default.
+        last: 'The last pass saved {count} memories.'
+        last-failed: The last pass failed. It tries again in 30 minutes.
+        last-merged: 'It merged {count} copies into other memories.'
+        merges: Recent merges
+        merges-description: After each pass, memories of the character that say the same thing become one memory. The general memories take no part.
+        merge: '{date}: {before} → {after}'
+      profile:
+        enable: Use an owner profile
+        enable-description: A short summary of what the character remembers about you goes with each message in your own conversations. A pass that saves memories writes it again. Off by default.
+        text: Owner profile
+        empty: No profile yet.
+        save: Save
+        write-now: Write from memories now
+        clear: Clear
       memories:
         title: Memories
         description: Each character keeps its own secrets, and the others cannot see them. After you share a secret, every character knows it, and you cannot take it back. You can delete any secret, but you cannot rewrite one.
@@ -1307,6 +1569,12 @@ pages:
     memory-short-term:
       description: Short-term memory specific settings and management
       title: Short-Term Memory
+      summary: Summarize older messages
+      summary-description: In a long conversation, the character gets a summary of the older messages and the recent messages as they are. The chat model writes the summary in the background, and it costs a model call. The chat view keeps every message.
+      current: Summary of this conversation
+      covered: 'Holds {count} older messages. Written {time}.'
+      empty: No summary yet. It comes when the conversation gets long.
+      remove: Remove
     messaging-discord:
       description: Chat & voice chat over Discord
       title: Discord
@@ -1691,6 +1959,12 @@ pages:
       api-key-description: Web search is powered by Tavily. Get a free API key at tavily.com.
       api-key-placeholder: Enter your Tavily API key
       configured: Web search is ready to use!
+      mcp:
+        tool-name: MCP search tool
+        tool-name-description: 'The tool that answers searches, as server::tool. Add its server in the MCP servers page. No API key is needed.'
+        unavailable: MCP search works only in the desktop app.
+      autonomous-per-day: Searches a day for lines the character starts
+      autonomous-per-day-description: 'Idle speech and small talk can look for topics. Replies to you have no limit, and a turn that reads the screen cannot search. 0 turns this off. Used today: {used}.'
     mcp-server:
       title: MCP servers
       description: Configure MCP servers and bring their tools into AIRI.
@@ -2163,6 +2437,33 @@ pages:
               label: Emotion expression strength
         callout_origin_title: Reaching the engine from a browser
         callout_origin: A browser reaches an engine on this machine only. For an engine on another machine, use the desktop application. The engine also has to accept this site, which you set on its settings page on port 10101.
+      irodori-tts:
+        description: github.com/Aratako/Irodori-TTS
+        title: Irodori-TTS
+        fields:
+          field:
+            caption:
+              label: Caption
+              description: Words about the voice and the way of speaking. The server joins them with the reference clips. Leave it empty to use only the clips.
+              placeholder: A bright girl who speaks close to the listener
+            num-steps:
+              label: Sampling steps
+              description: More steps take longer and can sound cleaner. 0 uses the default of the server, which suits the loaded model.
+        reference:
+          title: Reference voices
+          description: 'A reference voice joins several clips of one speaker in this order. Short, clean clips work best. About {recommended} seconds in total is enough. The server uses at most {max} seconds.'
+          add-voice: Add voice
+          new-voice-placeholder: Name of a new reference voice
+          remove-voice: Remove
+          add-clips: Add audio files
+          uploading: Sending to the server...
+          no-clips: No clips yet. Add audio files of one speaker.
+          total: 'Total {seconds}s of {max}s'
+          move-up: Move up
+          move-down: Move down
+          remove-clip: Remove clip
+          failed: The reference voice was not changed
+          unsupported: '{name} is not a supported audio file. Use wav, flac, mp3, m4a, ogg, opus, aac, or webm.'
       deepgram-tts:
         description: deepgram.com
         title: Deepgram
@@ -2406,6 +2707,15 @@ pages:
       openai-compatible:
         description: OpenAI Compatible
         title: OpenAI Compatible
+        fields:
+          field:
+            reasoning-control:
+              label: Reasoning request
+              description: How AIRI asks this server for a reasoning strength. Servers differ, so choose a form that your server accepts.
+              options:
+                none: Send nothing (server default)
+                thinking: Thinking on or off (DeepSeek style)
+                reasoning-effort: Reasoning effort (OpenAI style)
       nvidia:
         description: build.nvidia.com
         title: NVIDIA NIM
@@ -2579,6 +2889,12 @@ pages:
         global: Available to signed-in accounts
         account: Available to your account
       features:
+        settings_sync:
+          title: Settings sync
+          description: Sync your settings with your account when you are signed in, so other devices use the same settings. API keys and settings of this device, for example audio devices, stay here. Off by default.
+        memory_sync:
+          title: Memory sync
+          description: Sync Long-Term Memory, reminders, and the intentions of the character with your account when you are signed in, so other devices remember the same facts. A self-hosted server that runs the memory search also finds memories by meaning. Only one device then speaks on its own at a time. Off by default.
         fullscreen_workspace:
           title: Fullscreen workspace
           description: Open settings and the chat in a workspace that covers the screen, with the character on the left. Off by default.
@@ -2887,6 +3203,10 @@ theme:
 title: Settings
 voices: Voice
 vrm:
+  body-movement:
+    title: Natural movement
+    label: Move the body naturally
+    description: The character breathes, sways a little, turns the head after the gaze, looks away while it thinks, and nods while it speaks.
   fps:
     title: Frame rate limit
     description: Limit VRM rendering in the stage and model preview. Lower limits reduce GPU use without changing animation speed.
@@ -2974,6 +3294,62 @@ mmd:
     title: Extract colors from model
     button-extract:
       title: Extract
+  graphics:
+    title: Graphics
+    description: Post-processing makes the model glow and sets the color tone. Higher quality uses more GPU time. This device keeps its own setting.
+    quality: Quality
+    quality-options:
+      off: Off (as before)
+      low: Low
+      medium: Medium
+      high: High
+    tone-mapping: Tone mapping
+    tone-mapping-options:
+      neutral: Neutral (keeps the colors)
+      agx: AgX (film look)
+      aces: ACES (high contrast)
+    exposure: Exposure
+    bloom-intensity: Bloom strength
+    bloom-threshold: Bloom threshold
+    saturation: Saturation
+    contrast: Contrast
+    vignette: Vignette
+    depth-of-field: Background blur (depth of field)
+    chromatic-aberration: Chromatic aberration
+    render-mode: Shading
+    render-mode-options:
+      toon: Toon (as the model author made it)
+      hybrid: Hybrid (PBR, face and eyes stay toon)
+      pbr: PBR (everything)
+    environment-intensity: Studio light
+    rim-intensity: Rim light
+    shadows: Soft self-shadows
+    ambient-occlusion: Ambient occlusion
+  surfaces:
+    title: Surfaces (PBR)
+    description: >-
+      AIRI guesses each material's kind from its name and its bones. The kind
+      sets how rough, metallic, and soft the surface looks. Change a material
+      here if the guess is wrong. This device keeps the changes for each model.
+    material: Material
+    kind: Kind
+    kind-auto: Auto ({kind})
+    kinds:
+      face: Face
+      eye: Eyes
+      skin: Skin
+      hair: Hair
+      cloth: Cloth
+      fur: Fur
+      leather: Leather, latex
+      metal: Metal
+      other: Other
+    roughness: Roughness
+    metalness: Metalness
+    sheen: Cloth sheen
+    clearcoat: Gloss coat
+    stays-toon: Hybrid shading keeps faces and eyes toon. Choose another kind or PBR shading to change this material.
+    reset: Reset this material
   physics:
     title: Physics & Rig
     enabled: Enable physics (hair, skirt, accessories)
@@ -2988,8 +3364,11 @@ mmd:
       camera: Camera
       none: Disabled
   animation:
+    body-movement: Move the body naturally
+    body-movement-description: The character breathes, sways a little, turns the head after the gaze, looks away while it thinks, and nods while it speaks.
     title: Animation
     idle-motion: Idle Motion
+    default-idle: AIRI default (the VRM idle)
     import-motion: Import Motion (.vmd)
     play-once: Preview Animation
     remove: Remove motion

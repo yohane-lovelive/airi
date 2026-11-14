@@ -36,7 +36,7 @@ export function useVoiceRephrase() {
       },
     })
     return runInTraceSpan(span, signal, async () => {
-      const agent = createVoiceTranscriptionRephraseAgent({ generateText: textModel.generateText(selection) })
+      const agent = createVoiceTranscriptionRephraseAgent({ generateText: textModel.generateText(selection, 'voice-assist') })
       const rewritten = await agent.rephrase(segments, signal)
       span.update({ [VoiceAttributes.RephraseChangedCount]: rewritten.filter((text, index) => text.trim() !== segments[index]?.trim()).length })
       return rewritten

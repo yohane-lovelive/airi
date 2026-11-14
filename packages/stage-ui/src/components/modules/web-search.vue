@@ -1,17 +1,20 @@
 <script setup lang="ts">
-import { Alert, FieldCheckbox, FieldInput, FieldSelect, SettingsCard } from '@proj-airi/ui'
+import { Alert, FieldCheckbox, FieldInput, FieldRange, FieldSelect, SettingsCard } from '@proj-airi/ui'
 import { storeToRefs } from 'pinia'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-import { useWebSearchStore } from '../../stores/modules/web-search'
+import { useWebSearchStore, WEB_SEARCH_LIMITS } from '../../stores/modules/web-search'
 
 const { t } = useI18n()
 const webSearchStore = useWebSearchStore()
-const { enabled, provider, activeApiKey, configured } = storeToRefs(webSearchStore)
-const providers = [
+const { enabled, provider, activeApiKey, configured, autonomousPerDay, mcpToolName, mcpAvailable } = storeToRefs(webSearchStore)
+const providers = computed(() => [
   { label: 'Tavily', value: 'tavily' },
   { label: 'DeepSeek', value: 'deepseek' },
-]
+  // Only an app with an MCP runtime can reach a server.
+  ...(mcpAvailable.value ? [{ label: 'MCP', value: 'mcp' }] : []),
+])
 </script>
 
 <template>
@@ -28,8 +31,22 @@ const providers = [
       :options="providers"
     />
 
+    <template v-if="provider === 'mcp'">
+      <FieldInput
+        v-if="mcpAvailable"
+        v-model="mcpToolName"
+        :label="t('settings.pages.modules.web-search.mcp.tool-name')"
+        :description="t('settings.pages.modules.web-search.mcp.tool-name-description')"
+        placeholder="ddg-search::search"
+      />
+      <Alert
+        v-else
+        tone="warning"
+        :title="t('settings.pages.modules.web-search.mcp.unavailable')"
+      />
+    </template>
     <FieldInput
-      v-if="provider === 'deepseek'"
+      v-else-if="provider === 'deepseek'"
       v-model="activeApiKey"
       type="password"
       :label="t('settings.pages.modules.web-search.deepseek.api-key')"
@@ -43,6 +60,15 @@ const providers = [
       :label="t('settings.pages.modules.web-search.api-key')"
       :description="t('settings.pages.modules.web-search.api-key-description')"
       :placeholder="t('settings.pages.modules.web-search.api-key-placeholder')"
+    />
+
+    <FieldRange
+      v-model="autonomousPerDay"
+      :label="t('settings.pages.modules.web-search.autonomous-per-day')"
+      :description="t('settings.pages.modules.web-search.autonomous-per-day-description', { used: webSearchStore.autonomousSearchesUsed() })"
+      :min="WEB_SEARCH_LIMITS.minAutonomousPerDay"
+      :max="WEB_SEARCH_LIMITS.maxAutonomousPerDay"
+      :step="1"
     />
 
     <Alert

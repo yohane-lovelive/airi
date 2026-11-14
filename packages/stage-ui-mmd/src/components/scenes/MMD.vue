@@ -9,13 +9,16 @@
   * contract Stage.vue expects from every renderer.
 */
 
-import type { SkinnedMesh, Texture } from 'three'
+import type { GestureClipSource } from '@proj-airi/stage-shared/body-motion'
+import type { AnimationClip, Bone, SkinnedMesh, Texture } from 'three'
 
 import type { GazeOffset, MMDAnimationManager, MorphController } from '../../composables/mmd'
 import type { ResolvedMMDModel } from '../../utils/mmd-loader'
+import type { MMDRig } from '../../utils/vrma-retarget'
 
 import { errorMessageFrom } from '@moeru/std'
 import { coverRect } from '@proj-airi/stage-shared'
+import { BodyPoseApplier, ProceduralBodyMotion, SpeechLevelMeter } from '@proj-airi/stage-shared/body-motion'
 import { Screen } from '@proj-airi/ui'
 import { storeToRefs } from 'pinia'
 import {
@@ -25,6 +28,7 @@ import {
   Color,
   DirectionalLight,
   Group,
+  NeutralToneMapping,
   NoToneMapping,
   PerspectiveCamera,
   Quaternion,
@@ -45,19 +49,28 @@ import {
   EYE_PITCH_LIMIT,
   EYE_YAW_LIMIT,
   loadMMDAnimationClip,
+  MMDPhysicalLighting,
+  MMDPostProcessing,
   useMMDBlink,
   useMMDEmote,
   useMMDLipSync,
 } from '../../composables/mmd'
+import { DEFAULT_IDLE_MOTION } from '../../constants/actions'
 import { Emotion, EMOTION_VALUES } from '../../constants/emotions'
 import { useMMD } from '../../stores/mmd'
+import { mmdGestureClip, vrmAnimationOfGesture } from '../../utils/mmd-gestures'
+import { resolveMMDGraphics, resolveMMDLighting } from '../../utils/mmd-graphics'
 import { loadMMDModelFromSource } from '../../utils/mmd-loader'
 import {
   applyMMDMaterialOpacity,
+  applyMMDRenderMode,
   collectMMDMaterials,
   disposeMMDObject,
   setMMDMaterialGlow,
+  setMMDRimLight,
 } from '../../utils/mmd-materials'
+import { loadVRMAnimationFile } from '../../utils/vrma-loader'
+import { mmdRigFromMesh, retargetVRMAnimationToMMD } from '../../utils/vrma-retarget'
 
 const props = withDefaults(defineProps<{
   /** The context that creates the lip sync node. It must be the context of the played speech. */
@@ -74,9 +87,17 @@ const props = withDefaults(defineProps<{
   /** Connects the lip sync node to the played speech and returns the disconnection. */
   connectSpeech?: (node: AudioNode) => () => void
   enableOrbitControls?: boolean
+  /**
+   * A `.vrma` idle loop, retargeted to the MMD bones. It plays while the owner has chosen no VMD idle, so a model does
+   * not stand in its rest pose.
+   */
+  defaultIdleAnimationUrl?: string
+  /** A model turn is running, so the gaze moves away while the body motion is on. */
+  thinking?: boolean
 }>(), {
   paused: false,
   enableOrbitControls: false,
+  thinking: false,
 })
 
 const emit = defineEmits<{
@@ -92,6 +113,7 @@ const {
   grantEnabled,
   physicsGravity,
   gazeMode,
+  bodyMotionEnabled,
   position,
   scale,
   rotationY,
@@ -109,6 +131,10 @@ const {
   directionalPosition,
   albedoGlow,
   renderScale,
+  graphicsQuality,
+  graphicsAdjustments,
+  renderMode,
+  materialSurfaces,
 } = storeToRefs(mmdStore)
 
 const canvasRef = ref<HTMLCanvasElement>()
@@ -118,16 +144,26 @@ let renderer: WebGLRenderer | undefined
 let scene: Scene | undefined
 let camera: PerspectiveCamera | undefined
 let controls: OrbitControls | undefined
+/** Present while the graphics quality is not `off`. Without it, the scene renders directly. */
+let postProcessing: MMDPostProcessing | undefined
 let ambientLight: AmbientLight | undefined
 let directionalLight: DirectionalLight | undefined
+/** The environment light and shadows of hybrid and PBR modes. */
+let physicalLighting: MMDPhysicalLighting | undefined
 let modelGroup: Group | undefined
 let resolved: ResolvedMMDModel | undefined
+/** The rest pose of the current model, read at load, for the retarget of `.vrma` motions and gestures. */
+let rig: MMDRig | undefined
+/** Gesture clips retargeted to the current model, by gesture id. */
+const gestureClips = new Map<string, AnimationClip>()
 let mesh: SkinnedMesh | undefined
 let morphs: MorphController | undefined
 let animation: MMDAnimationManager | undefined
 let emote: ReturnType<typeof useMMDEmote> | undefined
 // Motion names already bound to the current model runtime.
 const registeredMotions = new Set<string>()
+/** Loaded `.vrma` files by URL, so a model change does not fetch the idle again. */
+const vrmAnimations = new Map<string, ReturnType<typeof loadVRMAnimationFile>>()
 const clock = new Clock()
 let rafHandle = 0
 
@@ -139,6 +175,45 @@ const lipSync = useMMDLipSync(
 const blink = useMMDBlink()
 let gaze: ReturnType<typeof createGazeController> | undefined
 
+// Body motion. The applier belongs to the current model, and the meter to the current audio context.
+const bodyMotion = new ProceduralBodyMotion()
+let bodyPose: BodyPoseApplier | undefined
+let speechLevel: SpeechLevelMeter | undefined
+watch(() => props.audioContext, (context, _, onCleanup) => {
+  if (!context)
+    return
+  const meter = new SpeechLevelMeter(context)
+  speechLevel = meter
+  onCleanup(() => {
+    meter.dispose()
+    if (speechLevel === meter)
+      speechLevel = undefined
+  })
+}, { immediate: true })
+watch(() => [props.connectSpeech, props.audioContext] as const, ([connect]) => speechLevel?.listen(connect), { immediate: true })
+
+/** The standard MMD bones of the body parts that the procedural layer moves. A model without one skips that part. */
+function createBodyPose(skinned: SkinnedMesh) {
+  const bone = (name: string) => skinned.skeleton.bones.find(candidate => candidate.name === name)
+  return new BodyPoseApplier({ spine: bone('上半身'), chest: bone('上半身2'), neck: bone('首'), head: bone('頭') })
+}
+
+/** Moves the eyes away while the model thinks. A tiny offset keeps the idle saccades of an untracked gaze. */
+function withThinkingEyes(offset: GazeOffset | undefined, eyes: { yaw: number, pitch: number }): GazeOffset | undefined {
+  if (Math.abs(eyes.yaw) < 0.01 && Math.abs(eyes.pitch) < 0.01)
+    return offset
+  const base = offset ?? { x: 0, y: 0 }
+  return {
+    x: Math.max(-1, Math.min(1, base.x + eyes.yaw / EYE_YAW_LIMIT)),
+    y: Math.max(-1, Math.min(1, base.y + eyes.pitch / EYE_PITCH_LIMIT)),
+  }
+}
+/** The bone that depth of field keeps sharp. Models without `頭` keep the middle of their bounds sharp. */
+let focusBone: Bone | undefined
+const focusPoint = new Vector3()
+/** The depth around the focus point that stays sharp, in world units. It follows the model size. */
+let focusRange = 1
+
 function canvasElement() {
   return canvasRef.value
 }
@@ -146,8 +221,8 @@ function canvasElement() {
 function captureFrame(): Promise<Blob | null> | undefined {
   if (!renderer || !scene || !camera)
     return undefined
-  // preserveDrawingBuffer keeps the last frame readable for the snapshot.
-  renderer.render(scene, camera)
+  // preserveDrawingBuffer keeps the last frame readable for the snapshot. The snapshot goes through the same effects.
+  renderFrame(0)
   return new Promise(resolve => canvasRef.value?.toBlob(resolve, 'image/png'))
 }
 
@@ -197,6 +272,38 @@ function applyTransform() {
   modelGroup.scale.setScalar(scale.value)
   modelGroup.rotation.y = rotationY.value
   modelGroup.position.set(position.value.x, position.value.y, 0)
+  placeDirectionalLight()
+  measureFocus()
+}
+
+/**
+ * Sizes the sharp depth from the model height, so the whole body stays sharp while the background blurs. Half the
+ * height covers long hair and a stretched arm in front of or behind the face.
+ */
+function measureFocus() {
+  if (!modelGroup)
+    return
+  modelGroup.updateMatrixWorld(true)
+  const bounds = new Box3().setFromObject(modelGroup)
+  if (bounds.isEmpty())
+    return
+  focusRange = bounds.getSize(new Vector3()).y * 0.5
+  if (!focusBone)
+    bounds.getCenter(focusPoint)
+}
+
+/** Keeps depth of field on the face. The head moves with every motion, so this runs every frame. */
+function updateFocus() {
+  if (!postProcessing)
+    return
+  focusBone?.getWorldPosition(focusPoint)
+  postProcessing.setFocus(focusPoint, focusRange)
+}
+
+/** Aims the directional light from the owner's direction at the model, so its shadows cover the model. */
+function placeDirectionalLight() {
+  const { x, y, z } = directionalPosition.value
+  physicalLighting?.fit(modelGroup, new Vector3(x, y, z))
 }
 
 /**
@@ -211,9 +318,7 @@ function setupScene() {
   const canvas = canvasRef.value!
   renderer = new WebGLRenderer({ canvas, alpha: true, antialias: true, preserveDrawingBuffer: true })
   renderer.outputColorSpace = SRGBColorSpace
-  // MMD toon materials are not PBR/HDR; filmic tone mapping desaturates and
-  // washes them out, so render their colors directly.
-  renderer.toneMapping = NoToneMapping
+  renderer.toneMapping = directToneMapping()
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2) * renderScale.value)
 
   scene = new Scene()
@@ -229,8 +334,9 @@ function setupScene() {
   ambientLight = new AmbientLight(new Color(normalizeHex(ambientColor.value)), ambientIntensity.value)
   scene.add(ambientLight)
   directionalLight = new DirectionalLight(new Color(normalizeHex(directionalColor.value)), directionalIntensity.value)
-  directionalLight.position.set(directionalPosition.value.x, directionalPosition.value.y, directionalPosition.value.z)
   scene.add(directionalLight)
+  physicalLighting = new MMDPhysicalLighting(renderer, scene, directionalLight)
+  placeDirectionalLight()
 
   controls = new OrbitControls(camera, canvas)
   controls.enableDamping = true
@@ -302,6 +408,8 @@ async function syncBackground() {
     scene.background = null
     backgroundTexture?.dispose()
     backgroundTexture = undefined
+    // Depth of field runs only behind a background image.
+    applyGraphics()
     return
   }
 
@@ -336,6 +444,7 @@ async function syncBackground() {
   backgroundTexture = texture
   scene.background = texture
   layoutBackground()
+  applyGraphics()
 }
 
 watch(() => props.backgroundUrl, () => void syncBackground())
@@ -348,6 +457,7 @@ function resize() {
   if (w === 0 || h === 0)
     return
   renderer.setSize(w, h, false)
+  postProcessing?.setSize(w, h)
   camera.aspect = w / h
   camera.updateProjectionMatrix()
   layoutBackground()
@@ -361,6 +471,8 @@ function renderLoop() {
     return
 
   if (animation) {
+    // A motion writes only the bones that it has tracks for, so the offsets of the last frame leave first.
+    bodyPose?.undo()
     // three-mmd preserves the required mixer → IK → grant → physics order.
     animation.update(delta)
     // Apply AIRI-owned morphs after the runtime so lip-sync/expression win
@@ -368,12 +480,70 @@ function renderLoop() {
     emote?.update(delta)
     blink.update(morphs, delta)
     lipSync.update(morphs, delta)
-    // Gaze rotates eye/head bones, also after the helper.
-    gaze?.update(resolveGazeOffset(), delta)
+    const gazeOffset = resolveGazeOffset()
+    const bodyMotionPose = bodyMotionEnabled.value
+      ? bodyMotion.update(delta, {
+          gaze: gazeOffset && { yaw: gazeOffset.x * EYE_YAW_LIMIT, pitch: gazeOffset.y * EYE_PITCH_LIMIT },
+          thinking: props.thinking,
+          speechLevel: speechLevel?.read() ?? 0,
+        })
+      : undefined
+    // Gaze rotates eye/head bones, also after the helper. The body layer turns the head while it is on.
+    gaze?.update(bodyMotionPose ? withThinkingEyes(gazeOffset, bodyMotionPose.eyes) : gazeOffset, delta, !bodyMotionPose)
+    if (bodyMotionPose)
+      bodyPose?.apply(bodyMotionPose.bones)
   }
 
   controls?.update()
-  renderer.render(scene, camera)
+  renderFrame(delta)
+}
+
+function renderFrame(delta: number) {
+  if (!renderer || !scene || !camera)
+    return
+  if (postProcessing) {
+    updateFocus()
+    postProcessing.render(delta)
+  }
+  else {
+    renderer.render(scene, camera)
+  }
+}
+
+/**
+ * The tone mapping when the scene renders without post-processing. Toon materials are not HDR, and a filmic curve
+ * washes them out, so they render directly. Physically based materials can pass 1.0, so they need a curve. The neutral
+ * curve leaves colors below about 0.8 as they are, so faces that stay toon do not change.
+ */
+function directToneMapping() {
+  return renderMode.value === 'toon' ? NoToneMapping : NeutralToneMapping
+}
+
+/** Turns the environment light, the shadows, and the rim light on or off for the render mode. */
+function applyLighting() {
+  physicalLighting?.apply(resolveMMDLighting(renderMode.value, graphicsAdjustments.value))
+  if (modelGroup)
+    setMMDRimLight(modelGroup, graphicsAdjustments.value.rimIntensity)
+}
+
+/** Builds, rebuilds, or removes the post-processing for the current graphics settings. */
+function applyGraphics() {
+  if (!renderer || !scene || !camera)
+    return
+  const config = resolveMMDGraphics(graphicsQuality.value, graphicsAdjustments.value, {
+    renderMode: renderMode.value,
+    hasBackground: scene.background !== null,
+  })
+  // The post-processing has its own tone mapping pass.
+  renderer.toneMapping = config ? NoToneMapping : directToneMapping()
+  if (!config) {
+    postProcessing?.dispose()
+    postProcessing = undefined
+    return
+  }
+  postProcessing ??= new MMDPostProcessing(renderer, scene, camera)
+  postProcessing.apply(config)
+  resize()
 }
 
 function disposeModel() {
@@ -391,11 +561,15 @@ function disposeModel() {
   }
   resolved?.dispose()
   registeredMotions.clear()
+  gestureClips.clear()
+  rig = undefined
   modelGroup = undefined
+  focusBone = undefined
   mesh = undefined
   morphs = undefined
   emote = undefined
   gaze = undefined
+  bodyPose = undefined
   resolved = undefined
   mmdStore.isModelLoaded = false
 }
@@ -442,23 +616,81 @@ async function syncMotions() {
     }
   }
 
+  applyIdleMotion()
+}
+
+/** Plays the chosen VMD idle, or the default idle while none is chosen or the chosen one is not loaded. */
+function applyIdleMotion() {
+  if (!animation)
+    return
   if (idleMotionName.value && registeredMotions.has(idleMotionName.value))
     animation.setIdleMotion(idleMotionName.value)
+  else if (registeredMotions.has(DEFAULT_IDLE_MOTION))
+    animation.setIdleMotion(DEFAULT_IDLE_MOTION)
 }
+
+/**
+ * Retargets the default `.vrma` idle to the current model and registers it. `rig` must come from the model at rest.
+ * A model that changed during the load keeps its own state, because the result belongs to the earlier model.
+ */
+async function registerDefaultIdle(rig: ReturnType<typeof mmdRigFromMesh>) {
+  const url = props.defaultIdleAnimationUrl
+  if (!url)
+    return
+  const owner = resolved
+  try {
+    let pending = vrmAnimations.get(url)
+    if (!pending) {
+      pending = loadVRMAnimationFile(url)
+      vrmAnimations.set(url, pending)
+    }
+    const vrmAnimation = await pending
+    if (!vrmAnimation || owner !== resolved || !animation)
+      return
+    animation.registerClip(DEFAULT_IDLE_MOTION, retargetVRMAnimationToMMD(vrmAnimation, rig, { name: DEFAULT_IDLE_MOTION }))
+    registeredMotions.add(DEFAULT_IDLE_MOTION)
+    applyIdleMotion()
+  }
+  catch (err) {
+    vrmAnimations.delete(url)
+    console.error('[mmd] failed to load the default idle motion:', errorMessageFrom(err))
+  }
+}
+
+/**
+ * Counts model loads. The mount and the source watcher can both start a load, and a load that finishes after a newer one
+ * started drops its result. Without it, both models entered the scene.
+ */
+let loadGeneration = 0
 
 async function loadModel(src: string) {
   if (!scene)
     return
 
+  const generation = ++loadGeneration
   componentState.value = 'loading'
   disposeModel()
 
   try {
-    resolved = await loadMMDModelFromSource(src, { cacheKey: props.modelId })
+    const loaded = await loadMMDModelFromSource(src, { cacheKey: props.modelId })
+    if (generation !== loadGeneration) {
+      loaded.mmd.dispose()
+      disposeMMDObject(loaded.mesh)
+      loaded.dispose()
+      return
+    }
+    resolved = loaded
     mesh = resolved.mesh
+    // Read the rig now, while every bone is at rest. Motions move the bones later.
+    const iks = resolved.mmd.pmx.bones.flatMap((bone, index) => bone.ik
+      ? [{ bone: index, effector: bone.ik.target, links: bone.ik.links.map(link => link.target) }]
+      : [])
+    const restRig = mmdRigFromMesh(mesh, iks)
+    rig = restRig
 
     modelGroup = new Group()
     modelGroup.add(mesh)
+    focusBone = mesh.skeleton.bones.find(bone => bone.name === '頭')
     applyTransform()
     scene.add(modelGroup)
 
@@ -474,11 +706,15 @@ async function loadModel(src: string) {
 
     emote = useMMDEmote(morphs)
     gaze = createGazeController(mesh)
+    bodyPose = createBodyPose(mesh)
 
     animation = createMMDAnimationManager(resolved.mmd, { physicsEnabled: physicsEnabled.value })
-    // No preset idle VMD ships yet; the runtime still advances solvers and
-    // physics without an animation action.
     await animation.init()
+    // A newer load already disposed this model when it started.
+    if (generation !== loadGeneration)
+      return
+    // No idle VMD ships, so the VRM idle loop plays until the owner chooses one.
+    void registerDefaultIdle(restRig)
     animation.setIKEnabled(ikEnabled.value)
     animation.setGrantEnabled(grantEnabled.value)
     animation.setGravity(physicsGravity.value)
@@ -486,6 +722,8 @@ async function loadModel(src: string) {
     // Ensure the camera aspect matches the live canvas before fitting.
     resize()
     frameCamera()
+    applyRenderMode()
+    applyLighting()
     setMMDMaterialGlow(modelGroup, albedoGlow.value)
     mmdStore.availableMaterials = collectMMDMaterials(modelGroup)
     applyMMDMaterialOpacity(modelGroup, materialOpacity.value)
@@ -497,6 +735,9 @@ async function loadModel(src: string) {
     await syncMotions()
   }
   catch (err) {
+    // A failed load that a newer load replaced must not dispose the newer model.
+    if (generation !== loadGeneration)
+      return
     disposeModel()
     componentState.value = 'pending'
     console.error('[mmd] failed to load model:', errorMessageFrom(err))
@@ -504,20 +745,78 @@ async function loadModel(src: string) {
   }
 }
 
-/** Plays the gesture motion mapped to an emotion, if the model has one. */
-function setEmotion(emotion: string, intensity = 1) {
+/** Swaps the model's materials for the render mode and the owner's material changes. */
+function applyRenderMode() {
+  if (!modelGroup)
+    return
+  applyMMDRenderMode(modelGroup, renderMode.value, materialSurfaces.value[props.modelId ?? ''])
+  // A new physical material starts at the authored opacity.
+  applyMMDMaterialOpacity(modelGroup, materialOpacity.value)
+}
+
+/**
+ * Shows an emotion, and plays the gesture motion mapped to it, if the model has one. With `withMotion` false, only the
+ * expression changes, because a gesture of the motion library already plays. With `holdMs`, the expression lasts as
+ * long as that gesture and then returns to neutral.
+ */
+function setEmotion(emotion: string, intensity = 1, withMotion = true, holdMs?: number) {
   const value = EMOTION_VALUES.includes(emotion as Emotion) ? emotion as Emotion : Emotion.Neutral
-  emote?.setEmotion(value, intensity)
+  if (holdMs)
+    emote?.setEmotionWithResetAfter(value, holdMs, intensity)
+  else
+    emote?.setEmotion(value, intensity)
 
   const actionName = emotionActionMap.value[value]
-  if (actionName)
+  if (actionName && withMotion)
     animation?.playAction(actionName, { loop: false })
+}
+
+async function loadVRMAnimationData(vrma: ArrayBuffer) {
+  const url = URL.createObjectURL(new Blob([vrma]))
+  try {
+    return await loadVRMAnimationFile(url)
+  }
+  finally {
+    URL.revokeObjectURL(url)
+  }
+}
+
+/**
+ * Plays a gesture of the motion library. A gesture of the upper body takes only the parts that it moves, and a `full`
+ * clip plays instead of the idle.
+ *
+ * @returns false when the model cannot play it, for example without the bones, or while a motion of the whole body plays.
+ */
+async function playGesture(source: GestureClipSource): Promise<boolean> {
+  const owner = resolved
+  if (!animation || !rig)
+    return false
+  let clip = gestureClips.get(source.id)
+  if (!clip) {
+    const vrmAnimation = source.kind === 'keys' ? vrmAnimationOfGesture(source.gesture) : await loadVRMAnimationData(source.vrma)
+    // The model can change while the file loads, and the clip belongs to the earlier model then.
+    if (!vrmAnimation || owner !== resolved || !rig)
+      return false
+    clip = source.part === 'full'
+      ? retargetVRMAnimationToMMD(vrmAnimation, rig, { name: source.id })
+      : mmdGestureClip(vrmAnimation, rig, source.id)
+    gestureClips.set(source.id, clip)
+  }
+  if (!animation)
+    return false
+  if (source.part === 'full') {
+    animation.playClip(clip, { loop: false })
+    return true
+  }
+  return animation.playGesture(clip)
 }
 
 let resizeObserver: ResizeObserver | undefined
 
 onMounted(() => {
   setupScene()
+  applyLighting()
+  applyGraphics()
   resizeObserver = new ResizeObserver(() => resize())
   if (canvasRef.value)
     resizeObserver.observe(canvasRef.value)
@@ -532,7 +831,12 @@ onMounted(() => {
 onUnmounted(() => {
   cancelAnimationFrame(rafHandle)
   resizeObserver?.disconnect()
+  loadGeneration++
   disposeModel()
+  postProcessing?.dispose()
+  postProcessing = undefined
+  physicalLighting?.dispose()
+  physicalLighting = undefined
   controls?.dispose()
   backgroundTexture?.dispose()
   backgroundTexture = undefined
@@ -549,10 +853,12 @@ onUnmounted(() => {
 })
 
 watch(() => props.modelSrc, (src) => {
-  if (src)
+  if (src) {
     loadModel(src)
-  else
-    disposeModel()
+    return
+  }
+  loadGeneration++
+  disposeModel()
 })
 
 watch(() => props.enableOrbitControls, (enabled) => {
@@ -589,10 +895,7 @@ watch(availableMotions, () => {
 }, { deep: true })
 
 // Idle-motion selection from the settings panel.
-watch(idleMotionName, (name) => {
-  if (name && registeredMotions.has(name))
-    animation?.setIdleMotion(name)
-})
+watch(idleMotionName, applyIdleMotion)
 
 // Scene settings — lighting.
 watch([ambientColor, ambientIntensity], () => {
@@ -607,9 +910,7 @@ watch([directionalColor, directionalIntensity], () => {
   directionalLight.color.set(normalizeHex(directionalColor.value))
   directionalLight.intensity = directionalIntensity.value
 })
-watch(directionalPosition, () => {
-  directionalLight?.position.set(directionalPosition.value.x, directionalPosition.value.y, directionalPosition.value.z)
-}, { deep: true })
+watch(directionalPosition, placeDirectionalLight, { deep: true })
 
 // Scene settings — camera & rendering.
 watch(cameraFov, () => {
@@ -622,6 +923,20 @@ watch(renderScale, () => {
   renderer?.setPixelRatio(Math.min(window.devicePixelRatio, 2) * renderScale.value)
   resize()
 })
+watch([graphicsQuality, graphicsAdjustments], () => {
+  applyLighting()
+  applyGraphics()
+}, { deep: true })
+watch(renderMode, () => {
+  applyRenderMode()
+  applyLighting()
+  applyGraphics()
+})
+watch(() => materialSurfaces.value[props.modelId ?? ''], () => {
+  applyRenderMode()
+  // New physical materials start without the rim light.
+  applyLighting()
+}, { deep: true })
 watch(albedoGlow, () => {
   if (modelGroup)
     setMMDMaterialGlow(modelGroup, albedoGlow.value)
@@ -635,6 +950,7 @@ defineExpose({
   canvasElement,
   captureFrame,
   setEmotion,
+  playGesture,
   listMorphs: () => morphs?.availableMorphs ?? [],
   listMotions: () => animation?.availableClips() ?? [],
 })

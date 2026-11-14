@@ -29,11 +29,13 @@ import {
 import { composeDrawCardPrompt } from '../tools/draw-card'
 import { composeMemoryPrompt } from '../tools/memory'
 import { useChatStore } from './chat'
-import { CHAT_FORMAT_RULES } from './chat/prompt-recipe'
+import { CHAT_FORMAT_RULES, composeReplyLengthPrompt, composeSharedPastPrompt } from './chat/prompt-recipe'
 import { characterMembersOfMeta } from './chat/session-members'
 import { useContextObservabilityStore } from './devtools/context-observability'
 import { useMemoryStore } from './memory'
-import { useConsciousnessSettingsStore } from './modules/consciousness-settings'
+import { chatRequestOptionsOf, useConsciousnessSettingsStore } from './modules/consciousness-settings'
+import { usePerceptionStore } from './perception'
+import { useProviderConfigStore } from './providers/config'
 import { useRecipesStore } from './recipes'
 
 const traceRecords: TraceRecord[] = []
@@ -120,7 +122,10 @@ vi.mock('./chat/context-store', () => ({
 
 // IndexedDB is a browser boundary. Browser tests exercise the real sticker and recipe repositories.
 vi.mock('../database/repos/chat-assets.repo')
+vi.mock('../database/repos/intentions.repo')
 vi.mock('../database/repos/memory.repo')
+vi.mock('../database/repos/missions.repo')
+vi.mock('../database/repos/timeline.repo')
 vi.mock('../database/repos/recipes.repo')
 
 vi.mock('../database/repos/stickers.repo', () => ({
@@ -242,9 +247,10 @@ vi.mock('./modules/consciousness', () => ({
     chatReady: chatReadyRef,
     providerModels: consciousnessModels.value,
     getModelsForProvider: async () => consciousnessModels.value,
-    getChatProviderInstance: (providerId: string) => getChatProviderInstanceMock(providerId, {
-      reasoning: useConsciousnessSettingsStore().reasoning ? 'enabled' : 'disabled',
-    }),
+    getChatProviderInstance: (providerId: string, _model: string, use: 'reply' | 'autonomous' = 'reply') => getChatProviderInstanceMock(
+      providerId,
+      chatRequestOptionsOf(useConsciousnessSettingsStore().levelFor(use)),
+    ),
   })),
 }))
 
@@ -600,7 +606,8 @@ describe('chat store contract', () => {
     await store.submit({ sessionId: 'session-2', messageId: 'bob-voice', text: 'For Bob' })
 
     expect(getChatProviderInstanceMock).toHaveBeenCalledWith('bob-provider', { reasoning: 'disabled' })
-    expect(llmStreamMock.mock.calls[0]?.[0]).toBe('bob-model')
+    // A submission resolves when it is accepted. The memory recall runs before the model call, so the call comes later.
+    await vi.waitFor(() => expect(llmStreamMock.mock.calls[0]?.[0]).toBe('bob-model'))
     expect(activeSessionIdRef.value).toBe('session-1')
   })
 
@@ -630,8 +637,8 @@ describe('chat store contract', () => {
     // The session character's wake word tool joins every turn. It is not a selectable stored tool.
     // Reply cards are on by default, so the owner's chat also gets the card tool and the icon search of cards.
     expect(resolvedToolNames).toEqual([
-      ['stage_widgets', 'configure_wake_words', 'builtIn_readMemory', 'builtIn_writeMemory', 'builtIn_forgetMemory', 'builtIn_useRecipe', 'builtIn_proposeRecipe', 'builtIn_drawCard', 'builtIn_searchIcons'],
-      ['stage_widgets', 'configure_wake_words', 'builtIn_readMemory', 'builtIn_writeMemory', 'builtIn_forgetMemory', 'builtIn_useRecipe', 'builtIn_proposeRecipe', 'builtIn_drawCard', 'builtIn_searchIcons'],
+      ['stage_widgets', 'configure_wake_words', 'builtIn_readMemory', 'builtIn_searchMemory', 'builtIn_writeMemory', 'builtIn_forgetMemory', 'builtIn_useRecipe', 'builtIn_proposeRecipe', 'builtIn_drawCard', 'builtIn_searchIcons'],
+      ['stage_widgets', 'configure_wake_words', 'builtIn_readMemory', 'builtIn_searchMemory', 'builtIn_writeMemory', 'builtIn_forgetMemory', 'builtIn_useRecipe', 'builtIn_proposeRecipe', 'builtIn_drawCard', 'builtIn_searchIcons'],
     ])
   })
 
@@ -1280,7 +1287,7 @@ describe('chat store contract', () => {
 
   it('passes the current consciousness reasoning option to the chat provider', async () => {
     const settings = useConsciousnessSettingsStore()
-    await settings.setReasoning(true)
+    await settings.setReasoningLevel('medium')
     llmStreamMock.mockImplementationOnce(async (_model: string, _chatProvider: GenerationProvider, _messages: Conversation, options: StreamOptions) => {
       await options.onStreamEvent?.({ type: 'finish' })
     })
@@ -1288,8 +1295,47 @@ describe('chat store contract', () => {
     const store = useChatStore()
     await store.send({ sessionId: 'session-1', text: 'reply without changing provider defaults' })
 
-    expect(getChatProviderInstanceMock).toHaveBeenCalledWith('mock-provider', { reasoning: 'enabled' })
-    await settings.setReasoning(false)
+    expect(getChatProviderInstanceMock).toHaveBeenCalledWith('mock-provider', { reasoning: 'enabled', effort: 'medium' })
+    await settings.setReasoningLevel('off')
+  })
+
+  it('passes the level of autonomous speech for an autonomous turn', async () => {
+    const settings = useConsciousnessSettingsStore()
+    await settings.setReasoningLevel('high')
+    await settings.setAutonomousReasoningLevel('off')
+    llmStreamMock.mockImplementation(async (_model: string, _chatProvider: GenerationProvider, _messages: Conversation, options: StreamOptions) => {
+      await options.onStreamEvent?.({ type: 'finish' })
+    })
+
+    const store = useChatStore()
+    await store.notifyConversation('session-1', { source: 'initiative', text: 'Autonomous turn', transient: true })
+    expect(getChatProviderInstanceMock).toHaveBeenLastCalledWith('mock-provider', { reasoning: 'disabled' })
+
+    await store.send({ sessionId: 'session-1', text: 'a reply to the owner' })
+    expect(getChatProviderInstanceMock).toHaveBeenLastCalledWith('mock-provider', { reasoning: 'enabled', effort: 'high' })
+    await settings.resetState()
+  })
+
+  it('uses the screen model only for a notice with images of the screen', async () => {
+    llmStreamMock.mockImplementation(async (_model: string, _provider: GenerationProvider, _messages: Conversation, options: StreamOptions) => {
+      await options.onStreamEvent?.({ type: 'finish' })
+    })
+    const perception = usePerceptionStore()
+    useProviderConfigStore().providers['screen-provider'] = { id: 'screen-provider', definitionId: 'openai', name: 'Screen', config: {}, status: 'configured' } as never
+    perception.screenModelProvider = 'screen-provider'
+    perception.screenModelId = 'screen-model'
+    const store = useChatStore()
+
+    await store.notifyConversation('session-1', { source: 'initiative', text: 'With a frame', transient: true, attachments: [{ type: 'image', data: 'a', mimeType: 'image/jpeg' }] })
+    expect(llmStreamMock.mock.lastCall?.[0]).toBe('screen-model')
+
+    await store.notifyConversation('session-1', { source: 'initiative', text: 'Without a frame', transient: true })
+    expect(llmStreamMock.mock.lastCall?.[0]).not.toBe('screen-model')
+
+    await store.send({ sessionId: 'session-1', text: 'A reply with an image of the owner', attachments: [{ type: 'image', url: 'https://example.com/a.png' }] })
+    expect(llmStreamMock.mock.lastCall?.[0]).not.toBe('screen-model')
+
+    perception.resetState()
   })
 
   it('passes a native reply relation to the chat runtime', async () => {
@@ -1584,7 +1630,7 @@ describe('chat store contract', () => {
     await store.ingest('second', { model: 'gpt-test', chatProvider: provider })
 
     // The owner's run reads the memory index and, with reply cards on by default, when to draw a card after the identity.
-    const after = `${composeMemoryPrompt('')}${composeDrawCardPrompt()}`
+    const after = `${composeMemoryPrompt('')}${composeDrawCardPrompt()}${composeReplyLengthPrompt('auto')}${composeSharedPastPrompt()}`
     expect(systemTexts).toEqual([`${CHAT_FORMAT_RULES}system prompt${after}`, `${CHAT_FORMAT_RULES}edited prompt${after}`])
   })
 
@@ -1687,7 +1733,7 @@ describe('chat store contract', () => {
     if (composedMessages[0].type !== 'system' || composedMessages[1].type !== 'user')
       throw new Error('Expected system and user turns')
     expect(composedMessages[0].content).toEqual([
-      { type: 'text', text: `${CHAT_FORMAT_RULES}system prompt${composeMemoryPrompt('')}${composeDrawCardPrompt()}` },
+      { type: 'text', text: `${CHAT_FORMAT_RULES}system prompt${composeMemoryPrompt('')}${composeDrawCardPrompt()}${composeReplyLengthPrompt('auto')}${composeSharedPastPrompt()}` },
       { type: 'text', text: '\n\nPlugin toolset guidance.' },
     ])
     expect(composedMessages[1].content[0]).toMatchObject({

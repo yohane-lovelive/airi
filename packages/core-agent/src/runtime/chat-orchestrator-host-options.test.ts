@@ -15,7 +15,7 @@ const provider: GenerationProvider = {
 
 type Stream = (model: string, chatProvider: GenerationProvider, conversation: Conversation, options?: StreamOptions) => Promise<void>
 
-function createHarness(options: Partial<Pick<ChatOrchestratorRuntimeDeps, 'getSystemPrompt'>> = {}) {
+function createHarness(options: Partial<Pick<ChatOrchestratorRuntimeDeps, 'getSystemPrompt' | 'projectHistory' | 'onTimelineMarker'>> = {}) {
   const messages: Record<string, ChatHistoryItem[]> = {}
   const stream = vi.fn<Stream>(async (_model, _provider, _conversation, streamOptions) => {
     await streamOptions?.onStreamEvent?.({ type: 'text-delta', text: 'reply' })
@@ -63,6 +63,25 @@ describe('chat orchestrator host options', () => {
     expect(harness.prompt(1)).not.toContain('Speak about this notice only if it fits now')
   })
 
+  // An autonomous turn runs often. A stored notice for each turn fills history, so only the request reads it.
+  it('keeps a transient notice out of history, but stores its reply', async () => {
+    const harness = createHarness()
+    harness.stream.mockImplementationOnce(async (_model, _provider, _conversation, streamOptions) => {
+      await streamOptions?.onStreamEvent?.({ type: 'finish' })
+    })
+
+    await harness.runtime.ingest('Quiet turn.', { model: 'test', chatProvider: provider, notice: { source: 'initiative', transient: true } })
+    await harness.runtime.ingest('Talk turn.', { model: 'test', chatProvider: provider, notice: { source: 'initiative', transient: true } })
+    await harness.runtime.ingest('hello', { model: 'test', chatProvider: provider })
+
+    expect(harness.prompt(0)).toContain('Quiet turn.')
+    expect(harness.prompt(1)).toContain('Talk turn.')
+    expect(harness.prompt(1)).not.toContain('Quiet turn.')
+    expect(harness.prompt(2)).not.toContain('Talk turn.')
+    expect(harness.messages['session-1']?.map(message => message.role)).toEqual(['assistant', 'user', 'assistant'])
+    expect(harness.messages['session-1']?.[0]).toMatchObject({ proactive: { source: 'initiative' } })
+  })
+
   it('leaves stored system messages out of the prompt, and reads identity per session', async () => {
     const harness = createHarness({ getSystemPrompt: sessionId => `identity of ${sessionId}` })
     harness.messages['session-1'] = [
@@ -74,6 +93,27 @@ describe('chat orchestrator host options', () => {
     expect(harness.prompt()).toContain('identity of session-1')
     expect(harness.prompt()).not.toContain('stored identity')
     expect(harness.prompt()).toContain('main question')
+  })
+
+  // A long session sends a summary and the recent messages. The stored history must stay whole for the chat view.
+  it('sends the projected history with its summary after the identity, and keeps the stored history whole', async () => {
+    const harness = createHarness({
+      getSystemPrompt: () => 'identity',
+      projectHistory: (_sessionId, messages) => ({ messages: messages.slice(-1), summary: 'The owner talked about a trip.' }),
+    })
+    harness.messages['session-1'] = [
+      { role: 'user', content: 'old question', id: 'old-user' },
+      { role: 'assistant', content: 'old answer', id: 'old-assistant', slices: [], tool_results: [] },
+    ]
+
+    await harness.runtime.ingest('new question', { model: 'test', chatProvider: provider })
+
+    const conversation = harness.stream.mock.calls[0]?.[2]
+    expect(conversation?.turns.map(turn => turn.id)).toEqual(['system-identity', 'history-summary', expect.any(String)])
+    expect(harness.prompt()).toContain('The owner talked about a trip.')
+    expect(harness.prompt()).toContain('new question')
+    expect(harness.prompt()).not.toContain('old question')
+    expect(harness.messages['session-1']?.map(message => message.id)).toEqual(['old-user', 'old-assistant', expect.any(String), expect.any(String)])
   })
 
   // Like a slash command, an invoked skill joins the owner's message and stays there for later requests.
@@ -139,6 +179,46 @@ describe('chat orchestrator host options', () => {
     expect(harness.messages['session-1']?.map(message => message.role)).toEqual(['user'])
   })
 
+  // A reminder must reach the owner as speech. The host sees the missing reply and tries again.
+  it('asks a must-speak notice to speak, and stores no reply that has no text', async () => {
+    const harness = createHarness()
+    harness.stream.mockImplementationOnce(async (_model, _provider, _conversation, streamOptions) => {
+      await streamOptions?.onStreamEvent?.({ type: 'tool-call', toolCallId: 'look', toolCallType: 'function', toolName: 'look', args: '{}' })
+      await streamOptions?.onStreamEvent?.({ type: 'finish' })
+    })
+
+    await harness.runtime.ingest('Reminder: medicine time', {
+      model: 'test',
+      chatProvider: provider,
+      notice: { source: 'mission:reminder', mustSpeak: true },
+    })
+
+    expect(harness.prompt(0)).toContain('Tell the owner about this notice now, in your own words.')
+    expect(harness.prompt(0)).not.toContain('or stay quiet')
+    expect(harness.messages['session-1']?.map(message => message.role)).toEqual(['user'])
+  })
+
+  it('speaks a fixed reply without a model call', async () => {
+    const harness = createHarness()
+    const speaks: ChatStreamEventContext['speaks'][] = []
+    harness.runtime.hooks.onBeforeSend(async (_message, context) => {
+      speaks.push(context.speaks)
+    })
+
+    await harness.runtime.ingest('The reminder was not spoken.', {
+      model: 'test',
+      chatProvider: provider,
+      notice: { source: 'mission:reminder:fixed', mustSpeak: true, reply: 'Reminder: medicine time' },
+    })
+
+    expect(harness.stream).not.toHaveBeenCalled()
+    expect(speaks).toEqual([true])
+    expect(harness.messages['session-1']?.[1]).toMatchObject({
+      proactive: { source: 'mission:reminder:fixed' },
+      slices: [{ type: 'text', text: 'Reminder: medicine time' }],
+    })
+  })
+
   it('keeps a notice reply that only contains a valid sticker', async () => {
     const harness = createHarness()
     harness.stream.mockImplementationOnce(async (_model, _provider, _conversation, streamOptions) => {
@@ -170,5 +250,47 @@ describe('chat orchestrator host options', () => {
     await harness.runtime.ingest('task', { model: 'test', chatProvider: provider, background: true }, 'recipe-session')
 
     expect(speaks).toEqual([true, false, false])
+  })
+
+  // The character notes the screen with markers. A reply with markers only stays silent, and its markers still count.
+  it('reports timeline markers, also from a silent reply, and keeps them out of the stored text', async () => {
+    const markers: Array<{ kind: string, text: string }> = []
+    const harness = createHarness({ onTimelineMarker: event => markers.push({ kind: event.kind, text: event.text }) })
+    harness.stream.mockImplementationOnce(async (_model, _provider, _conversation, streamOptions) => {
+      for (const text of ['<|SCENE ranked match, mid lane|>', '<|NOTE first blood|>', '<|NOTE dragon taken|>', '<|NOTE third note|>'])
+        await streamOptions?.onStreamEvent?.({ type: 'text-delta', text })
+      await streamOptions?.onStreamEvent?.({ type: 'finish' })
+    })
+    harness.stream.mockImplementationOnce(async (_model, _provider, _conversation, streamOptions) => {
+      for (const text of ['Nice play! ', '<|NOTE won the fight|>'])
+        await streamOptions?.onStreamEvent?.({ type: 'text-delta', text })
+      await streamOptions?.onStreamEvent?.({ type: 'finish' })
+    })
+
+    await harness.runtime.ingest('Autonomous turn', { model: 'test', chatProvider: provider, notice: { source: 'initiative', transient: true } })
+    expect(harness.messages['session-1'] ?? []).toEqual([])
+    await harness.runtime.ingest('Autonomous turn', { model: 'test', chatProvider: provider, notice: { source: 'initiative', transient: true } })
+
+    expect(markers).toEqual([
+      { kind: 'scene', text: 'ranked match, mid lane' },
+      { kind: 'note', text: 'first blood' },
+      { kind: 'note', text: 'dragon taken' },
+      { kind: 'note', text: 'won the fight' },
+    ])
+    const reply = harness.messages['session-1']?.at(-1)
+    expect(reply).toMatchObject({ role: 'assistant', content: 'Nice play! ' })
+    expect(reply?.role === 'assistant' && reply.categorization?.speech).toBe('Nice play! ')
+  })
+
+  // A scene anchor stays the same across autonomous turns, so it sits at a fixed place near the start of the request.
+  it('puts the anchor of a notice right after the system prompt, and keeps it out of history', async () => {
+    const harness = createHarness({ getSystemPrompt: () => 'identity' })
+
+    await harness.runtime.ingest('Autonomous turn', { model: 'test', chatProvider: provider, notice: { source: 'initiative', transient: true, anchor: { text: 'The anchor of the current scene', image: 'data:image/jpeg;base64,AAAA' } } })
+
+    const conversation = harness.stream.mock.calls[0]?.[2]
+    expect(conversation?.turns[0]).toMatchObject({ type: 'system', authority: 'system' })
+    expect(conversation?.turns[1]).toMatchObject({ id: 'notice-anchor', type: 'user', content: [{ type: 'tagged-text', text: 'The anchor of the current scene' }, { type: 'image', url: 'data:image/jpeg;base64,AAAA' }] })
+    expect(JSON.stringify(harness.messages['session-1'] ?? [])).not.toContain('AAAA')
   })
 })

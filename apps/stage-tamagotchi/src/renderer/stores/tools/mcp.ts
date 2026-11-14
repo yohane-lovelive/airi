@@ -2,8 +2,9 @@ import type { ExecutableTool } from '@proj-airi/stage-ui/stores/ai/chat-llm/tool
 
 import { useElectronEventaInvoke } from '@proj-airi/electron-vueuse'
 import { useLlmToolsStore } from '@proj-airi/stage-ui/stores/ai/chat-llm/tools'
+import { useWebSearchStore } from '@proj-airi/stage-ui/stores/modules/web-search'
 import { TOOL_ICONS } from '@proj-airi/stage-ui/tools/icons'
-import { createMcpTools } from '@proj-airi/stage-ui/tools/mcp'
+import { createMcpTools, withHiddenMcpServer } from '@proj-airi/stage-ui/tools/mcp'
 import { defineStore } from 'pinia'
 
 import { electronMcpCallTool, electronMcpListTools } from '../../../shared/eventa'
@@ -13,6 +14,8 @@ export const useTamagotchiMcpToolsStore = defineStore('tamagotchi-mcp-tools', ()
   const listMcpTools = useElectronEventaInvoke(electronMcpListTools)
   const callMcpTool = useElectronEventaInvoke(electronMcpCallTool)
   const toolIdPrefix = 'mcp:'
+  const webSearch = useWebSearchStore()
+  webSearch.setMcpCallTool(payload => callMcpTool(payload))
 
   function registeredToolIds() {
     return llmToolsStore.tools
@@ -21,10 +24,10 @@ export const useTamagotchiMcpToolsStore = defineStore('tamagotchi-mcp-tools', ()
   }
 
   async function refresh() {
-    const tools = await Promise.all(createMcpTools({
+    const tools = await Promise.all(createMcpTools(withHiddenMcpServer({
       listTools: () => listMcpTools(),
       callTool: payload => callMcpTool(payload),
-    }))
+    }, () => webSearch.mcpSearchServer)))
 
     llmToolsStore.removeToolsByIds(...registeredToolIds())
     llmToolsStore.addTools(...tools.map(tool => ({

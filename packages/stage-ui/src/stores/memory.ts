@@ -1,3 +1,4 @@
+import type { LocalDocumentChanges } from '../libs/document-sync'
 import type { MemoryEntry, MemoryWrite } from '../types/memory'
 
 import { errorMessageFrom } from '@moeru/std'
@@ -8,6 +9,8 @@ import { v7 as uuidv7 } from 'uuid'
 import { computed, ref, watch } from 'vue'
 
 import { memoryRepo } from '../database/repos/memory.repo'
+import { memoryIndexEntries } from '../libs/memory-index'
+import { applyMemoryChanges } from '../libs/memory-sync'
 
 const LEGACY_ENTRIES_STORAGE_KEY = 'memory/entries'
 
@@ -47,13 +50,20 @@ export const useMemoryStore = defineStore('memory', () => {
   const enabled = useLocalStorageManualReset<boolean>('memory/enabled', true)
   const entries = ref<MemoryEntry[]>([])
   const { data: changed, post } = useBroadcastChannel<string[], string[]>({ name: 'airi:memory' })
+  /** Counts the changes of the entries by a run or by the owner, in any window. A sync of other devices does not count. */
+  const changeCount = ref(0)
+  /** Counts the sync rounds that wrote `entries` before their save. A read that started before one does not replace them. */
+  let syncEdits = 0
   let pendingLoad = moveLegacyEntries()
     .catch(error => console.warn('[memory] Failed to move the entries from localStorage:', errorMessageFrom(error)))
 
   /** Reads the entries again, after the reads that started before. */
   function load() {
     pendingLoad = pendingLoad.catch(() => {}).then(async () => {
-      entries.value = await memoryRepo.list()
+      const startedAt = syncEdits
+      const stored = await memoryRepo.list()
+      if (startedAt === syncEdits)
+        entries.value = stored
     })
     return pendingLoad
   }
@@ -68,21 +78,40 @@ export const useMemoryStore = defineStore('memory', () => {
 
   /** Reads the entries again after a change, and tells the other windows. */
   async function publish(ids: string[]) {
+    changeCount.value += 1
     await load()
     post(ids)
   }
 
   /**
-   * The index for a card: its own memories, then general ones, each as an id and its description.
+   * Applies one round of the memory sync. It writes `entries` at once, before it awaits anything, as the sync needs.
+   * The save and a read follow in the order of the reads. Resolves to the ids that it could not apply.
+   */
+  function applySyncChanges(changes: LocalDocumentChanges) {
+    const applied = applyMemoryChanges(entries.value, changes, Date.now(), uuidv7)
+    syncEdits += 1
+    entries.value = applied.entries
+    pendingLoad = pendingLoad.catch(() => {}).then(() => memoryRepo.applySync(applied.saved, applied.removed, Date.now()))
+    const saved = pendingLoad
+    void load()
+    return saved.then(() => {
+      post([...applied.saved.map(entry => entry.id), ...applied.removed])
+      return { rejected: applied.rejected }
+    })
+  }
+
+  /**
+   * The index for a card: its own memories, then general ones, each as an id and its description, newest first.
+   * It lists `limit` entries at most, 50 by default, so a large memory does not fill every request. The model searches the rest.
    * A run reads it when it starts, from the entries that the window read last.
    */
-  function indexFor(personaId: string) {
+  function indexFor(personaId: string, limit?: number) {
     const line = (entry: MemoryEntry) => `- ${entry.id}: ${entry.description}`
-    const own = entries.value.filter(entry => entry.persona === personaId).map(line)
-    const general = entries.value.filter(entry => !entry.persona).map(line)
+    const { own, general, hidden } = memoryIndexEntries(entries.value, personaId, limit)
     return [
-      ...(own.length ? [`Your own:\n${own.join('\n')}`] : []),
-      ...(general.length ? [`General:\n${general.join('\n')}`] : []),
+      ...(own.length ? [`Your own:\n${own.map(line).join('\n')}`] : []),
+      ...(general.length ? [`General:\n${general.map(line).join('\n')}`] : []),
+      ...(hidden ? [`${hidden} older entries are not listed.`] : []),
     ].join('\n')
   }
 
@@ -133,12 +162,16 @@ export const useMemoryStore = defineStore('memory', () => {
   function reload() {
     void load().catch(error => console.warn('[memory] Failed to read the entries:', errorMessageFrom(error)))
   }
-  watch(changed, reload)
+  watch(changed, () => {
+    changeCount.value += 1
+    reload()
+  })
   reload()
 
   return {
     enabled,
     entries: computed(() => entries.value),
+    changeCount: computed(() => changeCount.value),
     ready,
     indexFor,
     read,
@@ -146,6 +179,7 @@ export const useMemoryStore = defineStore('memory', () => {
     makeGeneral,
     forget,
     remove,
+    applySyncChanges,
     resetState,
   }
 })

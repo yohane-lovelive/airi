@@ -1,0 +1,438 @@
+#nullable enable
+
+using System;
+using System.Collections.Generic;
+using Mmd.Native;
+using Mmd.Parser;
+using Mmd.Rendering;
+
+namespace Mmd
+{
+    public sealed class MmdRuntimeSession : IDisposable
+    {
+        private readonly MmdModelDefinition model;
+        private readonly MmdMotionDefinition motion;
+        private readonly string modelId;
+        private readonly string motionId;
+        private readonly byte[]? nativeModelSourceIdentity;
+        private readonly byte[]? nativeMotionSourceIdentity;
+        private readonly int nativeModelSourceLength;
+        private readonly int nativeMotionSourceLength;
+        private readonly ulong nativeModelSourceFingerprint;
+        private readonly ulong nativeMotionSourceFingerprint;
+        private readonly bool verifyNativeSourceFingerprints;
+        private MmdRuntimeFfiPlaybackSession? nativePlaybackSession;
+        private float[]? nativeWorldMatrices;
+        private float[]? nativeMorphWeights;
+        private byte[]? nativeIkEnabled;
+        private bool disposed;
+
+        public MmdRuntimeSession(
+            MmdModelDefinition model,
+            MmdMotionDefinition motion,
+            string modelId,
+            string motionId)
+            : this(model, motion, modelId, motionId, validateSources: true)
+        {
+        }
+
+        private MmdRuntimeSession(
+            MmdModelDefinition model,
+            MmdMotionDefinition motion,
+            string modelId,
+            string motionId,
+            bool validateSources)
+        {
+            if (model == null)
+            {
+                throw new ArgumentNullException(nameof(model));
+            }
+
+            if (motion == null)
+            {
+                throw new ArgumentNullException(nameof(motion));
+            }
+
+            if (string.IsNullOrWhiteSpace(modelId))
+            {
+                throw new ArgumentException("Model identifier is required.", nameof(modelId));
+            }
+
+            if (string.IsNullOrWhiteSpace(motionId))
+            {
+                throw new ArgumentException("Motion identifier is required.", nameof(motionId));
+            }
+
+            if (validateSources)
+            {
+                MmdModelValidator.ThrowIfInvalid(model);
+                MmdMotionValidator.ThrowIfInvalid(motion);
+            }
+            this.model = model;
+            this.motion = motion;
+            this.modelId = modelId;
+            this.motionId = motionId;
+            nativeModelSourceIdentity = model.sourceBytes;
+            nativeMotionSourceIdentity = motion.sourceBytes;
+            nativeModelSourceLength = nativeModelSourceIdentity?.Length ?? 0;
+            nativeMotionSourceLength = nativeMotionSourceIdentity?.Length ?? 0;
+            verifyNativeSourceFingerprints = validateSources;
+            nativeModelSourceFingerprint = validateSources
+                ? ComputeSourceFingerprint(nativeModelSourceIdentity)
+                : 0;
+            nativeMotionSourceFingerprint = validateSources
+                ? ComputeSourceFingerprint(nativeMotionSourceIdentity)
+                : 0;
+        }
+
+        internal static MmdRuntimeSession CreateFromValidatedSources(
+            MmdModelDefinition model,
+            MmdMotionDefinition motion,
+            string modelId,
+            string motionId)
+        {
+            // Playback assets keep their validated model private and create a fresh motion header.
+            // Identity and length checks still guard source replacement; avoid hashing the full PMX
+            // again on the Timeline frame that activates the binding.
+            return new MmdRuntimeSession(
+                model,
+                motion,
+                modelId,
+                motionId,
+                validateSources: false);
+        }
+
+        public int MotionMaxFrame => motion.maxFrame;
+
+        ~MmdRuntimeSession()
+        {
+            Dispose(disposing: false);
+        }
+
+        public MmdPlaybackSnapshot BuildSnapshot(int frame, float time)
+        {
+            ThrowIfDisposed();
+            return MmdPlaybackSnapshotBuilder.BuildPhaseOneSnapshot(model, motion, frame, time, modelId, motionId);
+        }
+
+        public MmdPlaybackSnapshot BuildSnapshotAtTime(float time, float frameRate)
+        {
+            MmdPlaybackTimeMapping mapping = DescribePlaybackTime(time, frameRate);
+            return BuildSnapshot(mapping.frame, time);
+        }
+
+        public MmdEvaluatedFrame EvaluateFrame(int frame, float time)
+        {
+            return EvaluateFrame(frame, time, 0);
+        }
+
+        public MmdEvaluatedFrame EvaluateFrame(int frame, float time, uint ikMaxIterationsCap)
+        {
+            ThrowIfDisposed();
+            return EvaluateNativeFrame(frame, time, ikMaxIterationsCap);
+        }
+
+        internal MmdEvaluatedFrame EvaluateBeforePhysicsFrame(int frame, float time)
+        {
+            return EvaluateBeforePhysicsFrame(frame, time, 0);
+        }
+
+        internal MmdEvaluatedFrame EvaluateBeforePhysicsFrame(int frame, float time, uint ikMaxIterationsCap)
+        {
+            ThrowIfDisposed();
+            if (nativeModelSourceIdentity == null || nativeMotionSourceIdentity == null)
+            {
+                throw new InvalidOperationException(
+                    "Model sourceBytes and motion sourceBytes are required for native evaluation.");
+            }
+
+            return EvaluateNativeFrame(
+                frame,
+                time,
+                ikMaxIterationsCap,
+                evaluationFrame: frame,
+                beforePhysics: model.HasDeformAfterPhysicsBones);
+        }
+
+        internal void GetNativeOutputBufferLengths(
+            out int worldMatrixFloatCount,
+            out int morphWeightCount,
+            out int ikEnabledCount)
+        {
+            ThrowIfDisposed();
+            EnsureNativePlaybackSession();
+            worldMatrixFloatCount = nativeWorldMatrices!.Length;
+            morphWeightCount = nativeMorphWeights!.Length;
+            ikEnabledCount = nativeIkEnabled!.Length;
+        }
+
+        internal MmdRuntimeFfiPlaybackSession NativePlaybackSession
+        {
+            get
+            {
+                ThrowIfDisposed();
+                EnsureNativePlaybackSession();
+                return nativePlaybackSession!;
+            }
+        }
+
+        internal void EvaluateBeforePhysicsFrameInto(
+            int frame,
+            float time,
+            float[] worldMatrices,
+            float[] morphWeights,
+            byte[] ikEnabled,
+            uint ikMaxIterationsCap = 0)
+        {
+            ThrowIfDisposed();
+            MmdPlaybackTime.ValidateFrame(frame);
+            MmdPlaybackTime.ValidateTime(time);
+            EnsureNativePlaybackSession();
+            ValidateNativeOutputBuffers(worldMatrices, morphWeights, ikEnabled);
+
+            if (model.HasDeformAfterPhysicsBones)
+                nativePlaybackSession!.EvaluateBeforePhysicsAndCopy(
+                    frame, worldMatrices, morphWeights, ikEnabled, ikMaxIterationsCap);
+            else
+                nativePlaybackSession!.EvaluateAndCopy(
+                    frame, worldMatrices, morphWeights, ikEnabled, ikMaxIterationsCap);
+        }
+
+        public MmdEvaluatedFrame EvaluateFrameAtTime(float time, float frameRate)
+        {
+            return EvaluateFrameAtTime(time, frameRate, 0);
+        }
+
+        public MmdEvaluatedFrame EvaluateFrameAtTime(float time, float frameRate, uint ikMaxIterationsCap)
+        {
+            MmdPlaybackTimeMapping mapping = DescribePlaybackTime(time, frameRate);
+            return EvaluateNativeFrame(
+                mapping.frame,
+                time,
+                ikMaxIterationsCap,
+                time * frameRate);
+        }
+
+        public MmdPlaybackSnapshot BuildSnapshotFromEvaluatedFrame(MmdEvaluatedFrame frame, MmdRenderingDescriptor rendering)
+        {
+            ThrowIfDisposed();
+            return new MmdPlaybackSnapshot
+            {
+                model = modelId,
+                motion = motionId,
+                frame = frame ?? throw new ArgumentNullException(nameof(frame)),
+                rendering = rendering ?? throw new ArgumentNullException(nameof(rendering))
+            };
+        }
+
+        public MmdPlaybackTimeMapping DescribePlaybackTime(float time, float frameRate)
+        {
+            ThrowIfDisposed();
+            return MmdPlaybackTime.Map(time, frameRate, motion.maxFrame);
+        }
+
+        public MmdPlaybackSnapshotSummary BuildSnapshotSummary(int frame, float time)
+        {
+            return MmdPlaybackSnapshotDiagnostics.Summarize(BuildSnapshot(frame, time));
+        }
+
+        public IReadOnlyList<MmdPlaybackSnapshot> BuildSnapshots(IReadOnlyList<int> frames, float frameRate)
+        {
+            ThrowIfDisposed();
+            EnsureNativeSourcesUnchanged();
+
+            return MmdPlaybackSnapshotBuilder.BuildPhaseOneSnapshots(model, motion, frames, frameRate, modelId, motionId);
+        }
+
+        public MmdPlaybackSnapshotSequenceSummary BuildSnapshotSequenceSummary(IReadOnlyList<int> frames, float frameRate)
+        {
+            return MmdPlaybackSnapshotDiagnostics.SummarizeSequence(BuildSnapshots(frames, frameRate));
+        }
+
+        public MmdAnimationBakeSummary BuildTransformBakeSummary(
+            int startFrame,
+            int endFrame,
+            float frameRate,
+            string outputPath = "Assets/MmdUnity/BakedAnimations/animation-bake-plan.anim")
+        {
+            ThrowIfDisposed();
+            return MmdAnimationBakePlanner.BuildTransformBakeSummary(this, startFrame, endFrame, frameRate, outputPath);
+        }
+
+        public void Dispose()
+        {
+            Dispose(disposing: true);
+            GC.SuppressFinalize(this);
+        }
+
+        private void Dispose(bool disposing)
+        {
+            if (disposed)
+            {
+                return;
+            }
+
+            disposed = true;
+            try
+            {
+                nativePlaybackSession?.Dispose();
+            }
+            finally
+            {
+                nativePlaybackSession = null;
+                nativeWorldMatrices = null;
+                nativeMorphWeights = null;
+                nativeIkEnabled = null;
+            }
+        }
+
+        internal MmdEvaluatedFrame EvaluateNativeFrame(int frame, float time, uint ikMaxIterationsCap = 0)
+        {
+            return EvaluateNativeFrame(frame, time, ikMaxIterationsCap, frame);
+        }
+
+        private MmdEvaluatedFrame EvaluateNativeFrame(
+            int frame,
+            float time,
+            uint ikMaxIterationsCap,
+            float evaluationFrame,
+            bool beforePhysics = false)
+        {
+            ThrowIfDisposed();
+            MmdPlaybackTime.ValidateFrame(frame);
+            MmdPlaybackTime.ValidateTime(time);
+            EnsureNativePlaybackSession();
+
+            if (beforePhysics)
+            {
+                nativePlaybackSession!.EvaluateBeforePhysicsAndCopy(
+                    evaluationFrame,
+                    nativeWorldMatrices!,
+                    nativeMorphWeights!,
+                    nativeIkEnabled!,
+                    ikMaxIterationsCap);
+            }
+            else
+            {
+                nativePlaybackSession!.EvaluateAndCopy(
+                    evaluationFrame,
+                    nativeWorldMatrices!,
+                    nativeMorphWeights!,
+                    nativeIkEnabled!,
+                    ikMaxIterationsCap);
+            }
+            return MmdRuntimeFrameEvaluator.BuildFrameFromNative(
+                model,
+                frame,
+                time,
+                nativeWorldMatrices!,
+                nativeMorphWeights!,
+                includeMaterials: false);
+        }
+
+        private void ValidateNativeOutputBuffers(
+            float[] worldMatrices,
+            float[] morphWeights,
+            byte[] ikEnabled)
+        {
+            if (worldMatrices == null || worldMatrices.Length != nativeWorldMatrices!.Length)
+                throw new ArgumentException("Native world matrix buffer length must match the runtime session.", nameof(worldMatrices));
+            if (morphWeights == null || morphWeights.Length != nativeMorphWeights!.Length)
+                throw new ArgumentException("Native morph weight buffer length must match the runtime session.", nameof(morphWeights));
+            if (ikEnabled == null || ikEnabled.Length != nativeIkEnabled!.Length)
+                throw new ArgumentException("Native IK enabled buffer length must match the runtime session.", nameof(ikEnabled));
+        }
+
+        private void EnsureNativePlaybackSession()
+        {
+            if (nativePlaybackSession != null)
+            {
+                return;
+            }
+
+            byte[] modelSourceIdentity = nativeModelSourceIdentity
+                ?? throw new InvalidOperationException("Model source bytes are required for native runtime evaluation.");
+            byte[] motionSourceIdentity = nativeMotionSourceIdentity
+                ?? throw new InvalidOperationException("Motion source bytes are required for native runtime evaluation.");
+            EnsureNativeSourcesUnchangedBeforeCompilation();
+
+            byte[] modelSource = (byte[])modelSourceIdentity.Clone();
+            byte[] motionSource = (byte[])motionSourceIdentity.Clone();
+            MmdRuntimeFfiPlaybackSession created = MmdRuntimeFfiPlaybackSession.Create(modelSource, motionSource);
+            try
+            {
+                nativeWorldMatrices = new float[created.WorldMatrixFloatCount];
+                nativeMorphWeights = new float[created.MorphWeightCount];
+                nativeIkEnabled = new byte[created.IkEnabledCount];
+                nativePlaybackSession = created;
+            }
+            catch
+            {
+                created.Dispose();
+                nativeWorldMatrices = null;
+                nativeMorphWeights = null;
+                nativeIkEnabled = null;
+                throw;
+            }
+        }
+
+        private void EnsureNativeSourcesUnchangedBeforeCompilation()
+        {
+            if (nativePlaybackSession != null)
+            {
+                return;
+            }
+
+            EnsureNativeSourcesUnchanged();
+        }
+
+        private void EnsureNativeSourcesUnchanged()
+        {
+            string phase = nativePlaybackSession == null
+                ? "before session compilation"
+                : "after session compilation";
+            if (!ReferenceEquals(model.sourceBytes, nativeModelSourceIdentity)
+                || !ReferenceEquals(motion.sourceBytes, nativeMotionSourceIdentity)
+                || (model.sourceBytes?.Length ?? 0) != nativeModelSourceLength
+                || (motion.sourceBytes?.Length ?? 0) != nativeMotionSourceLength)
+            {
+                throw new InvalidOperationException(
+                    "Native runtime session source identity changed " + phase + ".");
+            }
+
+            if (verifyNativeSourceFingerprints &&
+                (ComputeSourceFingerprint(model.sourceBytes) != nativeModelSourceFingerprint ||
+                 ComputeSourceFingerprint(motion.sourceBytes) != nativeMotionSourceFingerprint))
+            {
+                throw new InvalidOperationException("Native runtime source bytes changed " + phase + ".");
+            }
+        }
+
+        private static ulong ComputeSourceFingerprint(byte[]? source)
+        {
+            if (source == null)
+            {
+                return 0;
+            }
+
+            const ulong offset = 14695981039346656037UL;
+            const ulong prime = 1099511628211UL;
+            ulong hash = offset;
+            foreach (byte value in source)
+            {
+                hash = unchecked((hash ^ value) * prime);
+            }
+
+            return hash;
+        }
+
+        private void ThrowIfDisposed()
+        {
+            if (disposed)
+            {
+                throw new ObjectDisposedException(nameof(MmdRuntimeSession));
+            }
+        }
+
+    }
+}

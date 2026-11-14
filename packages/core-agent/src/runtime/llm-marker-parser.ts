@@ -59,6 +59,28 @@ function createPushStream<T>(): StreamController<T> {
   }
 }
 
+/**
+ * The end of a marker that the model closed wrongly, for example `<|SCENE a room|` or `<|SCENE a room>` before a line
+ * break or the next marker. A live check on 2026-11-04 saw both forms, and the open marker then took the next marker.
+ *
+ * Returns:
+ * - The index where the broken marker ends, or -1 when the marker is not closed wrongly before a break.
+ */
+function brokenCloseIndex(buffer: string) {
+  const lineBreak = buffer.indexOf('\n')
+  const nextOpen = buffer.indexOf(TAG_OPEN, TAG_OPEN.length)
+  const boundary = [lineBreak, nextOpen].filter(index => index >= 0).sort((a, b) => a - b)[0]
+  if (boundary === undefined)
+    return -1
+  // A correct marker can span lines, so only a marker that ends with a broken close stops at the break.
+  return /[|>]\s*$/.test(buffer.slice(TAG_OPEN.length, boundary)) ? boundary : -1
+}
+
+/** A broken marker with the closing that the marker handlers read. */
+function closedMarker(text: string) {
+  return `${text.trimEnd().replace(/[|>]$/, '')}${TAG_CLOSE}`
+}
+
 async function readStream<T>(stream: ReadableStream<T>, handler: (value: T) => Promise<void> | void) {
   const reader = stream.getReader()
   try {
@@ -108,6 +130,14 @@ function createLlmMarkerParser(options?: MarkerParserOptions) {
         }
         else {
           const closeTagIndex = buffer.indexOf(TAG_CLOSE)
+          const brokenIndex = brokenCloseIndex(buffer)
+          if (brokenIndex >= 0 && (closeTagIndex < 0 || brokenIndex < closeTagIndex)) {
+            const marker = buffer.slice(0, brokenIndex)
+            buffer = buffer.slice(brokenIndex)
+            await onSpecial(closedMarker(marker))
+            inTag = false
+            continue
+          }
           if (closeTagIndex < 0)
             break
 
@@ -119,11 +149,19 @@ function createLlmMarkerParser(options?: MarkerParserOptions) {
       }
     },
 
-    /** Emits the text held back to find a marker, unless a marker is still open. */
-    async flush(onLiteral: (value: string) => Promise<void> | void) {
+    /**
+     * Emits the text held back to find a marker, unless a marker is still open. At the end of the text, a marker that
+     * ends with a broken close, for example `<|NEXT wait|`, is emitted as a marker. Other open text is dropped.
+     */
+    async flush(onLiteral: (value: string) => Promise<void> | void, onSpecial?: (value: string) => Promise<void> | void) {
       if (!inTag && buffer.length > 0) {
         await onLiteral(buffer)
         buffer = ''
+      }
+      else if (inTag && onSpecial && /[|>]\s*$/.test(buffer.slice(TAG_OPEN.length))) {
+        await onSpecial(closedMarker(buffer))
+        buffer = ''
+        inTag = false
       }
     },
   }
@@ -158,6 +196,8 @@ function createLlmMarkerStream(input: ReadableStream<string | MarkerFlush>, opti
         if (!literal)
           return
         write({ type: 'literal', value: literal })
+      }, async (special) => {
+        write({ type: 'special', value: special })
       })
       close()
     })

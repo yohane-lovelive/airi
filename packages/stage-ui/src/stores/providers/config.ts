@@ -8,7 +8,7 @@ import { useDebounceFn, useIntervalFn, useLocalStorage } from '@vueuse/core'
 import { isEqual } from 'es-toolkit'
 import { nanoid } from 'nanoid'
 import { defineStore, getActivePinia } from 'pinia'
-import { computed, shallowRef, watch } from 'vue'
+import { computed, shallowRef, toRaw, watch } from 'vue'
 
 import { client } from '../../composables/api'
 import { getDefinedProvider } from '../../libs/providers'
@@ -262,6 +262,12 @@ export const useProviderConfigStore = defineStore('provider-config', () => {
       schedulePush()
   }
 
+  /** Reads a stored record without its reactive proxy, so a spread of it copies plain values. */
+  function rawProvider(providerId: string): StoredProvider | undefined {
+    const provider = providers.value[providerId]
+    return provider ? toRaw(provider) : undefined
+  }
+
   /**
    * Applies configuration fields through the leader-owned provider snapshot.
    *
@@ -270,7 +276,12 @@ export const useProviderConfigStore = defineStore('provider-config', () => {
    * Returns false if the provider no longer exists.
    */
   async function patchProviderConfig(providerId: string, patch: Record<string, unknown>) {
-    const provider = providers.value[providerId]
+    // ROOT CAUSE:
+    //
+    // A spread of the reactive record copied its nested objects as proxies into
+    // the new plain record. `structuredClone` then refused the stored config, so
+    // a provider with a nested field, such as a list of voices, could not speak.
+    const provider = rawProvider(providerId)
     if (!provider)
       return false
 
@@ -289,7 +300,7 @@ export const useProviderConfigStore = defineStore('provider-config', () => {
    * store and can overwrite newer leader state.
    */
   async function setProviderModel(providerId: string, model: string) {
-    const provider = providers.value[providerId]
+    const provider = rawProvider(providerId)
     if (!provider)
       return
 
@@ -304,7 +315,7 @@ export const useProviderConfigStore = defineStore('provider-config', () => {
    * Seeds a discovered default without replacing a model selected by the user.
    */
   async function setProviderModelIfUnset(providerId: string, model: string) {
-    const provider = providers.value[providerId]
+    const provider = rawProvider(providerId)
     if (!provider)
       return
 

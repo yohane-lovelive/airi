@@ -4,7 +4,7 @@ import type { McpToolRuntime } from './mcp'
 
 import { describe, expect, it, vi } from 'vitest'
 
-import { createMcpTools, mcp } from './mcp'
+import { createMcpTools, mcp, withHiddenMcpServer } from './mcp'
 
 function createRuntime(): McpToolRuntime {
   return {
@@ -104,5 +104,28 @@ describe('mcp discovery', () => {
     const result = await callTool.execute({ name: 'memory::missing', arguments: '{}' }, { messages: [], toolCallId: 'call-failed' })
 
     expect(result).toEqual({ isError: true, content: [{ type: 'text', text: 'Unknown tool.' }] })
+  })
+})
+
+describe('withHiddenMcpServer', () => {
+  const descriptor = (serverName: string) => ({ serverName, name: `${serverName}::search`, toolName: 'search', inputSchema: {} })
+  const runtime = {
+    listTools: vi.fn(async () => [descriptor('ddg-search'), descriptor('files')]),
+    callTool: vi.fn(async () => ({ content: [{ type: 'text', text: 'ok' }] })),
+  }
+
+  it('hides the server from the list and refuses a direct call', async () => {
+    const hidden = withHiddenMcpServer(runtime, () => 'ddg-search')
+
+    expect((await hidden.listTools()).map(tool => tool.serverName)).toEqual(['files'])
+    expect((await hidden.callTool({ name: 'ddg-search::search' })).isError).toBe(true)
+    expect(runtime.callTool).not.toHaveBeenCalled()
+    expect((await hidden.callTool({ name: 'files::search' })).isError).toBeUndefined()
+  })
+
+  it('hides nothing while no server answers searches', async () => {
+    const open = withHiddenMcpServer(runtime, () => undefined)
+
+    expect(await open.listTools()).toHaveLength(2)
   })
 })

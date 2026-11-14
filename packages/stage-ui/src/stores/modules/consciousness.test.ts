@@ -169,7 +169,7 @@ describe('consciousness store provider selection', () => {
     // The provider only sends efforts supported by the selected catalog model.
     expect(disabledProvider.generation('gpt-5.1').config).toMatchObject({ reasoning: { effort: 'none' } })
 
-    await settingsStore.setReasoning(true)
+    await settingsStore.setReasoningLevel('medium')
 
     const enabledProvider = await consciousnessStore.getChatProviderInstance('openai', 'gpt-5.1')
     expect(enabledProvider.generation('gpt-5.1').config).toMatchObject({ reasoning: { effort: 'medium', summary: 'auto' } })

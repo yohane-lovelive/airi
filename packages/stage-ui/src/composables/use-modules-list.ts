@@ -6,7 +6,10 @@ import { useI18n } from 'vue-i18n'
 
 import factorioIcon from '../assets/factorio-simple.png'
 
+import { useHistorySummaryStore } from '../stores/history-summary'
+import { useInitiativeStore } from '../stores/initiative'
 import { useMemoryStore } from '../stores/memory'
+import { useMissionsStore } from '../stores/missions'
 import { useArtistryStore } from '../stores/modules/artistry'
 import { useConsciousnessStore } from '../stores/modules/consciousness'
 import { useDiscordStore } from '../stores/modules/discord'
@@ -19,6 +22,7 @@ import { useStickersStore } from '../stores/modules/stickers'
 import { useTwitterStore } from '../stores/modules/twitter'
 import { useVisionStore } from '../stores/modules/vision'
 import { useWebSearchStore } from '../stores/modules/web-search'
+import { usePerceptionStore } from '../stores/perception'
 import { useToolCardsStore } from '../stores/tool-cards'
 
 export interface Module {
@@ -50,6 +54,10 @@ export function useModulesList() {
   const homeAssistantStore = useHomeAssistantStore()
   const artistryStore = useArtistryStore()
   const memoryStore = useMemoryStore()
+  const missionsStore = useMissionsStore()
+  const initiativeStore = useInitiativeStore()
+  const perceptionStore = usePerceptionStore()
+  const historySummaryStore = useHistorySummaryStore()
   const toolCardsStore = useToolCardsStore()
   const beatSyncState = ref<BeatSyncDetectorState>()
   const beatSyncSupported = isBeatSyncSupported()
@@ -126,7 +134,7 @@ export function useModulesList() {
       description: t('settings.pages.modules.memory-short-term.description'),
       icon: 'i-solar:bookmark-bold-duotone',
       to: '/settings/modules/memory-short-term',
-      configured: false,
+      configured: historySummaryStore.enabled,
       category: 'essential',
     },
     {
@@ -136,6 +144,43 @@ export function useModulesList() {
       icon: 'i-solar:book-bookmark-bold-duotone',
       to: '/settings/modules/memory-long-term',
       configured: memoryStore.enabled,
+      category: 'essential',
+    },
+    {
+      id: 'motions',
+      name: t('settings.pages.modules.motions.title'),
+      description: t('settings.pages.modules.motions.description'),
+      icon: 'i-solar:running-round-bold-duotone',
+      to: '/settings/modules/motions',
+      // Built-in gestures are always there, so the module needs no setup.
+      configured: true,
+      category: 'essential',
+    },
+    {
+      id: 'missions',
+      name: t('settings.pages.modules.missions.title'),
+      description: t('settings.pages.modules.missions.description'),
+      icon: 'i-solar:alarm-bold-duotone',
+      to: '/settings/modules/missions',
+      configured: missionsStore.enabled,
+      category: 'essential',
+    },
+    {
+      id: 'initiative',
+      name: t('settings.pages.modules.initiative.title'),
+      description: t('settings.pages.modules.initiative.description'),
+      icon: 'i-solar:chat-round-dots-bold-duotone',
+      to: '/settings/modules/initiative',
+      configured: initiativeStore.enabled,
+      category: 'essential',
+    },
+    {
+      id: 'perception',
+      name: t('settings.pages.modules.perception.title'),
+      description: t('settings.pages.modules.perception.description'),
+      icon: 'i-solar:eye-bold-duotone',
+      to: '/settings/modules/perception',
+      configured: perceptionStore.enabled,
       category: 'essential',
     },
     {

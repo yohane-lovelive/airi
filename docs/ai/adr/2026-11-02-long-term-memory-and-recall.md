@@ -1,0 +1,217 @@
+# Long-term memory: recall by meaning and sync between devices
+
+Status: proposed
+
+## Context
+
+[ADR 2026-10-10](./2026-10-10-skills-automations-and-memory.md) gave the character a long-term memory. Each fact is one entry with an index line and a body. [ADR 2026-10-28](./2026-10-28-autonomous-character-perception-and-missions.md) builds an autonomous character on top of it, and it waits for this ADR in four places:
+
+- A device that connects later gets the same memories.
+- The prompt holds the top 5 recalled memories, never the full index.
+- The `recall` speech type, the small-talk seeds, and the topic similarity read memories by meaning.
+- The server keeps the presence record that decides which device holds the floor.
+
+The current code has these limits:
+
+- IndexedDB keeps the entries on one device. A removal leaves a tombstone, but no sync reads it.
+- Each request lists the newest 50 index lines in the system prompt. `builtIn_searchMemory` finds other entries by shared character pairs. It finds the same words, not the same meaning.
+- The client has no text embeddings. Topic similarity also uses character pairs.
+- Only the model writes memories, with `builtIn_writeMemory`. Nothing reads a conversation afterwards to keep its facts.
+
+The backend stack already runs PostgreSQL with the VectorChord extension (`server/apps/api/sql/init.sql`). Character cards and settings already sync through the field store of [server ADR 2026-10-06](../../../server/docs/ai/adr/2026-10-06-document-sync.md).
+
+## Decision
+
+The server is the source of truth for memories. It also owns the embeddings. A device keeps a full copy, so recall and the chat work without a server.
+
+### Principles
+
+- One retrieval interface serves every reader: the chat reply, `builtIn_searchMemory`, the `recall` speech type, the topic seeds, and the topic similarity.
+- Recall by meaning needs the server. Without a server, the same interface recalls by character pairs. This is a supported mode for an owner without a server, not a legacy path.
+- The chat model stays free to change. The embedding model is fixed on the server, so a change of chat model keeps every memory and every vector.
+- Memory text leaves the device only to the server that the owner signed in to.
+- Recalled memories never change the cached prefix of a request.
+
+### Embedding model
+
+- The model is EmbeddingGemma 2 from Google, under the Apache 2.0 license. It supports more than 100 languages, and Japanese is one of them.
+- Only its text path runs. The text part has about 270 million parameters. The vision and audio encoders stay unloaded.
+- Vectors have 256 dimensions. The model makes 768 and supports Matryoshka truncation. At 256 dimensions the multilingual MTEB score falls from 61.36 to 60.41, and the storage is a third.
+- A query gets the prefix `task: search result | query: `. An entry gets `title: none | text: `, followed by its index line and its body.
+- The server runs the model in a small `embedder` service with Transformers.js and ONNX Runtime, with q8 weights. [The server ADR](../../../server/docs/ai/adr/2026-11-02-memory-store-and-search.md) has the details.
+
+### Sync of memories
+
+- Memories are a feature of the field store, `/api/v1/memories`. Each entry is one document, and its id is the UUIDv7 of the entry.
+- The fields are `description`, `body`, and `persona`. A general entry has no `persona` field.
+- A tombstone on the device becomes a document deletion on the server. A deletion on the server becomes a tombstone on the device.
+- On a conflict, the rules of the field store apply. Two devices that change one field keep the server value, and the local entry becomes a new entry, so no fact is lost.
+- The renderer leader runs the sync, like the settings sync: after a local change, on sign-in, and when the window becomes visible.
+- The client experiment `memory-sync` turns it on. It is off by default.
+
+Step M2a built the sync as follows.
+
+- `useMemorySyncStore()` runs `synchronize` of `libs/document-sync` on the leader. A change in any window reaches it as `changeCount` of the memory store, and one run follows 1.5 seconds after a burst of writes.
+- `updatedAt` does not sync. It changes with every edit, so two devices would conflict on the time alone. An entry that reaches a device for the first time takes the creation time in its UUIDv7, so the index keeps the order of the facts.
+- Fields from another device go through a Valibot schema with the limits of the server. An entry with invalid fields stays as it is on the device.
+- The memory store writes the entries of a round at once, before it awaits the save, as `synchronize` needs. A read that started before the round does not replace them.
+- A run reads the entries again before it starts. An edit in another window during a run can still lose to a remote change of the same entry. A lock for the whole run would stop every memory write while the network answers, so the run takes this rare case.
+
+### Retrieval interface
+
+`recallMemories({ query, personaId, limit })` returns the best entries for a query, best first. The card's own entries and the general entries take part.
+
+- With the sync on and the server ready, it calls `POST /api/v1/memories/search`. The server answers with entry ids and scores. The client reads the entries from its local copy.
+- Entries that changed on the device after the last sync are not on the server yet. The client also scores them by character pairs and puts them after the server results.
+- On a server error, or after 1.5 seconds, it recalls by character pairs.
+- The interface reports which mode answered, so the inspector and IO traces show it.
+
+### Recalled memories in the prompt
+
+The prompt budget of ADR 2026-10-28 gives recalled memories the top 5 and about 500 tokens.
+
+- Before each chat request, the client recalls 5 entries for the newest owner message.
+- The recalled entries go into the newest user turn as a tagged part, with their ids, index lines, and bodies. They are not stored in the history.
+- The system prompt keeps the index, so the model can read any entry by id. When recall by meaning works, the index lists the newest 20 entries, not 50.
+- An entry that the index already lists still appears in the recalled part with its body. The index shows only one line.
+- IO traces record the recall mode, the query characters, and the recalled ids.
+
+Step M2b built the recall as follows.
+
+- `recallMemories` in `libs/memory-recall.ts` merges the server results with the local entries that changed after the last sync. `useMemoryRecallStore()` calls the server and keeps the last recall for the inspector, without memory text.
+- Only the leader runs the sync, so only the leader knows the time of the last sync. A recall in another window takes the server results alone.
+- The chat recalls for a turn with the purpose `owner-reply`, before the LLM span starts. The recalled part joins the runtime context of the newest user turn in a copy of the request, under the source `memory:recall`. The query is the owner message without the time prefix of the turn.
+- The index limit follows the setting, not each answer of the server: 20 entries while the memory sync is active, 50 otherwise. A change of the limit with each answer would change the cached system prompt.
+- `builtIn_searchMemory` uses the same recall, so its results are the same as the recalled part.
+- The inspector shows the mode, the count, the query characters, and the time of the last recall.
+- A unit test checks that the recalled part goes into a copy of the request, so the stored history never holds it. The plan named a browser test of the whole chat store, but the copy is the only step that can reach the history.
+
+### Autonomous readers
+
+- The `recall` speech type recalls entries for the current topic and the scene. Code puts one of them into the situation block.
+- The small-talk seeds recall entries for the current topic, not only the newest entries.
+- The topic similarity of step 2b-2a compares topic labels by their vectors. It calls `POST /api/v1/memories/embed`. The client keeps the vectors of recent labels, so a label is embedded once.
+- Without the server, each reader uses character pairs, as today.
+
+Step M3 built the autonomous readers as follows.
+
+- `TopicVectors` in `libs/initiative/topic-vectors.ts` embeds the labels and seeds of a turn that have no vector yet, in one request, and keeps about 500 of them. The policy still compares with a synchronous function. A pair without two vectors compares by character pairs.
+- Cosines of short labels sit high: a check with Japanese pairs gave 0.80 to 0.92 for one topic, 0.69 to 0.86 for near topics, and 0.64 to 0.79 for other topics. `scaledCosine` maps 0.70 to 0.90 onto 0 to 1, so the thresholds of character pairs fit vectors too. The thread threshold of 0.5 falls at a cosine of 0.80. The ADR did not say how vectors meet the thresholds, so this is an addition. The check had 14 pairs. Labels from real turns can move the range.
+- The embed route uses the query prefix. It separated the groups better than the prefix for sentence similarity, which put same and other topics between 0.79 and 0.96.
+- While a thread is warm, the seeds add the five memories that fit its topic. A cold thread asks for a new topic, so it adds none.
+- A `recall` turn recalls with the current topic, else the scene, else the last line. It offers the best memory that did not come up in the last 6 hours, in one line of the situation block.
+- The inspector shows whether the topics compared by vectors, and the memory of the last `recall` turn.
+
+### Floor between devices
+
+- The server keeps one presence record for each account: the device id, the time it connected, and the last heartbeat.
+- The device that connected first holds the floor. When its heartbeat stops for 30 seconds, the next device takes it.
+- Only the device with the floor runs autonomous speech and missions. A reply to an owner message plays on the device where the owner sent it.
+- [Server ADR 2026-11-02 for the device floor](../../../server/docs/ai/adr/2026-11-02-device-floor.md) has the route.
+
+Step M4a built the floor as follows.
+
+- A row in PostgreSQL keeps the holder of each account. One conditional upsert gives the floor to the first device, keeps it for the holder, and moves it after 30 seconds without a heartbeat.
+- The device id is a random UUID in `localStorage`. It is not in the allow list of the settings sync, so it stays on the device.
+- `useDeviceFloorStore()` sends a heartbeat every 10 seconds from the leader, and gives the floor up on `pagehide`. The initiative runner and the watch runner run only on the device that holds the floor.
+- The synced runtime ends on `pagehide` before the store hears it, so the store keeps the last leadership that the runtime reported.
+- The floor is in use while the memory sync is active. Without an answer of the server for 30 seconds, the device acts as the holder. The ADR did not say what a device does without the server. The owner uses one device at a time, so a server outage must not keep the character quiet.
+- Reminders ran on every device until step M4b synced them.
+- The inspector shows whether this device holds the floor.
+
+### Records beyond memories
+
+Recipes, missions, intentions, and timeline notes stay on the device until step M4. Missions and intentions then sync like memories. Only the device with the floor runs them. Timeline notes stay on the device, because they describe one screen.
+
+Step M4b built the sync as follows. [Server ADR 2026-11-03](../../../server/docs/ai/adr/2026-11-03-autonomy-records.md) has the route.
+
+- Only reminders and intentions sync, under `/api/v1/autonomy-records`. Small talk, commentary, and watches stay on their device, because they belong to its screen and to the moment. The ADR said missions, so this narrows it.
+- A document has a `kind` and a `record`. The server checks only the kind and the size. The client checks each record with a Valibot schema, and refuses one whose id does not match its document.
+- A lost conflict drops the local side. A copy of a reminder would remind the owner twice. Only the device with the floor changes a running reminder, so a conflict needs two edits in Settings at the same time.
+- The mission runner delivers reminders only on the device that holds the floor. The memory sync turns this sync and the floor on together, so two devices never deliver one reminder.
+- `useLeaderDocumentSync` runs the sync loop of memories and of these records on the leader, so the two stores share one loop.
+
+### Owner profile and memory work
+
+Step M5 adds two background tasks with the usage purpose `memory`:
+
+- An owner profile summary of about 300 tokens, which the prompt budget of ADR 2026-10-28 reserves.
+- A pass over finished conversations that writes the facts the model did not save, and merges entries that say the same thing.
+
+Step M5a built the memory work and the profile as follows. Step M5b, the merge of entries that say the same thing, follows below.
+
+- A conversation counts as finished after 20 quiet minutes. A pass reads the owner's open conversation after the last pass, 60 messages or 20,000 characters at most. Notices count as context, not as owner words, and a part without owner words is skipped.
+- The pass gives the chat model of the card the transcript and the 8 memories nearest to the owner's words. The model answers with the `report_memories` tool: at most 5 entries, each new or the update of a related memory by its id, so it does not add copies. The call stops after the answer.
+- The entries go through `memory.write`, so the sync and the rules of the memory tools apply.
+- Only the leader of the device that holds the floor runs a pass. A failed pass waits 30 minutes, so a broken provider costs little.
+- After a pass that saved facts, the model writes the owner profile again from the memories of the card and the general ones, 1,200 characters at most. Settings shows it, and the owner can edit it, clear it, or write it now.
+- The profile is one record of the kind `profile` in the autonomy records, so every device sends the same one. The ADR did not say where the profile lives.
+- The system prompt of the owner's own conversations holds the profile. It changes only after a pass, so the cached prefix rarely changes.
+- Both the memory work and the profile are settings of long-term memory, off by default. Their calls count as the usage purpose `memory`.
+
+Step M5b built the merge as follows.
+
+- After each pass of the memory work, a merge checks the entries of the card that changed since the last merge, 10 at most, oldest first. The ADR did not say which entries a merge reads.
+- For each checked entry, the merge finds 4 near entries of the card: by the recall by meaning while the memory sync runs, and by a scan of shared characters otherwise. It compares them on one scale from 0 to 1, and a pair from 0.35 is a candidate.
+- A pair is the unit. One merge sends the 5 most similar pairs, and no entry is in two of them. A pair that waits keeps its entries unchecked, so a later merge finds it. Three copies of one fact merge over two merges.
+- Only the card's own entries take part. General entries belong to the owner, and a run cannot forget them. The ADR did not limit the merge.
+- The chat model of the card answers with the `merge_memories` tool: for each pair, one merged entry or null for different facts. A merge writes into the newer entry and forgets the other through the memory store, so the sync carries it. An answer with an id outside its pair is refused.
+- The device keeps the pairs that the model judged as different facts, so it does not ask about them again.
+- Settings shows the count of merged copies of the last pass, and the recent merges with the descriptions before and after. A merge has no undo, so the owner can see what changed.
+- A failed merge keeps the facts of the pass, and the next pass checks the same entries again.
+- This device had no memories on 2026-11-04, so a live check used 18 test memories in Japanese with `deepseek-v4.1-flash`: 6 pairs of one fact in other words, and 3 pairs of near but different facts. Shared characters gave 0.37 to 0.64 for copies, 0.38 to 0.77 for near facts, and 0 to 0.2 for other facts, so the threshold of 0.35 drops only other facts.
+- The check found two faults, and the step fixed both. Groups chained unrelated entries through words like "オーナーは", and one answer then kept real copies apart, so a pair is the unit now. The start of the next merge skipped the groups that one merge could not send. After the fixes, two merges of about 7 seconds each merged all 6 copies and kept the 3 near pairs apart.
+
+## Steps
+
+| Step | Content | State |
+| --- | --- | --- |
+| M1 | Server: the `embedder` service, the memory feature of the field store, vectors on write, and the search and embed routes. | Done |
+| M2a | Client: the memory sync. | Done |
+| M2b | Client: `recallMemories`, recalled memories in the prompt, and `builtIn_searchMemory` by meaning. | Done |
+| M3 | Autonomous readers: the `recall` speech type, the seeds, and the topic similarity by vectors. It finishes the recall of ADR 2026-10-28 step 5. | Done |
+| M4a | The floor between devices. | Done |
+| M4b | The sync of reminders and intentions. | Done |
+| M5a | The memory work of finished conversations, and the owner profile. | Done |
+| M5b | The merge of entries that say the same thing. | Done |
+
+## Relation to other ADRs
+
+- ADR 2026-10-10 says that the index lists every entry. Step 2-4 of ADR 2026-10-28 already limited it to 50. This ADR limits it to 20 when recall by meaning works.
+- ADR 2026-10-28 lists "Memory and devices" as its dependency on this ADR. This ADR replaces the planned direction there.
+- Server ADR 2026-10-31 left memories, recipes, and missions out of the settings sync. This ADR takes them.
+
+## Non-goals
+
+- Embeddings on the device. The web app on a phone cannot run the model well, and every device would compute the same vectors.
+- An embedding API of a provider. The owner chose a model on the own server.
+- Image, audio, or screen embeddings. EmbeddingGemma 2 supports them, but this ADR embeds text only.
+- Memories shared between accounts.
+- Sync of frames. Frames never leave the device, except to the speaking model.
+
+## Known risks
+
+| Risk | Plan |
+| --- | --- |
+| The Transformers.js version of the catalog (3.8.1) cannot load EmbeddingGemma 2. Support came in 4.3.1. | Step M1 found it. The owner chose 4.3.2 for the embedder only. Its `package.json` pins the version, because a second catalog entry of one package fails the lint. The apps keep 3.8.1. |
+| A slow server delays every chat reply. | Recall runs beside the other request work, and gives up after 1.5 seconds. |
+| A memory written on a device without the sync never reaches the server. | The first sync pushes every local entry. |
+
+## Validation
+
+- Server route tests: push, list, delete, search by owner and persona, the embed route, and the answer when the embedder is down.
+- Embedder tests: the prefixes, the 256-dimension cut, and the normalization. A real model check runs by hand, because CI does not download the model.
+- Client unit tests: the field mapping of entries, the merge of server results with local changes, the fallback by time and by error, and the prompt part.
+- Client browser test: a recalled part reaches the newest user turn and does not reach the history.
+- A recall check by hand with the owner's Japanese memories: questions that share no words with the entry, for example 「好きな食べ物は？」 for an entry about ramen.
+- A live check on 2026-11-03 ran steps M1 to M5a with the Docker stack, the desktop app, and two web origins. It found four bugs, and a later change fixed them.
+  - The user of the embedder image had no home, so corepack failed at start.
+  - A call that a report tool stops recorded no tokens.
+  - The floor release on `pagehide` never ran.
+  - The recall query held the time prefix of the turn.
+
+## Open work
+
+- Choose the limits of the memory feature with real data: documents, bytes, and history.
+- Decide when the index can leave the system prompt.
+- Measure the delay of recall on the owner's PC. A check in step M1 took about 130 ms for one query on the CPU, after a model load of about 10 seconds.

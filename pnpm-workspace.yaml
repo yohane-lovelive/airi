@@ -47,6 +47,10 @@ packages:
   - apps/**
   - server/**
   - '!**/dist/**'
+  # Unity keeps UPM packages here, each with a package.json that pnpm must not read as a workspace package.
+  - '!engines/stage-tamagotchi-unity/Library/**'
+  - '!engines/stage-tamagotchi-unity/Packages/**'
+  - '!engines/stage-tamagotchi-unity/Temp/**'
 
 overrides:
   # @huggingface/transformers 3.8.1 pins an onnxruntime-web dev build. Use the catalog version, which @sherpaw needs.
@@ -343,6 +347,7 @@ catalog:
   floating-vue: ^5.2.2
   fluent-ffmpeg: ^2.1.3
   get-port-please: ^3.2.0
+  get-windows: ^9.3.0
   gpuu: ^1.0.7
   grammy: ^1.45.1
   h3: 2.0.1-rc.29
@@ -527,6 +532,7 @@ allowBuilds:
   es5-ext: true
   esbuild: true
   ffmpeg-static: true
+  get-windows: true # Its install script downloads the prebuilt N-API binary of the foreground window reader.
   isolated-vm: true
   less: true
   msw: true

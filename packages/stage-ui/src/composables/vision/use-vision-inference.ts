@@ -89,6 +89,7 @@ export function useVisionInference() {
         // A frame description calls no tools. The chat tool list only costs context,
         // and a provider without tool calling rejects it.
         supportsTools: false,
+        purpose: 'vision',
         abortSignal: input.abortSignal ? AbortSignal.any([input.abortSignal, abortController.signal]) : abortController.signal,
         onStreamEvent: (event) => {
           if (event.type === 'text-delta') {

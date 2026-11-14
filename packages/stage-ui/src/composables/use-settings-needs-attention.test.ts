@@ -43,6 +43,10 @@ vi.mock('../database/storage', async (importOriginal) => {
     storage: createStorage({ driver: memoryDriver() }),
   }
 })
+// These repos keep their records in IndexedDB too.
+vi.mock('../database/repos/usage.repo')
+vi.mock('../database/repos/timeline.repo')
+vi.mock('../database/repos/motions.repo')
 
 function cardWithSpeech(provider: string): AiriCard {
   return {

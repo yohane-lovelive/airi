@@ -1,0 +1,28 @@
+{
+  "name": "@proj-airi/embedder-server",
+  "type": "module",
+  "version": "0.14.0",
+  "private": true,
+  "description": "Turns text into vectors with EmbeddingGemma 2 for the memory search of the AIRI API",
+  "scripts": {
+    "test:run": "vitest run --config vitest.config.ts",
+    "dev": "tsx --watch src/main.ts",
+    "start": "tsx src/main.ts",
+    "build": "tsc -b",
+    "typecheck": "tsc --noEmit",
+    "check:model": "tsx src/scripts/check-model.ts"
+  },
+  "dependencies": {
+    "@guiiai/logg": "catalog:",
+    "@hono/node-server": "catalog:",
+    "@huggingface/transformers": "4.3.2",
+    "@moeru/std": "catalog:",
+    "@proj-airi/http-error-shared": "workspace:*",
+    "hono": "catalog:",
+    "tsx": "catalog:",
+    "valibot": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

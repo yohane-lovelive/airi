@@ -375,6 +375,30 @@ describe('streamFrom tool errors', () => {
     })
   })
 
+  it('reports the usage of finished steps when the caller stopped after a tool answer', async () => {
+    const onUsage = vi.fn()
+    const onGeneratedTurn = vi.fn()
+    const stop = new AbortController()
+    // The report tool stops the call while the last step finishes, as the memory work does.
+    streamTextMock.mockImplementationOnce(() => createMockStreamResult(
+      Promise.resolve().then(() => {
+        stop.abort('The task got its report.')
+        return []
+      }),
+      Promise.resolve({ inputTokens: 30, outputTokens: 5, totalTokens: 35 }),
+    ))
+
+    await expect(streamFrom({
+      model: 'model-a',
+      chatProvider: provider,
+      conversation: { turns: chatMessagesToTurns([{ role: 'user', content: 'hello' }]) },
+      options: { abortSignal: stop.signal, onUsage, onGeneratedTurn },
+    })).rejects.toBe('The task got its report.')
+
+    expect(onUsage).toHaveBeenCalledWith({ inputTokens: 30, outputTokens: 5, totalTokens: 35, source: 'reported' })
+    expect(onGeneratedTurn).not.toHaveBeenCalled()
+  })
+
   it('marks usage unavailable when the provider omits the final usage chunk', async () => {
     const onUsage = vi.fn()
     streamTextMock.mockReturnValueOnce(createMockStreamResult())

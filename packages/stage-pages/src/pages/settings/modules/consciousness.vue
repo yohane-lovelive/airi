@@ -1,14 +1,16 @@
 <script setup lang="ts">
+import type { AutonomousReasoningLevel, ImageInputChoice, ReasoningLevel, ReplyLength } from '@proj-airi/stage-ui/stores/modules/consciousness-settings'
+
 import { RadioCardManySelect, RadioCardSimple } from '@proj-airi/stage-ui/components'
 import { useAnalytics } from '@proj-airi/stage-ui/composables'
 import { useAiriCardStore } from '@proj-airi/stage-ui/stores/modules/airi-card'
 import { useConsciousnessStore } from '@proj-airi/stage-ui/stores/modules/consciousness'
-import { useConsciousnessSettingsStore } from '@proj-airi/stage-ui/stores/modules/consciousness-settings'
+import { REASONING_LEVELS, REPLY_LENGTHS, useConsciousnessSettingsStore } from '@proj-airi/stage-ui/stores/modules/consciousness-settings'
 import { useProviderConfigStore } from '@proj-airi/stage-ui/stores/providers/config'
 import { useProviderStore } from '@proj-airi/stage-ui/stores/providers/provider'
-import { Alert, FieldCheckbox, FieldRange, SettingsCard } from '@proj-airi/ui'
+import { Alert, FieldCheckbox, FieldRange, FieldSelect, SettingsCard } from '@proj-airi/ui'
 import { storeToRefs } from 'pinia'
-import { watch } from 'vue'
+import { computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
 
@@ -21,7 +23,7 @@ const consciousnessStore = useConsciousnessStore()
 const consciousnessSettingsStore = useConsciousnessSettingsStore()
 const { configuredProviders } = storeToRefs(providerStore)
 const { moduleChatProvidersMetadata } = storeToRefs(providersStore)
-const { reasoning, temperatureEnabled, topPEnabled } = storeToRefs(consciousnessSettingsStore)
+const { reasoningLevel, autonomousReasoningLevel, replyLength, temperatureEnabled, topPEnabled } = storeToRefs(consciousnessSettingsStore)
 const {
   activeProvider,
   activeModel,
@@ -63,8 +65,53 @@ async function handleDeleteProvider(providerId: string) {
   await providersStore.deleteProvider(providerId)
 }
 
-async function updateReasoning(value: boolean) {
-  await consciousnessSettingsStore.setReasoning(value)
+const THINKING_KEY = 'settings.pages.modules.consciousness.sections.section.model-options.thinking'
+
+const reasoningOptions = computed(() => REASONING_LEVELS.map(level => ({ label: t(`${THINKING_KEY}.levels.${level}`), value: level })))
+const autonomousReasoningOptions = computed(() => [
+  { label: t(`${THINKING_KEY}.levels.same`), value: 'same' as const },
+  ...reasoningOptions.value,
+])
+
+const REPLY_LENGTH_KEY = 'settings.pages.modules.consciousness.sections.section.model-options.reply-length'
+const replyLengthOptions = computed(() => REPLY_LENGTHS.map(length => ({ label: t(`${REPLY_LENGTH_KEY}.options.${length}`), value: length })))
+
+async function updateReplyLength(value: ReplyLength | undefined) {
+  if (value)
+    await consciousnessSettingsStore.setReplyLength(value)
+}
+
+async function updateReasoningLevel(value: ReasoningLevel | undefined) {
+  if (value)
+    await consciousnessSettingsStore.setReasoningLevel(value)
+}
+
+async function updateAutonomousReasoningLevel(value: AutonomousReasoningLevel | undefined) {
+  if (value)
+    await consciousnessSettingsStore.setAutonomousReasoningLevel(value)
+}
+
+const IMAGE_INPUT_KEY = 'settings.pages.modules.consciousness.sections.section.model-options.image-input'
+
+/** What the model list of the provider says about image input, for the label of the default choice. */
+const catalogImageInput = computed(() => {
+  const vision = providerModels.value.find(model => model.id === activeModel.value)?.metadata?.abilities?.vision
+  return vision === true ? 'reads' : vision === false ? 'no-images' : 'unknown'
+})
+
+const imageInputOptions = computed(() => [
+  { label: t(`${IMAGE_INPUT_KEY}.options.catalog`, { catalog: t(`${IMAGE_INPUT_KEY}.catalog.${catalogImageInput.value}`) }), value: 'catalog' as const },
+  { label: t(`${IMAGE_INPUT_KEY}.options.reads`), value: 'reads' as const },
+  { label: t(`${IMAGE_INPUT_KEY}.options.no-images`), value: 'no-images' as const },
+])
+
+const imageInputChoice = computed(() => activeProvider.value && activeModel.value
+  ? consciousnessSettingsStore.imageInputChoiceOf(activeProvider.value, activeModel.value)
+  : 'catalog')
+
+async function updateImageInput(value: ImageInputChoice | undefined) {
+  if (value && activeProvider.value && activeModel.value)
+    await consciousnessSettingsStore.setImageInput(activeProvider.value, activeModel.value, value)
 }
 
 async function updateTemperatureEnabled(value: boolean) {
@@ -302,13 +349,35 @@ async function updateTopPEnabled(value: boolean) {
           {{ t('settings.pages.modules.consciousness.sections.section.model-options.thinking.provider-default-description') }}
         </span>
       </div>
-      <FieldCheckbox
-        v-else
-        :model-value="reasoning || activeModelRequiresReasoning"
-        :label="t('settings.pages.modules.consciousness.sections.section.model-options.thinking.label')"
-        :description="activeModelRequiresReasoning ? t('settings.pages.modules.consciousness.sections.section.model-options.thinking.required-description') : undefined"
-        :disabled="activeModelRequiresReasoning"
-        @update:model-value="updateReasoning"
+      <template v-else>
+        <FieldSelect
+          :model-value="reasoningLevel"
+          :options="reasoningOptions"
+          :label="t(`${THINKING_KEY}.label`)"
+          :description="activeModelRequiresReasoning ? t(`${THINKING_KEY}.required-description`) : t(`${THINKING_KEY}.description`)"
+          @update:model-value="updateReasoningLevel"
+        />
+        <FieldSelect
+          :model-value="autonomousReasoningLevel"
+          :options="autonomousReasoningOptions"
+          :label="t(`${THINKING_KEY}.autonomous-label`)"
+          :description="t(`${THINKING_KEY}.autonomous-description`)"
+          @update:model-value="updateAutonomousReasoningLevel"
+        />
+      </template>
+      <FieldSelect
+        :model-value="replyLength"
+        :options="replyLengthOptions"
+        :label="t(`${REPLY_LENGTH_KEY}.label`)"
+        :description="t(`${REPLY_LENGTH_KEY}.description`)"
+        @update:model-value="updateReplyLength"
+      />
+      <FieldSelect
+        :model-value="imageInputChoice"
+        :options="imageInputOptions"
+        :label="t(`${IMAGE_INPUT_KEY}.label`)"
+        :description="t(`${IMAGE_INPUT_KEY}.description`)"
+        @update:model-value="updateImageInput"
       />
     </section>
   </SettingsCard>

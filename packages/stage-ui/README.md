@@ -39,6 +39,77 @@ Entry points: the web account menu opens `InboxPopover` anchored to the account 
 The mobile menu opens `InboxDrawer` as a sub-panel with a back button. The Electron island shows `InboxPanel` in place.
 Entry points show nothing while the user is signed out. Announcements are a separate public surface.
 
+## Autonomous speech
+
+The character can start to talk without an owner message. It is step 2 of [the autonomy ADR](../../docs/ai/adr/2026-10-28-autonomous-character-perception-and-missions.md). It is off by default.
+`useInitiativeStore()` in `stores/initiative.ts` keeps the device settings: the switch, the talk interval, the tries per day, the intervals of small talk and commentary, and the quiet hours.
+`useInitiativeRunnerStore()` runs the policy of `@proj-airi/core-agent` on the renderer leader. Each app calls `initialize` once.
+
+- Each second, the runner asks the policy. On a turn, a transient notice goes to the open conversation. History keeps only the reply.
+- The runner waits while the owner types or speaks, while speech plays, and while a chat turn runs.
+- When the owner types, speaks, or queues a message during a turn, the runner cancels the turn.
+- Each chat input calls `useOwnerTypingReport()`. `stores/owner-typing.ts` carries typing to the leader in every window.
+- `libs/initiative/conversation.ts` reads the situation facts and the policy events from the stored messages.
+- Small talk: the mission tools start a `small-talk` mission when the owner asks, only while autonomous speech is on. While it runs, `settingsAt` of the initiative store gives the faster pace of small talk. The mission runner ends it at its time limit. The initiative runner ends it when the owner leaves, and the talk level tool ends it on a request for quiet.
+- `libs/initiative/topics.ts` reads the autonomous lines of recent days with their topic labels, and makes topic seeds from the memory index. The runner gives the current thread and the seeds to each drive turn.
+- `TopicVectors` (`libs/initiative/topic-vectors.ts`) compares topics by label vectors from the server while the memory sync is active, and by character pairs otherwise. A warm thread adds the memories that fit its topic to the seeds, and a `recall` turn gets one memory in its notice.
+- `useIntentionsStore()` in `stores/intentions.ts` keeps the intentions in IndexedDB. The intention tools in `tools/initiative.ts` add, list, and finish them.
+- The talk level tool applies the owner's words through `applyTalkRequest` of the initiative store. It refuses in a turn that does not answer an owner message.
+
+- `useInitiativeInspectorStore()` in `stores/initiative-inspector.ts` carries a readout of the policy from the leader. The runner publishes it each second, but only while a window watches.
+- `useTalkChanges()` lists the changes from the owner's words as text, for Settings and the inspector.
+- The daily rhythm: at app start, a conversation quiet for hours gets a greeting. After time away, the owner gets a welcome back. Each app passes an `OwnerPresenceSource` (`libs/initiative/presence.ts`) to `initialize`. The desktop app reads the system idle time, and the web app reads the input of its page.
+
+Settings > Modules > Autonomous speech changes the settings. It also shows the changes from the owner's words, and resets them.
+Settings > Developer > Autonomous Speech Inspector shows why the character talks or stays quiet.
+
+## Screen perception
+
+The character can see the screen of the device. It is step 3 of [the autonomy ADR](../../docs/ai/adr/2026-10-28-autonomous-character-perception-and-missions.md). It is off by default.
+
+- Each app passes a `ScreenSource` (`libs/perception/screen-source.ts`) to `usePerceptionRunnerStore().initialize`. The desktop app captures the primary display and knows the window in front. The web app captures a share that the owner chooses with a click.
+- The runner on the leader takes 2 frames each second into a `FrameRing` (`libs/perception/frame-ring.ts`). It keeps the last minute in memory only. `FrameEncoder` (`workers/frame-encoder`) makes a JPEG and a grayscale thumbnail of each frame.
+- `exclusionMatch` (`libs/perception/exclusion.ts`) skips the frames of excluded windows in front. `usePerceptionStore()` keeps the switch, the pause, and the exclusion list.
+- `ScreenDetector` of `@proj-airi/stage-shared/perception` reads each frame. The runner keeps the last 20 screen events and the activity level, and the status store shows them in the inspector.
+- `useTimelineStore()` keeps the screen timeline of each conversation on the device: code notes, the notes and the scene that the character writes with `<|NOTE|>` and `<|SCENE|>` markers, and a summary of older notes. A turn with the screen reads it.
+- Commentary: the mission tools start a `commentary` mission when the owner asks. The perception runner then captures the window of its app (`setTarget`), and its close ends the commentary. The initiative runner uses the commentary mode, paces it by the screen activity, and interrupts its own line for a very large event through `interruptTurns` of the speech output control.
+- Watch: `useWatchRunnerStore()` (`stores/watch-runner.ts`) checks the running watch on the leader. A check sends a crop of its region to the chat model outside the conversation and reads the `report_watch` answer. A yes sends a `mustSpeak` notice and ends the watch.
+- The initiative runner turns screen events into pressure. In a drive turn, `buildScreenTurn` (`libs/perception/screen-turn.ts`) picks frames with the frame policy of `usePerceptionStore().framePolicy` inside the image budget (`libs/perception/image-budget.ts`), and attaches them to the transient notice. They never reach the disk. `contact-sheet` draws one image of up to six tiles (`renderContactSheet`). `scene-anchor` puts the anchor frame of the scene in a turn right after the system prompt.
+- `usePerceptionStatusStore()` carries the state to every window. `usePerceptionIndicator()` gives the stage button that shows perception and pauses it.
+- The desktop app passes a `PerceptionRecorderSink` (`libs/perception/recorder.ts`) as the third argument of `initialize`. While `requestRecording(true)` of the status store holds, the runner records the frames, the screen events, and the owner messages for replay evaluation. It is the only way that frames reach the disk.
+- Use it to read the recent screen, for example the detectors and the decision turn. Do not use it to store frames: only the recorder does.
+
+Settings > Modules > Screen perception changes the settings and shows the state.
+
+## Prompt budget
+
+Each chat request has parts with limits. It is step 2-4 of [the autonomy ADR](../../docs/ai/adr/2026-10-28-autonomous-character-perception-and-missions.md).
+
+- `useHistorySummaryStore()` in `stores/history-summary.ts` gives the chat runtime a summary and the recent messages of a long conversation. After each send, it writes a new summary in the background when the recent part passes its limits. `libs/history-summary.ts` holds the limits and the pure rules.
+- The session meta keeps the summary on the device. The chat view still shows every message.
+- Settings > Modules > Short-Term Memory turns the summary on or off. It is on by default.
+- The memory index lists 50 entries at most, 20 while the memory sync is active (`libs/memory-index.ts`).
+- The card adds its greeting and its example dialogues as reference text, 1500 characters at most (`constants/prompts/card-voice.ts`).
+- The setting "Reply length" of the consciousness module adds one sentence for replies to the owner (`composeReplyLengthPrompt` in `stores/chat/prompt-recipe.ts`). By default, a reply matches the length of the owner's message. A fixed sentence after it asks the character to tell of the shared past only from memories, the conversation, or the screen (`composeSharedPastPrompt`).
+- `useMemoryRecallStore().recall` finds the memories that fit a text: by meaning on the server while the memory sync is active, by shared character pairs otherwise. The chat sends five of them with each owner message, and `builtIn_searchMemory` uses the same recall.
+- `useDeviceFloorStore()` tells whether this device holds the floor, while the memory sync is active. The initiative, watch, and mission runners run only on the holder.
+- `useMemoryWorkStore()` writes lasting facts from finished conversations, then merges the card's memories that say the same thing (`libs/memory-merge.ts`), and `useOwnerProfileStore()` keeps the owner profile that the system prompt of the owner's conversations holds. Both are settings of long-term memory, off by default.
+- `useAutonomySyncStore()` syncs reminders, intentions, and the owner profile with the account. `useLeaderDocumentSync` (`composables/use-leader-document-sync.ts`) runs the sync loop of memories and of these records on the leader.
+- `useMotionLibraryStore()` keeps the motion library: the built-in gestures, the imported `.vrma` clips, and the generated clips. The stage plays the clip that fits the `motion` of an `ACT` marker on VRM and MMD models, and the system prompt lists the enabled clips by name (`constants/prompts/gesture-act.ts`). A change and a preview reach the other windows through a `BroadcastChannel`.
+- `useMotionGenerationStore()` generates the clips that the library lacks. A marker motion without a clip joins a queue, and one generation runs after each chat turn. The desktop app connects Text-To-VRMA through its main process. The web app connects nothing, so it generates nothing.
+- `builtIn_performMotion` does a movement that the owner asks for, while the model is VRM or MMD. A clip that fits plays through an `ACT` marker of the reply. Without one, `requestForOwner` puts the generation first, and the stage plays the clip when it is ready within a minute.
+- `useMemorySyncStore()` syncs the memories with the account on the leader, while the `memory-sync` experiment is on. `libs/memory-sync` maps an entry to its synced fields, and `applySyncChanges` of the memory store writes a round.
+- `libs/prompt-parts.ts` measures each part of a request for IO traces.
+
+## Model usage
+
+`useUsageStore()` in `stores/usage.ts` keeps the tokens and images of model calls for each day, purpose, and model. IndexedDB keeps 30 days on the device, and the records never sync.
+
+- `useLLM().stream` records each finished stream under its `purpose` option. A call without a purpose counts as `other`.
+- The chat store reads the purpose of a turn from its notice source, for example `initiative` for autonomous speech.
+- `libs/usage.ts` holds the purposes and the pure sums.
+- Settings > Usage shows the tokens of each purpose. The records hold no cost. The provider site shows the exact cost.
+
 ## Message times
 
 Chat history shows a centered timestamp before the first dated message and after five minutes without a message.
@@ -84,6 +155,7 @@ Consumers subscribe to the microphone input with their own abort signal. The las
 - `useVoiceMessagesStore` owns voice message recordings and their attachment submission.
 - Hearing selects providers and converts captured PCM to each provider's upload format. It does not open the microphone.
 - Speech preserves existing chunked synthesis and bidirectional provider output.
+- `IrodoriTtsSettings` is the settings page body of Irodori-TTS. `IrodoriReferenceVoices` inside it makes reference voices: it uploads several clips of one speaker to the server, and keeps their order.
 - `createVoiceRephrasePlugin` rewrites final transcripts with a chat model through a checked transcript patch. The raw text stays in the transcript history. Each segment gets its own rewrite, so segment boundaries stay for later speaker labels. A reply with another segment count leaves the text unchanged.
 - `createVoiceEndJudgePlugin` ends a paused input early when a chat model reads its transcript as a finished message. The model is the rephrase model, or the chat model when no rephrase provider is set.
 - `createSpeakerEvidencePlugin` compares each automatic input with the owner's voiceprint while Speaker recognition is on. It writes the mean cosine of the speech as speaker evidence, and the IO trace of the input records it. It never changes an input, and the chat prompt does not include it.
@@ -188,6 +260,40 @@ Queries accept 1–128 Unicode characters and support operators such as `site:` 
 The tool requests five results by default, with a maximum of ten. It uses summaries without fetching full pages.
 Results retain source links and site icons in the existing search cards. Search requests time out after 15 seconds and stop when the turn stops.
 An API error fails the tool call without switching services. Use another search service when your network cannot reach the selected endpoint.
+
+The model decides when to search. The prompt asks it to search when it is not sure about a fact, to say a few words first, and to write no URLs, because the words can be read aloud.
+Lines that the character starts can search too, for example to find a topic. The setting **Searches a day** limits them, 20 by default, and 0 turns them off. Replies to the owner have no limit.
+A turn with images of the screen cannot search. A commentary line must come fast, and the text on the screen must not leave the device as a query.
+
+The desktop app also offers **MCP** as a search service, without an API key. Add a server in the MCP servers page, for example:
+
+```json
+{
+  "mcpServers": {
+    "ddg-search": {
+      "command": "uvx",
+      "args": ["duckduckgo-mcp-server==0.7.0"],
+      "env": { "DDG_REGION": "jp-ja", "DDG_REF_URL_THRESHOLD": "2048" }
+    }
+  }
+}
+```
+
+The `web_search` tool then calls `ddg-search::search`, so its prompt, limits, and cards stay the same. While this service is selected, `builtIn_mcpCallTool` cannot reach that server, because a direct call would skip the limits.
+Hits in the `1. title`, `URL:`, `Summary:` format become cards. Other text reaches the model as data, without cards.
+This server reads the HTML page of DuckDuckGo, not an official API, so a change of that page or a block can stop it. A block returns the same text as no results.
+
+## Solo talk
+
+Small talk has a solo style for an owner who only wants to listen, like to a radio. The model starts it when the owner asks, for example "keep talking by yourself".
+The character speaks again about 10 seconds after its voice ends, and **Pause in solo talk** changes this from 3 to 60 seconds. It talks longer, asks no questions, sends no images of the screen, and can search the web for a topic. A topic lasts about five lines.
+A message from the owner gets a reply, and solo talk goes on after the grace time. It ends at its time limit, when the owner asks to stop or for quiet, and at a screen lock or sleep. Time without input does not end it. Code refuses to start it without a voice.
+
+## Screen model
+
+Settings > Modules > Screen perception can name a model for each call that sends images of the screen: commentary, idle speech and small talk with images, and watch checks. A stronger model can read the screen while the card keeps a cheaper one for replies.
+That model speaks itself, so no second model describes the screen first. The card still sets the voice. The choice stays on the device, because the keys of its provider do.
+Without a choice, these calls use the model of the card. They also do so when the provider of the choice is not configured, and the console then shows a warning.
 
 ## Chat sampling
 

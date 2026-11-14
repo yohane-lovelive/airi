@@ -37,6 +37,15 @@ pnpm -F @proj-airi/provider-inference test:browser
 pnpm -F @proj-airi/provider-inference build
 ```
 
+## Irodori-TTS
+
+`irodori-tts` speaks to [Irodori-TTS-Server](https://github.com/Aratako/Irodori-TTS-Server), the OpenAI-compatible server of Irodori-TTS. The default address is `http://localhost:8088/v1/`.
+The server chooses the checkpoint, for example `IRODORI_HF_CHECKPOINT=phasefield-audio/Irodori-TTS-v4.1-Anime`. A browser page also needs its origin in `IRODORI_CORS_ORIGINS`.
+
+A reference voice joins several clips of one speaker. `uploadIrodoriClip` stores each clip on the server as a voice whose id starts with `airi-`.
+A request names the clips in `irodori.ref_wavs`, by the paths that `GET /v1/audio/voices` reports. The voice list hides the uploaded clips.
+The caption, the sampling steps, and the speed come from `voiceSettings`. Zero steps keeps the default of the server.
+
 ## Generation protocols
 
 OpenAI and OpenAI Compatible configurations accept `api: 'chat-completions' | 'responses'`. OpenAI defaults to `responses`. OpenAI Compatible defaults to `chat-completions`. Saved protocol choices take precedence. The provider settings page renders this field as an API protocol selector.
@@ -78,4 +87,6 @@ Reported search abilities do not select a native tool implementation.
 
 OpenAI reasoning controls use the exact model entry and effort levels from the pinned catalog.
 Unsupported effort values are omitted. In particular, models without a `none` effort keep their server default when reasoning is disabled.
+A request can carry an effort (`low`, `medium`, or `high`) with `enabled`. Providers with only on and off treat every effort as on.
+The OpenAI-compatible provider sends a reasoning field only when its `reasoningControl` asks for one: the DeepSeek-style `thinking` switch or the OpenAI-style `reasoning_effort`.
 Generation validation uses the configured model before consulting the endpoint model list.

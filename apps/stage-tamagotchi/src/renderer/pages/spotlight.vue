@@ -3,6 +3,7 @@ import { errorMessageFrom } from '@moeru/std'
 import { useElectronEventaInvoke } from '@proj-airi/electron-vueuse'
 import { useAnalytics } from '@proj-airi/stage-ui/composables'
 import { useBackdropSurface } from '@proj-airi/stage-ui/composables/backdrop-surface'
+import { useOwnerTypingReport } from '@proj-airi/stage-ui/composables/use-owner-typing-report'
 import { extractMessageText } from '@proj-airi/stage-ui/libs/chat-sync/wire-message'
 import { useChatStore } from '@proj-airi/stage-ui/stores/chat'
 import { useChatSessionStore } from '@proj-airi/stage-ui/stores/chat/session-store'
@@ -19,6 +20,7 @@ import { artistryToolReferences } from '../stores/tools'
 const messageInput = shallowRef('')
 const isComposing = shallowRef(false)
 const sending = shallowRef(false)
+useOwnerTypingReport(messageInput, isComposing)
 const inputRef = useTemplateRef<HTMLInputElement>('inputRef')
 // The card floats over the desktop in a transparent window, so the host can draw native glass behind its fill.
 useBackdropSurface(useTemplateRef<HTMLElement>('card'))

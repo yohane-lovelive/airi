@@ -108,7 +108,7 @@ model-select:
   panel-callout:
     support-status-header: 2D および 3D モデルの両方をサポートしています
     support-status: >
-      {select-button} をクリックしてモデルを選択またはインポートします。現在、{zip} (Live2D および Spine モデル用)、{vrm} (VRM モデル用)、{mmd} (MMD モデル用、テクスチャと一緒に圧縮したもの) に対応しています。
+      {select-button} をクリックしてモデルを選択またはインポートします。現在、{zip} (Live2D および Spine モデル用)、{vrm} (VRM モデル用)、{mmd} (MMD モデル用、モデルのフォルダーまたはその ZIP) に対応しています。
     model-type-example: >
       Neuro-sama は Live2D Inc. が開発したフレームワークによる 2D モデルを使用しており、Grok Ani (Grok Companion 内) はオープンフォーマットである VRM / MMD の 3D モデルを使用しています。
   select-model:
@@ -117,6 +117,15 @@ model-select:
     select: 選択
     import: インポート
     remove: 削除
+    mmd:
+      folder: MMD（フォルダー）
+      model-only: このファイルにはテクスチャが含まれていないため、モデルが表示されません。「MMD（フォルダー）」でモデルのフォルダーを選ぶか、フォルダーを ZIP にして取り込んでください。
+      no-model: .pmx または .pmd のモデルが見つかりませんでした。
+      failed: 'MMD モデルを取り込めませんでした: {error}'
+      choose-variant:
+        title: モデルを選択
+        description: このフォルダーには複数のモデルがあります。取り込むモデルを選んでください。
+        cancel: キャンセル
     confirm: 確定
   live2d-report:
     title: インポート前の確認
@@ -453,6 +462,7 @@ pages:
       description: 説明
       behavior: 振る舞い
       greetings: 挨拶 (1行に1つ)
+      message_examples: 会話の例
       settings: 設定
       version: バージョン
       create: 作成
@@ -484,6 +494,8 @@ pages:
         scenario: 周囲の状況はどうなっていますか？現在の状況は？
         greetings_field: 挨拶
         greetings: キャラクターはどのように「こんにちは」と言うべきですか？
+        message_examples: "キャラクターの話し方を示す短いやりとりです。各行を {'{{'}char{'}}'}: か {'{{'}user{'}}'}: で始め、やりとりの間には空行を入れます。キャラクターは、過去の会話ではなく例として読みます。"
+        message_examples_placeholder: "{'{{'}user{'}}'}: ゲームしよう！\n{'{{'}char{'}}'}: いいよ、負けないからね！"
         systemprompt: AI LLMに対して、質問された際にどのように回答すべきかをここで説明してください。
         posthistoryinstructions: メッセージ履歴の後にAI LLMに読んでほしい内容をここに配置してください。
         version: >-
@@ -529,6 +541,34 @@ pages:
     import_invalid_file: 無効なカードパックファイルです
     upload: アップロード
     upload_desc: ここをクリックするか AIRI カードパックをドラッグ＆ドロップしてインポートします
+  usage:
+    title: 使用量
+    description: この端末で、モデル呼び出しの種類ごとに使ったトークン量
+    intro: この端末のモデル呼び出しについて、プロバイダーが報告したトークン量を、呼び出しの目的ごとに表示します。正確な料金はプロバイダーのサイトで確認してください。
+    periods:
+      today: 今日
+      last-30-days: 過去 30 日
+    tokens: '{count} トークン'
+    details: '入力 {input} · 出力 {output} · {calls} 回 · 画像 {images} 枚'
+    unreported: '報告なし {count} 回'
+    empty: まだモデル呼び出しはありません。
+    purposes:
+      owner-reply: あなたへの返答
+      initiative: 自律発話
+      commentary: 実況
+      watch: 見張りの確認
+      mission: ミッション
+      task: バックグラウンドタスク
+      scene: ほかの人への返答
+      vision: 画像の説明
+      voice-assist: 音声入力の補助
+      tool-card: ツールカード
+      artistry: 画像生成
+      history-summary: 履歴の要約
+      memory: 記憶の整理
+      timeline: 画面のタイムラインの要約
+      motion: モーションの生成
+      other: その他
   memory:
     description: 記憶が保存され、整理される場所
     title: 記憶
@@ -752,7 +792,37 @@ pages:
             title: モデルオプション
             thinking:
               label: 思考 (Thinking)
+              description: 返事の前にモデルがどれだけ推論するかです。推論が多いほど時間がかかります。
+              autonomous-label: 自律的な発話の思考
+              autonomous-description: 雑談、実況、放置中の発話の推論です。少なくすると、画面への反応が早くなります。
+              levels:
+                same: 返事と同じ
+                default: プロバイダーの既定
+                'off': オフ
+                low: 低
+                medium: 中
+                high: 高
               required-description: このモデルでは思考機能が必須です。
+            reply-length:
+              label: 返事の長さ
+              description: あなたのメッセージへの返事の長さです。自律的な発話には、別の長さがあります。
+              options:
+                auto: メッセージに合わせる
+                short: 短め（1〜2 文）
+                normal: ふつう（2〜4 文）
+                long: 長め（話題に合わせて）
+                free: 指示しない
+            image-input:
+              label: 画像の入力
+              description: このモデルが画像を自分で読めるかどうかです。読めないときは、視覚モジュールが先に各画像を説明するので、数秒かかります。OpenAI 互換のサーバーなど、多くのモデル一覧はこれを載せていません。
+              catalog:
+                reads: 画像を読める
+                no-images: 画像なし
+                unknown: 記載なし
+              options:
+                catalog: 'モデル一覧に従う（{catalog}）'
+                reads: 画像を読める
+                no-images: 画像を読めない
               provider-default-description: AIRI にはこのモデルの推論設定がありません。OpenRouter の初期設定が適用されます。
       title: 意識
     description: 思考、視覚、音声合成、ゲームなど。
@@ -898,12 +968,210 @@ pages:
               注意: プロバイダーが verbose_json レスポンスに対応していない場合、この設定は効果がありません。
             verbose-json-unsupported: >-
               お使いのプロバイダーは verbose_json セグメントを返しません。最新の文字起こしセグメントに対する信頼度フィルターは適用されません。
+    initiative:
+      title: 自律発話
+      description: キャラクターが、ときどき自分から話しかけます
+      enable: キャラクターから話しかける
+      enable-description: あなたのメッセージがなくても、開いているチャットでキャラクターがときどき話し始めます。キャラクターが黙ったときも、1 回の試行ごとにモデルを 1 回呼びます。あなたが話すかメッセージを送ると、その試行は止まります。
+      idle-interval: 話しかける間隔
+      idle-interval-description: ほかに何も起きていないとき、キャラクターはおよそこの間隔で話します。実際の間隔は毎回変わります。
+      minutes: '{count} 分'
+      daily-turn-budget: 1 日の試行回数
+      daily-turn-budget-description: 1 日に自律発話でモデルを呼ぶ回数の上限です。
+      small-talk-interval: 雑談の間隔
+      small-talk-interval-description: 雑談の間、あなたが黙っていると、キャラクターはおよそこの間隔で話します。
+      solo-pause: 一人雑談の間
+      solo-pause-description: 一人雑談では、キャラクターがラジオのように一人で話し続けます。チャットで「一人で喋ってて」のように頼みます。これは、声が終わってから次の発話までの間です。
+      commentary-interval: 実況の間隔
+      commentary-interval-description: 実況の間、落ち着いた画面では、キャラクターはおよそこの間隔で話します。画面の動きが大きいと、間隔は短くなります。
+      seconds: '{count} 秒'
+      quiet-hours: 静かな時間帯を使う
+      quiet-hours-description: この時間帯は、キャラクターから話し始めません。あなたへの返事はします。
+      quiet-hours-start: 開始
+      quiet-hours-end: 終了
+      greeting: アプリの起動時にあいさつする
+      greeting-description: 開いているチャットが 3 時間以上静かだったとき、キャラクターが時間帯に合ったあいさつをします。
+      welcome-back: 戻ったらおかえりと言う
+      welcome-back-description: 30 分以上離れてから戻ると、キャラクターがひとこと声をかけます。デスクトップ版はどのアプリの操作も数え、web 版はこのページの操作だけを数えます。
+      talk-changes: 言葉による変更
+      talk-changes-description: 'チャットで頼めます。例: 「30 分静かにして」「もっと話していいよ」。ずっと続く変更は、上の話す間隔を変えます。'
+      talk-changes-empty: 今は、時間つきの変更はありません。
+      quiet-until: '{time} まで静か'
+      interval-until: '{time} まで話す間隔 ×{factor}'
+      reset-talk-changes: リセット
+    motions:
+      title: モーション
+      description: VRM と MMD のモデルで、キャラクターが言葉に合わせて再生するジェスチャー
+      intro: キャラクターは、ACT トークンの motion ごとにジェスチャーを選びます。オフにしたジェスチャーは、プロンプトに載らず、再生もされません。
+      clips: ジェスチャー
+      source:
+        built-in: 最初から
+        imported: 取り込み
+        generated: 生成
+      not-kept: 未確認
+      keep: '{name} を残す'
+      seconds: '{count} 秒'
+      uses: '{count} 回使用'
+      preview: '{name} をステージで再生'
+      preview-note: プレビューは、メインウィンドウのステージで再生します。
+      remove: '{name} を削除'
+      import:
+        title: .vrma ファイルを取り込む
+        file: ファイル
+        file-description: VRM Animation のファイルです。脚を動かすクリップは、再生中は idle 全体と入れ替わります。
+        description: 説明
+        description-hint: どんな動きかを 1 文で書きます。プロンプトに載ります。
+        tags: タグ
+        tags-hint: 動きを表す言葉を、カンマで区切って書きます。例：dance, 踊る
+        submit: 取り込む
+        no-animation: このファイルには VRM のアニメーションがありません。
+      generator:
+        title: 足りないモーションの生成
+        intro: ACT トークンの motion に合うジェスチャーがないとき、この PC の Text-To-VRMA がクリップを作ります。最初は表情だけが出て、クリップは次の回から再生されます。脚と腰は動きません。
+        desktop-only: モーションの生成は、デスクトップ版で使えます。同じ PC の Text-To-VRMA を呼び出します。
+        enable: 足りないモーションを生成する
+        enable-description: 生成は返答が終わってから、1 つずつ行います。新しいクリップは、上の一覧で残すか削除するかを選びます。
+        address: アドレス
+        address-description: Text-To-VRMA のローカル HTTP API のアドレスです。この PC のアドレスだけが使えます。
+        token: アクセストークン
+        token-description: Text-To-VRMA のローカル HTTP API の設定に出るトークンです。この PC に残り、同期しません。
+        token-saved: トークンは保存済みです。そのままにするには、欄を空のままにします。
+        save: 保存
+        check: 接続を確認
+        check-ok: Text-To-VRMA が応答しました。
+        failed: リクエストに失敗しました。
+        daily-limit: 1 日のクリップ数
+        daily-limit-description: 1 日に作るクリップの上限です。生成には、この PC の GPU を使います。
+        used-today: '今日 {count} / {limit}'
+        last-error: '前回の失敗：{message}'
+    missions:
+      title: ミッション
+      description: リマインドなど、キャラクターがあなたのために行うタスク
+      enable: ミッションを使う
+      enable-description: 頼むと、キャラクターがリマインドを設定してその時刻に伝えたり、しばらく雑談の相手をしたりします。雑談には、自律発話をオンにする必要があります。オフのときは、ミッションは動きません。web 版で音声出力がオフのときにリマインドを見るには、通知を許可してください。
+      missed-age-limit: 伝える見逃したリマインド
+      missed-age-limit-description: リマインドの時刻にアプリが閉じていた場合、キャラクターは次の起動の後で伝えます。これより古いリマインドは、「見逃し」と表示されるだけです。
+      hours: '{count} 時間'
+      active: 実行中
+      ended: 終了
+      clear-ended: 消去
+      empty: 実行中のミッションはありません。キャラクターにリマインドや雑談を頼んでみてください。例：「18時に薬を飲むよう教えて」「しばらく話し相手になって」
+      next: '次回: {time}'
+      stop: '{name} を止める'
+      repeat:
+        once: 1 回だけ
+        daily: 毎日
+        weekdays: 平日
+        weekly: '毎週: {days}'
+        interval-hours: '{count} 時間ごと'
+        interval-minutes: '{count} 分ごと'
+      status:
+        scheduled: 予定
+        running: 実行中
+        done: 完了
+        stopped: 停止
+        missed: 見逃し
+      small-talk:
+        name: 雑談
+        solo-name: 一人雑談
+        minutes: '{count} 分'
+        until: '{time} まで'
+      commentary:
+        name: '{app} の実況'
+      watch:
+        name: '{app} の見張り: {condition}'
+        last-seen: '前回の確認: {text}'
+        regions:
+          full: ウィンドウ全体
+          top: 上
+          bottom: 下
+          left: 左
+          right: 右
+          center: 中央
+          top-left: 左上
+          top-right: 右上
+          bottom-left: 左下
+          bottom-right: 右下
+      end-reason:
+        time: 時間切れ
+        owner: あなたが止めました
+        away: あなたが離席しました
+        quiet: あなたが静かにと頼みました
+        target-closed: ウィンドウが閉じました
+        condition: 条件が満たされました
+    perception:
+      title: 画面の知覚
+      description: キャラクターがあなたの画面を見ます
+      unsupported: このアプリでは画面の知覚は動きません。デスクトップアプリと、パソコンの web アプリで動きます。
+      enable: キャラクターに画面を見せる
+      enable-description: アプリは、直近 1 分の画面をメモリーだけに持ち、ディスクには書きません。キャラクターが話すかどうかを決めるとき、最大 3 枚のフレームをチャットモデルのプロバイダーに送ります。チャットモデルは画像を受け付ける必要があります。ステージの目のボタンが、知覚が動いていることを示し、1 クリックで一時停止します。
+      paused: 一時停止
+      paused-description: 一時停止の間は、何も取り込みません。一時停止は再起動の後も続きます。
+      start: 開始
+      images-per-hour: 1 時間あたりの画像
+      images-per-hour-description: 1 時間にモデルへ送るフレームの上限です。半分を使うと、1 ターンに 1 枚だけを送り、画面の出来事の押す力も弱まります。すべて使うと、キャラクターは画面を見ずに話します。
+      images-sent: '直近 1 時間に送った画像: {used} / {limit} 枚'
+      frame-policy: フレームポリシー（開発者向け）
+      frame-policy-description: ターンが送るフレームの選び方です。evals/autonomy-replay のリプレイ評価が、あなたの録画で比べます。試すとき以外は、既定のままにしてください。
+      frame-policies:
+        fresh-keyframes: 最新のフレームとキーフレーム（既定）
+        contact-sheet: コンタクトシート（最大 6 枚のタイルを 1 枚の画像に）
+        scene-anchor: 先頭近くのシーンのアンカーと、最新のフレーム
+        scene-anchor+contact-sheet: シーンのアンカーとコンタクトシート
+      commentary-images-per-hour: 実況中の 1 時間あたりの画像
+      screen-model:
+        provider: 画面用のモデル
+        provider-description: 画面の画像を送る呼び出しに使うモデルです。実況、画像付きの放置中の発話、見張りの確認が入ります。話し方はカードのままです。あなたへの返事は、カードのモデルのままです。
+        same-as-card: カードのモデルと同じ
+        model: モデル
+        needs-model: モデルを選んでください。それまで、これらの呼び出しはカードのモデルを使います。
+        no-images: このモデルは画像を読めないので、視覚モジュールが先に各フレームを説明し、数秒かかります。画像を読めるモデルなら、上の画像の入力を変えてください。
+      commentary-images-per-hour-description: 実況はよく話すので、別の予算を持ちます。実況の間は、上の上限の代わりにこの上限を使います。実況の 1 ターンで送るフレームは最大 2 枚です。
+      states:
+        off: 知覚はオフです。
+        paused: 知覚は一時停止中です。
+        needs-share: 共有するウィンドウかタブを選んでください。
+        starting: 取り込みを始めています。
+        running: キャラクターは画面を見ています。
+        interrupted: 画面がロックされているか、端末がスリープしています。
+        ended: 共有していた画面かウィンドウがなくなりました。
+        failed: 取り込みを始められませんでした。
+      frames: 'メモリーのフレーム: {count} 枚（{size} MB）'
+      foreground: '前面のアプリ: {app}'
+      excluded-now: 除外リストで飛ばしています
+      excluded: '除外リストで飛ばしたフレーム: {count} 枚'
+      exclusions: 除外リスト
+      exclusions-description: 1 行に 1 つ、アプリ名かウィンドウのタイトルの語を書きます。合うウィンドウが前面にある間は、フレームを取りません。大文字と小文字は区別しません。英語の項目は、単語全体が合うときだけ合います。
+      web-share: web アプリは前面のウィンドウが分からないので、除外リストが効きません。画面全体ではなく、ウィンドウかタブを 1 つ共有してください。
     memory-long-term:
       description: 長期記憶固有の設定と管理
       title: 長期記憶
+      work:
+        enable: 終わった会話から記憶を書く
+        enable-description: 20 分静かになった後、キャラクターのチャットモデルが会話の最後の部分を読み、続く事実を保存します。その後、同じことを言う記憶を 1 つにまとめます。毎回モデルを 1〜2 回呼びます。初期設定では無効です。
+        last: '前回は {count} 件の記憶を保存しました。'
+        last-failed: 前回は失敗しました。30 分後にもう一度試します。
+        last-merged: '{count} 件の重複をほかの記憶にまとめました。'
+        merges: 最近のまとめ
+        merges-description: 毎回の処理の後、同じことを言うキャラクターの記憶を 1 つにまとめます。共通の記憶は対象にしません。
+        merge: '{date}: {before} → {after}'
+      profile:
+        enable: オーナーのプロフィールを使う
+        enable-description: キャラクターがあなたについて覚えていることの短い要約を、あなた自身の会話の各メッセージと一緒に送ります。記憶を保存した後に書き直します。初期設定では無効です。
+        text: オーナーのプロフィール
+        empty: まだプロフィールはありません。
+        save: 保存
+        write-now: 今すぐ記憶から書く
+        clear: 消去
     memory-short-term:
       description: 短期記憶固有の設定と管理
       title: 短期記憶
+      summary: 古いメッセージを要約する
+      summary-description: 長い会話では、キャラクターは古いメッセージの要約と、最近のメッセージをそのまま受け取ります。要約はチャットモデルが裏で書き、そのたびにモデルを 1 回呼びます。チャットの画面には、すべてのメッセージが残ります。
+      current: この会話の要約
+      covered: '古いメッセージ {count} 件を含みます。{time} に作成。'
+      empty: まだ要約はありません。会話が長くなると作られます。
+      remove: 削除
     messaging-discord:
       description: Discordでのチャットとボイスチャット
       enable: Discord連携を有効にする
@@ -1258,6 +1526,12 @@ pages:
       api-key-description: Web 検索機能は Tavily によって提供されています。tavily.com で無料の API キーを取得できます。
       api-key-placeholder: Tavily API キーを入力
       configured: Web 検索を利用する準備が整いました！
+      mcp:
+        tool-name: MCP の検索ツール
+        tool-name-description: '検索に答えるツールを server::tool の形で書きます。サーバーは MCP サーバーのページで追加します。API キーはいりません。'
+        unavailable: MCP の検索はデスクトップ版でだけ使えます。
+      autonomous-per-day: キャラクターが自分から話すときの 1 日の検索回数
+      autonomous-per-day-description: '放置中の発話と雑談で、話題を探せます。あなたへの返事に上限はありません。画面を読むターンは検索できません。0 でオフになります。今日の回数: {used}。'
     mcp-server:
       title: MCP サーバー
       description: MCP サーバーを設定し、そのツールを AIRI に導入します。
@@ -1670,6 +1944,33 @@ pages:
               label: 感情表現の強さ
         callout_origin_title: ブラウザーからエンジンに接続
         callout_origin: ブラウザーはこの端末のエンジンにのみ接続できます。別の端末のエンジンにはデスクトップアプリを使ってください。エンジン側でもこのサイトを許可する必要があります。ポート 10101 の設定ページで設定してください。
+      irodori-tts:
+        description: github.com/Aratako/Irodori-TTS
+        title: Irodori-TTS
+        fields:
+          field:
+            caption:
+              label: キャプション
+              description: 声と話し方を言葉で伝えます。サーバーは参照音声と合わせて使います。空にすると参照音声だけを使います。
+              placeholder: 聞き手の近くで話す、明るい少女
+            num-steps:
+              label: サンプリングステップ数
+              description: 多いほど時間がかかり、音がきれいになることがあります。0 は、読み込んだモデルに合ったサーバーの初期値を使います。
+        reference:
+          title: 参照ボイス
+          description: '参照ボイスは、1 人の話者の複数のクリップをこの順番でつなげて使います。短くてきれいなクリップが向いています。合計 {recommended} 秒ほどで十分です。サーバーが使うのは最大 {max} 秒です。'
+          add-voice: ボイスを追加
+          new-voice-placeholder: 新しい参照ボイスの名前
+          remove-voice: 削除
+          add-clips: 音声ファイルを追加
+          uploading: サーバーに送っています...
+          no-clips: クリップはまだありません。1 人の話者の音声ファイルを追加してください。
+          total: '合計 {seconds} 秒 / 最大 {max} 秒'
+          move-up: 上へ
+          move-down: 下へ
+          remove-clip: クリップを削除
+          failed: 参照ボイスを変更できませんでした
+          unsupported: '{name} は使えない音声ファイルです。wav、flac、mp3、m4a、ogg、opus、aac、webm を使ってください。'
       speech-noop:
         title: なし
         description: 音声を再生しません。
@@ -1849,6 +2150,15 @@ pages:
       openai-compatible:
         description: OpenAI互換
         title: OpenAI互換
+        fields:
+          field:
+            reasoning-control:
+              label: 推論の指定
+              description: AIRI がこのサーバーに推論の強さを伝える方法です。サーバーによって違うので、使っているサーバーが受け付ける形を選んでください。
+              options:
+                none: 送らない（サーバーの既定）
+                thinking: 思考のオン・オフ（DeepSeek 式）
+                reasoning-effort: reasoning effort（OpenAI 式）
       n1n:
         description: n1n.ai - 高性能 AI API を提供。
       volcengine:
@@ -1944,6 +2254,12 @@ pages:
         character_card_sync:
           title: キャラクターカードのクラウド同期
           description: ログイン中にキャラクターカードをアカウントと同期し、他のデバイスでも使えるようにします。初期設定では無効です。削除したカードはアカウントの履歴に 30 日間残ります。
+        settings_sync:
+          title: 設定の同期
+          description: ログイン中に設定をアカウントと同期し、他のデバイスでも同じ設定を使えるようにします。API キーと、オーディオデバイスなどこのデバイスだけの設定は同期しません。初期設定では無効です。
+        memory_sync:
+          title: 記憶の同期
+          description: ログイン中に長期記憶、リマインダー、キャラクターの意図をアカウントと同期し、他のデバイスでも同じことを覚えているようにします。記憶の検索を動かすセルフホストのサーバーでは、意味で記憶を探せます。自分から話すのは、一度に 1 台の端末だけになります。初期設定では無効です。
     color-scheme:
       description: ステージの配色を変更します。
       title: 配色
@@ -2156,6 +2472,10 @@ theme:
 title: 設定
 voices: 音声
 vrm:
+  body-movement:
+    title: 自然な体の動き
+    label: 体を自然に動かす
+    description: 呼吸し、少し揺れ、視線を追って頭を向け、考えている間は目をそらし、話しながらうなずきます。
   fps:
     title: フレームレート上限
     description: ステージとモデルのプレビューで VRM の描画を制限します。上限を下げるとアニメーション速度を変えずに GPU の使用量を減らせます。
@@ -2239,6 +2559,60 @@ mmd:
     title: モデルからテーマカラーを抽出
     button-extract:
       title: 抽出
+  graphics:
+    title: グラフィック
+    description: 後処理でモデルの光り方と色調を整えます。品質を上げるほど GPU を使います。この設定は端末ごとに保存します。
+    quality: 品質
+    quality-options:
+      off: オフ（今までどおり）
+      low: 低
+      medium: 中
+      high: 高
+    tone-mapping: トーンマッピング
+    tone-mapping-options:
+      neutral: Neutral（色を保つ）
+      agx: AgX（映画風）
+      aces: ACES（高コントラスト）
+    exposure: 露出
+    bloom-intensity: ブルームの強さ
+    bloom-threshold: ブルームのしきい値
+    saturation: 彩度
+    contrast: コントラスト
+    vignette: ビネット
+    depth-of-field: 背景のボケ（被写界深度）
+    chromatic-aberration: 色収差
+    render-mode: 陰影
+    render-mode-options:
+      toon: トゥーン（モデル作者の見た目どおり）
+      hybrid: ハイブリッド（PBR、顔と目はトゥーン）
+      pbr: PBR（すべて）
+    environment-intensity: スタジオ光
+    rim-intensity: リムライト
+    shadows: やわらかいセルフシャドウ
+    ambient-occlusion: アンビエントオクルージョン
+  surfaces:
+    title: 質感（PBR）
+    description: >-
+      材質の種類は、名前とボーンから自動で推定します。種類によって、表面の粗さ、金属らしさ、やわらかさが決まります。推定が違うときは、ここで変更してください。変更はモデルごとに、この端末に保存します。
+    material: 材質
+    kind: 種類
+    kind-auto: 自動（{kind}）
+    kinds:
+      face: 顔
+      eye: 目
+      skin: 肌
+      hair: 髪
+      cloth: 布
+      fur: ファー
+      leather: 革・ラテックス
+      metal: 金属
+      other: その他
+    roughness: 粗さ
+    metalness: 金属度
+    sheen: 布の光沢
+    clearcoat: 表面のつや
+    stays-toon: ハイブリッドでは、顔と目はトゥーンのままです。この材質を変えるには、別の種類か PBR を選んでください。
+    reset: この材質を元に戻す
   physics:
     title: 物理演算 & リグ
     enabled: 物理演算を有効化 (髪、スカート、アクセサリ)
@@ -2253,8 +2627,11 @@ mmd:
       camera: カメラ
       none: 無効
   animation:
+    body-movement: 体を自然に動かす
+    body-movement-description: 呼吸し、少し揺れ、視線を追って頭を向け、考えている間は目をそらし、話しながらうなずきます。
     title: アニメーション
     idle-motion: アイドルモーション
+    default-idle: AIRI 標準（VRM と同じ待機）
     import-motion: モーションをインポート (.vmd)
     play-once: モーションをプレビュー
     remove: モーションを削除

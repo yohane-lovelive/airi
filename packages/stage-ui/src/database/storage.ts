@@ -12,7 +12,7 @@ export const storage = createStorage({
 storage.mount('local', indexedDbDriver({ base: 'airi-local' }))
 storage.mount('outbox', indexedDbDriver({ base: 'airi-sync-queue' }))
 
-// The `device`, `chat-assets`, `memory`, and `recipes` stores are the ones that localforage created. Their names are permanent, because user files live in them.
+// The `device`, `chat-assets`, `memory`, `recipes`, and autonomy stores are the ones that localforage created. Their names are permanent, because user files live in them.
 // Read and write raw values, because the records hold `Blob` and `File` objects.
 
 // Do not call `clear()` on `device` or the root storage. `device` holds every imported model, background, and motion.
@@ -28,6 +28,18 @@ storage.mount('memory', indexedDbDriver({ dbName: 'airi-memory', storeName: 'ent
 storage.mount('recipes', indexedDbDriver({ dbName: 'airi-recipes', storeName: 'recipes' }))
 /** The sticker library. Entries and images have their own key prefixes. */
 storage.mount('stickers', indexedDbDriver({ dbName: 'airi-sticker-library', storeName: 'records' }))
+/** The intentions of the character, one record for each intention, keyed by the intention ID. */
+storage.mount('intentions', indexedDbDriver({ dbName: 'airi-intentions', storeName: 'intentions' }))
+/** Mission instances, one record for each instance, keyed by the mission ID. */
+storage.mount('missions', indexedDbDriver({ dbName: 'airi-missions', storeName: 'missions' }))
+/** The clips of the motion library, keyed by the clip ID. */
+storage.mount('motions', indexedDbDriver({ dbName: 'airi-motions', storeName: 'motions' }))
+/** The screen timeline of each conversation, keyed by the session ID. */
+storage.mount('timeline', indexedDbDriver({ dbName: 'airi-timeline', storeName: 'timelines' }))
+/** Model usage, one record for each day, purpose, and model. */
+storage.mount('usage', indexedDbDriver({ dbName: 'airi-usage', storeName: 'usage' }))
+/** The owner profile, one record. */
+storage.mount('owner-profile', indexedDbDriver({ dbName: 'airi-owner-profile', storeName: 'profile' }))
 
 /**
  * Reads the raw value of each key that starts with `prefix`.

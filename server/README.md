@@ -8,10 +8,11 @@ while production deployment configuration remains in `proj-airi/airi-railway`.
 
 - `apps/api`: resource API, business domains, database migrations, and API runtime.
 - `apps/auth`: standalone Better Auth and OIDC service.
+- `apps/embedder`: local-only text embedder for the memory search, with EmbeddingGemma 2.
 - `packages/auth-shared`: Auth-owned database schema and principal contracts.
 - `packages/server-sdk-shared`: Eventa contracts for the hosted chat WebSocket.
 - `dev/caddy`: local-only public edge routing for the shared Auth/API origin.
-- `docker-compose.yaml`: complete local API + Auth + PostgreSQL + Redis + Caddy stack.
+- `docker-compose.yaml`: complete local API + Auth + embedder + PostgreSQL + Redis + Caddy stack.
 
 ## Run locally
 
@@ -23,6 +24,74 @@ pnpm dev:backend
 
 The command uses `server/docker-compose.yaml` and exposes only Caddy at
 `http://localhost:6112`.
+
+## Self-host for your own devices
+
+Use these steps to sync your chats, character cards, models, and settings
+through your own server. The steps use the local stack above.
+
+1. Create `server/apps/api/.env.local`. Both the API and Auth read this file.
+   Make each secret a new random value, for example with `openssl rand -base64 32`.
+   Email sign-in does not use Google or GitHub, but Auth needs a value for them.
+
+   ```sh
+   AUTH_UI_URL=http://localhost:5175/ui
+   LLM_ROUTER_MASTER_KEY=<random base64 of 32 bytes>
+   BETTER_AUTH_SECRET=<random base64 of 32 bytes>
+   AUTH_GOOGLE_CLIENT_ID=unused
+   AUTH_GOOGLE_CLIENT_SECRET=unused
+   AUTH_GITHUB_CLIENT_ID=unused
+   AUTH_GITHUB_CLIENT_SECRET=unused
+   ```
+
+2. Start Docker, then start the stack with `pnpm dev:backend`.
+3. Run the sign-in pages on their own port. The stage apps use port 5173.
+   `VITE_WEB_APP_URL` is the page that opens after an email verification.
+
+   ```sh
+   VITE_SERVER_URL=http://localhost:6112 VITE_WEB_APP_URL=http://localhost:5173/ pnpm -F @proj-airi/ui-server-auth dev --port 5175
+   ```
+
+4. Create `apps/stage-tamagotchi/.env.local` and `apps/stage-web/.env.local`
+   with this line, and restart the apps.
+
+   ```sh
+   VITE_SERVER_URL=http://localhost:6112
+   ```
+
+5. Sign up with your email in an app. The stack sends no email without
+   `RESEND_API_KEY`, so mark the address as verified once:
+
+   ```sh
+   docker compose -f server/docker-compose.yaml exec db psql -U postgres -c "UPDATE \"user\" SET email_verified = true WHERE email = 'you@example.com';"
+   ```
+
+   PowerShell does not read `\"` as a quote. In PowerShell, send the SQL
+   through standard input:
+
+   ```powershell
+   'UPDATE "user" SET email_verified = true WHERE email = ''you@example.com'';' | docker compose -f server/docker-compose.yaml exec -T db psql -U postgres
+   ```
+
+6. Sign in on each device with the same account. Chats sync at once.
+7. In Settings > System > Experimental Features, turn on the sync features
+   that you want: character cards, models, and settings.
+
+A self-hosted server has no AIRI Cloud, so notifications and server feature
+policies are off. Local experiments still work.
+Settings sync leaves API keys and the settings of one device on that device.
+`server/docs/ai/adr/2026-10-31-settings-sync.md` lists the rules.
+Sign in on your main device first. A new device takes the server settings
+on its first run.
+
+The stack also runs the memory embedder. Its first start downloads the text
+model of EmbeddingGemma 2, about 330 MB, into the `embedder_models` volume.
+The API finds memories by meaning only after that. Until then, the apps find
+them by shared characters. `server/docs/ai/adr/2026-11-02-memory-store-and-search.md`
+has the design.
+
+A phone cannot use `localhost`. It needs the server on an HTTPS address, for
+example through a private network tunnel. This guide does not cover that.
 
 ## Railway deployment
 

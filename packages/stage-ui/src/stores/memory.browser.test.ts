@@ -42,7 +42,8 @@ describe('memory store', () => {
     expect(other.id).not.toBe(game.id)
     expect(memory.entries).toHaveLength(2)
     expect(memory.read(game.id, 'airi')?.body).toBe('Minecraft.')
-    expect(memory.indexFor('airi')).toBe(`Your own:\n- ${other.id}: What the owner plays.\n- ${game.id}: What the owner plays now.`)
+    // The index lists the newest entries first, so the changed entry leads.
+    expect(memory.indexFor('airi')).toBe(`Your own:\n- ${game.id}: What the owner plays now.\n- ${other.id}: What the owner plays.`)
   })
 
   // A card keeps its own memories. Only the owner makes one general, and then every card reads it.
@@ -110,6 +111,29 @@ describe('memory store', () => {
     await vi.waitFor(() => expect(chat.entries).toEqual([]))
     // The removal stays as a tombstone.
     expect(await records.getItemRaw(nickname.id)).toEqual({ id: nickname.id, updatedAt: expect.any(Number), deleted: true })
+  })
+
+  it('applies a sync round to the entries at once, saves it, and tells the other windows', async () => {
+    const leader = createStore()
+    const other = createStore()
+    const kept = (await leader.write({ description: 'Food', body: 'Ramen.' }, 'airi'))!
+    const gone = (await leader.write({ description: 'Pet', body: 'A cat.' }, 'airi'))!
+    await other.ready()
+    const changesBefore = leader.changeCount
+
+    const applied = leader.applySyncChanges({
+      upserts: { [kept.id]: { description: 'Food', body: 'Sushi.', persona: 'airi' }, broken: { body: '' } },
+      removals: [gone.id],
+      conflictCopies: [],
+    })
+    // The sync reads the entries again in the same task, so they change before the save.
+    expect(leader.entries.map(entry => entry.body)).toEqual(['Sushi.'])
+
+    expect(await applied).toEqual({ rejected: ['broken'] })
+    expect(await records.getItemRaw(gone.id)).toEqual({ id: gone.id, updatedAt: expect.any(Number), deleted: true })
+    await vi.waitFor(() => expect(other.read(kept.id, 'airi')?.body).toBe('Sushi.'))
+    // A sync of other devices is no change of this device, so it requests no new sync.
+    expect(leader.changeCount).toBe(changesBefore)
   })
 
   it('moves the entries from localStorage once, with new ids, before it is ready', async () => {

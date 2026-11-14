@@ -8,10 +8,13 @@ import { refDebounced, useBroadcastChannel } from '@vueuse/core'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 
 import { captionGetIsFollowingWindow, captionIsFollowingWindowChanged } from '../../shared/eventa'
+import { useHideDevToolsButton } from '../composables/use-hide-dev-tools-button'
 import { useCaptionItems } from '../composables/useCaptionItems'
 
 /** Keep stale captions from lingering after the last broadcast update. */
 const CAPTION_TEXT_EXPIRY_MS = 10_000
+
+useHideDevToolsButton()
 
 const attached = ref(true)
 

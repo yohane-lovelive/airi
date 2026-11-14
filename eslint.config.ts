@@ -26,6 +26,12 @@ export default defineConfig({
     'apps/stage-tamagotchi-kirie/addons/**',
     'apps/stage-tamagotchi-kirie/tests/**/bin/**',
     'apps/stage-tamagotchi-kirie/tests/**/obj/**',
+    'engines/stage-tamagotchi-unity/tests/**/bin/**',
+    'engines/stage-tamagotchi-unity/tests/**/obj/**',
+    // Unity generates these files. A format fix here does not last, because Unity writes them again.
+    'engines/stage-tamagotchi-unity/{Library,Temp,Logs,Builds,UserSettings,ProjectSettings}/**',
+    'engines/stage-tamagotchi-unity/Packages/packages-lock.json',
+    'engines/stage-tamagotchi-unity/Packages/com.yohawing.mmd-loader/**', // A vendored package.
     'apps/stage-tamagotchi/src/bindings/**',
     'apps/stage-tamagotchi-electron/out/**',
     'apps/stage-tamagotchi-electron/src/renderer/bindings/**',

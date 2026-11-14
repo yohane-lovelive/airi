@@ -9,9 +9,11 @@
 
 import type { VRM } from '@pixiv/three-vrm'
 import type { PresenceBubblePalette, PresenceBubbleState } from '@proj-airi/stage-shared'
+import type { GestureClipSource } from '@proj-airi/stage-shared/body-motion'
 import type { TresContext } from '@tresjs/core'
 import type { DirectionalLight, SphericalHarmonics3, Texture, WebGLRenderer, WebGLRenderTarget } from 'three'
 
+import type { VrmGestureOptions } from '../composables/vrm/gesture-layer'
 import type { VrmInteractionTarget } from '../composables/vrm/interaction'
 import type { SceneBootstrap, ScenePhase, Vec3 } from '../stores/model-store'
 import type { VrmLifecycleReason } from '../trace'
@@ -204,6 +206,7 @@ const {
 
   lookAtTarget,
   trackingMode,
+  bodyMotionEnabled,
   eyeHeight,
   envSelect,
   skyBoxSrc,
@@ -984,9 +987,10 @@ watch(directionalLightRotation, (newRotation) => {
 }, { deep: true })
 
 defineExpose({
-  setExpression: (expression: string, intensity = 1) => {
-    modelRef.value?.setExpression(expression, intensity)
+  setExpression: (expression: string, intensity = 1, durationMs?: number) => {
+    modelRef.value?.setExpression(expression, intensity, durationMs)
   },
+  playGesture: (source: GestureClipSource, options?: VrmGestureOptions) => modelRef.value?.playGesture(source, options) ?? Promise.resolve(false),
   // NOTICE: External runtime hooks are intentionally separate from internal VRM model hooks.
   // This public frame hook is reserved for live pose/tracking input and is forwarded to VRMModel
   // without exposing the internal model/material lifecycle hook pipeline.
@@ -1094,6 +1098,8 @@ defineExpose({
         :model-offset="modelOffset"
         :model-rotation-y="modelRotationY"
         :tracking-mode="trackingMode"
+        :body-motion="bodyMotionEnabled"
+        :thinking="props.presence.thinking"
         :eye-height="eyeHeight"
         :camera-position="cameraPosition"
         :camera="camera"

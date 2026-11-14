@@ -9,7 +9,7 @@ import { defineStore } from 'pinia'
 import { parse } from 'valibot'
 import { computed, onScopeDispose, shallowRef, watch } from 'vue'
 
-import { useCloudFetch } from '../composables/cloud'
+import { resolveCloudUrl, useCloudFetch } from '../composables/cloud'
 import { featureFlagPreferencesSchema, featureFlagResponseSchema, featureFlagVariantPreferencesSchema, offeredFeatureFlags, resolveFeatureFlag, resolveFeatureVariant } from '../libs/feature-flags'
 import { useAuthStore } from './auth'
 
@@ -17,6 +17,8 @@ import { useAuthStore } from './auth'
 export const useFeatureFlagsStore = defineStore('feature-flags', () => {
   const auth = useAuthStore()
   const cloudFetch = useCloudFetch()
+  /** A self-hosted server has no Cloud, so it has no feature policies. Local experiments still work. */
+  const hasCloud = !!resolveCloudUrl()
   const offered = offeredFeatureFlags(isStageTamagotchi())
   const preferences = useLocalStorageManualReset<Record<string, boolean>>('settings/feature-flags', {}, {
     serializer: {
@@ -95,8 +97,12 @@ export const useFeatureFlagsStore = defineStore('feature-flags', () => {
     request?.abort()
     request = new AbortController()
     policies.value = []
-    loading.value = true
     error.value = undefined
+    if (!hasCloud) {
+      loading.value = false
+      return
+    }
+    loading.value = true
     try {
       const response = await cloudFetch('/v1/feature-flags', {
         signal: AbortSignal.any([request.signal, AbortSignal.timeout(10_000)]),

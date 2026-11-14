@@ -13,6 +13,7 @@ import { array, integer, isoTimestamp, minValue, nonEmpty, number, object, parse
 import { computed, onScopeDispose, shallowRef, watch } from 'vue'
 
 import { isRenderableInboxMessage } from '../components/scenarios/notifications/inbox-presentation'
+import { resolveCloudUrl } from '../composables/cloud'
 import { authedFetch } from '../libs/auth-fetch'
 import { useAuthStore } from './auth'
 
@@ -47,7 +48,7 @@ const messageSchema = object({
  */
 export const useInboxStore = defineStore('inbox', () => {
   const auth = useAuthStore()
-  const baseUrl = import.meta.env.VITE_CLOUD_URL || 'https://cloud.airi.build'
+  const baseUrl = resolveCloudUrl()
 
   const unread = shallowRef(0)
   const messages = shallowRef<InboxMessage[]>([])
@@ -59,7 +60,8 @@ export const useInboxStore = defineStore('inbox', () => {
   /** The list request failed. The panel shows a retry action. */
   const error = shallowRef(false)
 
-  const signedIn = computed(() => auth.isAuthenticated && !!auth.token)
+  // A self-hosted server has no Cloud, so its account has no notifications.
+  const signedIn = computed(() => !!baseUrl && auth.isAuthenticated && !!auth.token)
   const hasMore = computed(() => nextCursor.value !== '')
 
   // A session change advances `generation`. A response from an older generation belongs to

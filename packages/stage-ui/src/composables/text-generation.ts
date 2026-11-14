@@ -1,5 +1,7 @@
 import type { GenerateText } from '@proj-airi/agents'
 
+import type { UsagePurpose } from '../libs/usage'
+
 import { useLLM } from '../stores/ai/chat-llm/llm'
 import { useProviderStore } from '../stores/providers/provider'
 
@@ -8,13 +10,14 @@ import { useProviderStore } from '../stores/providers/provider'
  *
  * Returns:
  * - `generateText`, which sends a conversation through the LLM store with reasoning off. A request gets only the tools
- *   that the task passes, never the tools of the chat. The store remembers provider compatibility.
+ *   that the task passes, never the tools of the chat. The store remembers provider compatibility. The usage records
+ *   sum its calls under `purpose`.
  */
 export function useTextGeneration() {
   const llm = useLLM()
   const providers = useProviderStore()
 
-  function generateText(selection: { providerId: string, model: string }): GenerateText {
+  function generateText(selection: { providerId: string, model: string }, purpose: UsagePurpose): GenerateText {
     return async (conversation, signal, tools) => {
       const provider = await providers.getChatProviderInstance(selection.providerId, { reasoning: 'disabled' })
       let reply = ''
@@ -23,6 +26,7 @@ export function useTextGeneration() {
         supportsTools: tools ? undefined : false,
         taskTools: tools,
         abortSignal: signal,
+        purpose,
         onStreamEvent: (event) => {
           // Text before a tool call only leads up to the call. The reply is the text after the last call.
           if (event.type === 'tool-call')

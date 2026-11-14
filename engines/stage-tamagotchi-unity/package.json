@@ -1,0 +1,27 @@
+{
+  "name": "@proj-airi/stage-tamagotchi-unity",
+  "type": "module",
+  "version": "0.14.0",
+  "private": true,
+  "description": "Unity display sidecar for stage-tamagotchi",
+  "author": {
+    "name": "Moeru AI Project AIRI Team",
+    "email": "airi@moeru.ai",
+    "url": "https://github.com/moeru-ai"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/moeru-ai/airi.git",
+    "directory": "engines/stage-tamagotchi-unity"
+  },
+  "scripts": {
+    "build": "dotnet build ./stage-tamagotchi-unity.slnx",
+    "typecheck": "dotnet build ./stage-tamagotchi-unity.slnx",
+    "test": "dotnet run --project ./tests/stage-tamagotchi-unity.tests/stage-tamagotchi-unity.tests.csproj",
+    "setup:project": "powershell -NoProfile -ExecutionPolicy Bypass -File ./tools/run-unity.ps1 -Arguments -quit,-executeMethod,Airi.Stage.Editor.StageProjectSetup.Apply",
+    "build:player": "powershell -NoProfile -ExecutionPolicy Bypass -File ./tools/run-unity.ps1 -Arguments -quit,-executeMethod,Airi.Stage.Editor.StageBuild.BuildPlayer",
+    "import:motion": "powershell -NoProfile -ExecutionPolicy Bypass -File ./tools/run-unity.ps1 -Arguments -quit,-executeMethod,Airi.Stage.Editor.StageMotionImport.ImportAll",
+    "import:room": "powershell -NoProfile -ExecutionPolicy Bypass -File ./tools/run-unity.ps1 -Arguments -quit,-executeMethod,Airi.Stage.Editor.StageRoomImport.ImportAll"
+  }
+}

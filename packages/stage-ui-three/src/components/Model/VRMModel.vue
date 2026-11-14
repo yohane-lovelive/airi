@@ -7,6 +7,7 @@
 */
 
 import type { VRM } from '@pixiv/three-vrm'
+import type { GestureClipSource } from '@proj-airi/stage-shared/body-motion'
 import type {
   Group,
   Material,
@@ -18,6 +19,7 @@ import type {
   WebGLRenderer,
 } from 'three'
 
+import type { VrmGestureOptions } from '../../composables/vrm/gesture-layer'
 import type {
   VrmDisposeHookContext,
   VrmFrameHookContext,
@@ -31,6 +33,7 @@ import type { VrmLifecycleReason } from '../../trace'
 import type { ManagedVrmInstance } from './vrm-instance-cache'
 
 import { VRMUtils } from '@pixiv/three-vrm'
+import { BodyPoseApplier, ProceduralBodyMotion, SpeechLevelMeter } from '@proj-airi/stage-shared/body-motion'
 import { useLoop, useTresContext } from '@tresjs/core'
 import { until } from '@vueuse/core'
 import {
@@ -76,6 +79,7 @@ import {
 } from '../../composables/vrm/animation'
 import { loadVrm } from '../../composables/vrm/core'
 import { useVRMEmote } from '../../composables/vrm/expression'
+import { existingVrmGestureLayer, playVrmGesture, vrmGestureLayer } from '../../composables/vrm/gesture-layer'
 import { createVrmInteractionColliders } from '../../composables/vrm/interaction'
 import { resolveInternalVrmHooks } from '../../composables/vrm/internal-hooks'
 import { useVRMLipSync } from '../../composables/vrm/lip-sync'
@@ -133,6 +137,10 @@ const props = withDefaults(defineProps<{
   modelOffset: Vec3
   modelRotationY: number
   trackingMode: TrackingMode
+  /** Adds breath, sway, a neck that follows the gaze, and nods over the idle clip. */
+  bodyMotion?: boolean
+  /** A model turn is running, so the gaze moves away. */
+  thinking?: boolean
   eyeHeight: number
   screenBoundingBox: () => { top: number, left: number, width: number, height: number }
   cameraPosition: Vec3
@@ -140,6 +148,8 @@ const props = withDefaults(defineProps<{
   camera: PerspectiveCamera
 }>(), {
   paused: false,
+  bodyMotion: false,
+  thinking: false,
 })
 /*
   * Emits:
@@ -195,7 +205,9 @@ let loadSequence = 0
 const raycaster = new Raycaster()
 
 // Animation related ref
-const vrmAnimationMixer = ref<AnimationMixer>()
+// shallowRef: the gesture layer and the `finished` event of the mixer compare objects by identity, and a deep ref
+// returns a reactive proxy. With the proxy, a gesture gets a second layer without the idle, and both play at half weight.
+const vrmAnimationMixer = shallowRef<AnimationMixer>()
 const { onBeforeRender, stop, start } = useLoop()
 
 const vrmHooks: readonly VrmHook[] = resolveInternalVrmHooks()
@@ -216,6 +228,50 @@ const idleEyeSaccades = useIdleEyeSaccades()
 // like vrmEmote.value.isEmoteActive.value in the render loop.
 const vrmEmote = shallowRef<ReturnType<typeof useVRMEmote>>()
 const vrmLipSync = useVRMLipSync(audioContext, connectSpeech, toRef(props, 'speechActive'))
+
+// Body motion. The applier belongs to the current model, and the meter to the current audio context.
+const bodyMotion = new ProceduralBodyMotion()
+let bodyPose: BodyPoseApplier | undefined
+let speechLevel: SpeechLevelMeter | undefined
+const gazeHead = new Vector3()
+const gazeTarget = new Vector3()
+watch(audioContext, (context, _, onCleanup) => {
+  if (!context)
+    return
+  const meter = new SpeechLevelMeter(context)
+  speechLevel = meter
+  onCleanup(() => {
+    meter.dispose()
+    if (speechLevel === meter)
+      speechLevel = undefined
+  })
+}, { immediate: true })
+watch([connectSpeech, audioContext], ([connect]) => speechLevel?.listen(connect), { immediate: true })
+
+/** A VRM 0.x model faces -Z, and a VRM 1.0 model faces +Z. */
+function facingOf(activeVrm: VRM): 1 | -1 {
+  return activeVrm.meta?.metaVersion === '0' ? -1 : 1
+}
+
+function createBodyPose(activeVrm: VRM) {
+  const bone = (name: 'spine' | 'chest' | 'neck' | 'head') => activeVrm.humanoid.getNormalizedBoneNode(name) ?? undefined
+  return new BodyPoseApplier({ spine: bone('spine'), chest: bone('chest'), neck: bone('neck'), head: bone('head') }, facingOf(activeVrm))
+}
+
+/** The direction from the head to the eye target, as yaw and pitch in the frame that faces +Z. */
+function gazeOf(activeVrm: VRM) {
+  const target = activeVrm.lookAt?.target
+  const head = activeVrm.humanoid.getNormalizedBoneNode('head')
+  if (!target || !head)
+    return undefined
+  activeVrm.scene.worldToLocal(head.getWorldPosition(gazeHead))
+  activeVrm.scene.worldToLocal(target.getWorldPosition(gazeTarget))
+  gazeTarget.sub(gazeHead)
+  const facing = facingOf(activeVrm)
+  const x = gazeTarget.x * facing
+  const z = gazeTarget.z * facing
+  return { yaw: Math.atan2(x, z), pitch: Math.atan2(-gazeTarget.y, Math.hypot(x, z)) }
+}
 
 // For sky box update
 const nprProgramVersion = ref(0)
@@ -345,6 +401,7 @@ function applyManagedVrmInstance(instance: ManagedVrmInstance) {
   vrmAnimationMixer.value = instance.mixer
   vrmEmote.value = instance.emote
   interactionColliders.value = instance.interactionColliders
+  bodyPose = createBodyPose(instance.vrm)
 }
 
 function destroyManagedVrmInstance(instance?: ManagedVrmInstance) {
@@ -463,7 +520,11 @@ function bindManagedVrmInstanceRenderLoop() {
     const traceStart = isStageThreeRuntimeTraceEnabled() ? performance.now() : 0
     const tracingEnabled = traceStart > 0
 
+    // The clip writes only the bones that it has tracks for, so the offsets of the last frame leave first.
+    bodyPose?.undo()
     const animationMixerMs = measureFrameStep(tracingEnabled, () => {
+      if (vrmAnimationMixer.value)
+        existingVrmGestureLayer(vrmAnimationMixer.value)?.update(delta)
       vrmAnimationMixer.value?.update(delta)
     })
     const activeVrm = vrm.value
@@ -483,11 +544,24 @@ function bindManagedVrmInstanceRenderLoop() {
       if (activeVrm)
         runVrmFrameRuntimeHook(activeVrm, delta)
     })
+    // The procedural layer moves the normalized bones, so it runs before the humanoid copies them to the model.
+    const bodyMotionPose = activeVrm && props.bodyMotion
+      ? bodyMotion.update(delta, { gaze: gazeOf(activeVrm), thinking: props.thinking, speechLevel: speechLevel?.read() ?? 0 })
+      : undefined
+    if (bodyMotionPose)
+      bodyPose?.apply(bodyMotionPose.bones)
     const humanoidMs = measureFrameStep(tracingEnabled, () => {
       activeVrm?.humanoid.update()
     })
     const lookAtMs = measureFrameStep(tracingEnabled, () => {
       activeVrm?.lookAt?.update?.(delta)
+      // The eyes look away while the model thinks. Yaw and pitch of `lookAt` are degrees, and a positive pitch looks up.
+      if (activeVrm?.lookAt && bodyMotionPose && (bodyMotionPose.eyes.yaw || bodyMotionPose.eyes.pitch)) {
+        activeVrm.lookAt.applier.applyYawPitch(
+          activeVrm.lookAt.yaw + MathUtils.radToDeg(bodyMotionPose.eyes.yaw),
+          activeVrm.lookAt.pitch - MathUtils.radToDeg(bodyMotionPose.eyes.pitch),
+        )
+      }
     })
     const isEmoteActive = vrmEmote.value?.isEmoteActive?.value ?? false
 
@@ -592,6 +666,9 @@ function componentCleanUp(
 
   disposeBeforeRenderLoop?.()
   disposeBeforeRenderLoop = undefined
+  // A stashed instance can come back, so its bones must not keep the offsets of the last frame.
+  bodyPose?.undo()
+  bodyPose = undefined
 
   if (activeInstance)
     detachVrmGroup(activeInstance.group)
@@ -843,7 +920,8 @@ async function loadModel() {
 
     // play animation
     nextVrmAnimationMixer = new AnimationMixer(_vrm.scene)
-    nextVrmAnimationMixer.clipAction(clip).play()
+    // The idle plays in parts, so a gesture can take the head or an arm while the rest keeps the idle.
+    vrmGestureLayer(_vrm, nextVrmAnimationMixer).setIdle(clip, 0)
 
     nextVrmEmote = useVRMEmote(_vrm)
 
@@ -1108,8 +1186,15 @@ function headAnchor() {
 defineExpose({
   headAnchor,
   getInteractionColliders: () => interactionColliders.value?.colliders ?? [],
-  setExpression(expression: string, intensity = 1) {
-    vrmEmote.value?.setEmotionWithResetAfter(expression, 3000, intensity)
+  /** Shows an expression for `durationMs`, for example as long as a gesture, and returns to the neutral face. */
+  setExpression(expression: string, intensity = 1, durationMs = 3000) {
+    vrmEmote.value?.setEmotionWithResetAfter(expression, durationMs, intensity)
+  },
+  /** Plays a gesture of the motion library. Resolves to false when the model cannot play it. */
+  async playGesture(source: GestureClipSource, options?: VrmGestureOptions) {
+    const activeVrm = vrm.value
+    const mixer = vrmAnimationMixer.value
+    return !!activeVrm && !!mixer && await playVrmGesture(activeVrm, mixer, source, options)
   },
   // NOTICE: This runtime frame hook is intentionally separate from internal VRM model hooks.
   // External callers use it for live pose/tracking input; internal hooks remain reserved for

@@ -11,11 +11,17 @@ import { usePiniaSynced } from '@proj-airi/stage-ui/libs/pinia'
 import { initializeAnalytics } from '@proj-airi/stage-ui/libs/product-signals'
 import { isSherpawModelBundled, setSherpawModelAssetHost } from '@proj-airi/stage-ui/libs/providers/providers/sherpaw/model-assets'
 import { useAuthStore } from '@proj-airi/stage-ui/stores/auth'
+import { useAutonomySyncStore } from '@proj-airi/stage-ui/stores/autonomy-sync'
 import { useCharacterOrchestratorStore } from '@proj-airi/stage-ui/stores/character'
 import { useChatStore } from '@proj-airi/stage-ui/stores/chat'
+import { useDeviceFloorStore } from '@proj-airi/stage-ui/stores/device-floor'
 import { useDevicePermissionsStore } from '@proj-airi/stage-ui/stores/device-permissions'
 import { usePluginHostInspectorStore } from '@proj-airi/stage-ui/stores/devtools/plugin-host-debug'
 import { useDisplayModelsStore } from '@proj-airi/stage-ui/stores/display-models'
+import { useInitiativeRunnerStore } from '@proj-airi/stage-ui/stores/initiative-runner'
+import { useMemorySyncStore } from '@proj-airi/stage-ui/stores/memory-sync'
+import { useMemoryWorkStore } from '@proj-airi/stage-ui/stores/memory-work'
+import { useMissionRunnerStore } from '@proj-airi/stage-ui/stores/mission-runner'
 import { useModsServerChannelStore } from '@proj-airi/stage-ui/stores/mods/api/channel-server'
 import { useContextBridgeStore } from '@proj-airi/stage-ui/stores/mods/api/context-bridge'
 import { useAiriCardStore } from '@proj-airi/stage-ui/stores/modules/airi-card'
@@ -24,11 +30,15 @@ import { useConsciousnessStore } from '@proj-airi/stage-ui/stores/modules/consci
 import { useHearingStore } from '@proj-airi/stage-ui/stores/modules/hearing'
 import { useSpeechStore } from '@proj-airi/stage-ui/stores/modules/speech'
 import { useVisionStore } from '@proj-airi/stage-ui/stores/modules/vision'
+import { useMotionGenerationStore } from '@proj-airi/stage-ui/stores/motion-generation'
 import { useOnboardingStore } from '@proj-airi/stage-ui/stores/onboarding'
+import { usePerceptionRunnerStore } from '@proj-airi/stage-ui/stores/perception-runner'
 import { usePerfTracerBridgeStore } from '@proj-airi/stage-ui/stores/perf-tracer-bridge'
 import { listProvidersForPluginHost, shouldPublishPluginHostCapabilities } from '@proj-airi/stage-ui/stores/plugin-host-capabilities'
 import { useSettings, useSettingsAudioDevice } from '@proj-airi/stage-ui/stores/settings'
+import { useSettingsSyncStore } from '@proj-airi/stage-ui/stores/settings-sync'
 import { useSettingsStageModel } from '@proj-airi/stage-ui/stores/settings/stage-model'
+import { useWatchRunnerStore } from '@proj-airi/stage-ui/stores/watch-runner'
 import { useTheme } from '@proj-airi/ui'
 import { isEqual } from 'es-toolkit'
 import { storeToRefs } from 'pinia'
@@ -48,6 +58,7 @@ import {
   i18nSetLocale,
 } from '../shared/eventa'
 import { electronModelAssetCancel, electronModelAssetEnsure, electronModelAssetRemove, electronModelAssetsClear, electronModelAssetsList, electronModelAssetStatusChanged } from '../shared/eventa/model-assets'
+import { motionGeneratorCheck, motionGeneratorGenerate, motionGeneratorGetConfig, motionGeneratorSetConfig } from '../shared/eventa/motion-generator'
 import {
   electronPluginUpdateCapability,
   pluginProtocolListProviders,
@@ -66,9 +77,14 @@ import {
   electronPluginUnload,
 } from '../shared/eventa/plugin/host'
 import { electronPluginToolsChanged } from '../shared/eventa/plugin/tools'
+import { unityStageStatusChanged } from '../shared/eventa/unity-stage'
 import { initializeElectronAuthCallbackBridge } from './bridges/electron-auth-callback'
 import { initializeIOTraceHubBridge } from './bridges/io-trace-hub'
+import { createElectronOwnerPresenceSource } from './bridges/owner-presence'
+import { createElectronPerceptionRecorder } from './bridges/perception-recorder'
+import { createElectronScreenSource } from './bridges/screen-source'
 import { initializeStageThreeRuntimeTraceBridge } from './bridges/stage-three-runtime-trace'
+import { syncUnityStageRenderer } from './composables/unity-stage'
 import { useDevicePermissions } from './composables/use-device-permissions'
 import { useLanguage } from './composables/use-language'
 import { useFullscreenStore } from './stores/fullscreen'
@@ -110,6 +126,13 @@ setSherpawModelAssetHost({
   cancel: cancelModelAsset,
   remove: removeModelAsset,
   clear: clearModelAssets,
+})
+// The main process calls Text-To-VRMA, and every window reads its settings through it.
+useMotionGenerationStore().connect({
+  getConfig: useElectronEventaInvoke(motionGeneratorGetConfig),
+  setConfig: useElectronEventaInvoke(motionGeneratorSetConfig),
+  check: useElectronEventaInvoke(motionGeneratorCheck),
+  generate: useElectronEventaInvoke(motionGeneratorGenerate),
 })
 const getMainLocale = useElectronEventaInvoke(i18nGetLocale)
 const setLocale = useElectronEventaInvoke(i18nSetLocale)
@@ -168,6 +191,15 @@ function createFullStageRuntime() {
   const cardStore = useAiriCardStore()
   const serverChannelStore = useModsServerChannelStore()
   const characterOrchestratorStore = useCharacterOrchestratorStore()
+  const missionRunnerStore = useMissionRunnerStore()
+  const initiativeRunnerStore = useInitiativeRunnerStore()
+  const perceptionRunnerStore = usePerceptionRunnerStore()
+  const watchRunnerStore = useWatchRunnerStore()
+  const settingsSyncStore = useSettingsSyncStore()
+  const memorySyncStore = useMemorySyncStore()
+  const deviceFloorStore = useDeviceFloorStore()
+  const autonomySyncStore = useAutonomySyncStore()
+  const memoryWorkStore = useMemoryWorkStore()
   const inferencePreload = useInferencePreload()
   const pluginHostInspectorStore = usePluginHostInspectorStore()
   const stageWindowLifecycleStore = useStageWindowLifecycleStore()
@@ -297,6 +329,11 @@ function createFullStageRuntime() {
     syncGodotStageRenderer(event.body)
   })
 
+  context.value.on(unityStageStatusChanged, (event) => {
+    if (event.body)
+      syncUnityStageRenderer(settingsStore, event.body)
+  })
+
   context.value.on(electronPluginToolsChanged, () => {
     void refreshPluginRuntimeTools()
   })
@@ -336,6 +373,15 @@ function createFullStageRuntime() {
       contextBridgeStore.initialize()
       if (!isWidgetsWindow) {
         characterOrchestratorStore.initialize(syncedPinia)
+        missionRunnerStore.initialize(syncedPinia)
+        initiativeRunnerStore.initialize(syncedPinia, createElectronOwnerPresenceSource(context.value))
+        perceptionRunnerStore.initialize(syncedPinia, createElectronScreenSource(context.value), createElectronPerceptionRecorder(context.value))
+        watchRunnerStore.initialize(syncedPinia)
+        settingsSyncStore.initialize(syncedPinia)
+        memorySyncStore.initialize(syncedPinia)
+        deviceFloorStore.initialize(syncedPinia)
+        autonomySyncStore.initialize(syncedPinia)
+        memoryWorkStore.initialize(syncedPinia)
       }
 
       defineInvokeHandler(context.value, pluginProtocolListProviders, async () => listProvidersForPluginHost())

@@ -53,8 +53,11 @@ import { registerIOTraceHub } from './services/airi/io-trace-hub/register'
 import { IOTraceRecordingService } from './services/airi/io-trace-recording'
 import { recordHubRecords } from './services/airi/io-trace-recording/hub'
 import { setupMcpManager } from './services/airi/mcp-servers'
+import { setupMotionGenerator } from './services/airi/motion-generator'
+import { PerceptionRecorderService } from './services/airi/perception-recorder'
 import { setupExtensionHost } from './services/airi/plugins'
 import { createBuiltInExtensionKits } from './services/airi/plugins/kits'
+import { setupUnityStageManager } from './services/airi/unity-stage'
 import { setupArtistryBridge } from './services/airi/widgets/artistry-bridge'
 import { isExternallyUpdatedInstall, setupAutoUpdater } from './services/electron/auto-updater'
 import { setupSherpawModelAssetsProtocol } from './services/electron/bundled-sherpaw-assets'
@@ -320,6 +323,10 @@ app.whenReady().then(async () => {
     build: async () => setupGodotStageManager(),
   })
 
+  const unityStageManager = injeca.provide('modules:unity-stage-manager', {
+    build: async () => setupUnityStageManager(),
+  })
+
   const appleSpeechTranscription = injeca.provide('modules:apple-speech-transcription', {
     build: ({ on }) => setupAppleSpeechTranscriptionService({ on }),
   })
@@ -342,6 +349,17 @@ app.whenReady().then(async () => {
       const unregister = registerIOTraceHub(hub)
       on('stop', unregister)
       return hub
+    },
+  })
+
+  // Screen recordings for replay evaluation are the only frames on the disk. They stay in the user data folder.
+  const perceptionRecorder = injeca.provide('services:perception-recorder', {
+    build: ({ on }) => {
+      const service = new PerceptionRecorderService({ directory: join(app.getPath('userData'), 'perception-recordings'), appVersion: app.getVersion() })
+      on('stop', async () => {
+        await service.stop('owner')
+      })
+      return service
     },
   })
 
@@ -456,7 +474,7 @@ app.whenReady().then(async () => {
   })
 
   const settingsWindow = injeca.provide('windows:settings', {
-    dependsOn: { widgetsManager, beatSync, autoUpdater, devtoolsWindow: devtoolsMarkdownStressWindow, editorWindow, serverChannel, godotStageManager, mcpManager, i18n, globalShortcut, spotlightWindow, ioTraceRecording },
+    dependsOn: { widgetsManager, beatSync, autoUpdater, devtoolsWindow: devtoolsMarkdownStressWindow, editorWindow, serverChannel, godotStageManager, unityStageManager, mcpManager, i18n, globalShortcut, spotlightWindow, ioTraceRecording, perceptionRecorder },
     build: async ({ dependsOn }) => {
       settingsWindowManager = setupSettingsWindowReusableFunc({
         ...dependsOn,
@@ -469,7 +487,7 @@ app.whenReady().then(async () => {
   })
 
   const workspaceWindow = injeca.provide('windows:workspace', {
-    dependsOn: { chatWindow, widgetsManager, autoUpdater, devtoolsWindow: devtoolsMarkdownStressWindow, editorWindow, serverChannel, godotStageManager, mcpManager, i18n, globalShortcut, spotlightWindow, ioTraceRecording },
+    dependsOn: { chatWindow, widgetsManager, autoUpdater, devtoolsWindow: devtoolsMarkdownStressWindow, editorWindow, serverChannel, godotStageManager, unityStageManager, mcpManager, i18n, globalShortcut, spotlightWindow, ioTraceRecording, perceptionRecorder },
     build: ({ dependsOn }) => {
       workspaceWindowManager = setupWorkspaceWindowManager({
         ...dependsOn,
@@ -485,7 +503,7 @@ app.whenReady().then(async () => {
   })
 
   const mainWindow = injeca.provide('windows:main', {
-    dependsOn: { editorWindow, settingsWindow, workspaceWindow, chatWindow, widgetsManager, noticeWindow, beatSync, autoUpdater, serverChannel, godotStageManager, mcpManager, i18n, onboardingWindowManager, inlayWindow, appleSpeechTranscription, appleVision, ioTraceRecording, globalShortcut, spotlightWindow, devtoolsWindow: devtoolsMarkdownStressWindow },
+    dependsOn: { editorWindow, settingsWindow, workspaceWindow, chatWindow, widgetsManager, noticeWindow, beatSync, autoUpdater, serverChannel, godotStageManager, unityStageManager, mcpManager, i18n, onboardingWindowManager, inlayWindow, appleSpeechTranscription, appleVision, ioTraceRecording, perceptionRecorder, globalShortcut, spotlightWindow, devtoolsWindow: devtoolsMarkdownStressWindow },
     build: async ({ dependsOn }) => setupMainWindow({
       ...dependsOn,
       onWindowCreated: (window) => {
@@ -540,11 +558,12 @@ app.whenReady().then(async () => {
   }
 
   injeca.invoke({
-    dependsOn: { mainWindow, tray, serverChannel, airiHttpServer, godotStageManager, pluginHost, mcpManager, onboardingWindow: onboardingWindowManager, widgetsWindow: widgetsManager, spotlightWindow, artistryConfig },
+    dependsOn: { mainWindow, tray, serverChannel, airiHttpServer, godotStageManager, unityStageManager, pluginHost, mcpManager, onboardingWindow: onboardingWindowManager, widgetsWindow: widgetsManager, spotlightWindow, artistryConfig },
     callback: async (deps) => {
       const { context } = createContext(ipcMain)
       setupComputerUse(context)
       setupHomeAssistant(context)
+      setupMotionGenerator(context)
       await setupArtistryBridge({
         widgetsManager: deps.widgetsWindow,
         context,

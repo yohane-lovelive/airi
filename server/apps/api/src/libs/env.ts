@@ -135,6 +135,8 @@ const EnvSchema = intersect([S3EnvironmentSchema, object({
 
   OTEL_TRACES_SAMPLING_RATIO: optionalNumberFromString(1, 'OTEL_TRACES_SAMPLING_RATIO', 0, 1),
   PORT: optionalIntegerFromString(3000, 'PORT', 1),
+  // The internal address of the memory embedder, for example `http://embedder:3000`. Without it, the memory search answers 503.
+  EMBEDDER_URL: optional(string()),
   OPENPANEL_API_URL: optional(string()),
   OPENPANEL_CLIENT_ID: optional(string()),
   OPENPANEL_CLIENT_SECRET: optional(string()),
