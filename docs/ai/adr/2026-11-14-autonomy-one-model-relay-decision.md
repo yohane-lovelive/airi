@@ -109,7 +109,8 @@ Each app has one host for the relay.
 
 - Unit tests cover the relay, the Node adapter with a real HTTP server, the handler of the custom scheme, and the provider definition.
 - Through the relay of the web dev server on 2026-11-14: the model list gave 30 models, a chat request without a key gave the HTTP 401 of the server, and a streamed reply of `gpt-6-luna` gave its first text after 1.0 second.
-- The desktop relay was not run against the server in the app. The key of the owner must be in the app settings for that check.
+- Through the relay scheme in the main window of the desktop dev app on 2026-11-14: the model list gave 30 models, another target gave HTTP 404, and a streamed reply of `gpt-6-luna` gave its first text after 1.6 seconds.
+- The provider `opencode-go` was not run from the app settings. The key of the owner must be in the settings for that check.
 
 ## Verification of step 3
 
