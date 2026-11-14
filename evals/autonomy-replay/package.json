@@ -16,10 +16,12 @@
   },
   "scripts": {
     "eval:run": "vieval run --config ./vieval.config.ts",
+    "import-video": "tsx src/bin/import-video.ts",
     "test:run": "vitest run --config vitest.config.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@moeru/std": "catalog:",
     "@napi-rs/image": "catalog:",
     "@proj-airi/core-agent": "workspace:^",
     "@proj-airi/stage-shared": "workspace:^",
