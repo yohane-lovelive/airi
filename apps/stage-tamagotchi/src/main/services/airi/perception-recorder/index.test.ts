@@ -46,6 +46,26 @@ describe('perceptionRecorderService', () => {
     expect(stopped).toMatchObject({ frames: 1, recording: false })
   })
 
+  it('writes the start of a chat request to the recording, and a later one replaces it', async () => {
+    const service = recorder()
+    const started = await service.start()
+
+    await service.writeRequestStart(started.id, '{"systemPrompt":"first"}')
+    await service.writeRequestStart(started.id, '{"systemPrompt":"second"}')
+
+    expect(await readFile(join(directory, started.id, 'request-start.json'), 'utf8')).toBe('{"systemPrompt":"second"}')
+  })
+
+  it('writes no request start for a recording that does not run', async () => {
+    const service = recorder()
+    const started = await service.start()
+    await service.stop()
+
+    await service.writeRequestStart(started.id, '{"systemPrompt":"late"}')
+
+    expect(await readdir(join(directory, started.id))).not.toContain('request-start.json')
+  })
+
   it('lists recordings newest first, with the running one marked', async () => {
     const service = recorder()
     const first = await service.start()

@@ -314,6 +314,39 @@ describe('isToolRelatedError', () => {
     expect(streamTextMock.mock.calls[0]?.[0]?.tools?.map(toolNameFrom)).toContain('builtIn_emitSparkCommand')
   })
 
+  it('keeps the start of a chat request: the system prompt and the tool definitions without their code', async () => {
+    streamTextMock.mockImplementation(() => createMockStreamResult())
+    const store = useLLM()
+
+    await store.stream('model-a', provider, helloTurns, {
+      purpose: 'commentary',
+      tools: [customTool],
+      resolveStep: async () => ({ model: 'model-b', chatProvider: provider, providerId: 'test', systemPrompt: 'You are AIRI.' }),
+    })
+
+    const start = store.lastChatRequestStart
+    expect(start?.model).toBe('model-b')
+    expect(start?.purpose).toBe('commentary')
+    expect(start?.systemPrompt).toBe('You are AIRI.')
+    // The definitions of the request, in the same order.
+    const sent: Tool[] = streamTextMock.mock.calls[0]?.[0]?.tools
+    expect(sent.map(toolNameFrom)).toContain('custom-tool')
+    expect(start?.tools).toEqual(sent.map(tool => ({ type: tool.type, function: tool.function })))
+    expect(start?.tools.every(tool => !('execute' in tool))).toBe(true)
+  })
+
+  it('keeps no request start of a task beside the chat, because its prompt and tools are its own', async () => {
+    streamTextMock.mockImplementation(() => createMockStreamResult())
+    const store = useLLM()
+
+    await store.stream('model-a', provider, helloTurns, {
+      purpose: 'task',
+      resolveStep: async () => ({ model: 'model-b', chatProvider: provider, providerId: 'test', systemPrompt: 'The steps of a recipe.' }),
+    })
+
+    expect(store.lastChatRequestStart).toBeUndefined()
+  })
+
   it('merges runtime-registered tools from the llm-tools store into the builtin tool resolver', async () => {
     const store = useLLM()
     const llmToolsStore = useLlmToolsStore()

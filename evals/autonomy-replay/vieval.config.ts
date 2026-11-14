@@ -1,16 +1,22 @@
 import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { FRAME_POLICY_NAMES } from '@proj-airi/stage-shared/perception'
-import { parse, picklist } from 'valibot'
 import { defineConfig, loadEnv } from 'vieval'
 import { chatModelFrom, ChatModels, chatProviderFrom, ChatProviders } from 'vieval/plugins/chat-models'
 
 const rootDirectory = dirname(fileURLToPath(import.meta.url))
-const env = loadEnv('', rootDirectory, '')
-const models = (env.AUTONOMY_REPLAY_MODELS ?? 'deepseek-v4.1-flash').split(',').map(model => model.trim()).filter(Boolean)
+// The mode `test` reads `.env.test`, the file that the README names.
+const env = loadEnv('test', rootDirectory, '')
+const models = (env.AUTONOMY_REPLAY_MODELS || 'gpt-6-luna').split(',').map(model => model.trim()).filter(Boolean)
+// NOTICE:
+// The task checks the policy names, because this file cannot import them from `@proj-airi/stage-shared/perception`.
+// Node loads this file and cannot resolve the TypeScript source that the package exports.
+// Source: `exports` in `packages/stage-shared/package.json`.
+// Remove this when stage-shared exports built files.
+const APP_POLICY = 'fresh-keyframes'
+
 // Each recording runs once for each model and each policy, so a shorter list makes a cheaper run.
-const policies = (env.AUTONOMY_REPLAY_POLICIES || FRAME_POLICY_NAMES.join(',')).split(',').map(policy => parse(picklist(FRAME_POLICY_NAMES), policy.trim()))
+const policies = (env.AUTONOMY_REPLAY_POLICIES || APP_POLICY).split(',').map(policy => policy.trim()).filter(Boolean)
 
 export default defineConfig({
   env,
@@ -34,7 +40,7 @@ export default defineConfig({
     {
       name: 'autonomy-replay',
       root: '.',
-      include: ['evals/**/*.eval.ts'],
+      include: ['evals/replay.eval.ts'],
       exclude: ['node_modules/**'],
       runMatrix: {
         override: {

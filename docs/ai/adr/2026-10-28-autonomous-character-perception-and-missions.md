@@ -615,6 +615,7 @@ Step 3-6a built the recorder as follows.
 - **Folder.** The main process writes `perception-recordings/<start time>/` in the user data folder of the app: `frames/<n>.jpg`, `frames.jsonl`, `events.jsonl`, and `manifest.json`. The folder is fixed. Settings show and open it, and a choice of folder can come later.
 - **Control.** Settings > Developer > Screen Recorder starts and stops a recording, lists the recordings, deletes one, and opens the folder. A recording needs running perception. A pause, a screen lock, a leader change, or the end of the share stops it. While it records, the eye button turns into a red record mark.
 - **Limits.** A recording stops by itself after 20 minutes or 1 GB. At 2 frames each second, it writes about 13 MB each minute. A delete touches only the folders of the recordings.
+- **Request start.** Since 2026-11-15, a recording also holds `request-start.json`: the system prompt and the tool definitions of the newest chat request. Replay evaluation sends them again, so its requests have the size of the requests of the app. See [the ADR of 2026-11-14](2026-11-14-autonomy-one-model-relay-decision.md).
 
 ### Game audio (later)
 

@@ -56,6 +56,13 @@ export interface ReplayTurn {
 export interface SpokenReply {
   readonly text: string
   readonly usage?: TokenUsage
+  /** The time from the start of the request to the first text, in milliseconds. A reply without text has none. */
+  readonly firstTextMs?: number
+  /** The time of the whole turn, with its tool rounds, in milliseconds. */
+  readonly durationMs?: number
+  /** The model requests of the turn. A turn with a tool call has more than one. */
+  readonly requests?: number
+  readonly toolCalls?: number
 }
 
 /** One line that the character spoke in the replay. */
@@ -66,6 +73,8 @@ export interface ReplayLine {
   readonly speechType?: SpeechType
   /** The frames that the turn showed, oldest first: the single frames or the tiles of the contact sheet. */
   readonly frames: readonly RecordedFrame[]
+  /** The time until the owner hears the start of the line, without the speech synthesis. */
+  readonly firstTextMs?: number
 }
 
 export interface ReplayResult {
@@ -73,6 +82,9 @@ export interface ReplayResult {
   readonly turns: number
   readonly silent: number
   readonly images: number
+  /** The model requests of all turns. More requests than turns means tool calls. */
+  readonly requests: number
+  readonly toolCalls: number
   readonly usage: TokenUsage
   readonly lines: readonly ReplayLine[]
   readonly events: readonly ScreenEvent[]
@@ -137,6 +149,8 @@ export async function replayRecording(recording: Recording, options: ReplayOptio
   let turns = 0
   let silent = 0
   let images = 0
+  let requests = 0
+  let toolCalls = 0
   let speakingUntil = 0
   /** The end of the last spoken line, until the policy hears of it. */
   let speechEnd: number | undefined
@@ -227,6 +241,8 @@ export async function replayRecording(recording: Recording, options: ReplayOptio
     usage.input += reply.usage?.input ?? 0
     usage.output += reply.usage?.output ?? 0
     usage.cached += reply.usage?.cached ?? 0
+    requests += reply.requests ?? 1
+    toolCalls += reply.toolCalls ?? 0
 
     const { spoken, markers } = splitReply(reply.text)
     for (const marker of markers) {
@@ -235,7 +251,7 @@ export async function replayRecording(recording: Recording, options: ReplayOptio
         : setTimelineScene(timeline, marker.text, frame.at)
     }
     if (spoken) {
-      lines.push({ at: frame.at, text: spoken, trigger: decision.trigger, ...(decision.speechType ? { speechType: decision.speechType } : {}), frames: sheet?.length ? sheet : picked })
+      lines.push({ at: frame.at, text: spoken, trigger: decision.trigger, ...(decision.speechType ? { speechType: decision.speechType } : {}), frames: sheet?.length ? sheet : picked, ...(reply.firstTextMs !== undefined ? { firstTextMs: reply.firstTextMs } : {}) })
       speakingUntil = frame.at + spoken.length * SPEECH_MS_PER_CHARACTER
       speechEnd = speakingUntil
     }
@@ -251,6 +267,8 @@ export async function replayRecording(recording: Recording, options: ReplayOptio
     turns,
     silent,
     images,
+    requests,
+    toolCalls,
     usage,
     lines,
     events,

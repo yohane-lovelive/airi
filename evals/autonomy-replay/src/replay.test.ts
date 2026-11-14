@@ -8,8 +8,8 @@ import { join } from 'node:path'
 import { Transformer } from '@napi-rs/image'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { complete } from './chat'
-import { renderContactSheet } from './contact-sheet'
+import { complete, sessionHeaders } from './chat'
+import { renderContactSheet, scaleFrame } from './contact-sheet'
 import { parseJudgment } from './judge'
 import { replayMetrics } from './metrics'
 import { frameImage, loadRecording, loadRecordings } from './recording'
@@ -141,6 +141,19 @@ describe('renderContactSheet', () => {
   })
 })
 
+describe('scaleFrame', () => {
+  it('scales a large frame down to the long side, and keeps a small frame as it is', async () => {
+    const pixels = new Uint8Array(1280 * 720 * 4).fill(200)
+    const large = (await Transformer.fromRgbaPixels(pixels, 1280, 720).jpeg(80)).toString('base64')
+
+    const small = await scaleFrame(large, 512)
+    const metadata = await new Transformer(Buffer.from(small, 'base64')).metadata()
+
+    expect([metadata.width, metadata.height]).toEqual([512, 288])
+    expect(await scaleFrame(small, 512)).toBe(small)
+  })
+})
+
 describe('replay helpers', () => {
   it('draws the same values for the same seed', () => {
     const left = seededRandom(3)
@@ -158,6 +171,8 @@ describe('replay helpers', () => {
       turns: 4,
       silent: 1,
       images: 6,
+      requests: 5,
+      toolCalls: 1,
       usage: { input: 1_000, output: 50, cached: 250 },
       lines: [
         { at: 0, text: 'ラーメン食べたい', trigger: 'boredom', speechType: 'ask', frames: [] },
@@ -177,14 +192,15 @@ describe('replay helpers', () => {
     expect(parseJudgment('{"grounded": "yes"}')).toBeUndefined()
   })
 
-  it('sends images as data URLs and reads the cached tokens of the response', async () => {
+  it('sends images as data URLs with the session header, and reads the cached tokens of the response', async () => {
     const fetch = vi.fn(async (_url: string, init: RequestInit) => {
       expect(JSON.parse(String(init.body)).messages[1].content[1].image_url.url).toBe('data:image/jpeg;base64,AAAA')
+      expect(new Headers(init.headers).get('x-opencode-session')).toBe('judge-1')
       return new Response(JSON.stringify({ choices: [{ message: { content: 'hi' } }], usage: { prompt_tokens: 100, completion_tokens: 5, prompt_tokens_details: { cached_tokens: 60 } } }))
     })
     vi.stubGlobal('fetch', fetch)
     try {
-      const reply = await complete({ baseURL: 'https://example.test/v1/', apiKey: 'key', model: 'model' }, [
+      const reply = await complete({ baseURL: 'https://example.test/v1/', apiKey: 'key', model: 'model', headers: sessionHeaders('judge-1') }, [
         { role: 'system', content: 'persona' },
         { role: 'user', content: [{ type: 'text', text: 'notice' }, { type: 'image', base64: 'AAAA' }] },
       ])

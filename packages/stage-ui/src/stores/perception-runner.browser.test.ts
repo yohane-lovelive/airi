@@ -1,7 +1,7 @@
 import type { SyncedPiniaRuntime } from 'pinia-plugin-synced'
 
 import type { ForegroundWindow } from '../libs/perception/exclusion'
-import type { PerceptionRecorderSink, RecorderEvent, RecorderFrame } from '../libs/perception/recorder'
+import type { PerceptionRecorderSink, RecorderEvent, RecorderFrame, RecorderRequestStart } from '../libs/perception/recorder'
 import type { ScreenSource } from '../libs/perception/screen-source'
 
 import { createPinia, disposePinia, setActivePinia } from 'pinia'
@@ -312,6 +312,7 @@ describe('usePerceptionRunnerStore', { timeout: 60_000 }, () => {
     const screen = canvasSource({ foreground: () => window })
     const frames: RecorderFrame[] = []
     const events: RecorderEvent[] = []
+    const requestStarts: RecorderRequestStart[] = []
     const recorder: PerceptionRecorderSink = {
       start: vi.fn(async () => ({ id: 'rec-1', startedAt: Date.now(), frames: 0, bytes: 0, recording: true })),
       appendFrame: vi.fn(async (_id: string, frame: RecorderFrame) => {
@@ -320,6 +321,9 @@ describe('usePerceptionRunnerStore', { timeout: 60_000 }, () => {
       }),
       appendEvents: vi.fn(async (_id: string, added: RecorderEvent[]) => {
         events.push(...added)
+      }),
+      writeRequestStart: vi.fn(async (_id: string, start: RecorderRequestStart) => {
+        requestStarts.push(start)
       }),
       stop: vi.fn(async () => undefined),
       list: vi.fn(async () => []),
@@ -330,9 +334,17 @@ describe('usePerceptionRunnerStore', { timeout: 60_000 }, () => {
     perception.enabled = true
     await expect.poll(() => status.status.state, { timeout: 15_000 }).toBe('running')
     expect(status.status.canRecord).toBe(true)
+    // A chat request before the recording. The recording still gets its start.
+    const earlier: RecorderRequestStart = { model: 'gpt-6-luna', purpose: 'owner-reply', systemPrompt: 'You are AIRI.', tools: [] }
+    runner.recordRequestStart(earlier)
+    expect(requestStarts).toEqual([])
 
     status.requestRecording(true)
     await expect.poll(() => frames.length, { timeout: 15_000 }).toBeGreaterThan(1)
+    expect(requestStarts).toEqual([earlier])
+    const later: RecorderRequestStart = { ...earlier, purpose: 'commentary' }
+    runner.recordRequestStart(later)
+    await expect.poll(() => requestStarts).toEqual([earlier, later])
     expect(frames[0]).toMatchObject({ app: 'Game', thumbnail: expect.any(String) })
     expect(frames[0].image.byteLength).toBeGreaterThan(0)
     runner.recordOwnerMessage(1_234)

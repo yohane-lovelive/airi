@@ -10,6 +10,7 @@ export function createElectronPerceptionRecorder(context: ReturnType<typeof useE
   const start = defineInvoke(context, electronPerceptionRecorder.start)
   const appendFrame = defineInvoke(context, electronPerceptionRecorder.appendFrame)
   const appendEvents = defineInvoke(context, electronPerceptionRecorder.appendEvents)
+  const writeRequestStart = defineInvoke(context, electronPerceptionRecorder.writeRequestStart)
   const stop = defineInvoke(context, electronPerceptionRecorder.stop)
   const list = defineInvoke(context, electronPerceptionRecorder.list)
   const remove = defineInvoke(context, electronPerceptionRecorder.remove)
@@ -18,6 +19,9 @@ export function createElectronPerceptionRecorder(context: ReturnType<typeof useE
     start: () => start(),
     appendFrame: (id, frame) => appendFrame({ id, frame: { ...frame } }),
     appendEvents: (id, events) => appendEvents({ id, events: events.map(event => ({ ...event })) }),
+    // The text form drops what a tool definition can hold beside data, which the IPC channel cannot clone.
+    writeRequestStart: (id, start) => writeRequestStart({ id, json: `${JSON.stringify(start, null, 2)}
+` }),
     stop: () => stop(),
     list: () => list(),
     remove: id => remove({ id }),

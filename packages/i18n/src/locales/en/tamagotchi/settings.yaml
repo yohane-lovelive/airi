@@ -92,7 +92,7 @@ devtools:
     perception-recorder:
       title: Screen Recorder
       description: Record the screen that the character sees, for replay evaluation
-      intro: A developer tool. It writes each frame that screen perception takes, the app in front, the screen events, and the times of your messages to a folder on this device. Recordings never leave the device. Excluded windows are not recorded.
+      intro: A developer tool. It writes each frame that screen perception takes, the app in front, the screen events, and the times of your messages to a folder on this device. It also writes the system prompt and the tool list of the newest chat request, which hold the character and the memory index. Recordings never leave the device. Excluded windows are not recorded.
       unsupported: Only the desktop app can record the screen.
       needs-perception: Turn screen perception on and let it run, then start a recording.
       start: Start recording

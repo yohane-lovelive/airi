@@ -13,6 +13,20 @@ export type RecorderEvent
   = | { readonly kind: 'screen', readonly at: number, readonly type: string, readonly salience: number, readonly app?: string }
     | { readonly kind: 'owner-message', readonly at: number }
 
+/**
+ * The start of a chat request of the app while a recording runs: the system prompt and the tool definitions.
+ * Replay evaluation sends it again, so its requests have the size of the requests of the app.
+ */
+export interface RecorderRequestStart {
+  readonly model: string
+  /** Why the request ran, for example `commentary`. */
+  readonly purpose: string
+  /** The whole system prompt: the character, the memory index, and the tool notes. */
+  readonly systemPrompt: string
+  /** The tools as the provider gets them, without the code that runs them. */
+  readonly tools: readonly { readonly type: 'function', readonly function: Readonly<Record<string, unknown>> }[]
+}
+
 /** One recording on the device. */
 export interface RecordingInfo {
   readonly id: string
@@ -32,6 +46,8 @@ export interface PerceptionRecorderSink {
   /** Resolves to the reason when the recording stopped at a limit, or when it does not run. */
   appendFrame: (id: string, frame: RecorderFrame) => Promise<{ stopped?: 'time' | 'size' | 'not-recording' }>
   appendEvents: (id: string, events: RecorderEvent[]) => Promise<void>
+  /** Writes the start of the newest chat request to the recording. A later one replaces it. */
+  writeRequestStart: (id: string, start: RecorderRequestStart) => Promise<void>
   stop: () => Promise<RecordingInfo | undefined>
   list: () => Promise<RecordingInfo[]>
   remove: (id: string) => Promise<boolean>

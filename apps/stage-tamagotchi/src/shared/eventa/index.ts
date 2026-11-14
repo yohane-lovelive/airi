@@ -85,6 +85,8 @@ export const electronPerceptionRecorder = {
   start: defineInvokeEventa<PerceptionRecordingInfo>('eventa:invoke:electron:perception-recorder:start'),
   appendFrame: defineInvokeEventa<{ stopped?: 'time' | 'size' | 'not-recording' }, { id: string, frame: PerceptionRecordedFrame }>('eventa:invoke:electron:perception-recorder:append-frame'),
   appendEvents: defineInvokeEventa<void, { id: string, events: PerceptionRecordedEvent[] }>('eventa:invoke:electron:perception-recorder:append-events'),
+  /** `json` is the file text of `request-start.json`. The renderer owns its form, and replay evaluation reads it. */
+  writeRequestStart: defineInvokeEventa<void, { id: string, json: string }>('eventa:invoke:electron:perception-recorder:write-request-start'),
   stop: defineInvokeEventa<PerceptionRecordingInfo | undefined>('eventa:invoke:electron:perception-recorder:stop'),
   list: defineInvokeEventa<PerceptionRecordingInfo[]>('eventa:invoke:electron:perception-recorder:list'),
   remove: defineInvokeEventa<boolean, { id: string }>('eventa:invoke:electron:perception-recorder:remove'),

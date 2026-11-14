@@ -1,7 +1,7 @@
 import type { ScreenEvent } from '@proj-airi/stage-shared/perception'
 import type { SyncedPiniaRuntime } from 'pinia-plugin-synced'
 
-import type { PerceptionRecorderSink, RecorderEvent } from '../libs/perception/recorder'
+import type { PerceptionRecorderSink, RecorderEvent, RecorderRequestStart } from '../libs/perception/recorder'
 import type { ScreenSource } from '../libs/perception/screen-source'
 import type { PerceptionState } from './perception-status'
 
@@ -118,6 +118,8 @@ export const usePerceptionRunnerStore = defineStore('perception-runner', () => {
   let recording: { id: string, startedAt: number, frames: number } | undefined
   let recordingStarting = false
   let recordQueue: Promise<void> = Promise.resolve()
+  /** The start of the newest chat request of this window. A recording that starts later still gets it. */
+  let requestStart: RecorderRequestStart | undefined
 
   function createDetector() {
     return new ScreenDetector({ width: FRAME_LIMITS.thumbnailWidth, height: FRAME_LIMITS.thumbnailHeight })
@@ -185,6 +187,12 @@ export const usePerceptionRunnerStore = defineStore('perception-runner', () => {
     recordQueue = recordQueue.then(() => write(id)).catch(error => console.warn('[perception] Failed to write the recording:', errorMessageFrom(error)))
   }
 
+  function writeRequestStart() {
+    const start = requestStart
+    if (start)
+      record(id => recorder!.writeRequestStart(id, start))
+  }
+
   /** Starts or stops the recording to match the owner's request and the capture. */
   function syncRecording() {
     if (!recorder || !isLeader())
@@ -194,6 +202,7 @@ export const usePerceptionRunnerStore = defineStore('perception-runner', () => {
       recordingStarting = true
       void recorder.start().then((info) => {
         recording = { id: info.id, startedAt: info.startedAt, frames: 0 }
+        writeRequestStart()
       }).catch((error) => {
         console.warn('[perception] Failed to start the recording:', errorMessageFrom(error))
         statusStore.requestRecording(false)
@@ -631,6 +640,14 @@ export const usePerceptionRunnerStore = defineStore('perception-runner', () => {
     setTarget,
     /** Notes an owner message in the recording that runs now. The text stays out. */
     recordOwnerMessage: (at: number) => recordEvents([{ kind: 'owner-message', at }]),
+    /**
+     * Notes the start of a chat request: its system prompt and its tool definitions. The recording that runs now, or
+     * the next one, holds the newest one, so replay evaluation can send requests of the same size.
+     */
+    recordRequestStart: (start: RecorderRequestStart) => {
+      requestStart = start
+      writeRequestStart()
+    },
     /** The recordings on the device, and their actions. Undefined in an app that cannot record. */
     recorder: () => recorder,
     startFromGesture,

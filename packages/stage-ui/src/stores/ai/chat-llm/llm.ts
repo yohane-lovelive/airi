@@ -2,13 +2,14 @@ import type { Conversation, StreamOptions } from '@proj-airi/core-agent'
 import type { GenerationProvider } from '@proj-airi/provider-inference'
 import type { Tool } from '@xsai/shared-chat'
 
+import type { RecorderRequestStart } from '../../../libs/perception/recorder'
 import type { UsagePurpose } from '../../../libs/usage'
 import type { DescribeToolImage } from './tool-images'
 
 import { streamFrom as coreStreamFrom, isContentArrayRelatedError, isToolRelatedError, modelKey } from '@proj-airi/core-agent'
 import { listModels } from '@xsai/model'
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, shallowRef } from 'vue'
 
 import { countRequestImages } from '../../../libs/usage'
 import { useUsageStore } from '../../usage'
@@ -30,10 +31,21 @@ export interface LlmStreamOptions extends StreamOptions {
   purpose?: UsagePurpose
 }
 
+/**
+ * The purposes of the turns of the owner's own conversation. Their requests carry the system prompt and the tools of
+ * the chat. A task or a scene has a prompt and tools of its own.
+ */
+const CHAT_PURPOSES: readonly UsagePurpose[] = ['owner-reply', 'initiative', 'commentary', 'mission']
+
 export const useLLM = defineStore('llm', () => {
   const toolsCompatibility = ref<Map<string, boolean>>(new Map())
   const contentArrayCompatibility = ref<Map<string, boolean>>(new Map())
   const usage = useUsageStore()
+  /**
+   * The start of the newest chat request of this window: its system prompt and its tool definitions. The screen
+   * recorder keeps it with a recording, so replay evaluation sends requests of the size that the app sends.
+   */
+  const lastChatRequestStart = shallowRef<RecorderRequestStart>()
 
   async function stream(model: string, chatProvider: GenerationProvider, context: Conversation, options?: LlmStreamOptions) {
     // Compatibility belongs to the model that received the failing request.
@@ -61,7 +73,19 @@ export const useLLM = defineStore('llm', () => {
             ...(taskTools ? { providerTools: false } : {}),
             // Core uses only the tools of a resolved step, so each step carries the complete tool list.
             resolveStep: resolveStep
-              ? async () => ({ ...await resolveStep(), tools: await resolveTools() })
+              ? async () => {
+                const step = { ...await resolveStep(), tools: await resolveTools() }
+                if (CHAT_PURPOSES.includes(purpose)) {
+                  lastChatRequestStart.value = {
+                    model: step.model,
+                    purpose,
+                    systemPrompt: step.systemPrompt,
+                    // The definition only. The code that runs a tool stays in the app.
+                    tools: step.tools.map(tool => ({ type: tool.type, function: tool.function })),
+                  }
+                }
+                return step
+              }
               : undefined,
             prepareConversation: async (conversation, target) => {
               key = modelKey(target.model, target.request)
@@ -142,5 +166,6 @@ export const useLLM = defineStore('llm', () => {
   return {
     models,
     stream,
+    lastChatRequestStart,
   }
 })

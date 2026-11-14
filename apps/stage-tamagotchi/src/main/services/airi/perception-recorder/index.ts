@@ -37,7 +37,8 @@ function folderName(at: number) {
  * Writes screen recordings for replay evaluation. It is the only part of the app that keeps frames on the disk.
  *
  * - Each recording is one folder under `directory`: `frames/<n>.jpg`, `frames.jsonl` with one line for each frame,
- *   `events.jsonl` with the screen events and the owner messages, and `manifest.json`.
+ *   `events.jsonl` with the screen events and the owner messages, and `manifest.json`. A recording with a chat
+ *   request also has `request-start.json`, the system prompt and the tool definitions of that request.
  * - One recording runs at a time. It stops by itself at its time or size limit.
  * - Delete and list touch only the folders under `directory`.
  *
@@ -104,6 +105,17 @@ export class PerceptionRecorderService {
     const lines = events.map(event => `${JSON.stringify(event)}\n`).join('')
     await appendFile(join(active.directory, 'events.jsonl'), lines)
     active.bytes += lines.length
+  }
+
+  /**
+   * Writes the start of a chat request of the app to `request-start.json`. A later call replaces the file, so the
+   * recording holds the newest one.
+   */
+  async writeRequestStart(id: string, json: string) {
+    const active = this.active
+    if (!active || active.id !== id)
+      return
+    await writeFile(join(active.directory, 'request-start.json'), json)
   }
 
   /** Stops the running recording and writes its manifest. Resolves to its info, or `undefined` without one. */

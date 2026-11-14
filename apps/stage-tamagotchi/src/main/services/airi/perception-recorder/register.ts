@@ -18,6 +18,7 @@ export function registerPerceptionRecorder(
     defineInvokeHandler(context, electronPerceptionRecorder.start, () => service.start()),
     defineInvokeHandler(context, electronPerceptionRecorder.appendFrame, ({ id, frame }) => service.appendFrame(id, frame)),
     defineInvokeHandler(context, electronPerceptionRecorder.appendEvents, ({ id, events }) => service.appendEvents(id, events)),
+    defineInvokeHandler(context, electronPerceptionRecorder.writeRequestStart, ({ id, json }) => service.writeRequestStart(id, json)),
     defineInvokeHandler(context, electronPerceptionRecorder.stop, () => service.stop('owner')),
     defineInvokeHandler(context, electronPerceptionRecorder.list, () => service.list()),
     defineInvokeHandler(context, electronPerceptionRecorder.remove, ({ id }) => service.remove(id)),

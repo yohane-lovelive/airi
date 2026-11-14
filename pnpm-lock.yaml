@@ -3592,6 +3592,9 @@ importers:
       '@proj-airi/core-agent':
         specifier: workspace:^
         version: link:../../packages/core-agent
+      '@proj-airi/provider-inference':
+        specifier: workspace:^
+        version: link:../../packages/provider-inference
       '@proj-airi/stage-shared':
         specifier: workspace:^
         version: link:../../packages/stage-shared

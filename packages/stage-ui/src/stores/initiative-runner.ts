@@ -38,6 +38,7 @@ import { MEMORY_INDEX_LIMIT, MEMORY_INDEX_LIMIT_WITH_RECALL } from '../libs/memo
 import { eventPressureFactor, IMAGE_BUDGET_LIMITS } from '../libs/perception/image-budget'
 import { buildScreenTurn } from '../libs/perception/screen-turn'
 import { Ticker } from '../workers/ticker'
+import { useLLM } from './ai/chat-llm/llm'
 import { useSpeakingStore } from './audio'
 import { useChatStore } from './chat'
 import { useChatSessionStore } from './chat/session-store'
@@ -508,6 +509,13 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
       perceptionRunner.recordOwnerMessage(message.createdAt ?? Date.now())
     }
     observe(event)
+  })
+
+  // A screen recording keeps the start of the newest chat request, for replay evaluation.
+  const llm = useLLM()
+  watch(() => llm.lastChatRequestStart, (start) => {
+    if (start)
+      perceptionRunner.recordRequestStart(start)
   })
 
   // The pause before the next turn counts from the end of the speech, so a long line does not shorten it.
