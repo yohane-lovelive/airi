@@ -21,6 +21,7 @@ import { createContext } from '@moeru/eventa/adapters/electron/main'
 import { hasSelectedScreenCaptureSource, initScreenCaptureForMain } from '@proj-airi/electron-screen-capture/main'
 import { ExtensionHost } from '@proj-airi/plugin-sdk/plugin-host'
 import { isEnvTruthy } from '@proj-airi/stage-shared'
+import { PROVIDER_RELAY_SCHEME } from '@proj-airi/stage-shared/provider-relay'
 import { app, ipcMain, protocol, session } from 'electron'
 import { createLoggLogger, injeca } from 'injeca'
 import { isLinux } from 'std-env'
@@ -63,6 +64,7 @@ import { isExternallyUpdatedInstall, setupAutoUpdater } from './services/electro
 import { setupSherpawModelAssetsProtocol } from './services/electron/bundled-sherpaw-assets'
 import { setupGlobalShortcutService } from './services/electron/global-shortcut'
 import { setupPermissionHandlers } from './services/electron/media-permissions'
+import { setupProviderRelayProtocol } from './services/electron/provider-relay'
 import { setupSherpawModelAssets } from './services/electron/sherpaw-model-assets'
 import { setupTray } from './tray'
 import { setupAboutWindowReusable } from './windows/about'
@@ -93,6 +95,10 @@ protocol.registerSchemesAsPrivileged([{
   privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true },
 }, {
   scheme: 'airi-sherpaw',
+  privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true },
+}, {
+  // The renderer posts chat requests to this scheme and reads the replies as streams.
+  scheme: PROVIDER_RELAY_SCHEME,
   privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true },
 }])
 setGlobalFormat(Format.Pretty)
@@ -266,6 +272,7 @@ app.whenReady().then(async () => {
   }
 
   setupSherpawModelAssetsProtocol(getRendererRoot)
+  setupProviderRelayProtocol()
   setupSherpawModelAssets(createContext(ipcMain).context)
   defineInvokeHandler(createContext(ipcMain).context, electronErrorReportingSet, enabled => errorReporting.setEnabled(Boolean(enabled)))
   setupPermissionHandlers(session.defaultSession, hasSelectedScreenCaptureSource)

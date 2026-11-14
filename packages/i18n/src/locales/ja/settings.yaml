@@ -803,6 +803,7 @@ pages:
                 medium: 中
                 high: 高
               required-description: このモデルでは思考機能が必須です。
+              provider-default-description: AIRI にはこのモデルの推論設定がありません。OpenRouter の初期設定が適用されます。
             reply-length:
               label: 返事の長さ
               description: あなたのメッセージへの返事の長さです。自律的な発話には、別の長さがあります。
@@ -823,7 +824,6 @@ pages:
                 catalog: 'モデル一覧に従う（{catalog}）'
                 reads: 画像を読める
                 no-images: 画像を読めない
-              provider-default-description: AIRI にはこのモデルの推論設定がありません。OpenRouter の初期設定が適用されます。
       title: 意識
     description: 思考、視覚、音声合成、ゲームなど。
     gaming-factorio:
@@ -2147,6 +2147,9 @@ pages:
         playground:
           default-text: こんにちは！これは MiniMax 音声合成のテストです。
         title: MiniMax 音声
+      opencode-go:
+        description: opencode.ai。AIRI の中継を通して呼び出します。Web 版では AIRI の開発サーバーが必要です。
+        title: OpenCode Go
       openai-compatible:
         description: OpenAI互換
         title: OpenAI互換

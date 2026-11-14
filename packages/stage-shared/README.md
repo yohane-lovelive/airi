@@ -49,6 +49,16 @@ The same entrypoint owns the gestures. `BUILT_IN_GESTURES` holds eight gestures 
 
 The `stage-sidecar` entrypoint owns the messages between Electron main and a display sidecar, for example `engines/stage-tamagotchi-unity`. `parseHostMessage` and `parseSidecarMessage` read them. The C# tests of the sidecar read `protocol-fixtures.json` too, so a change of the protocol fails on the side that did not follow it.
 
+The `provider-relay` entrypoint owns the relay between a page and a model server that a browser cannot call, for example OpenCode Go. `createProviderRelay` forwards a request to a target of its closed list and adds the session header of the server. The host of the page runs it: Electron main with `protocol.handle`, and the Vite server with `createNodeRelayHandler` of `provider-relay/node`. `providerRelayBaseUrl` gives the address that a page uses:
+
+```ts
+import { createProviderRelay, providerRelayBaseUrl } from '@proj-airi/stage-shared/provider-relay'
+
+const relay = createProviderRelay({ sessionId: crypto.randomUUID() })
+const response = await relay('opencode-go', '/chat/completions', request)
+const baseUrl = providerRelayBaseUrl('opencode-go', 'desktop') // airi-relay://opencode-go/
+```
+
 ## Do not use this package
 
 Keep Electron IPC definitions in the Electron application. Keep UI state and actions in `@proj-airi/stage-ui`. Keep Extension runtime and manifest behavior in `@proj-airi/plugin-sdk`.

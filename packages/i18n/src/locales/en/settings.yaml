@@ -1056,6 +1056,7 @@ pages:
                 medium: Medium
                 high: High
               required-description: This model requires Thinking.
+              provider-default-description: AIRI has no reasoning settings for this model. OpenRouter applies its default.
             reply-length:
               label: Reply length
               description: How long the replies to your messages are. Autonomous speech has its own length.
@@ -1076,7 +1077,6 @@ pages:
                 catalog: 'Model list ({catalog})'
                 reads: Reads images
                 no-images: No images
-              provider-default-description: AIRI has no reasoning settings for this model. OpenRouter applies its default.
       title: Consciousness
     description: Thinking, vision, speech synthesis, gaming, etc.
     gaming-factorio:
@@ -2704,6 +2704,9 @@ pages:
       azure-openai:
         description: Azure OpenAI API
         title: Azure OpenAI
+      opencode-go:
+        description: opencode.ai. AIRI reaches it through its relay, so the web app needs the AIRI development server.
+        title: OpenCode Go
       openai-compatible:
         description: OpenAI Compatible
         title: OpenAI Compatible

@@ -27,6 +27,8 @@
     "./model-assets": "./src/model-assets/index.ts",
     "./perception": "./src/perception/index.ts",
     "./plugin-host": "./src/plugin-host.ts",
+    "./provider-relay": "./src/provider-relay/index.ts",
+    "./provider-relay/node": "./src/provider-relay/node.ts",
     "./screen-ambient-light": "./src/screen-ambient-light/index.ts",
     "./server-channel-qr": "./src/server-channel-qr.ts",
     "./settings-search": "./src/settings-search/index.ts",

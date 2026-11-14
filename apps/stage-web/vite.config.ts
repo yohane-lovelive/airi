@@ -1,3 +1,5 @@
+import type { Plugin } from 'vite'
+
 import crypto from 'node:crypto'
 import process, { cwd, env } from 'node:process'
 
@@ -23,6 +25,8 @@ import { localeRemap, serializeStartupFallbackLocales } from '@proj-airi/i18n'
 import { paraformerBilingualZhEn, xAsrBilingualZhEnInt8, zipformerMultilingual } from '@proj-airi/provider-inference/sherpaw-transcription/models'
 import { createSettingsSearch } from '@proj-airi/stage-pages/vite/settings-search'
 import { sentrySourceMaps } from '@proj-airi/stage-shared/analytics/sentry-vite'
+import { createProviderRelay, PROVIDER_RELAY_PATH } from '@proj-airi/stage-shared/provider-relay'
+import { createNodeRelayHandler } from '@proj-airi/stage-shared/provider-relay/node'
 import { speakerModel } from '@proj-airi/stage-shared/speaker-model'
 import { kwsModel } from '@proj-airi/stage-ui/libs/voice/kws-model-info'
 import { Download } from '@proj-airi/unplugin-fetch/vite'
@@ -37,6 +41,23 @@ const sharedCacheDir = resolve(join(import.meta.dirname, '..', '..', '.cache'))
 const settingsSearch = createSettingsSearch()
 // 起動ごとに固定（または任意のUUID）のセッションIDを生成
 const opencodeSessionId = crypto.randomUUID()
+
+/**
+ * Serves the provider relay from the dev server and the preview server, so the page reaches model servers that a
+ * browser cannot call. A static deployment of the build has no relay.
+ */
+function ProviderRelay(): Plugin {
+  const handler = createNodeRelayHandler(createProviderRelay({ sessionId: crypto.randomUUID() }))
+  return {
+    name: 'airi-provider-relay',
+    configureServer(server) {
+      server.middlewares.use(PROVIDER_RELAY_PATH, handler)
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use(PROVIDER_RELAY_PATH, handler)
+    },
+  }
+}
 
 function hasFlagEnableMkcert(): boolean {
   if (process.argv.includes('--mkcert')) {
@@ -153,6 +174,7 @@ export default defineConfig({
   },
 
   plugins: [
+    ProviderRelay(),
     {
       name: 'airi-startup-locales',
       transformIndexHtml: html => html.replace('__AIRI_STARTUP_LOCALES__', serializeStartupFallbackLocales(messages, localeRemap)),
