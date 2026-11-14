@@ -1,15 +1,11 @@
 import type { FramePolicyName } from '@proj-airi/stage-shared/perception'
 
-import type { ModelSelection } from '../libs/perception/screen-model'
-
 import { useLocalStorageManualReset } from '@proj-airi/stage-shared/composables'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 import { DEFAULT_PERCEPTION_EXCLUSIONS } from '../libs/perception/exclusion'
 import { IMAGE_BUDGET_LIMITS, imageBudgetState, imagesInWindow } from '../libs/perception/image-budget'
-import { modelForScreen } from '../libs/perception/screen-model'
-import { useProviderConfigStore } from './providers/config'
 
 /**
  * The owner settings of screen perception: the character sees the screen of the device.
@@ -39,12 +35,6 @@ export const usePerceptionStore = defineStore('perception', () => {
    * evaluation chooses one.
    */
   const framePolicy = useLocalStorageManualReset<FramePolicyName>('perception/frame-policy', 'fresh-keyframes')
-  /**
-   * The model of the calls that send images of the screen. Empty fields keep the model of the card. Its provider has
-   * keys of this device, so the choice stays on the device too.
-   */
-  const screenModelProvider = useLocalStorageManualReset<string>('perception/screen-model-provider', '')
-  const screenModelId = useLocalStorageManualReset<string>('perception/screen-model-id', '')
   /** When frames went to the model, in the last hour. The device keeps them, so a restart does not reset the budget. */
   const sentImageTimes = useLocalStorageManualReset<number[]>('perception/sent-image-times', [])
   /**
@@ -69,14 +59,7 @@ export const usePerceptionStore = defineStore('perception', () => {
     sentImageTimes.value = [...imagesInWindow(sentImageTimes.value, at), ...Array.from<number>({ length: count }).fill(at)]
   }
 
-  /** The model of a call that sends images of the screen, for a character with this model on its card. */
-  function modelOfScreenCall(card: ModelSelection) {
-    return modelForScreen(card, { provider: screenModelProvider.value, model: screenModelId.value }, provider => Boolean(useProviderConfigStore().configuredProviders[provider]))
-  }
-
   function resetState() {
-    screenModelProvider.reset()
-    screenModelId.reset()
     enabled.reset()
     paused.reset()
     exclusions.reset()
@@ -93,11 +76,8 @@ export const usePerceptionStore = defineStore('perception', () => {
     imagesPerHour,
     commentaryImagesPerHour,
     framePolicy,
-    screenModelProvider,
-    screenModelId,
     sentImageTimes,
     supported,
-    modelOfScreenCall,
     togglePaused,
     budgetAt,
     recordImages,

@@ -39,8 +39,6 @@ import { VitePWA } from 'vite-plugin-pwa'
 const stageUIAssetsRoot = resolve(join(import.meta.dirname, '..', '..', 'packages', 'stage-ui', 'src', 'assets'))
 const sharedCacheDir = resolve(join(import.meta.dirname, '..', '..', '.cache'))
 const settingsSearch = createSettingsSearch()
-// 起動ごとに固定（または任意のUUID）のセッションIDを生成
-const opencodeSessionId = crypto.randomUUID()
 
 /**
  * Serves the provider relay from the dev server and the preview server, so the page reaches model servers that a
@@ -118,18 +116,6 @@ export default defineConfig({
     },
   },
   server: {
-    proxy: {
-      '/opencode-api': {
-        target: 'https://opencode.ai/zen/go/v1',
-        changeOrigin: true,
-        rewrite: path => path.replace(/^\/opencode-api/, ''),
-        // --- 以下を追加：OpenCode Go 必須ヘッダーを自動注入 ---
-        headers: {
-          'x-opencode-session': opencodeSessionId,
-          'User-Agent': 'opencode/1.0.0', // 万が一UA判定がある場合の保険
-        },
-      },
-    },
     fs: {
       // To mute errors like:
       //   The request id ".../node_modules/@fontsource/sniglet/files/sniglet-latin-400-normal.woff" is outside of Vite serving allow list.

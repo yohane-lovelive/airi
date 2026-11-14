@@ -289,11 +289,16 @@ Small talk has a solo style for an owner who only wants to listen, like to a rad
 The character speaks again about 10 seconds after its voice ends, and **Pause in solo talk** changes this from 3 to 60 seconds. It talks longer, asks no questions, sends no images of the screen, and can search the web for a topic. A topic lasts about five lines.
 A message from the owner gets a reply, and solo talk goes on after the grace time. It ends at its time limit, when the owner asks to stop or for quiet, and at a screen lock or sleep. Time without input does not end it. Code refuses to start it without a voice.
 
-## Screen model
+## One model for each turn
 
-Settings > Modules > Screen perception can name a model for each call that sends images of the screen: commentary, idle speech and small talk with images, and watch checks. A stronger model can read the screen while the card keeps a cheaper one for replies.
-That model speaks itself, so no second model describes the screen first. The card still sets the voice. The choice stays on the device, because the keys of its provider do.
-Without a choice, these calls use the model of the card. They also do so when the provider of the choice is not configured, and the console then shows a warning.
+Every turn uses the chat model of the session character: a reply, a commentary line, a watch check, and each other autonomous turn. The model that speaks sees the screen itself.
+The perception settings have no separate screen model. `docs/ai/adr/2026-11-14-autonomy-one-model-relay-decision.md` gives the reason.
+
+## OpenCode Go
+
+The provider `opencode-go` in `src/libs/providers/providers/opencode-go` reaches OpenCode Go through the provider relay of `@proj-airi/stage-shared/provider-relay`, because a browser cannot call that server.
+Its config holds the API key only. The desktop app relays through the scheme `airi-relay`, and the web app through the path `/provider-relay` of its Vite server. The mobile app does not offer the provider.
+The reasoning field follows the model. A table in the definition holds the measured models, and a model outside the table gets no reasoning field.
 
 ## Chat sampling
 

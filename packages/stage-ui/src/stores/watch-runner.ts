@@ -110,7 +110,7 @@ export const useWatchRunnerStore = defineStore('watch-runner', () => {
   /** Sends one check turn. Resolves to the answer of the model, or `undefined` without one. */
   async function askModel(watch: WatchMission, crop: Blob) {
     const characterId = chatSession.sessionMetas[watch.sessionId]?.characterId ?? cardStore.activeCardId
-    const { provider, model } = perception.modelOfScreenCall(cardStore.getModules(characterId).consciousness)
+    const { provider, model } = cardStore.getModules(characterId).consciousness
     if (!provider || !model)
       return undefined
     let answer: { holds: boolean, seen: string } | undefined

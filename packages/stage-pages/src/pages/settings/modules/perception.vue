@@ -1,23 +1,18 @@
 <script setup lang="ts">
-import type { ImageInputChoice } from '@proj-airi/stage-ui/stores/modules/consciousness-settings'
-
 import { FRAME_POLICY_NAMES } from '@proj-airi/stage-shared/perception'
 import { IMAGE_BUDGET_LIMITS } from '@proj-airi/stage-ui/libs/perception/image-budget'
-import { useConsciousnessStore } from '@proj-airi/stage-ui/stores/modules/consciousness'
-import { useConsciousnessSettingsStore } from '@proj-airi/stage-ui/stores/modules/consciousness-settings'
 import { usePerceptionStore } from '@proj-airi/stage-ui/stores/perception'
 import { usePerceptionRunnerStore } from '@proj-airi/stage-ui/stores/perception-runner'
 import { usePerceptionStatusStore } from '@proj-airi/stage-ui/stores/perception-status'
-import { useProviderStore } from '@proj-airi/stage-ui/stores/providers/provider'
-import { Alert, Button, FieldCheckbox, FieldInput, FieldRange, FieldSelect, FieldTextArea } from '@proj-airi/ui'
+import { Alert, Button, FieldCheckbox, FieldRange, FieldSelect, FieldTextArea } from '@proj-airi/ui'
 import { useNow } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
-import { computed, watch } from 'vue'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
 const perception = usePerceptionStore()
-const { enabled, paused, exclusions, imagesPerHour, commentaryImagesPerHour, framePolicy, screenModelProvider, screenModelId, supported } = storeToRefs(perception)
+const { enabled, paused, exclusions, imagesPerHour, commentaryImagesPerHour, framePolicy, supported } = storeToRefs(perception)
 const { status } = storeToRefs(usePerceptionStatusStore())
 const runner = usePerceptionRunnerStore()
 
@@ -32,51 +27,6 @@ const exclusionText = computed({
 })
 
 const framePolicyOptions = computed(() => FRAME_POLICY_NAMES.map(value => ({ value, label: t(`${KEY}.frame-policies.${value}`) })))
-
-const providersStore = useProviderStore()
-const consciousness = useConsciousnessStore()
-const consciousnessSettings = useConsciousnessSettingsStore()
-
-/** A select cannot hold an empty value, so this one stands for the model of the card. */
-const CARD_MODEL = 'card'
-const IMAGE_INPUT_KEY = 'settings.pages.modules.consciousness.sections.section.model-options.image-input'
-
-const screenProviderOptions = computed(() => [
-  { value: CARD_MODEL, label: t(`${KEY}.screen-model.same-as-card`) },
-  ...providersStore.configuredChatProvidersMetadata.map(provider => ({ value: provider.id, label: provider.localizedName ?? provider.name })),
-])
-const screenProvider = computed({
-  get: () => screenModelProvider.value || CARD_MODEL,
-  set: (value: string) => {
-    screenModelProvider.value = value === CARD_MODEL ? '' : value
-    screenModelId.value = ''
-  },
-})
-const screenModels = computed(() => screenModelProvider.value ? providersStore.getModelsForProvider(screenModelProvider.value) : [])
-const screenModelOptions = computed(() => screenModels.value.map(model => ({ value: model.id, label: model.name || model.id })))
-
-watch(screenModelProvider, (provider) => {
-  if (provider)
-    void consciousness.loadModelsForProvider(provider)
-}, { immediate: true })
-
-/** What the model list of the provider says about image input, for the label of the default choice. */
-const screenCatalogVision = computed(() => screenModels.value.find(model => model.id === screenModelId.value)?.metadata?.abilities?.vision)
-const screenImageInputOptions = computed(() => {
-  const catalog = screenCatalogVision.value === true ? 'reads' : screenCatalogVision.value === false ? 'no-images' : 'unknown'
-  return [
-    { value: 'catalog', label: t(`${IMAGE_INPUT_KEY}.options.catalog`, { catalog: t(`${IMAGE_INPUT_KEY}.catalog.${catalog}`) }) },
-    { value: 'reads', label: t(`${IMAGE_INPUT_KEY}.options.reads`) },
-    { value: 'no-images', label: t(`${IMAGE_INPUT_KEY}.options.no-images`) },
-  ]
-})
-const screenImageInput = computed({
-  get: () => consciousnessSettings.imageInputChoiceOf(screenModelProvider.value, screenModelId.value),
-  set: (value: string) => {
-    void consciousnessSettings.setImageInput(screenModelProvider.value, screenModelId.value, value as ImageInputChoice)
-  },
-})
-const screenModelReadsImages = computed(() => consciousnessSettings.readsImages(screenModelProvider.value, screenModelId.value, screenCatalogVision.value))
 
 const canStart = computed(() => ['needs-share', 'ended', 'failed'].includes(status.value.state))
 const megabytes = computed(() => (status.value.bytes / 1_000_000).toFixed(1))
@@ -133,38 +83,6 @@ const budget = computed(() => perception.budgetAt(now.value.getTime()))
         </li>
       </ul>
     </section>
-
-    <div :class="['flex flex-col', 'gap-4', 'rounded-xl', 'bg-neutral-100 dark:bg-neutral-900', 'p-4']">
-      <FieldSelect
-        v-model="screenProvider"
-        :label="t(`${KEY}.screen-model.provider`)"
-        :description="t(`${KEY}.screen-model.provider-description`)"
-        :options="screenProviderOptions"
-      />
-      <template v-if="screenModelProvider">
-        <FieldSelect
-          v-if="screenModelOptions.length"
-          v-model="screenModelId"
-          :label="t(`${KEY}.screen-model.model`)"
-          :options="screenModelOptions"
-        />
-        <FieldInput
-          v-else
-          v-model="screenModelId"
-          :label="t(`${KEY}.screen-model.model`)"
-        />
-        <template v-if="screenModelId">
-          <FieldSelect
-            v-model="screenImageInput"
-            :label="t(`${IMAGE_INPUT_KEY}.label`)"
-            :description="t(`${IMAGE_INPUT_KEY}.description`)"
-            :options="screenImageInputOptions"
-          />
-          <Alert v-if="!screenModelReadsImages" tone="warning" :title="t(`${KEY}.screen-model.no-images`)" />
-        </template>
-        <Alert v-else tone="warning" :title="t(`${KEY}.screen-model.needs-model`)" />
-      </template>
-    </div>
 
     <div :class="['flex flex-col', 'gap-4', 'rounded-xl', 'bg-neutral-100 dark:bg-neutral-900', 'p-4']">
       <FieldTextArea

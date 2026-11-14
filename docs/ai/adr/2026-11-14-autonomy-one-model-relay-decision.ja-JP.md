@@ -92,8 +92,8 @@ Status: accepted
 
 | 手順 | 内容 | ワークスペース | 状態 |
 | --- | --- | --- | --- |
-| 1 | プロバイダーの中継、その 2 つのホスト、プロバイダー `opencode-go`。 | `packages/stage-shared`、`packages/stage-ui`、`apps/stage-tamagotchi`、`apps/stage-web`、`packages/i18n` | この変更 |
-| 2 | Vite のプロキシの設定と、認識の設定の画面用モデルを削る。 | `apps/stage-web`、`packages/stage-ui`、`packages/stage-pages`、`packages/i18n` | 未着手 |
+| 1 | プロバイダーの中継、その 2 つのホスト、プロバイダー `opencode-go`。 | `packages/stage-shared`、`packages/stage-ui`、`apps/stage-tamagotchi`、`apps/stage-web`、`packages/i18n` | 完了 |
+| 2 | Vite のプロキシの設定と、認識の設定の画面用モデルを削る。 | `apps/stage-web`、`packages/stage-ui`、`packages/stage-pages`、`packages/i18n` | この変更 |
 | 3 | Gemini Decision 1 のクライアント。 | `packages/core-agent`、`packages/stage-ui` | 未着手 |
 | 4 | 画面の判定、4 択、実況の行に渡すフレーム。 | `packages/core-agent`、`packages/stage-ui` | 未着手。この文書に専用の節を足す |
 

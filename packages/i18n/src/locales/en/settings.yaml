@@ -1437,13 +1437,6 @@ pages:
         contact-sheet: Contact sheet, one image of up to six tiles
         scene-anchor: Scene anchor near the start, then the newest frames
         scene-anchor+contact-sheet: Scene anchor and a contact sheet
-      screen-model:
-        provider: Model for the screen
-        provider-description: The model of each call that sends images of the screen, for example commentary, idle speech with images, and watch checks. It speaks in the voice of the card. Replies to you keep the model of the card.
-        same-as-card: Same as the model of the card
-        model: Model
-        needs-model: Choose a model. Until then, these calls use the model of the card.
-        no-images: This model does not read images, so the vision module describes each frame first, which takes several seconds. If it can read images, change the image input above.
       commentary-images-per-hour: Images each hour during commentary
       commentary-images-per-hour-description: Commentary talks often, so it has its own budget. While a commentary runs, this limit replaces the one above. Each commentary turn sends two frames at most.
       states:

@@ -1514,12 +1514,8 @@ export const useChatStore = defineStore('chat', () => {
     if (!characterId)
       throw new Error('The target session has no character')
 
-    // A call with images of the screen uses the screen model of the owner. It follows the card when the owner names none.
-    const readsScreen = noticeReadsScreen(payload, extra)
-    const selectionOfTurn = () => {
-      const selection = cardStore.getModules(characterId).consciousness
-      return readsScreen ? perception.modelOfScreenCall(selection) : selection
-    }
+    // Every turn uses the chat model of the character, also a turn with images of the screen.
+    const selectionOfTurn = () => cardStore.getModules(characterId).consciousness
     const { provider: providerId, model: modelId } = selectionOfTurn()
     // Autonomous speech can reason less than a reply, so its turns ask for the level of autonomous speech.
     const reasoningUse = AUTONOMOUS_PURPOSES.includes(usagePurposeOf(payload.sessionId, extra.notice)) ? 'autonomous' : 'reply'

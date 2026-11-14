@@ -92,8 +92,8 @@ Each app has one host for the relay.
 
 | Step | Content | Workspaces | State |
 | --- | --- | --- | --- |
-| 1 | The provider relay, its two hosts, and the provider `opencode-go`. | `packages/stage-shared`, `packages/stage-ui`, `apps/stage-tamagotchi`, `apps/stage-web`, `packages/i18n` | This change |
-| 2 | Remove the Vite proxy entries and the screen model of the perception settings. | `apps/stage-web`, `packages/stage-ui`, `packages/stage-pages`, `packages/i18n` | To do |
+| 1 | The provider relay, its two hosts, and the provider `opencode-go`. | `packages/stage-shared`, `packages/stage-ui`, `apps/stage-tamagotchi`, `apps/stage-web`, `packages/i18n` | Done |
+| 2 | Remove the Vite proxy entries and the screen model of the perception settings. | `apps/stage-web`, `packages/stage-ui`, `packages/stage-pages`, `packages/i18n` | This change |
 | 3 | The client of Gemini Decision 1. | `packages/core-agent`, `packages/stage-ui` | To do |
 | 4 | The screen gate, the choice of four answers, and the frame input of a commentary line. | `packages/core-agent`, `packages/stage-ui` | To do, with its own section in this document |
 
