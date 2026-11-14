@@ -92,6 +92,7 @@ export type {
   WatchValues,
 } from './missions'
 export { nextFromMarker } from './next-marker'
+export { SCREEN_GATE, SCREEN_GATE_QUESTION, screenGateInput } from './screen-gate'
 export { SPEECH_TYPES } from './speech-types'
 export type { SpeechType } from './speech-types'
 export { activeTalkControl, applyTalkLevel, TALK_CONTROL_LIMITS, talkControlEffect } from './talk-control'

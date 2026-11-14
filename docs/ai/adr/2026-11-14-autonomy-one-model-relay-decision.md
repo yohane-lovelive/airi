@@ -79,6 +79,18 @@ Each app has one host for the relay.
 - The API key is the key of the provider `google-generative-ai`. No new setting holds it.
 - The client lives in `packages/core-agent`. Later changes add the screen gate and the choice of four answers on top of it.
 
+### The replay evaluation sends the requests of the app
+
+Each later step changes the speed or the quality of commentary. The replay evaluation in `evals/autonomy-replay` measures both on a recording, before and after a step.
+
+- **The chat runtime of the app composes each request.** The replay speaks each turn through `createChatOrchestratorRuntime` and `streamFrom` of `packages/core-agent`. A change of the request order in that package reaches the replay too.
+- **A recording holds the start of a request.** The screen recorder writes `request-start.json` at each chat request: the system prompt and the tool definitions. The replay sends them again, so a request has the size that the app sends. Without the file, the system prompt is a short persona and the times are shorter than in the app.
+- **No tool runs.** The replay answers each tool call with a fixed text, so a replay changes no memory and no mission.
+- **The request is a stream with the session header.** OpenCode Go rejects a request without `x-opencode-session`. The replay reads the time to the first text from the runtime, and the cached input tokens from the stream.
+- **A play video becomes a recording.** `import-video` takes 2 frames each second with ffmpeg and writes the format of the screen recorder.
+- **The question of the screen gate lives in `packages/core-agent`.** The gate trace asks it about a recording, one look each 2 seconds, and scores the passes against labeled events. The app calls the same question in step 5.
+- **New metrics.** The time to the first text (the median, and the time that 9 of 10 lines stay under), the input tokens for each line, and the share of repeated lines.
+
 ## Rejected options
 
 - **A vision model before the chat model.** It made fewer wrong lines, but each line came 3 to 5 seconds later.
@@ -87,6 +99,8 @@ Each app has one host for the relay.
 - **A route on the API server for the desktop app.** Chat then stops when the local backend does not run.
 - **The relay URL in the provider config.** A config from the desktop app then breaks the web app after a sync.
 - **A pixel detector for the moment to speak.** At the same trigger rate, it found 73% of the important events.
+- **A copy of the request form in the evaluation.** The evaluation of step 3-6b built its own messages. They were far smaller than the requests of the app, and they did not follow a change of the app.
+- **An export button for the request start.** The settings window sends no chat request. The request start also belongs to the recorded session, so the recorder writes it.
 
 ## Steps
 
@@ -94,8 +108,9 @@ Each app has one host for the relay.
 | --- | --- | --- | --- |
 | 1 | The provider relay, its two hosts, and the provider `opencode-go`. | `packages/stage-shared`, `packages/stage-ui`, `apps/stage-tamagotchi`, `apps/stage-web`, `packages/i18n` | Done |
 | 2 | Remove the Vite proxy entries and the screen model of the perception settings. | `apps/stage-web`, `packages/stage-ui`, `packages/stage-pages`, `packages/i18n` | Done |
-| 3 | The client of Gemini Decision 1 and the store that gives it the key. | `packages/core-agent`, `packages/stage-ui` | This change |
-| 4 | The screen gate, the choice of four answers, and the frame input of a commentary line. | `packages/core-agent`, `packages/stage-ui` | To do, with its own section in this document |
+| 3 | The client of Gemini Decision 1 and the store that gives it the key. | `packages/core-agent`, `packages/stage-ui` | Done |
+| 4 | The replay evaluation sends the requests of the app. It gets the video import, the gate trace, and the question of the screen gate. | `evals/autonomy-replay`, `packages/core-agent`, `packages/stage-ui`, `apps/stage-tamagotchi`, `packages/i18n` | This change |
+| 5 | The screen gate in the app, the choice of four answers, and the frame input of a commentary line. | `packages/core-agent`, `packages/stage-ui` | To do, with its own section in this document |
 
 ## Consequences
 
@@ -103,7 +118,9 @@ Each app has one host for the relay.
 - The screen model that an owner selected has no effect after step 2. Screen turns use the chat model of the character.
 - The web app reaches OpenCode Go only through `pnpm dev:web` or a preview server.
 - The reasoning table needs an update when OpenCode Go adds a model. Until then, a new model reasons as the server decides.
-- Autonomous turns need a Gemini API key after step 4. Its free tier allows 10,000 requests each day.
+- Autonomous turns need a Gemini API key after step 5. Its free tier allows 10,000 requests each day.
+- A recording holds the system prompt of the character, with the memory index. It stays on the device, like the frames.
+- The replay runs one frame policy by default, the policy of the app.
 
 ## Verification of step 1
 
@@ -117,3 +134,15 @@ Each app has one host for the relay.
 - Unit tests cover the request form, both answer forms, a refusal of the server, and a reply without an answer.
 - A test that needs `GEMINI_API_KEY` calls the real API. On 2026-11-14 it passed on the free tier: a yes or no question and a choice about one text.
 - `useDecisionModelStore` of `packages/stage-ui` was not run in the app. The Google provider of the owner must hold a key for that check.
+
+## Verification of step 4
+
+- Unit tests cover the video import, the speaker through the chat runtime with a fake provider, the request start in a recording, the metrics, and the gate trace with its saved looks. One import test runs the real ffmpeg where it is installed.
+- `import-video` turned the match of 2026-11-12 (16 minutes) into a recording of 1,932 frames.
+- The gate trace of 2026-11-15 on that recording asked 482 looks on the free tier. At the threshold 0.7 the gate passed 6.3 looks each minute. It caught 66 of 67 important events, and 55% of the passes were at an important event.
+- The labels of that recording come from HUD readings of `gpt-6-luna`. No person checked them.
+- The replay of 2026-11-15 on that recording used `gpt-6-luna` with reasoning off, the policy `fresh-keyframes`, and the short persona. The time to the first text was 1.7 seconds at the median, and 2.0 seconds for 9 of 10 lines. A line cost about 2,300 input tokens, and the cache held almost none.
+- That replay showed a fault of the model. Most lines went on after their last sentence, with stray symbols or a repeated sentence. One line did not stop: it reached 132,308 characters and 129,000 output tokens.
+- A line with such a tail stays in the history, and later lines copied the tail. With a limit of 400 output tokens, all 11 lines ran to the limit.
+- The speech of a long line holds the next turns, so the match gave only 7 lines without a limit and 11 lines with it. Step 5 must cut such an output before the line enters the history.
+- Not checked: `request-start.json` from the running app, and a replay with a request of the size of the app. For both, the owner must record once while the character speaks.

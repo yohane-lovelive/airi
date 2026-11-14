@@ -184,6 +184,8 @@ if (answers.react.probability >= 0.7)
 The questions of one request cannot see each other. Compare numbers and times in code, and give the model the result as a named value. A choice about what to do next reads text only, because an image pulls the choice toward what the image shows.
 The client does not retry. `DecisionRequestError` carries the HTTP status, so the caller can wait after 429.
 
+The screen gate is the first use of the decision model. `SCREEN_GATE_QUESTION` asks whether something happened that a friend beside the owner speaks about. `screenGateInput` gives its material: the frame of 2 seconds ago, then the current frame, both at low resolution. `SCREEN_GATE` has the step of 2 seconds and the threshold of 0.7. The app does not call the gate yet. The gate trace of `evals/autonomy-replay` measures the question on a recording, so run it again after a change of the words or the threshold.
+
 ## Verify
 
 ```sh

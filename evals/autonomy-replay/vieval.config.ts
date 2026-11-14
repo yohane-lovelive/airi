@@ -49,5 +49,12 @@ export default defineConfig({
         },
       },
     },
+    // The gate asks the decision model, which is no chat model. So it has no model axis, and each recording runs once.
+    {
+      name: 'screen-gate',
+      root: '.',
+      include: ['evals/gate.eval.ts'],
+      exclude: ['node_modules/**'],
+    },
   ],
 })
