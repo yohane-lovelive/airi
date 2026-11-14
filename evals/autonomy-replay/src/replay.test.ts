@@ -184,6 +184,69 @@ describe('replay helpers', () => {
 
     expect(metrics).toMatchObject({ turnsPerMinute: 2, silenceShare: 0.25, imagesPerHour: 180, cacheShare: 0.25, groundedShare: 0.5, contradictionShare: 0.5 })
     expect(metrics.topicSimilarity).toBeGreaterThan(0)
+    expect(metrics.inputTokensPerLine).toBe(500)
+    expect(metrics.outputTokensPerLine).toBe(25)
+    expect(metrics.requestsPerTurn).toBe(1.25)
+    expect(metrics.toolCalls).toBe(1)
+  })
+
+  it('measures the time to the first text of the lines: the median, and the time that 9 of 10 lines stay under', () => {
+    const line = (firstTextMs: number | undefined) => ({ at: 0, text: `line ${firstTextMs}`, trigger: 'event' as const, frames: [], ...(firstTextMs !== undefined ? { firstTextMs } : {}) })
+    const metrics = replayMetrics({
+      durationMs: MINUTE,
+      turns: 10,
+      silent: 0,
+      images: 0,
+      requests: 10,
+      toolCalls: 0,
+      usage: { input: 0, output: 0, cached: 0 },
+      // A line of a fake model has no time, and it does not count.
+      lines: [900, 1_000, 1_100, 1_200, 1_300, 1_400, 1_500, 1_600, 1_700, 4_000, undefined].map(line),
+      events: [],
+      timeline: { notes: [] },
+    })
+
+    expect(metrics.firstTextMsMedian).toBe(1_300)
+    expect(metrics.firstTextMsSlow).toBe(1_700)
+  })
+
+  it('counts a line as a repeat when it is close to one of the three lines before it', () => {
+    const texts = ['敵を倒したね、すごい！', 'ショップを開いたね', 'レベルが上がったよ', '敵を倒したね、すごい！', 'そろそろ集団戦かな', '次のオーグメントは何にする？', 'タワーが折れそう', '敵を倒したね、すごい！']
+    const metrics = replayMetrics({
+      durationMs: MINUTE,
+      turns: texts.length,
+      silent: 0,
+      images: 0,
+      requests: texts.length,
+      toolCalls: 0,
+      usage: { input: 0, output: 0, cached: 0 },
+      lines: texts.map((text, index) => ({ at: index, text, trigger: 'event' as const, frames: [] })),
+      events: [],
+      timeline: { notes: [] },
+    })
+
+    // The fourth line repeats the first one. The last line comes four lines after its twin, so it is no repeat.
+    expect(metrics.repeatShare).toBe(1 / texts.length)
+  })
+
+  it('shows a line of a model that did not stop by the length of the longest line', () => {
+    const texts = ['ナイス！', 'いい感じだね。', `${'敵を倒したね。'.repeat(500)}`]
+    const metrics = replayMetrics({
+      durationMs: MINUTE,
+      turns: texts.length,
+      silent: 0,
+      images: 0,
+      requests: texts.length,
+      toolCalls: 0,
+      usage: { input: 0, output: 3_000, cached: 0 },
+      lines: texts.map((text, index) => ({ at: index, text, trigger: 'event' as const, frames: [] })),
+      events: [],
+      timeline: { notes: [] },
+    })
+
+    expect(metrics.lineCharsMedian).toBe(7)
+    expect(metrics.lineCharsMax).toBe(3_500)
+    expect(metrics.outputTokensPerLine).toBe(1_000)
   })
 
   it('reads a judgment inside text or a code fence, and nothing from a broken answer', () => {
