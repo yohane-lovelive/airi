@@ -300,6 +300,11 @@ The provider `opencode-go` in `src/libs/providers/providers/opencode-go` reaches
 Its config holds the API key only. The desktop app relays through the scheme `airi-relay`, and the web app through the path `/provider-relay` of its Vite server. The mobile app does not offer the provider.
 The reasoning field follows the model. A table in the definition holds the measured models, and a model outside the table gets no reasoning field.
 
+## Decision model
+
+`useDecisionModelStore` gives Gemini Decision 1 to autonomous speech. It uses the API key of the provider "Google Generative AI", so the owner sets one key for the Gemini chat models and for the decision model.
+`configured` is false until that provider is set up. The page calls the Gemini API directly, without the provider relay.
+
 ## Chat sampling
 
 In **Settings → Modules → Consciousness**, custom temperature and Top P are off

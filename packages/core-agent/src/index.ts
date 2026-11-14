@@ -4,6 +4,8 @@ export type { ChatHookRegistry } from './contracts/hook-types'
 export type { AgentLLMPort } from './contracts/llm-port'
 export type { AgentSessionPort } from './contracts/session-port'
 export type { AgentForegroundStreamPort } from './contracts/stream-port'
+export { createGeminiDecisionClient, DecisionRequestError } from './decision/gemini-decision'
+export type { DecisionModelAnswer, DecisionModelInput, DecisionModelResult, GeminiDecisionClient } from './decision/gemini-decision'
 export { chatContentToInputSegments, chatMessagesToTurns, conversationToChatMessages } from './messages/chat-completions'
 export {
   buildContextPromptMessage,

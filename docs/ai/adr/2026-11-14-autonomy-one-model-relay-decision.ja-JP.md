@@ -93,8 +93,8 @@ Status: accepted
 | 手順 | 内容 | ワークスペース | 状態 |
 | --- | --- | --- | --- |
 | 1 | プロバイダーの中継、その 2 つのホスト、プロバイダー `opencode-go`。 | `packages/stage-shared`、`packages/stage-ui`、`apps/stage-tamagotchi`、`apps/stage-web`、`packages/i18n` | 完了 |
-| 2 | Vite のプロキシの設定と、認識の設定の画面用モデルを削る。 | `apps/stage-web`、`packages/stage-ui`、`packages/stage-pages`、`packages/i18n` | この変更 |
-| 3 | Gemini Decision 1 のクライアント。 | `packages/core-agent`、`packages/stage-ui` | 未着手 |
+| 2 | Vite のプロキシの設定と、認識の設定の画面用モデルを削る。 | `apps/stage-web`、`packages/stage-ui`、`packages/stage-pages`、`packages/i18n` | 完了 |
+| 3 | Gemini Decision 1 のクライアントと、それにキーを渡すストア。 | `packages/core-agent`、`packages/stage-ui` | この変更 |
 | 4 | 画面の判定、4 択、実況の行に渡すフレーム。 | `packages/core-agent`、`packages/stage-ui` | 未着手。この文書に専用の節を足す |
 
 ## 影響
@@ -110,3 +110,9 @@ Status: accepted
 - 単体テストが、中継、Node 用のアダプター（実際の HTTP サーバーを使う）、独自スキームのハンドラー、プロバイダー定義を確かめる。
 - 2026-11-14 に、Web 版の開発サーバーの中継を通して確かめた。モデル一覧は 30 件、キーなしの会話リクエストはサーバーの HTTP 401、`gpt-6-luna` のストリーム応答は最初の文字まで 1.0 秒だった。
 - デスクトップ版の中継は、アプリの中でサーバーに対しては動かしていない。その確認には、アプリの設定にオーナーのキーが要る。
+
+## 手順 3 の確認
+
+- 単体テストが、リクエストの形、2 種類の答えの形、サーバーの拒否、答えのない応答を確かめる。
+- `GEMINI_API_KEY` が要るテストが、実際の API を呼ぶ。2026-11-14 に無料枠で通った。1 つの文章についての「はい / いいえ」の質問と選択である。
+- `packages/stage-ui` の `useDecisionModelStore` は、アプリの中では動かしていない。その確認には、オーナーの Google のプロバイダーにキーが要る。

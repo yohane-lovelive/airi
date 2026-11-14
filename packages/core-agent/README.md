@@ -164,6 +164,26 @@ A notice with `mustSpeak` asks the model to speak, and only reply text counts as
 
 `src/autonomy/simulation.ts` runs the policy against synthetic event streams with a fake clock and a seeded random source. `simulation.test.ts` checks the metrics of the ADR, for example turns per minute, silence share, and speech type entropy.
 
+## Decision model
+
+`createGeminiDecisionClient` calls Gemini Decision 1, a model that judges and writes no text. Autonomous speech asks it before a call of the chat model, for example whether the screen shows a moment to speak.
+A yes or no question gives the chance of yes, and a choice gives the best option and the chance of each option. The host gives the API key and can give its own `fetch`:
+
+```ts
+import { createGeminiDecisionClient } from '@proj-airi/core-agent'
+
+const client = createGeminiDecisionClient({ apiKey: () => key })
+const { answers } = await client.decide(
+  [{ type: 'text', text: 'Two frames follow.' }, { type: 'image', data: before, mimeType: 'image/jpeg' }, { type: 'image', data: now, mimeType: 'image/jpeg' }],
+  { react: { type: 'noul', instructions: 'Did something happen that a friend would speak about?', criteria: { true: 'A clear event happened.', false: 'The same state goes on.' } } },
+)
+if (answers.react.probability >= 0.7)
+  startLine()
+```
+
+The questions of one request cannot see each other. Compare numbers and times in code, and give the model the result as a named value. A choice about what to do next reads text only, because an image pulls the choice toward what the image shows.
+The client does not retry. `DecisionRequestError` carries the HTTP status, so the caller can wait after 429.
+
 ## Verify
 
 ```sh

@@ -93,8 +93,8 @@ Each app has one host for the relay.
 | Step | Content | Workspaces | State |
 | --- | --- | --- | --- |
 | 1 | The provider relay, its two hosts, and the provider `opencode-go`. | `packages/stage-shared`, `packages/stage-ui`, `apps/stage-tamagotchi`, `apps/stage-web`, `packages/i18n` | Done |
-| 2 | Remove the Vite proxy entries and the screen model of the perception settings. | `apps/stage-web`, `packages/stage-ui`, `packages/stage-pages`, `packages/i18n` | This change |
-| 3 | The client of Gemini Decision 1. | `packages/core-agent`, `packages/stage-ui` | To do |
+| 2 | Remove the Vite proxy entries and the screen model of the perception settings. | `apps/stage-web`, `packages/stage-ui`, `packages/stage-pages`, `packages/i18n` | Done |
+| 3 | The client of Gemini Decision 1 and the store that gives it the key. | `packages/core-agent`, `packages/stage-ui` | This change |
 | 4 | The screen gate, the choice of four answers, and the frame input of a commentary line. | `packages/core-agent`, `packages/stage-ui` | To do, with its own section in this document |
 
 ## Consequences
@@ -110,3 +110,9 @@ Each app has one host for the relay.
 - Unit tests cover the relay, the Node adapter with a real HTTP server, the handler of the custom scheme, and the provider definition.
 - Through the relay of the web dev server on 2026-11-14: the model list gave 30 models, a chat request without a key gave the HTTP 401 of the server, and a streamed reply of `gpt-6-luna` gave its first text after 1.0 second.
 - The desktop relay was not run against the server in the app. The key of the owner must be in the app settings for that check.
+
+## Verification of step 3
+
+- Unit tests cover the request form, both answer forms, a refusal of the server, and a reply without an answer.
+- A test that needs `GEMINI_API_KEY` calls the real API. On 2026-11-14 it passed on the free tier: a yes or no question and a choice about one text.
+- `useDecisionModelStore` of `packages/stage-ui` was not run in the app. The Google provider of the owner must hold a key for that check.
