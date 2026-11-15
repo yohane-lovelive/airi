@@ -249,4 +249,13 @@ This changes one decision of 2026-11-13: the decision model judged only whether 
 - That replay gave 23 lines. No line said the score, 21 lines named the character of the owner, and the judge found one wrong name. Before this step, the same recording gave no cast.
 - The replay ran 3 cast reads. The 2 reads at the scoreboard left the cast alone.
 - The cast kept the costume names of 4 characters, although the notice asks to leave them out.
-- Not checked: the looks and a cast read in the app, a memory that the character saves in the app, the window of a live game, and a game other than League of Legends.
+- The desktop dev app ran on a copy of the owner's profile on 2026-11-15, for 11 minutes on the same video. The owner set the two keys and told the player name in the chat.
+- The character saved the name with the memory tool. The description of the entry was `Game account: League of Legends`.
+- The app made 314 looks, one each 2 seconds, of 862 input tokens each. The console showed no failed look.
+- The roster answer was 0.91 to 0.94 at the loading screen. In the play it passed 2 looks, both at an open scoreboard.
+- The first look started a cast read. 18 seconds after the start, the cast held the character of the owner, all allies, and 4 of 5 opponents. It kept one costume name.
+- The commentary gave 30 lines, and no line said the score. 9 lines named the character of the owner. No line named an ally, an opponent, or a skill.
+- The record does not tell whether a cast read ran at the scoreboard. The cast did not change there.
+- The answer of the gate question was 0.7 or more in 71 of the 314 looks.
+- After the 11 minutes, 62 of the 120 images of the budget were used.
+- Not checked: the window of a live game, and a game other than League of Legends.
