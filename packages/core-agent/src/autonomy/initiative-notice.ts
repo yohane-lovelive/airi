@@ -128,8 +128,10 @@ export function initiativeNoticeText(context: InitiativeNoticeContext): string {
   ]
   if (context.awayMs !== undefined)
     lines.push(`- The owner was away for: ${durationSince(context.now - context.awayMs, context.now)}.`)
+  // The line avoids the word "commentary". With it, gpt-6-luna wrote its line as a commentary message of its API,
+  // and wrote on after the line. See `FINAL_ANSWER_RULE`.
   if (context.mode === 'commentary')
-    lines.push('- Mode: commentary of the owner\'s screen.')
+    lines.push('- Mode: you talk about the owner\'s screen.')
   if (context.smallTalkEndsAt !== undefined) {
     lines.push(context.solo
       ? `- Mode: solo talk, like a radio host, for ${durationSince(context.now, context.smallTalkEndsAt)} more. The owner only listens. Keep talking on your own. Do not stay silent, ask the owner anything, or wait for an answer.`
@@ -182,6 +184,18 @@ export function initiativeNoticeText(context: InitiativeNoticeContext): string {
   if (!context.solo)
     lines.push('Then add <|NEXT continue|> if you have more to say, <|NEXT wait|> if you want the owner\'s answer, or <|NEXT done|> if the topic is closed.')
   return lines.join('\n')
+}
+
+/**
+ * The marker that ends a reply to the notice of {@link initiativeNoticeText}: the last marker that its text asks for.
+ * The chat runtime drops what a model writes after this marker.
+ *
+ * @example
+ * initiativeEndMarker({ solo: true })
+ * // => 'TOPIC'
+ */
+export function initiativeEndMarker(context: Pick<InitiativeNoticeContext, 'solo'>): 'NEXT' | 'TOPIC' {
+  return context.solo ? 'TOPIC' : 'NEXT'
 }
 
 function screenLines(screen: InitiativeScreenContext) {

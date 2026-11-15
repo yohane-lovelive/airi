@@ -88,8 +88,18 @@ Each later step changes the speed or the quality of commentary. The replay evalu
 - **No tool runs.** The replay answers each tool call with a fixed text, so a replay changes no memory and no mission.
 - **The request is a stream with the session header.** OpenCode Go rejects a request without `x-opencode-session`. The replay reads the time to the first text from the runtime, and the cached input tokens from the stream.
 - **A play video becomes a recording.** `import-video` takes 2 frames each second with ffmpeg and writes the format of the screen recorder.
-- **The question of the screen gate lives in `packages/core-agent`.** The gate trace asks it about a recording, one look each 2 seconds, and scores the passes against labeled events. The app calls the same question in step 5.
+- **The question of the screen gate lives in `packages/core-agent`.** The gate trace asks it about a recording, one look each 2 seconds, and scores the passes against labeled events. The app calls the same question in step 6.
 - **New metrics.** The time to the first text (the median, and the time that 9 of 10 lines stay under), the input tokens for each line, and the share of repeated lines.
+
+### A reply is one final answer, and it ends at its end marker
+
+`gpt-6-luna` wrote on after most lines of an autonomous turn: stray words, the line again, or a run without end. The Responses route of OpenCode Go showed the cause. The model wrote its line as a message of the phase `commentary`. Then it wrote the final answer, which was empty or the line again. The chat route joins both messages.
+
+- **The system prompt ends with the final answer rule.** The chat runtime adds `FINAL_ANSWER_RULE` of `packages/core-agent` as the last text of each system prompt, after every supplement. The rule works only in the system prompt.
+- **The notice of an autonomous turn does not use the word "commentary".** With the word, the model wrote a commentary message more often.
+- **A reply to a notice ends at its end marker.** The notice names the last marker that its text asks for: `NEXT`, or `TOPIC` for solo talk. When text follows that marker, the runtime stops the model request and drops the text. The speech and the history get the reply up to the marker.
+- **A line break after the marker is not a tail.** The runtime cuts at other text, or at more than 16 blank characters.
+- **The runtime reports each cut.** The app writes one log line. The replay evaluation gets two metrics: the share of cut turns, and the share of lines without an end marker.
 
 ## Rejected options
 
@@ -101,6 +111,11 @@ Each later step changes the speed or the quality of commentary. The replay evalu
 - **A pixel detector for the moment to speak.** At the same trigger rate, it found 73% of the important events.
 - **A copy of the request form in the evaluation.** The evaluation of step 3-6b built its own messages. They were far smaller than the requests of the app, and they did not follow a change of the app.
 - **An export button for the request start.** The settings window sends no chat request. The request start also belongs to the recorded session, so the recorder writes it.
+- **A cut by symbols, scripts, and repeated sentences.** It needs no marker. But it also cuts emoticons, and a broken marker reaches the speech as text.
+- **A stop sequence.** The server rejects `stop` for `gpt-6-luna`.
+- **More reasoning.** With the effort `high`, 7 of 20 replies still had a tail, and the first text came after 3.2 seconds.
+- **Another speaking model.** `deepseek-v4.1-flash`, `hy4`, and `muse-spark-1.3-contributor` stopped by themselves. Each one was slower to the first text, or wrong about the screen more often.
+- **A JSON schema for the reply.** The server holds only the final answer to the schema. With the final answer rule, 20 of 20 replies were valid JSON. But the reply of the app is text with markers, and its speech starts while the text streams.
 
 ## Steps
 
@@ -109,8 +124,9 @@ Each later step changes the speed or the quality of commentary. The replay evalu
 | 1 | The provider relay, its two hosts, and the provider `opencode-go`. | `packages/stage-shared`, `packages/stage-ui`, `apps/stage-tamagotchi`, `apps/stage-web`, `packages/i18n` | Done |
 | 2 | Remove the Vite proxy entries and the screen model of the perception settings. | `apps/stage-web`, `packages/stage-ui`, `packages/stage-pages`, `packages/i18n` | Done |
 | 3 | The client of Gemini Decision 1 and the store that gives it the key. | `packages/core-agent`, `packages/stage-ui` | Done |
-| 4 | The replay evaluation sends the requests of the app. It gets the video import, the gate trace, and the question of the screen gate. | `evals/autonomy-replay`, `packages/core-agent`, `packages/stage-ui`, `apps/stage-tamagotchi`, `packages/i18n` | This change |
-| 5 | The screen gate in the app, the choice of four answers, and the frame input of a commentary line. | `packages/core-agent`, `packages/stage-ui` | To do, with its own section in this document |
+| 4 | The replay evaluation sends the requests of the app. It gets the video import, the gate trace, and the question of the screen gate. | `evals/autonomy-replay`, `packages/core-agent`, `packages/stage-ui`, `apps/stage-tamagotchi`, `packages/i18n` | Done |
+| 5 | The final answer rule, the notice without the word "commentary", and the end marker of a reply. | `packages/core-agent`, `packages/stage-ui`, `evals/autonomy-replay` | This change |
+| 6 | The screen gate in the app, the choice of four answers, and the frame input of a commentary line. | `packages/core-agent`, `packages/stage-ui` | To do, with its own section in this document |
 
 ## Consequences
 
@@ -118,9 +134,14 @@ Each later step changes the speed or the quality of commentary. The replay evalu
 - The screen model that an owner selected has no effect after step 2. Screen turns use the chat model of the character.
 - The web app reaches OpenCode Go only through `pnpm dev:web` or a preview server.
 - The reasoning table needs an update when OpenCode Go adds a model. Until then, a new model reasons as the server decides.
-- Autonomous turns need a Gemini API key after step 5. Its free tier allows 10,000 requests each day.
+- Autonomous turns need a Gemini API key after step 6. Its free tier allows 10,000 requests each day.
 - A recording holds the system prompt of the character, with the memory index. It stays on the device, like the frames.
 - The replay runs one frame policy by default, the policy of the app.
+- Every chat request ends its system prompt with the final answer rule: a reply to the owner and a task too. A request without a system prompt gets a system message with only the rule.
+- A stopped request reports no usage, so the tokens of a cut reply are not counted.
+- A reply without an end marker is not cut. A turn that stays quiet has none.
+- The mission tools keep the word "commentary", because it is the name of the mission.
+- A character card that names the provider "OpenAI Compatible" for its chat model must change to "OpenCode Go" too. The card selection wins over the chat settings of the app.
 
 ## Verification of step 1
 
@@ -144,5 +165,15 @@ Each later step changes the speed or the quality of commentary. The replay evalu
 - The replay of 2026-11-15 on that recording used `gpt-6-luna` with reasoning off, the policy `fresh-keyframes`, and the short persona. The time to the first text was 1.7 seconds at the median, and 2.0 seconds for 9 of 10 lines. A line cost about 2,300 input tokens, and the cache held almost none.
 - That replay showed a fault of the model. Most lines went on after their last sentence, with stray symbols or a repeated sentence. One line did not stop: it reached 132,308 characters and 129,000 output tokens.
 - A line with such a tail stays in the history, and later lines copied the tail. With a limit of 400 output tokens, all 11 lines ran to the limit.
-- The speech of a long line holds the next turns, so the match gave only 7 lines without a limit and 11 lines with it. Step 5 must cut such an output before the line enters the history.
+- The speech of a long line holds the next turns, so the match gave only 7 lines without a limit and 11 lines with it. Step 5 cuts such an output before the line enters the history.
 - Not checked: `request-start.json` from the running app, and a replay with a request of the size of the app. For both, the owner must record once while the character speaks.
+
+## Verification of step 5
+
+- Unit tests cover the rule at the end of the system prompt, the notice text, and the two metrics. For the cut, they cover the speech, the stored message, the next request, the stop of the request, a line break after the marker, a run of blank lines, the topic marker, and a reply to the owner.
+- On 2026-11-15, the same 10 requests of a replay went to `gpt-6-luna` through the chat route, several times each. Without the change, 2 of 20 replies ended right after the line. With the rule in the system prompt, 46 of 60 did. With the rule and without the word "commentary", 58 of 60 did.
+- The rule inside the notice did not work: 7 of 20 replies ended right after the line.
+- The replay of the match of 2026-11-12 with the change gave 17 lines. The longest line had 66 characters, against 676 before. The first text came after 1.2 seconds at the median, and after 1.6 seconds for 9 of 10 lines. In 3 of 17 turns the model wrote on, and the runtime dropped that text. The replay had a limit of 1,000 output tokens, and no line reached it.
+- The desktop dev app ran on a copy of the owner's profile on 2026-11-15. The system prompt of the character had 6,190 characters and 22 tools, and it ended with the rule. A reply to the owner with a tool call worked.
+- In that app, a commentary on a video of the match gave 31 lines in 10.7 minutes. In the history, every line ended at its `NEXT` marker. No speech text held a marker or stray text. The runtime cut 5 replies.
+- Not checked: the time to the first text in the app, the speech synthesis (it was muted), the window of a live game, and solo talk.

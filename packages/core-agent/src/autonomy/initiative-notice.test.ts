@@ -2,7 +2,7 @@ import type { InitiativeNoticeContext } from './initiative-notice'
 
 import { describe, expect, it } from 'vitest'
 
-import { initiativeNoticeText } from './initiative-notice'
+import { initiativeEndMarker, initiativeNoticeText } from './initiative-notice'
 
 const NOW = Date.UTC(2026, 10, 1, 12, 0)
 
@@ -160,9 +160,19 @@ describe('initiativeNoticeText', () => {
     expect(initiativeNoticeText(context())).toContain('<|NEXT continue|>')
   })
 
+  it('names the last marker that the notice asks for as the end of the reply', () => {
+    // Solo talk asks for no NEXT marker, so its topic label is last.
+    expect(initiativeNoticeText(context({ smallTalkEndsAt: NOW + 25 * 60_000, solo: true }))).not.toContain('<|NEXT')
+    expect(initiativeEndMarker({ solo: true })).toBe('TOPIC')
+    expect(initiativeNoticeText(context())).toContain('Then add <|NEXT continue|>')
+    expect(initiativeEndMarker({})).toBe('NEXT')
+  })
+
   it('names commentary, and asks for the drawn length instead of a fixed one', () => {
     const commentary = initiativeNoticeText(context({ mode: 'commentary', trigger: 'event' }))
-    expect(commentary).toContain('Mode: commentary of the owner\'s screen.')
+    expect(commentary).toContain('Mode: you talk about the owner\'s screen.')
+    // The word makes gpt-6-luna write its line as a commentary message of its API, and write on after it.
+    expect(commentary).not.toContain('commentary')
     expect(commentary).toContain('Length: one short sentence. Keep it natural, in your own voice and habits.')
     expect(commentary).not.toContain('one or two sentences')
 

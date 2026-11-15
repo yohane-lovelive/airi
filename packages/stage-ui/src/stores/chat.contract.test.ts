@@ -9,6 +9,7 @@ import type { ChatSessionMeta } from '../types/chat-session'
 import type { LlmStreamOptions } from './ai/chat-llm/llm'
 
 import { errorMessageFrom } from '@moeru/std'
+import { FINAL_ANSWER_RULE } from '@proj-airi/core-agent'
 import { ATTR_GEN_AI_CONVERSATION_ID, ATTR_GEN_AI_OPERATION_NAME, ATTR_GEN_AI_TOOL_NAME } from '@proj-airi/trace-kit'
 import { AgentAttributes, AgentIdKeys, AgentNames } from '@proj-airi/trace-kit/agent'
 import { VoiceIdKeys } from '@proj-airi/trace-kit/voice'
@@ -521,7 +522,8 @@ describe('chat store contract', () => {
 
     // The session prompt also carries the format rules and the memory index, so only its parts are checked.
     expect(steps[0]).toMatchObject({ model: 'alice-model', providerId: 'alice-provider', systemPrompt: expect.stringContaining('Alice prompt') })
-    expect(steps[0]?.systemPrompt).toMatch(/Plugin toolset guidance\.$/)
+    // The chat runtime ends each system prompt with its final answer rule, after the supplement.
+    expect(steps[0]?.systemPrompt?.endsWith(`Plugin toolset guidance.\n\n${FINAL_ANSWER_RULE}`)).toBe(true)
     expect(steps[0]?.headers).not.toHaveProperty(AIRI_CHAT_SESSION_ID_HEADER)
     expect(steps[1]).toMatchObject({ model: 'chat-auto', providerId: 'official-provider', systemPrompt: expect.stringContaining('Edited Alice prompt') })
     expect(steps[1]?.headers).toMatchObject({
@@ -1724,7 +1726,8 @@ describe('chat store contract', () => {
       throw new Error('Expected system and user turns')
     expect(composedMessages[0].content).toEqual([
       { type: 'text', text: `${CHAT_FORMAT_RULES}system prompt${composeMemoryPrompt('')}${composeDrawCardPrompt()}${composeReplyLengthPrompt('auto')}${composeSharedPastPrompt()}` },
-      { type: 'text', text: '\n\nPlugin toolset guidance.' },
+      // The chat runtime ends each system prompt with its final answer rule, after the supplement.
+      { type: 'text', text: `\n\nPlugin toolset guidance.\n\n${FINAL_ANSWER_RULE}` },
     ])
     expect(composedMessages[1].content[0]).toMatchObject({
       type: 'text',

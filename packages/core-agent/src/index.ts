@@ -28,11 +28,13 @@ export type {
   ChatOrchestratorSendOptions,
   ChatOrchestratorSessionPort,
   QueuedSendSnapshot,
+  ReplyEndMarker,
   ToolContent,
 } from './runtime/chat-orchestrator-runtime'
 export { createChatOrchestratorRuntime } from './runtime/chat-orchestrator-runtime'
 export type { ContextHistoryEntry, ContextIngestResult, ContextRegistry } from './runtime/context-registry'
 export { createContextRegistry } from './runtime/context-registry'
+export { FINAL_ANSWER_RULE } from './runtime/final-answer-rule'
 export { useLlmmarkerParser } from './runtime/llm-marker-parser'
 export {
   isContentArrayRelatedError,

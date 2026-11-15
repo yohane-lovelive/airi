@@ -1,4 +1,4 @@
-import type { ChatAttachment, ChatInvokedSkill, ChatOrchestratorRuntimeState, ChatOrchestratorSendOptions, Conversation, Recipe, StreamEvent, StreamOptions } from '@proj-airi/core-agent'
+import type { ChatAttachment, ChatInvokedSkill, ChatOrchestratorRuntimeState, ChatOrchestratorSendOptions, Conversation, Recipe, ReplyEndMarker, StreamEvent, StreamOptions } from '@proj-airi/core-agent'
 import type { GenerationProvider, GenerationRequest } from '@proj-airi/provider-inference'
 import type { WebSocketEventInputs } from '@proj-airi/server-sdk'
 import type { TraceSpan } from '@proj-airi/trace-kit'
@@ -484,7 +484,7 @@ export const useChatStore = defineStore('chat', () => {
    */
   async function notifyConversation(
     sessionId: string,
-    notice: { source: string, text: string, mustSpeak?: boolean, reply?: string, transient?: boolean, attachments?: ChatAttachment[], anchor?: { text: string, image: string } },
+    notice: { source: string, text: string, mustSpeak?: boolean, reply?: string, transient?: boolean, attachments?: ChatAttachment[], anchor?: { text: string, image: string }, endMarker?: ReplyEndMarker },
     messageId?: string,
   ): Promise<'spoke' | 'silent' | 'failed' | 'skipped'> {
     if (!isOwnerSession(sessionId))
@@ -1312,6 +1312,8 @@ export const useChatStore = defineStore('chat', () => {
       void (kind === 'note' ? timeline.addNotes(sessionId, [{ at, text, source: 'model' }]) : timeline.setScene(sessionId, text, at))
         .catch(error => console.warn('[chat] Failed to keep a timeline marker:', errorMessageFrom(error)))
     },
+    // The reply is whole, so this is no failure. The line shows how often a model writes on after its reply.
+    onReplyCut: ({ sessionId, turnId, marker }) => console.warn(`[chat] The model wrote on after the ${marker} marker of its reply. The rest was dropped.`, { sessionId, turnId }),
     onAssistantMessageAppended: ({ sessionId, message, roundId }) => {
       const source = chatSession.getSessionMessages(sessionId).find(message => message.role === 'user' && message.id === roundId)
       if (source && isCloudSyncableMessage(source) && isCloudSyncableMessage(message) && message.id && syncsToCloud(sessionId)) {

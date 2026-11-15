@@ -11,6 +11,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { chatMessagesToTurns, conversationToChatMessages } from '../messages/chat-completions'
 import { createChatOrchestratorRuntime } from './chat-orchestrator-runtime'
+import { FINAL_ANSWER_RULE } from './final-answer-rule'
 import { streamFrom } from './llm-service'
 
 const provider: GenerationProvider = {
@@ -39,6 +40,7 @@ function createHarness(getActiveProvider = () => 'mock-provider') {
   const assistantTurns: unknown[] = []
   const stateChanges: unknown[] = []
   const settled: unknown[] = []
+  const replyCuts: unknown[] = []
   const telemetry = {
     chatActivationStarted: [] as unknown[],
     chatActivationSucceeded: [] as unknown[],
@@ -107,6 +109,7 @@ function createHarness(getActiveProvider = () => 'mock-provider') {
     onAssistantTurnReady: event => assistantTurns.push(event),
     onStateChange: state => stateChanges.push(state),
     onSendSettled: event => settled.push(event),
+    onReplyCut: event => replyCuts.push(event),
     onChatActivationStarted: event => telemetry.chatActivationStarted.push(event),
     onChatActivationSucceeded: event => telemetry.chatActivationSucceeded.push(event),
     onChatActivationFailed: event => telemetry.chatActivationFailed.push(event),
@@ -158,6 +161,7 @@ function createHarness(getActiveProvider = () => 'mock-provider') {
       },
     },
     promptProjections,
+    replyCuts,
     runtime,
     sessionMessages,
     stateChanges,
@@ -377,7 +381,8 @@ describe('createChatOrchestratorRuntime', () => {
       await harness.runtime.ingest(`old-${index}`, { model: 'gpt-test', chatProvider: provider })
     harness.sessionMessages['session-1'] = [{ role: 'user', content: 'replacement', id: 'replacement' }]
     await harness.runtime.ingest('new input', { model: 'gpt-test', chatProvider: provider })
-    expect(harness.stream.mock.calls[3]![2].turns[0]?.id).toBe('replacement-0')
+    // The system message with the final answer rule comes first.
+    expect(harness.stream.mock.calls[3]![2].turns.find(turn => turn.type === 'user')?.id).toBe('replacement-0')
   })
 
   it.each(['generation', 'cancellation'] as const)('resets the cut on session %s', async (reset) => {
@@ -1124,7 +1129,7 @@ describe('createChatOrchestratorRuntime', () => {
       'turn-complete',
     ])
     expect(composedMessages).toHaveLength(2)
-    expect(composedMessages[0]).toMatchObject({ role: 'system', content: 'system prompt' })
+    expect(composedMessages[0]).toMatchObject({ role: 'system', content: `system prompt\n\n${FINAL_ANSWER_RULE}` })
     expect(composedMessages[1]).toMatchObject({ role: 'user' })
     expect(composedMessages[1]?.content).toBe('[2026-04-25 18:47] hello from user\n[Context]\n- system:weather: sunny')
     expect(harness.lifecycleRecords).toEqual(expect.arrayContaining([
@@ -1219,9 +1224,10 @@ describe('createChatOrchestratorRuntime', () => {
       chatProvider: provider,
     })
 
+    // The final answer rule is the last text, after the supplement. A live check found that it works at that place.
     expect(composedMessages[0]).toMatchObject({
       role: 'system',
-      content: 'system prompt\n\nPlugin toolset guidance.',
+      content: `system prompt\n\nPlugin toolset guidance.\n\n${FINAL_ANSWER_RULE}`,
     })
   })
 
@@ -1240,7 +1246,7 @@ describe('createChatOrchestratorRuntime', () => {
       resolveStep: async () => ({ model: 'edited-model', chatProvider: provider, providerId: 'mock-provider', systemPrompt: 'edited prompt' }),
     })
 
-    expect(resolvedPrompt).toBe('edited prompt\n\nPlugin toolset guidance.')
+    expect(resolvedPrompt).toBe(`edited prompt\n\nPlugin toolset guidance.\n\n${FINAL_ANSWER_RULE}`)
   })
 
   it('creates a system message when only a system prompt supplement is available', async () => {
@@ -1261,7 +1267,7 @@ describe('createChatOrchestratorRuntime', () => {
 
     expect(composedMessages[0]).toMatchObject({
       role: 'system',
-      content: 'Plugin toolset guidance.',
+      content: `Plugin toolset guidance.\n\n${FINAL_ANSWER_RULE}`,
     })
     expect(composedMessages[1]).toMatchObject({ role: 'user' })
   })
@@ -2256,5 +2262,108 @@ describe('chat topic markers', () => {
     expect(saved).toMatchObject({ role: 'assistant', content: 'Did you eat? ', next: 'wait' })
     expect(specials).toEqual([])
     expect(saved?.role === 'assistant' && saved.categorization?.speech).toBe('Did you eat? ')
+  })
+})
+
+describe('reply end marker', () => {
+  /** A model that writes the chunks and then goes on until the request stops. A reply that is not cut never settles. */
+  function streamUntilStopped(chunks: string[]) {
+    return async (_model: string, _provider: GenerationProvider, _context: Conversation, options?: StreamOptions) => {
+      for (const text of chunks)
+        await options?.onStreamEvent?.({ type: 'text-delta', text })
+      const signal = options?.abortSignal
+      await new Promise<never>((_resolve, reject) => {
+        const stop = () => reject(signal?.reason)
+        if (signal?.aborted)
+          stop()
+        signal?.addEventListener('abort', stop, { once: true })
+      })
+    }
+  }
+  const notice = { source: 'initiative', transient: true, endMarker: 'NEXT' } as const
+
+  it('ends the reply to a notice at its end marker, stops the request, and drops the text after the marker', async () => {
+    const harness = createHarness()
+    const literals: string[] = []
+    const ended: string[] = []
+    harness.runtime.hooks.onTokenLiteral(async (text) => {
+      literals.push(text)
+    })
+    harness.runtime.hooks.onAssistantResponseEnd(async (text) => {
+      ended.push(text)
+    })
+    harness.stream.mockImplementationOnce(streamUntilStopped(['Nice kill! ', '<|TOPIC the fight|>', '<|NEXT wait|>', ' tulip\nNice kill again! <|TOPIC other|><|NEXT done|>', ' 2\n2\n2']))
+
+    await harness.runtime.ingest('Autonomous turn', { model: 'test', chatProvider: provider, notice })
+    const saved = harness.sessionMessages['session-1'].at(-1)
+
+    expect(saved).toMatchObject({ role: 'assistant', content: 'Nice kill! ', topic: 'the fight', next: 'wait' })
+    expect(saved?.role === 'assistant' && saved.categorization?.speech).toBe('Nice kill! ')
+    expect(literals.join('')).toBe('Nice kill! ')
+    expect(ended).toEqual(['Nice kill! <|TOPIC the fight|><|NEXT wait|>'])
+    expect(harness.replyCuts).toEqual([expect.objectContaining({ sessionId: 'session-1', marker: 'NEXT' })])
+    expect(harness.settled).toEqual([expect.objectContaining({ status: 'finished' })])
+  })
+
+  it('sends only the kept text of a cut reply with the next request', async () => {
+    const harness = createHarness()
+    harness.stream.mockImplementationOnce(streamUntilStopped(['Nice kill! ', '<|TOPIC the fight|>', '<|NEXT wait|>', ' tulip Nice kill again!']))
+
+    await harness.runtime.ingest('Autonomous turn', { model: 'test', chatProvider: provider, notice })
+    await harness.runtime.ingest('Hello', { model: 'test', chatProvider: provider })
+    const second = JSON.stringify(harness.stream.mock.calls[1][2])
+
+    expect(second).toContain('Nice kill! <|TOPIC the fight|><|NEXT wait|>')
+    expect(second).not.toContain('tulip')
+  })
+
+  it('keeps a reply whole when only a line break follows the end marker', async () => {
+    const harness = createHarness()
+    let stopped = false
+    harness.stream.mockImplementationOnce(async (_model, _provider, _context, options) => {
+      for (const text of ['Nice kill! ', '<|NEXT wait|>', '\n'])
+        await options?.onStreamEvent?.({ type: 'text-delta', text })
+      await options?.onStreamEvent?.({ type: 'finish' })
+      stopped = Boolean(options?.abortSignal?.aborted)
+    })
+
+    await harness.runtime.ingest('Autonomous turn', { model: 'test', chatProvider: provider, notice })
+
+    expect(harness.sessionMessages['session-1'].at(-1)).toMatchObject({ role: 'assistant', content: 'Nice kill! ', next: 'wait' })
+    expect(harness.replyCuts).toEqual([])
+    expect(stopped).toBe(false)
+  })
+
+  it('cuts a run of blank lines after the end marker', async () => {
+    const harness = createHarness()
+    harness.stream.mockImplementationOnce(streamUntilStopped(['Nice kill! ', '<|NEXT wait|>', ...Array.from<string>({ length: 20 }).fill(' \n')]))
+
+    await harness.runtime.ingest('Autonomous turn', { model: 'test', chatProvider: provider, notice })
+
+    expect(harness.sessionMessages['session-1'].at(-1)).toMatchObject({ role: 'assistant', content: 'Nice kill! ' })
+    expect(harness.replyCuts).toHaveLength(1)
+  })
+
+  it('ends a reply at the topic marker when the notice names it as the end', async () => {
+    const harness = createHarness()
+    harness.stream.mockImplementationOnce(streamUntilStopped(['Good evening. ', '<|TOPIC the radio|>', ' and more words']))
+
+    await harness.runtime.ingest('Autonomous turn', { model: 'test', chatProvider: provider, notice: { ...notice, endMarker: 'TOPIC' } })
+
+    expect(harness.sessionMessages['session-1'].at(-1)).toMatchObject({ role: 'assistant', content: 'Good evening. ', topic: 'the radio' })
+    expect(harness.replyCuts).toEqual([expect.objectContaining({ marker: 'TOPIC' })])
+  })
+
+  it('keeps the text after a NEXT marker in a reply without an end marker, for example a reply to the owner', async () => {
+    const harness = createHarness()
+    harness.stream.mockImplementationOnce(async (_model, _provider, _context, options) => {
+      for (const text of ['First. ', '<|NEXT wait|>', 'Second.'])
+        await options?.onStreamEvent?.({ type: 'text-delta', text })
+    })
+
+    await harness.runtime.ingest('Hello', { model: 'test', chatProvider: provider })
+
+    expect(harness.sessionMessages['session-1'].at(-1)).toMatchObject({ role: 'assistant', content: 'First. Second.' })
+    expect(harness.replyCuts).toEqual([])
   })
 })

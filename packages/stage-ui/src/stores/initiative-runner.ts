@@ -12,6 +12,7 @@ import {
   decideInitiative,
   decideInterruption,
   drawLineLength,
+  initiativeEndMarker,
   initiativeNoticeText,
   initiativeReadout,
   initiativeTimeFrom,
@@ -390,7 +391,7 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
     salienceSinceTurn = 0
     let outcome: 'spoke' | 'silent' | 'dropped' | 'failed' = 'failed'
     try {
-      const result = await chat.notifyConversation(sessionId, { source: INITIATIVE_SOURCE, text, transient: true, ...(screen?.attachments.length ? { attachments: screen.attachments } : {}), ...(screen?.anchor ? { anchor: screen.anchor } : {}) }, turn.turnId)
+      const result = await chat.notifyConversation(sessionId, { source: INITIATIVE_SOURCE, text, transient: true, endMarker: initiativeEndMarker({ solo }), ...(screen?.attachments.length ? { attachments: screen.attachments } : {}), ...(screen?.anchor ? { anchor: screen.anchor } : {}) }, turn.turnId)
       outcome = turn.dropped ? 'dropped' : result === 'spoke' ? 'spoke' : result === 'failed' ? 'failed' : 'silent'
     }
     catch (error) {

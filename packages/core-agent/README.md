@@ -80,6 +80,8 @@ Realtime transport is not implemented. A future session adapter can project the 
 - `background` marks work beside the conversation, for example a recipe task. It never speaks.
 - `notice` sends text that is not owner speech, for example a finished task. History stores it with `notice`, and requests mark it with its source. The reply carries `proactive`.
   With `transient`, only that request reads the notice, and history keeps the reply alone. Autonomous turns use it, so silent turns leave no trace.
+  With `endMarker`, the reply ends at that marker. When a model writes on after it, the runtime stops the request, drops the text, and calls `onReplyCut`. `initiativeEndMarker` names the marker of an autonomous turn.
+- The runtime ends each system prompt with `FINAL_ANSWER_RULE`. Without it, `gpt-6-luna` wrote its line as a progress message of its API and then wrote on. [The ADR of 2026-11-14](../../docs/ai/adr/2026-11-14-autonomy-one-model-relay-decision.md) has the measurements.
 - `skills` stores invoked skill steps with the owner's message. Later requests project them after that message.
 
 The stream context carries `speaks`. Only a send that is neither `background` nor `scene` speaks.

@@ -17,6 +17,7 @@ import { chatMessagesToTurns } from '../messages/chat-completions'
 import { formatTimePrefix } from '../messages/datetime-prefix'
 import { renderConversationPreview } from '../messages/preview'
 import { createChatHooks } from './agent-hooks'
+import { FINAL_ANSWER_RULE } from './final-answer-rule'
 import { useLlmmarkerParser } from './llm-marker-parser'
 import { categorizeResponse, createStreamingCategorizer } from './response-categoriser'
 
@@ -204,8 +205,23 @@ export interface ChatOrchestratorSendOptions {
      * Only this request gets it, and history never stores it.
      */
     anchor?: { text: string, image: string }
+    /**
+     * The marker that ends the reply, as the text of the notice asks for it. Some models write on after their reply:
+     * stray words, a second version of the line, or a run without end.
+     * Text after this marker is not part of the reply. It is not spoken and not stored, and the model request stops.
+     */
+    endMarker?: ReplyEndMarker
   }
 }
+
+/** The last marker of a reply to a notice. See `notice.endMarker`. */
+export type ReplyEndMarker = 'NEXT' | 'TOPIC'
+
+/**
+ * The spaces and line breaks that can follow the end marker of a reply. A model can add a line break after its reply.
+ * More than this is a run without end, so the reply is cut.
+ */
+const REPLY_END_BLANK_LIMIT = 16
 
 interface QueuedSend {
   accepted: ReturnType<typeof Promise.withResolvers<{ sessionId: string, messageId: string }>>
@@ -482,6 +498,11 @@ export interface ChatOrchestratorRuntimeDeps {
    * A reply that stays silent still reports its markers, so the character can note the screen without a word.
    */
   onTimelineMarker?: (event: { sessionId: string, turnId: string, kind: 'note' | 'scene', text: string }) => void
+  /**
+   * Called when the model wrote on after the end marker of its reply. The reply ends at the marker, and the rest is
+   * dropped. See `notice.endMarker`.
+   */
+  onReplyCut?: (event: { sessionId: string, turnId: string, marker: ReplyEndMarker }) => void
   /** Called after user turn persistence, before provider prompt composition. */
   onUserTurnReady?: (event: {
     sessionId: string
@@ -959,10 +980,35 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
       let stickerEmitted = false
       let timelineNotes = 0
 
+      // The reply to a notice with an end marker ends at that marker. Later text is dropped, and the request stops.
+      const endMarker = options.notice?.endMarker
+      const replyEnd = new AbortController()
+      const streamSignal = endMarker ? AbortSignal.any([abortSignal, replyEnd.signal]) : abortSignal
+      /** The reply up to its end marker, with its markers. */
+      let replyText = ''
+      let replyEnded = false
+      let replyCut = false
+      let blankAfterEnd = 0
+      const cutReply = () => {
+        if (replyCut || !endMarker)
+          return
+        replyCut = true
+        replyEnd.abort(new DOMException('The reply ended at its end marker.', 'AbortError'))
+        deps.onReplyCut?.({ sessionId, turnId: streamingMessageContext.turnId, marker: endMarker })
+      }
+
       const parser = useLlmmarkerParser({
         onLiteral: async (literal) => {
           if (shouldAbort())
             return
+
+          if (replyEnded) {
+            blankAfterEnd += literal.length
+            if (literal.trim() || blankAfterEnd > REPLY_END_BLANK_LIMIT)
+              cutReply()
+            return
+          }
+          replyText += literal
 
           categorizer.consume(literal)
 
@@ -1006,6 +1052,12 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
           if (shouldAbort())
             return
 
+          if (replyEnded) {
+            cutReply()
+            return
+          }
+          replyText += special
+
           if (/^<\|STICKER\b/.test(special)) {
             // Text-based reasoning can contain markers too. Only visible speech can select an image.
             if (!categorizer.filterToSpeech(special, streamPosition))
@@ -1033,17 +1085,23 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
 
           if (/^<\|NEXT\b/.test(special)) {
             // What the model wants after the reply is data for code, like a topic label. The last marker counts.
-            const next = categorizer.filterToSpeech(special, streamPosition) ? nextFromMarker(special) : undefined
+            const visible = Boolean(categorizer.filterToSpeech(special, streamPosition))
+            const next = visible ? nextFromMarker(special) : undefined
             if (next)
               buildingMessage.next = next
+            if (visible && endMarker === 'NEXT')
+              replyEnded = true
             return
           }
 
           if (/^<\|TOPIC\b/.test(special)) {
             // A topic label is data for code, like a sticker. Only the first label of visible speech counts.
-            const topic = categorizer.filterToSpeech(special, streamPosition) ? topicFromMarker(special) : undefined
+            const visible = Boolean(categorizer.filterToSpeech(special, streamPosition))
+            const topic = visible ? topicFromMarker(special) : undefined
             if (topic && !buildingMessage.topic)
               buildingMessage.topic = topic
+            if (visible && endMarker === 'TOPIC')
+              replyEnded = true
             return
           }
 
@@ -1054,7 +1112,7 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
             return
 
           // Strip only sticker, topic, next, and timeline markers, including the escaped form accepted by the parser.
-          const speechText = fullText.replace(/<(?:\||\{'\|'\})(?:STICKER|TOPIC|NEXT|NOTE|SCENE)\b[\s\S]*?(?:(?:\||\{'\|'\})>|$)/g, '')
+          const speechText = (replyEnded ? replyText : fullText).replace(/<(?:\||\{'\|'\})(?:STICKER|TOPIC|NEXT|NOTE|SCENE)\b[\s\S]*?(?:(?:\||\{'\|'\})>|$)/g, '')
           const finalCategorization = categorizeResponse(speechText, activeProvider)
 
           const reasoningContentField = buildingMessage.categorization?.reasoning?.trim()
@@ -1129,7 +1187,8 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
             ...stickers.map(sticker => `<|STICKER ${sticker.id}|>: ${sticker.description}`),
           ].join('\n')
         : ''
-      const systemPromptSupplement = [options.systemPromptSupplement?.trim(), stickerPrompt].filter(Boolean).join('\n\n')
+      // The final answer rule is the last text of the system prompt, after every supplement. It worked at that place.
+      const systemPromptSupplement = [options.systemPromptSupplement?.trim(), stickerPrompt, FINAL_ANSWER_RULE].filter(Boolean).join('\n\n')
       if (systemPromptSupplement) {
         const systemMessage = context.turns.find(turn => turn.type === 'system' && turn.authority === 'system')
         if (systemMessage?.type === 'system')
@@ -1198,6 +1257,7 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
       let llmFirstTokenEmitted = false
       let generationUsage: LlmUsage = { source: 'unavailable' }
       let generatedTurn: AssistantTurn | undefined
+      let toolCalled = false
       deps.onLlmRequestStarted?.({
         ...correlation,
         model: options.model,
@@ -1208,7 +1268,7 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
       const resolveOwnerStep = options.resolveStep
       const fixedReply = options.notice?.reply
       const stream = fixedReply === undefined ? deps.llm.stream : streamFixedReply(fixedReply)
-      await waitForProvider(stream(options.model, options.chatProvider, context, {
+      const generationWork = waitForProvider(stream(options.model, options.chatProvider, context, {
         headers,
         providerId: activeProvider,
         // A resolved prompt replaces the composed system message, so it must carry the same supplement.
@@ -1220,7 +1280,7 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
           : undefined,
         supportsAudioInput: options.supportsAudioInput,
         supportsVisionInput: options.supportsVisionInput,
-        abortSignal,
+        abortSignal: streamSignal,
         onGeneratedTurn: (turn) => { generatedTurn = structuredClone(turn) },
         requestCorrelation: {
           conversationId: correlation.conversationId,
@@ -1267,6 +1327,7 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
               break
             }
             case 'tool-call': {
+              toolCalled = true
               const content = deps.toolContents?.[event.toolName]
               if (content) {
                 // The content joins when the result arrives, after the flush, so the text before the call stays in front of it.
@@ -1324,6 +1385,9 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
 
               break
             case 'text-delta':
+              // The reply ended at its end marker. A provider can still send text until the request stops.
+              if (replyCut)
+                break
               if (!llmFirstTokenEmitted) {
                 llmFirstTokenEmitted = true
                 deps.onLlmFirstToken?.({
@@ -1358,7 +1422,15 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
               throw event.error ?? new Error('Stream error')
           }
         },
-      }), abortSignal)
+      }), streamSignal)
+      try {
+        await generationWork
+      }
+      catch (error) {
+        // The cut stops the request on purpose, and the reply up to its end marker is whole. Every other stop fails.
+        if (!replyCut || abortSignal.aborted)
+          throw error
+      }
 
       // Session generation is the lifecycle correlation key. Re-check it
       // after every awaited completion boundary so deleting a session while a
@@ -1371,6 +1443,20 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
         return
 
       generationCompleted = true
+      if (replyCut) {
+        // The parser read the end marker before it read the text after it, so the kept text is whole here.
+        fullText = replyText
+        // The turn of the provider holds the dropped text, or the stopped request gave no turn. The next request reads
+        // the kept text. After a tool call, the stored message gives the history, as for a turn without a transcript.
+        generatedTurn = toolCalled
+          ? undefined
+          : {
+              type: 'assistant',
+              id: roundId,
+              status: 'completed',
+              rounds: [{ id: createId(), modelCall: { model: options.model, finishReason: 'stop' }, content: [{ type: 'text', text: replyText }], toolInvocations: [], projectionIssues: [] }],
+            }
+      }
       buildingMessage.generationTranscript = generatedTurn
       try {
         deps.onAssistantResponseRendered?.({
