@@ -6,7 +6,7 @@ import type { ImageBudgetState } from './image-budget'
 
 import { encodeBase64 } from '@moeru/std/base64'
 import { SCENE_ANCHOR_TEXT } from '@proj-airi/core-agent'
-import { pickContactSheet, pickFreshKeyframes } from '@proj-airi/stage-shared/perception'
+import { pickContactSheet, pickFreshKeyframes, pickRecentSheet } from '@proj-airi/stage-shared/perception'
 
 import { renderContactSheet, scaleImage } from './encode-frame'
 import { FRAME_LIMITS } from './frame-ring'
@@ -60,6 +60,8 @@ async function attachmentOf(image: Blob): Promise<ChatAttachment> {
  * - `scene-anchor` puts the anchor frame of the scene near the start of the request and adds the newest frames. With
  *   one image left, the newest frame wins over the anchor.
  * - `scene-anchor+contact-sheet` sends the anchor and one contact sheet. With one image left, the sheet wins.
+ * - `recent-sheet` sends one contact sheet of the seconds before now, then the newest frame at full size. With one
+ *   image left, the newest frame goes alone.
  *
  * Use when:
  * - The initiative runner starts a decision turn while screen perception runs.
@@ -71,6 +73,7 @@ export async function buildScreenTurn(input: ScreenTurnInput): Promise<ScreenTur
   const eventTimes = fresh.map(event => event.at)
   const withAnchor = Boolean(input.anchor) && count >= 2 && (policy === 'scene-anchor' || policy === 'scene-anchor+contact-sheet')
   const withSheet = count >= 1 && (policy === 'contact-sheet' || policy === 'scene-anchor+contact-sheet')
+  const withRecentSheet = count >= 2 && policy === 'recent-sheet'
   const ageOf = (frame: CapturedFrame) => Math.max(0, input.now - frame.at)
 
   const attachments: ChatAttachment[] = []
@@ -81,6 +84,18 @@ export async function buildScreenTurn(input: ScreenTurnInput): Promise<ScreenTur
     if (tiles.length) {
       attachments.push(await attachmentOf(await renderContactSheet(tiles.map(tile => tile.image))))
       contactSheetAgesMs = tiles.map(ageOf)
+    }
+  }
+  else if (withRecentSheet) {
+    const newest = input.frames.at(-1)
+    const tiles = pickRecentSheet(input.frames).map(index => input.frames[index])
+    if (tiles.length) {
+      attachments.push(await attachmentOf(await renderContactSheet(tiles.map(tile => tile.image))))
+      contactSheetAgesMs = tiles.map(ageOf)
+    }
+    if (newest) {
+      attachments.push(await attachmentOf(newest.image))
+      frameAgesMs = [ageOf(newest)]
     }
   }
   else {

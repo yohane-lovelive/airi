@@ -1,7 +1,7 @@
 import type { Timeline, TimelineNote } from '@proj-airi/core-agent'
 
 import { errorMessageFrom } from '@moeru/std'
-import { addTimelineNotes, applyTimelineSummary, EMPTY_TIMELINE, setTimelineScene, timelineNotesToSummarize, timelineSummaryRequest } from '@proj-airi/core-agent'
+import { addTimelineNotes, applyTimelineSummary, EMPTY_TIMELINE, setTimelineCast, setTimelineScene, timelineNotesToSummarize, timelineSummaryRequest } from '@proj-airi/core-agent'
 import { useBroadcastChannel } from '@vueuse/core'
 import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
@@ -18,7 +18,7 @@ const SUMMARY_TIMEOUT_MS = 120_000
  * The screen timeline of each conversation: short notes of what happened on the screen, a summary of older notes, and
  * the current scene. It is the only history of the screen, because frames never stay.
  *
- * - Code writes notes, for example an app switch. The character writes notes and the scene with markers.
+ * - Code writes notes, for example an app switch. The character writes notes, the scene, and its cast with markers.
  * - IndexedDB keeps each timeline on the device. It never syncs. Other windows read it again after each change.
  * - Past its limits, the chat model of the session summarizes the oldest notes in the background.
  *
@@ -64,6 +64,11 @@ export const useTimelineStore = defineStore('timeline', () => {
 
   function setScene(sessionId: string, text: string, at: number) {
     return change(sessionId, stored => setTimelineScene(stored, text, at))
+  }
+
+  /** Who is who in the current scene, for example the characters of a match. A new cast takes the place of the old one. */
+  function setCast(sessionId: string, text: string, at: number) {
+    return change(sessionId, stored => setTimelineCast(stored, text, at))
   }
 
   /** Summarizes the oldest notes when the timeline grew past its limits. A failure only logs, and the next change tries again. */
@@ -117,6 +122,7 @@ export const useTimelineStore = defineStore('timeline', () => {
     load,
     addNotes,
     setScene,
+    setCast,
     clear,
     resetState,
   }

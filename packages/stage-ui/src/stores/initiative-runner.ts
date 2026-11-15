@@ -24,7 +24,7 @@ import {
   topicOf,
   topicVariety,
 } from '@proj-airi/core-agent'
-import { sceneAnchorAt } from '@proj-airi/stage-shared/perception'
+import { COMMENTARY_FRAME_POLICY, sceneAnchorAt } from '@proj-airi/stage-shared/perception'
 import { nanoid } from 'nanoid'
 import { defineStore, storeToRefs } from 'pinia'
 import { computed, onScopeDispose, readonly, shallowRef, watch } from 'vue'
@@ -314,7 +314,7 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
       })
       sceneAnchor = frames.find(frame => frame.at === anchorAt) ?? sceneAnchor
       const turn = await buildScreenTurn({
-        policy: perception.framePolicy,
+        policy: commentary ? COMMENTARY_FRAME_POLICY : perception.framePolicy,
         ...(sceneAnchor ? { anchor: sceneAnchor } : {}),
         frames: perceptionRunner.frames(),
         events: perceptionRunner.events(),

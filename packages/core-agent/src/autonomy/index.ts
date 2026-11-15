@@ -101,13 +101,14 @@ export {
   addTimelineNotes,
   applyTimelineSummary,
   EMPTY_TIMELINE,
+  setTimelineCast,
   setTimelineScene,
   TIMELINE_LIMITS,
   timelineMarkerFrom,
   timelineNotesToSummarize,
   timelineSummaryRequest,
 } from './timeline'
-export type { Timeline, TimelineNote } from './timeline'
+export type { Timeline, TimelineMarkerKind, TimelineNote } from './timeline'
 export {
   bigramSimilarity,
   calendarTopicSeeds,

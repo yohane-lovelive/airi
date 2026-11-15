@@ -2,7 +2,7 @@ import type { TimelineNote } from './timeline'
 
 import { describe, expect, it } from 'vitest'
 
-import { addTimelineNotes, applyTimelineSummary, EMPTY_TIMELINE, setTimelineScene, TIMELINE_LIMITS, timelineMarkerFrom, timelineNotesToSummarize, timelineSummaryRequest } from './timeline'
+import { addTimelineNotes, applyTimelineSummary, EMPTY_TIMELINE, setTimelineCast, setTimelineScene, TIMELINE_LIMITS, timelineMarkerFrom, timelineNotesToSummarize, timelineSummaryRequest } from './timeline'
 
 const HOUR = 60 * 60_000
 
@@ -17,6 +17,11 @@ describe('timeline markers', () => {
     expect(timelineMarkerFrom(`<|NOTE ${'a'.repeat(200)}|>`)?.text).toHaveLength(TIMELINE_LIMITS.maxNoteLength)
     expect(timelineMarkerFrom('<|NOTE   |>')).toBeUndefined()
     expect(timelineMarkerFrom('<|TOPIC games|>')).toBeUndefined()
+  })
+
+  it('reads the cast of a scene, and cuts it at its own limit', () => {
+    expect(timelineMarkerFrom('<|CAST the owner plays Ambessa. Allies: Karma. Opponents: Leona|>')).toEqual({ kind: 'cast', text: 'the owner plays Ambessa. Allies: Karma. Opponents: Leona' })
+    expect(timelineMarkerFrom(`<|CAST ${'a'.repeat(900)}|>`)?.text).toHaveLength(TIMELINE_LIMITS.maxCastLength)
   })
 })
 
@@ -34,6 +39,13 @@ describe('timeline', () => {
     const timeline = setTimelineScene(setTimelineScene(EMPTY_TIMELINE, 'lobby', 1), 'ranked match', 2)
 
     expect(timeline.scene).toEqual({ text: 'ranked match', at: 2 })
+  })
+
+  it('replaces the cast, and keeps it when the new text is empty', () => {
+    const timeline = setTimelineCast(setTimelineCast(EMPTY_TIMELINE, 'the owner plays Lux', 1), 'the owner plays Ambessa', 2)
+
+    expect(timeline.cast).toEqual({ text: 'the owner plays Ambessa', at: 2 })
+    expect(setTimelineCast(timeline, '   ', 3).cast).toEqual({ text: 'the owner plays Ambessa', at: 2 })
   })
 
   it('summarizes the oldest notes past the count, and every note past the age', () => {

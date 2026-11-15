@@ -124,8 +124,11 @@ describe('initiativeNoticeText', () => {
     expect(text).not.toContain('"first"')
     expect(text).toContain('"second"')
     expect(text).toContain(`"${'a'.repeat(119)}…"`)
-    // About 300 tokens at most. English text has about 4 characters for each token.
-    expect(initiativeNoticeText(context({ mode: 'commentary', speechType: 'recall', recentLines: [long, long, long] })).length).toBeLessThan(1200)
+    // About 450 tokens at most. English text has about 4 characters for each token.
+    // A line about the screen gets what to talk about and the rule for names. They are about 180 of these tokens.
+    expect(initiativeNoticeText(context({ mode: 'commentary', speechType: 'recall', recentLines: [long, long, long] })).length).toBeLessThan(1800)
+    // While the cast is not known, the notice with the screen also tells how to write it: about 150 tokens more.
+    expect(initiativeNoticeText(context({ mode: 'commentary', speechType: 'recall', recentLines: [long, long, long], screen: { frameAgesMs: [0], events: [] } })).length).toBeLessThan(3200)
   })
 
   // ROOT CAUSE:
@@ -158,6 +161,44 @@ describe('initiativeNoticeText', () => {
     expect(initiativeNoticeText(context({ trigger: 'continuation' }))).toContain('Go on with the next point of what you were saying')
     expect(initiativeNoticeText(context({ trigger: 'follow-up' }))).toContain('Nudge lightly once, or move on to another topic')
     expect(initiativeNoticeText(context())).toContain('<|NEXT continue|>')
+  })
+
+  // ROOT CAUSE:
+  // The notice only said to talk about the screen. A live check on 2026-11-15 heard the score in 24 of 31 lines, a
+  // character name in 2, and no skill name. With the focus alone, the model made up names, so the cast goes with it.
+  it('asks a line about the screen for the play itself, for sure names, and for the cast of the scene', () => {
+    const screen = { frameAgesMs: [0], events: [] }
+    const text = initiativeNoticeText(context({ mode: 'commentary', trigger: 'event', screen }))
+
+    expect(text).toContain('- What to talk about: what happens in the scene, not the numbers of a scoreboard.')
+    expect(text).toContain('Say the score only when the lead changes.')
+    expect(text).toContain('React to it like a friend who watches, and do not give advice in every line.')
+    expect(text).toContain('Name a character or an item only when its name is written on the screen or the cast of the scene names it.')
+    expect(text).toContain('For a character of the cast, name the skill that it uses when you know that skill.')
+    // A replay let the model write the cast from portraits. It took the wrong character for the owner's.
+    expect(text).toContain('- The cast of this scene is not known yet.')
+    expect(text).toContain('write <|CAST The owner plays ... Allies: ... Opponents: ...|>')
+    expect(text).toContain('Take only names that are written on the screen or that the owner told you, and do not guess a character from its look.')
+    // An app check got a cast without the character of the owner, and then no line named it.
+    expect(text).toContain('The character of the owner is the one beside the owner\'s player name, when you know that name.')
+    expect(text).toContain('When you cannot tell, write "The owner plays: not known".')
+    // An idle turn can talk about anything, so it gets none of these lines.
+    const idle = initiativeNoticeText(context({ screen }))
+    expect(idle).not.toContain('What to talk about')
+    expect(idle).not.toContain('<|CAST')
+  })
+
+  it('gives the cast of the scene back to the model, until the cast is too old', () => {
+    const screen = { frameAgesMs: [0], events: [] }
+    const castAt = (ageMs: number) => ({ notes: [], cast: { text: 'The owner plays Ambessa.', at: NOW - ageMs } })
+
+    const known = initiativeNoticeText(context({ mode: 'commentary', screen, timeline: castAt(10 * 60_000) }))
+    expect(known).toContain('- Cast of the scene, written 10 minutes ago: The owner plays Ambessa.')
+    expect(known).toContain('- Write <|CAST ...|> again only when the cast changes, or when you can add a character to it.')
+    expect(known).not.toContain('is not known yet')
+    const old = initiativeNoticeText(context({ mode: 'commentary', screen, timeline: castAt(2 * 60 * 60_000) }))
+    expect(old).not.toContain('Cast of the scene')
+    expect(old).toContain('- The cast of this scene is not known yet.')
   })
 
   it('names the last marker that the notice asks for as the end of the reply', () => {

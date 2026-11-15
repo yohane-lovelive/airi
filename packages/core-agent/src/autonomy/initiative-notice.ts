@@ -88,6 +88,28 @@ export interface InitiativeNoticeContext {
   readonly lineLength: LineLength
 }
 
+/**
+ * What a line about the screen talks about. Without it, a live check on 2026-11-15 heard the score in 24 of 31 lines,
+ * a character name in 2, and no skill name. The words fit any game, so they name no game.
+ */
+const COMMENTARY_FOCUS = '- What to talk about: what happens in the scene, not the numbers of a scoreboard. Pick one: what the character of the owner just did, a skill that someone used, how the two sides stand, or a choice of an item or an upgrade. React to it like a friend who watches, and do not give advice in every line. Say the score only when the lead changes.'
+
+/** With the focus alone, the model made up names of characters that were not in the match. */
+const COMMENTARY_NAMES = '- Name a character or an item only when its name is written on the screen or the cast of the scene names it. Do not guess a character from a look. Without a sure name, say "an ally" or "an opponent". For a character of the cast, name the skill that it uses when you know that skill.'
+
+/**
+ * The cast stays in the timeline, so later lines can name the characters after the screen that showed them is gone.
+ * The first replay with one fixed line got no cast in 16 turns, so the line tells whether the cast is known.
+ * A second replay let the model write a part of the cast from portraits. It took the wrong character for the owner's,
+ * and every later line named it. So only written names count.
+ * An app check got a cast without the owner's character, and then no line named it. So the line asks for it first.
+ * The model read it in 8 of 8 tries when it knew the owner's player name, and in none of 8 without the name.
+ */
+const COMMENTARY_CAST = {
+  unknown: '- The cast of this scene is not known yet. When the screen shows the names of who plays, for example a loading screen or a scoreboard with names, write <|CAST The owner plays ... Allies: ... Opponents: ...|>. Take only names that are written on the screen or that the owner told you, and do not guess a character from its look. The character of the owner is the one beside the owner\'s player name, when you know that name. The screen can also mark the owner, for example with a player name in another color. When you cannot tell, write "The owner plays: not known". Nobody sees or hears it.',
+  known: '- Write <|CAST ...|> again only when the cast changes, or when you can add a character to it. Then write the whole cast.',
+} as const
+
 const TRIGGER_REASONS: Record<InitiativeTrigger, string> = {
   'event': 'something happened',
   'boredom': 'it has been quiet for a while',
@@ -131,7 +153,7 @@ export function initiativeNoticeText(context: InitiativeNoticeContext): string {
   // The line avoids the word "commentary". With it, gpt-6-luna wrote its line as a commentary message of its API,
   // and wrote on after the line. See `FINAL_ANSWER_RULE`.
   if (context.mode === 'commentary')
-    lines.push('- Mode: you talk about the owner\'s screen.')
+    lines.push('- Mode: you talk about the owner\'s screen.', COMMENTARY_FOCUS, COMMENTARY_NAMES)
   if (context.smallTalkEndsAt !== undefined) {
     lines.push(context.solo
       ? `- Mode: solo talk, like a radio host, for ${durationSince(context.now, context.smallTalkEndsAt)} more. The owner only listens. Keep talking on your own. Do not stay silent, ask the owner anything, or wait for an answer.`
@@ -152,6 +174,8 @@ export function initiativeNoticeText(context: InitiativeNoticeContext): string {
       lines.push(...timelineLines(context.timeline, context.now))
     lines.push(...screenLines(context.screen))
     lines.push('- If the screen shows something worth remembering later, add <|NOTE a short fact|>, at most two. If the scene changed, write <|SCENE the current scene: the app or game, the place, the goal, the state|>. Nobody sees or hears them, and you can write them also when you stay quiet.')
+    if (context.mode === 'commentary')
+      lines.push(freshCast(context.timeline, context.now) ? COMMENTARY_CAST.known : COMMENTARY_CAST.unknown)
   }
 
   if (context.thread) {
@@ -225,10 +249,18 @@ function screenLines(screen: InitiativeScreenContext) {
   return lines
 }
 
+/** The cast of the scene, while it is young enough to trust. */
+function freshCast(timeline: Timeline | undefined, now: number) {
+  return timeline?.cast && now - timeline.cast.at <= TIMELINE_LIMITS.maxCastAgeMs ? timeline.cast : undefined
+}
+
 function timelineLines(timeline: Timeline, now: number) {
   const lines: string[] = []
   if (timeline.scene)
     lines.push(`- Current scene, written ${ageLabel(now - timeline.scene.at)} ago: ${timeline.scene.text}`)
+  const cast = freshCast(timeline, now)
+  if (cast)
+    lines.push(`- Cast of the scene, written ${ageLabel(now - cast.at)} ago: ${cast.text}`)
   if (timeline.summary)
     lines.push(`- Earlier on the screen: ${timeline.summary.text}`)
   const notes = timeline.notes.slice(-TIMELINE_LIMITS.promptNotes)

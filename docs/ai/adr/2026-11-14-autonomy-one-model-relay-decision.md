@@ -88,7 +88,7 @@ Each later step changes the speed or the quality of commentary. The replay evalu
 - **No tool runs.** The replay answers each tool call with a fixed text, so a replay changes no memory and no mission.
 - **The request is a stream with the session header.** OpenCode Go rejects a request without `x-opencode-session`. The replay reads the time to the first text from the runtime, and the cached input tokens from the stream.
 - **A play video becomes a recording.** `import-video` takes 2 frames each second with ffmpeg and writes the format of the screen recorder.
-- **The question of the screen gate lives in `packages/core-agent`.** The gate trace asks it about a recording, one look each 2 seconds, and scores the passes against labeled events. The app calls the same question in step 6.
+- **The question of the screen gate lives in `packages/core-agent`.** The gate trace asks it about a recording, one look each 2 seconds, and scores the passes against labeled events. The app calls the same question in step 7.
 - **New metrics.** The time to the first text (the median, and the time that 9 of 10 lines stay under), the input tokens for each line, and the share of repeated lines.
 
 ### A reply is one final answer, and it ends at its end marker
@@ -100,6 +100,18 @@ Each later step changes the speed or the quality of commentary. The replay evalu
 - **A reply to a notice ends at its end marker.** The notice names the last marker that its text asks for: `NEXT`, or `TOPIC` for solo talk. When text follows that marker, the runtime stops the model request and drops the text. The speech and the history get the reply up to the marker.
 - **A line break after the marker is not a tail.** The runtime cuts at other text, or at more than 16 blank characters.
 - **The runtime reports each cut.** The app writes one log line. The replay evaluation gets two metrics: the share of cut turns, and the share of lines without an end marker.
+
+### A line about the screen talks about the play
+
+In the app check of step 5, 24 of 31 lines said the score. 2 lines named a character, and no line named a skill. The notice only said to talk about the screen. The model did not know who plays, and two single frames rarely show a move.
+
+- **The notice says what to talk about.** A line picks one thing of the scene: what the character of the owner did, a skill that someone used, how the two sides stand, or a choice of an item. It says the score only when the lead changes. The words name no game.
+- **The timeline keeps the cast of the scene.** The model writes `<|CAST ...|>` when the screen shows the names of who plays, for example a loading screen. The notice gives the cast back for 90 minutes, and a new cast takes its place.
+- **Only written names count.** The cast holds names that are written on the screen, or that the owner told. In a replay the model wrote the cast from portraits. It took the wrong character for the owner's, and every later line named it.
+- **The cast names the character of the owner first.** The model finds it beside the owner's player name, when it knows that name. Without it, the cast says that the character is not known.
+- **A line names what is sure.** A character or an item needs a written name or the cast. A skill of a character of the cast can come from what the model knows.
+- **A commentary turn sends the recent sheet.** One contact sheet holds the six frames of 12 to 2 seconds before now, and the newest frame goes at full size. The owner chose this on 2026-11-13. The developer setting of the frame policy sets the other turns.
+- **The replay measures the content.** New metrics: the share of lines with a score, with a name, and with a wrong name. A recording can hold `cast.txt`, which a person wrote. The replay starts with it, and the judge checks names against it.
 
 ## Rejected options
 
@@ -115,6 +127,7 @@ Each later step changes the speed or the quality of commentary. The replay evalu
 - **A stop sequence.** The server rejects `stop` for `gpt-6-luna`.
 - **More reasoning.** With the effort `high`, 7 of 20 replies still had a tail, and the first text came after 3.2 seconds.
 - **Another speaking model.** `deepseek-v4.1-flash`, `hy4`, and `muse-spark-1.3-contributor` stopped by themselves. Each one was slower to the first text, or wrong about the screen more often.
+- **A part of the cast from the look of the screen.** It gave a cast sooner, but one wrong guess of the owner's character stayed in every later line.
 - **A JSON schema for the reply.** The server holds only the final answer to the schema. With the final answer rule, 20 of 20 replies were valid JSON. But the reply of the app is text with markers, and its speech starts while the text streams.
 
 ## Steps
@@ -125,8 +138,9 @@ Each later step changes the speed or the quality of commentary. The replay evalu
 | 2 | Remove the Vite proxy entries and the screen model of the perception settings. | `apps/stage-web`, `packages/stage-ui`, `packages/stage-pages`, `packages/i18n` | Done |
 | 3 | The client of Gemini Decision 1 and the store that gives it the key. | `packages/core-agent`, `packages/stage-ui` | Done |
 | 4 | The replay evaluation sends the requests of the app. It gets the video import, the gate trace, and the question of the screen gate. | `evals/autonomy-replay`, `packages/core-agent`, `packages/stage-ui`, `apps/stage-tamagotchi`, `packages/i18n` | Done |
-| 5 | The final answer rule, the notice without the word "commentary", and the end marker of a reply. | `packages/core-agent`, `packages/stage-ui`, `evals/autonomy-replay` | This change |
-| 6 | The screen gate in the app, the choice of four answers, and the frame input of a commentary line. | `packages/core-agent`, `packages/stage-ui` | To do, with its own section in this document |
+| 5 | The final answer rule, the notice without the word "commentary", and the end marker of a reply. | `packages/core-agent`, `packages/stage-ui`, `evals/autonomy-replay` | Done |
+| 6 | What a line about the screen talks about: the focus, the cast of the scene, and the recent sheet. | `packages/core-agent`, `packages/stage-shared`, `packages/stage-ui`, `packages/i18n`, `evals/autonomy-replay` | This change |
+| 7 | The screen gate in the app, and the choice of four answers. | `packages/core-agent`, `packages/stage-ui` | To do, with its own section in this document |
 
 ## Consequences
 
@@ -134,7 +148,7 @@ Each later step changes the speed or the quality of commentary. The replay evalu
 - The screen model that an owner selected has no effect after step 2. Screen turns use the chat model of the character.
 - The web app reaches OpenCode Go only through `pnpm dev:web` or a preview server.
 - The reasoning table needs an update when OpenCode Go adds a model. Until then, a new model reasons as the server decides.
-- Autonomous turns need a Gemini API key after step 6. Its free tier allows 10,000 requests each day.
+- Autonomous turns need a Gemini API key after step 7. Its free tier allows 10,000 requests each day.
 - A recording holds the system prompt of the character, with the memory index. It stays on the device, like the frames.
 - The replay runs one frame policy by default, the policy of the app.
 - Every chat request ends its system prompt with the final answer rule: a reply to the owner and a task too. A request without a system prompt gets a system message with only the rule.
@@ -142,6 +156,10 @@ Each later step changes the speed or the quality of commentary. The replay evalu
 - A reply without an end marker is not cut. A turn that stays quiet has none.
 - The mission tools keep the word "commentary", because it is the name of the mission.
 - A character card that names the provider "OpenAI Compatible" for its chat model must change to "OpenCode Go" too. The card selection wins over the chat settings of the app.
+- The notice of a commentary turn is about 180 tokens longer, and about 150 more while the cast is not known.
+- A line names the character of the owner only when the cast holds it. For that, the character must know the owner's player name, for example from a memory, or the owner must tell which character it is.
+- The cast is known only after a turn saw a screen with the names. A match that a commentary joins later has no cast, and its lines say "an ally" and "an opponent".
+- A commentary turn sends two images. With the default of 120 images each hour and a line each 20 seconds, the budget runs low after about 10 minutes and is empty after about 30.
 
 ## Verification of step 1
 
@@ -177,3 +195,17 @@ Each later step changes the speed or the quality of commentary. The replay evalu
 - The desktop dev app ran on a copy of the owner's profile on 2026-11-15. The system prompt of the character had 6,190 characters and 22 tools, and it ended with the rule. A reply to the owner with a tool call worked.
 - In that app, a commentary on a video of the match gave 31 lines in 10.7 minutes. In the history, every line ended at its `NEXT` marker. No speech text held a marker or stray text. The runtime cut 5 replies.
 - Not checked: the time to the first text in the app, the speech synthesis (it was muted), the window of a live game, and solo talk.
+
+## Verification of step 6
+
+- Unit tests cover the cast marker and its place in the timeline, the lines of the notice with a known and an unknown cast, the recent sheet in the app and in the replay, the cast file of a recording, and the three metrics.
+- The cast of the recording of 2026-11-12 comes from its loading screen. A person read it, and one opponent is a guess from the name of a skin.
+- The replay with that cast gave 17 lines. No line said the score, 16 lines held a name, and the judge found no wrong name. The first text came after 1.4 seconds at the median, and a line cost about 3,200 input tokens.
+- The replay without a cast gave 15 lines. No line said the score, 2 lines held a name, and the judge found no wrong name.
+- The judge is the speaking model. Its count of wrong names is weak evidence: it did not see a cast with the wrong character of the owner.
+- One line of 17 named a skill. The model does not name a skill that it is not sure of.
+- With the recent sheet, the first text came about 0.2 seconds later than with two single frames, at about the same input tokens.
+- The desktop dev app ran on a copy of the owner's profile on 2026-11-15, on a video of the match with its loading screen held for 25 seconds. The first turn read the cast from that screen: five allies right, four of five opponents right, and no character of the owner.
+- In that app, a commentary gave 24 lines in 9.4 minutes. No line said the score, against 24 of 31 before. 3 lines named a character, and no line named the character of the owner, because the cast did not hold it. The runtime cut no reply.
+- After that check, the cast line got the rule for the character of the owner. On the loading screen, the model then named it in 8 of 8 tries when its memory held the owner's player name. Without the name, it said "not known" in 3 of 4 tries and guessed wrongly in one.
+- Not checked: a commentary in the app with the owner's player name in the memory, the window of a live game, and a game other than League of Legends.

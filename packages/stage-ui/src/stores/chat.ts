@@ -1309,7 +1309,10 @@ export const useChatStore = defineStore('chat', () => {
     // The character notes the screen with markers. They go to the timeline of the conversation on this device.
     onTimelineMarker: ({ sessionId, kind, text }) => {
       const at = Date.now()
-      void (kind === 'note' ? timeline.addNotes(sessionId, [{ at, text, source: 'model' }]) : timeline.setScene(sessionId, text, at))
+      const kept = kind === 'note'
+        ? timeline.addNotes(sessionId, [{ at, text, source: 'model' }])
+        : kind === 'scene' ? timeline.setScene(sessionId, text, at) : timeline.setCast(sessionId, text, at)
+      void kept
         .catch(error => console.warn('[chat] Failed to keep a timeline marker:', errorMessageFrom(error)))
     },
     // The reply is whole, so this is no failure. The line shows how often a model writes on after its reply.

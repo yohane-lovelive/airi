@@ -1,6 +1,7 @@
 import type { GenerationProvider } from '@proj-airi/provider-inference'
 import type { CommonContentPart, Message, ToolMessage } from '@xsai/shared-chat'
 
+import type { TimelineMarkerKind } from '../autonomy/timeline'
 import type { AgentContextPort } from '../contracts/context-port'
 import type { AgentLLMPort } from '../contracts/llm-port'
 import type { AgentForegroundStreamPort } from '../contracts/stream-port'
@@ -494,10 +495,11 @@ export interface ChatOrchestratorRuntimeDeps {
     messageText: string
   }) => void
   /**
-   * Called with each `<|NOTE ...|>` or `<|SCENE ...|>` marker of visible speech, at most two notes for each reply.
+   * Called with each `<|NOTE ...|>`, `<|SCENE ...|>`, or `<|CAST ...|>` marker of visible speech, at most two notes for
+   * each reply.
    * A reply that stays silent still reports its markers, so the character can note the screen without a word.
    */
-  onTimelineMarker?: (event: { sessionId: string, turnId: string, kind: 'note' | 'scene', text: string }) => void
+  onTimelineMarker?: (event: { sessionId: string, turnId: string, kind: TimelineMarkerKind, text: string }) => void
   /**
    * Called when the model wrote on after the end marker of its reply. The reply ends at the marker, and the rest is
    * dropped. See `notice.endMarker`.
@@ -1072,10 +1074,10 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
             return
           }
 
-          if (/^<\|(?:NOTE|SCENE)\b/.test(special)) {
+          if (/^<\|(?:NOTE|SCENE|CAST)\b/.test(special)) {
             // Timeline markers are data for code, like a topic label. They never reach speech or plugins.
             const marker = categorizer.filterToSpeech(special, streamPosition) ? timelineMarkerFrom(special) : undefined
-            if (marker && (marker.kind === 'scene' || timelineNotes < TIMELINE_LIMITS.maxModelNotesPerTurn)) {
+            if (marker && (marker.kind !== 'note' || timelineNotes < TIMELINE_LIMITS.maxModelNotesPerTurn)) {
               if (marker.kind === 'note')
                 timelineNotes += 1
               deps.onTimelineMarker?.({ sessionId, turnId: streamingMessageContext.turnId, ...marker })
@@ -1112,7 +1114,7 @@ export function createChatOrchestratorRuntime(deps: ChatOrchestratorRuntimeDeps)
             return
 
           // Strip only sticker, topic, next, and timeline markers, including the escaped form accepted by the parser.
-          const speechText = (replyEnded ? replyText : fullText).replace(/<(?:\||\{'\|'\})(?:STICKER|TOPIC|NEXT|NOTE|SCENE)\b[\s\S]*?(?:(?:\||\{'\|'\})>|$)/g, '')
+          const speechText = (replyEnded ? replyText : fullText).replace(/<(?:\||\{'\|'\})(?:STICKER|TOPIC|NEXT|NOTE|SCENE|CAST)\b[\s\S]*?(?:(?:\||\{'\|'\})>|$)/g, '')
           const finalCategorization = categorizeResponse(speechText, activeProvider)
 
           const reasoningContentField = buildingMessage.categorization?.reasoning?.trim()

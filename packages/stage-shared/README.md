@@ -33,7 +33,7 @@ const events = detector.observe({ at: Date.now(), thumbnail, app: 'Code' })
 
 `regionDiff` measures the change inside one part of two thumbnails, for example for a watch. `ScreenDetector` settles before it compares, it knows familiar screens and the usual change of each app, and it counts an app switch after a dwell time. `DETECTOR_LIMITS` holds the thresholds.
 
-The frame policies pick the frames of one decision turn. `FRAME_POLICY_NAMES` lists them. `pickFreshKeyframes` picks the newest frame and key frames, `pickContactSheet` picks up to six tiles, `contactSheetLayout` places them, and `sceneAnchorAt` finds the anchor frame of the current scene. The app and `evals/autonomy-replay` use the same functions, so a replay picks the frames that the app picks.
+The frame policies pick the frames of one decision turn. `FRAME_POLICY_NAMES` lists them. `pickFreshKeyframes` picks the newest frame and key frames, `pickContactSheet` picks up to six tiles, `pickRecentSheet` picks the frames of the 12 seconds before now for the sheet of a commentary turn (`COMMENTARY_FRAME_POLICY`), `contactSheetLayout` places them, and `sceneAnchorAt` finds the anchor frame of the current scene. The app and `evals/autonomy-replay` use the same functions, so a replay picks the frames that the app picks.
 
 The `body-motion` entrypoint owns the procedural layer of 3D models. `ProceduralBodyMotion` gives breath, a small sway, a neck and a head that follow the gaze late, a gaze that moves away while the model thinks, and nods on speech peaks. `BodyPoseApplier` adds its offsets to the bones of a model, and `SpeechLevelMeter` measures the speech loudness. The VRM and MMD renderers share them:
 

@@ -21,6 +21,11 @@ export interface Timeline {
   readonly notes: readonly TimelineNote[]
   /** What the current scene is, for example the game, the place, the goal, and the state of the player. */
   readonly scene?: { readonly text: string, readonly at: number }
+  /**
+   * Who is who in the current scene: the character of the owner, its allies, and its opponents. A line can name them.
+   * A new cast takes the place of the old one.
+   */
+  readonly cast?: { readonly text: string, readonly at: number }
   /** A summary of the notes up to `until`. */
   readonly summary?: { readonly text: string, readonly until: number }
 }
@@ -35,6 +40,9 @@ export const TIMELINE_LIMITS = {
   maxAgeMs: 12 * 60 * 60_000,
   maxNoteLength: 120,
   maxSceneLength: 300,
+  maxCastLength: 400,
+  /** The situation block leaves out a cast older than this. A match of a game ends sooner, and its cast with it. */
+  maxCastAgeMs: 90 * 60_000,
   maxSummaryLength: 600,
   /** The character writes at most this many notes in one turn. */
   maxModelNotesPerTurn: 2,
@@ -50,22 +58,32 @@ function clean(text: string, maxLength: number) {
   return flat.length > maxLength ? `${flat.slice(0, maxLength - 1)}…` : flat
 }
 
-const MARKER = /^<\|(NOTE|SCENE)\s([\s\S]*)\|>$/
+const MARKER = /^<\|(NOTE|SCENE|CAST)\s([\s\S]*)\|>$/
+
+/** What a timeline marker of the character writes: a note, the current scene, or the cast of the scene. */
+export type TimelineMarkerKind = 'note' | 'scene' | 'cast'
+
+const MARKER_KINDS: Record<string, { kind: TimelineMarkerKind, maxLength: number }> = {
+  NOTE: { kind: 'note', maxLength: TIMELINE_LIMITS.maxNoteLength },
+  SCENE: { kind: 'scene', maxLength: TIMELINE_LIMITS.maxSceneLength },
+  CAST: { kind: 'cast', maxLength: TIMELINE_LIMITS.maxCastLength },
+}
 
 /**
- * Reads a `<|NOTE ...|>` or `<|SCENE ...|>` marker. Returns `undefined` for another marker or an empty text.
+ * Reads a `<|NOTE ...|>`, `<|SCENE ...|>`, or `<|CAST ...|>` marker. Returns `undefined` for another marker or an
+ * empty text.
  *
  * @example
  * timelineMarkerFrom('<|NOTE the boss fight started|>')
  * // => { kind: 'note', text: 'the boss fight started' }
  */
-export function timelineMarkerFrom(special: string): { kind: 'note' | 'scene', text: string } | undefined {
+export function timelineMarkerFrom(special: string): { kind: TimelineMarkerKind, text: string } | undefined {
   const match = MARKER.exec(special.trim())
-  if (!match)
+  const marker = match ? MARKER_KINDS[match[1]] : undefined
+  if (!match || !marker)
     return undefined
-  const kind = match[1] === 'NOTE' ? 'note' : 'scene'
-  const text = clean(match[2] ?? '', kind === 'note' ? TIMELINE_LIMITS.maxNoteLength : TIMELINE_LIMITS.maxSceneLength)
-  return text ? { kind, text } : undefined
+  const text = clean(match[2] ?? '', marker.maxLength)
+  return text ? { kind: marker.kind, text } : undefined
 }
 
 /** Adds notes in time order. Each text is cleaned and cut to its limit, and an empty text is dropped. */
@@ -82,6 +100,12 @@ export function addTimelineNotes(timeline: Timeline, notes: readonly TimelineNot
 export function setTimelineScene(timeline: Timeline, text: string, at: number): Timeline {
   const scene = clean(text, TIMELINE_LIMITS.maxSceneLength)
   return scene ? { ...timeline, scene: { text: scene, at } } : timeline
+}
+
+/** Replaces the cast of the current scene. */
+export function setTimelineCast(timeline: Timeline, text: string, at: number): Timeline {
+  const cast = clean(text, TIMELINE_LIMITS.maxCastLength)
+  return cast ? { ...timeline, cast: { text: cast, at } } : timeline
 }
 
 /**

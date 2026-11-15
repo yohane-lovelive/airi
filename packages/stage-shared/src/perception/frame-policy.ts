@@ -101,10 +101,18 @@ export function pickFreshKeyframes(input: FramePolicyInput): PickedFrame[] {
  * - `contact-sheet`: several reduced frames as tiles of one image. The budget counts one image.
  * - `scene-anchor`: one anchor frame for each scene at a fixed place of the request, then the newest frames.
  * - `scene-anchor+contact-sheet`: the anchor, then one contact sheet.
+ * - `recent-sheet`: one contact sheet of the seconds before now, then the newest frame at full size. The sheet shows
+ *   how the screen moved, for example a skill or a chase, and the frame shows the details.
  */
-export const FRAME_POLICY_NAMES = ['fresh-keyframes', 'contact-sheet', 'scene-anchor', 'scene-anchor+contact-sheet'] as const
+export const FRAME_POLICY_NAMES = ['fresh-keyframes', 'contact-sheet', 'scene-anchor', 'scene-anchor+contact-sheet', 'recent-sheet'] as const
 
 export type FramePolicyName = typeof FRAME_POLICY_NAMES[number]
+
+/**
+ * The frame policy of a commentary turn. The owner chose it on 2026-11-13, so the developer setting does not change it.
+ * A line about a game needs to see how the screen moved, and two single frames rarely show a skill or a chase.
+ */
+export const COMMENTARY_FRAME_POLICY: FramePolicyName = 'recent-sheet'
 
 /** Limits of the contact sheet and the scene anchor. */
 export const CONTACT_SHEET_LIMITS = {
@@ -157,6 +165,36 @@ export function pickContactSheet(input: Omit<FramePolicyInput, 'maxImages'> & { 
       picked.push({ index: entry.index, role: 'change' })
   }
   return picked.sort((left, right) => left.index - right.index)
+}
+
+/** Limits of `recent-sheet`. The owner chose them on 2026-11-13: six frames, 2 seconds apart. */
+export const RECENT_SHEET_LIMITS = {
+  tiles: 6,
+  stepMs: 2_000,
+} as const
+
+/**
+ * The tiles of `recent-sheet`: for each step before the newest frame, the newest frame at or before that time.
+ * Returns the indexes oldest first. The newest frame is no tile, because it goes at full size.
+ * A step before the first frame gives no tile, so a short ring gives fewer tiles.
+ *
+ * @example
+ * // Frames each 500 ms for 20 seconds.
+ * pickRecentSheet(frames)
+ * // => the indexes of the frames of 12, 10, 8, 6, 4, and 2 seconds before the newest frame
+ */
+export function pickRecentSheet(frames: readonly PolicyFrame[]): number[] {
+  const newest = frames.at(-1)
+  if (!newest)
+    return []
+  const picked: number[] = []
+  for (let step = RECENT_SHEET_LIMITS.tiles; step >= 1; step--) {
+    const at = newest.at - step * RECENT_SHEET_LIMITS.stepMs
+    const index = frames.findLastIndex((frame, position) => position < frames.length - 1 && frame.at <= at)
+    if (index >= 0 && !picked.includes(index))
+      picked.push(index)
+  }
+  return picked
 }
 
 /**

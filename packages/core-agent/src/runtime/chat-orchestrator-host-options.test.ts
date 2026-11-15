@@ -282,6 +282,23 @@ describe('chat orchestrator host options', () => {
     expect(reply?.role === 'assistant' && reply.categorization?.speech).toBe('Nice play! ')
   })
 
+  it('reports the cast marker of a reply, and keeps it out of the stored text', async () => {
+    const markers: Array<{ kind: string, text: string }> = []
+    const harness = createHarness({ onTimelineMarker: event => markers.push({ kind: event.kind, text: event.text }) })
+    harness.stream.mockImplementationOnce(async (_model, _provider, _conversation, streamOptions) => {
+      for (const text of ['Here we go! ', '<|CAST the owner plays Ambessa. Opponents: Leona|>'])
+        await streamOptions?.onStreamEvent?.({ type: 'text-delta', text })
+      await streamOptions?.onStreamEvent?.({ type: 'finish' })
+    })
+
+    await harness.runtime.ingest('Autonomous turn', { model: 'test', chatProvider: provider, notice: { source: 'initiative', transient: true } })
+
+    expect(markers).toEqual([{ kind: 'cast', text: 'the owner plays Ambessa. Opponents: Leona' }])
+    const reply = harness.messages['session-1']?.at(-1)
+    expect(reply).toMatchObject({ role: 'assistant', content: 'Here we go! ' })
+    expect(reply?.role === 'assistant' && reply.categorization?.speech).toBe('Here we go! ')
+  })
+
   // A scene anchor stays the same across autonomous turns, so it sits at a fixed place near the start of the request.
   it('puts the anchor of a notice right after the system prompt, and keeps it out of history', async () => {
     const harness = createHarness({ getSystemPrompt: () => 'identity' })

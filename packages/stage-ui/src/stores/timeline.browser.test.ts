@@ -41,6 +41,14 @@ describe('useTimelineStore', () => {
     expect(generate).not.toHaveBeenCalled()
   })
 
+  it('keeps the cast of a scene on the device, and a new cast takes its place', async () => {
+    const first = createStore()
+    await first.setCast('session-1', 'the owner plays Lux', 1)
+    await first.setCast('session-1', 'the owner plays Ambessa', 2)
+
+    expect(await createStore().load('session-1')).toEqual({ notes: [], cast: { text: 'the owner plays Ambessa', at: 2 } })
+  })
+
   it('keeps each conversation apart, and deletes one timeline', async () => {
     const timelines = createStore()
     await timelines.addNotes('session-1', [{ at: Date.now(), text: 'one', source: 'code' }])

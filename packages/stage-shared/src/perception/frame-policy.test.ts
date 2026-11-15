@@ -2,12 +2,28 @@ import type { PolicyFrame } from './frame-policy'
 
 import { describe, expect, it } from 'vitest'
 
-import { CONTACT_SHEET_LIMITS, contactSheetLayout, pickContactSheet, pickFreshKeyframes, sceneAnchorAt } from './frame-policy'
+import { CONTACT_SHEET_LIMITS, contactSheetLayout, pickContactSheet, pickFreshKeyframes, pickRecentSheet, sceneAnchorAt } from './frame-policy'
 
 /** Frames each 500 ms from time 0, each a flat screen of one brightness. Two values far apart give a large change. */
 function frames(...values: number[]): PolicyFrame[] {
   return values.map((value, index) => ({ at: index * 500, thumbnail: new Uint8Array(64 * 36).fill(value) }))
 }
+
+describe('pickRecentSheet', () => {
+  it('picks the frames of 12 to 2 seconds before the newest frame, oldest first', () => {
+    // 41 frames, from 0 to 20 seconds.
+    const ring = frames(...Array.from<number>({ length: 41 }).fill(10))
+
+    expect(pickRecentSheet(ring)).toEqual([16, 20, 24, 28, 32, 36])
+  })
+
+  it('gives fewer tiles for a short ring, and none without an earlier frame', () => {
+    // 9 frames, from 0 to 4 seconds: only the steps of 4 and 2 seconds have a frame.
+    expect(pickRecentSheet(frames(...Array.from<number>({ length: 9 }).fill(10)))).toEqual([0, 4])
+    expect(pickRecentSheet(frames(10))).toEqual([])
+    expect(pickRecentSheet([])).toEqual([])
+  })
+})
 
 describe('pickFreshKeyframes', () => {
   it('always picks the newest frame first, and nothing without frames or images', () => {

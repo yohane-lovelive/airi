@@ -47,6 +47,29 @@ describe('buildScreenTurn', () => {
     expect(await decodedWidth(newest.data!)).toBe(FRAME_LIMITS.maxLongSide)
   })
 
+  it('sends one sheet of the seconds before now and the newest frame at full size for the recent sheet', async () => {
+    // Seven frames, 2 seconds apart. The last one is the screen now.
+    const frames = await Promise.all(Array.from({ length: 7 }, (_, index) => frame(NOW - (6 - index) * 2_000, index % 2 ? '#ffffff' : '#000000')))
+
+    const turn = await buildScreenTurn({ policy: 'recent-sheet', frames, events: [], budget: imageBudgetState([], 20, NOW), since: NOW - 60_000, now: NOW })
+
+    expect(turn.context.contactSheetAgesMs).toEqual([12_000, 10_000, 8_000, 6_000, 4_000, 2_000])
+    expect(turn.context.frameAgesMs).toEqual([0])
+    expect(turn.attachments).toHaveLength(2)
+    expect(turn.images).toBe(2)
+    expect(await decodedWidth(turn.attachments[1].data!)).toBe(FRAME_LIMITS.maxLongSide)
+  })
+
+  it('sends the newest frame alone for the recent sheet when one image is left', async () => {
+    const frames = await Promise.all(Array.from({ length: 7 }, (_, index) => frame(NOW - (6 - index) * 2_000, '#808080')))
+
+    const turn = await buildScreenTurn({ policy: 'recent-sheet', frames, events: [], budget: imageBudgetState([], 20, NOW), maxImagesPerTurn: 1, since: NOW - 60_000, now: NOW })
+
+    expect(turn.context.contactSheetAgesMs).toBeUndefined()
+    expect(turn.context.frameAgesMs).toEqual([0])
+    expect(turn.attachments).toHaveLength(1)
+  })
+
   it('sends no frame and says so when the budget is used up', async () => {
     const frames = [await frame(NOW - 500, '#808080')]
     const sentAt = Array.from({ length: 20 }, (_, index) => NOW - index * 1_000)
