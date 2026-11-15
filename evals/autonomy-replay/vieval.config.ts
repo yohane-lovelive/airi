@@ -13,7 +13,7 @@ const models = (env.AUTONOMY_REPLAY_MODELS || 'gpt-6-luna').split(',').map(model
 // Node loads this file and cannot resolve the TypeScript source that the package exports.
 // Source: `exports` in `packages/stage-shared/package.json`.
 // Remove this when stage-shared exports built files.
-const APP_POLICY = 'fresh-keyframes'
+const APP_POLICY = 'recent-sheet'
 
 // Each recording runs once for each model and each policy, so a shorter list makes a cheaper run.
 const policies = (env.AUTONOMY_REPLAY_POLICIES || APP_POLICY).split(',').map(policy => policy.trim()).filter(Boolean)

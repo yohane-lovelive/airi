@@ -8,7 +8,17 @@ export interface LineJudgment {
   readonly grounded: boolean
   /** The line contradicts the timeline. */
   readonly contradicts: boolean
+  /** The count of proper names in the line: characters, skills, and items. */
+  readonly names?: number
+  /** The count of those names that are wrong for the scene. */
+  readonly wrongNames?: number
 }
+
+/**
+ * A score in a line, for example "24対25", "3-2", or "12 to 11". A clock like "5:23" is no score, so a colon does not
+ * count. Full-width digits count after the text is normalized.
+ */
+const SCORE = /\d+\s*(?:対|-|vs\.?|to)\s*\d+/i
 
 /**
  * When a line counts as a repeat: its similarity with one of the lines before it, on the scale of `bigramSimilarity`.
@@ -71,6 +81,12 @@ export interface ReplayMetrics {
   readonly topicSimilarity?: number
   readonly groundedShare?: number
   readonly contradictionShare?: number
+  /** The share of lines that say a score. A high share means that the character reads the scoreboard aloud. */
+  readonly scoreShare?: number
+  /** The share of judged lines that name a character, a skill, or an item. */
+  readonly namedShare?: number
+  /** The share of judged lines with a wrong name. */
+  readonly wrongNameShare?: number
 }
 
 /** Measures one replay, with the judgments of its lines when the judge ran. */
@@ -99,6 +115,7 @@ export function replayMetrics(result: ReplayResult, judgments: readonly LineJudg
           lineCharsMedian: percentile(texts.map(text => text.length), 0.5),
           lineCharsMax: Math.max(...texts.map(text => text.length)),
           missingEndShare: result.missingEnd / texts.length,
+          scoreShare: texts.filter(text => SCORE.test(text.normalize('NFKC'))).length / texts.length,
         }
       : {}),
     requestsPerTurn: result.turns ? result.requests / result.turns : 0,
@@ -110,6 +127,8 @@ export function replayMetrics(result: ReplayResult, judgments: readonly LineJudg
       ? {
           groundedShare: judgments.filter(judgment => judgment.grounded).length / judgments.length,
           contradictionShare: judgments.filter(judgment => judgment.contradicts).length / judgments.length,
+          namedShare: judgments.filter(judgment => (judgment.names ?? 0) > 0).length / judgments.length,
+          wrongNameShare: judgments.filter(judgment => (judgment.wrongNames ?? 0) > 0).length / judgments.length,
         }
       : {}),
   }

@@ -34,7 +34,7 @@ It has two tasks.
 
 `AUTONOMY_REPLAY_RECORDINGS` names the folder of the recordings. Without it, the suite reads the recordings folder of the desktop app. `AUTONOMY_REPLAY_MODE` is `idle` or `commentary`.
 
-Each recording runs once for each model and each frame policy. Without `AUTONOMY_REPLAY_POLICIES`, the replay runs `fresh-keyframes`, the frame policy of the app. Name other policies of `@proj-airi/stage-shared/perception`, separated by commas, to compare them.
+Each recording runs once for each model and each frame policy. Without `AUTONOMY_REPLAY_POLICIES`, the replay runs `recent-sheet`, the frame policy of a commentary turn of the app. Name other policies of `@proj-airi/stage-shared/perception`, separated by commas, to compare them.
 
 ## The request of the app
 
@@ -51,6 +51,16 @@ A replay measures speed and cache only when its requests have the size of the re
 The request start holds the character and the memory index of the owner. Keep it on the device, like the frames.
 
 These parts of a request of the app are not in a replay: the summary of a long history, runtime contexts, and stickers.
+
+## The cast of a recording
+
+A line names a character only when the cast of the scene holds it. A recording can start after the screen that shows the names, for example a loading screen. Then write the names into `cast.txt` in the recording folder:
+
+```text
+The owner plays Ambessa. Allies: Caitlyn, Twitch, Karma. Opponents: Leona, Rakan.
+```
+
+The replay starts with this cast, and the judge checks the names of each line against it. `AUTONOMY_REPLAY_CAST=off` runs without the file.
 
 ## Labels for the gate trace
 
@@ -78,6 +88,8 @@ The trace saves each look to `gate-trace.json` in the recording folder. A second
 | `lineCharsMedian`, `lineCharsMax` | The length of a line in characters. A longest line of thousands means that the model did not stop. Its speech holds every later turn of the replay. |
 | `cutShare` | The share of turns where the model wrote on after the end marker of its reply. The chat runtime dropped that text. |
 | `missingEndShare` | The share of lines without an end marker. What the model writes after such a line reaches the speech. |
+| `scoreShare` | The share of lines that say a score. A high share means that the character reads the scoreboard aloud. |
+| `namedShare`, `wrongNameShare` | The share of judged lines that name a character, a skill, or an item, and the share with a wrong name. The judge is a model, so check the lines when a cast was wrong. |
 | `requestsPerTurn`, `toolCalls` | The model requests for each turn. A tool call adds a request before the line. |
 | `groundedShare`, `contradictionShare` | The share of lines that the judge found grounded in the screen, and the share that contradict the timeline. |
 | `passesPerMinute`, `linesPerMinute` (gate) | How often the gate passes, and the lines that a gap of 6 seconds between lines leaves. |

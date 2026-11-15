@@ -3,7 +3,7 @@ import type { Dirent } from 'node:fs'
 import process from 'node:process'
 
 import { Buffer } from 'node:buffer'
-import { readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { homedir, platform } from 'node:os'
 import { join } from 'node:path'
@@ -25,6 +25,20 @@ export interface RecordedOwnerMessage {
 }
 
 /** A recording that the screen recorder of the desktop app wrote. */
+/** The file name of the cast in a recording folder. */
+const CAST_FILE = 'cast.txt'
+
+/**
+ * Reads `cast.txt` of a recording folder: who the owner plays, the allies, and the opponents, as a person read them
+ * from the recording. Returns `undefined` without the file.
+ *
+ * The replay starts with this cast, and the judge checks the names of a line against it.
+ */
+export function loadCast(recording: Recording): string | undefined {
+  const path = join(recording.directory, CAST_FILE)
+  return existsSync(path) ? readFileSync(path, 'utf8').replace(/\s+/g, ' ').trim() || undefined : undefined
+}
+
 export interface Recording {
   readonly id: string
   readonly directory: string

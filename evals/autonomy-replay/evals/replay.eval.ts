@@ -17,9 +17,12 @@ import { complete, sessionHeaders } from '../src/chat'
 import { renderContactSheet, scaleFrame } from '../src/contact-sheet'
 import { judgeMessages, parseJudgment } from '../src/judge'
 import { replayMetrics } from '../src/metrics'
-import { defaultRecordingsDirectory, frameImage, loadRecordings } from '../src/recording'
+import { defaultRecordingsDirectory, frameImage, loadCast, loadRecordings } from '../src/recording'
 import { replayRecording } from '../src/replay'
 import { requestStartOf } from '../src/request-start'
+
+/** The judge sees this many images for one line: the newest frames before the line, and the screen after it. */
+const JUDGE_IMAGES = 3
 
 /** The app sends the older frames of a turn at this size (`FRAME_LIMITS.smallLongSide` of stage-ui). */
 const SMALL_LONG_SIDE = 512
@@ -59,13 +62,15 @@ describeTask('autonomy-replay', ({ casesFromInputs }) => {
     const speak = async (turn: ReplayTurn) => {
       const older = await Promise.all(turn.frames.slice(0, -1).map(async frame => scaleFrame(await frameImage(recording, frame), SMALL_LONG_SIDE)))
       const newest = turn.frames.at(-1)
-      const images = [...older, ...(newest ? [await frameImage(recording, newest)] : [])]
-      if (turn.sheet)
-        images.push(await renderContactSheet(await Promise.all(turn.sheet.map(frame => frameImage(recording, frame)))))
+      // The contact sheet comes before the single frames, as in the app.
+      const sheet = turn.sheet?.length ? [await renderContactSheet(await Promise.all(turn.sheet.map(frame => frameImage(recording, frame))))] : []
+      const images = [...sheet, ...older, ...(newest ? [await frameImage(recording, newest)] : [])]
       const anchor = turn.anchor ? await frameImage(recording, turn.anchor) : undefined
       return speaker.speak({ at: turn.at, notice: turn.notice, endMarker: turn.endMarker, images, ...(anchor ? { anchor } : {}) }, context.signal)
     }
-    const result = await replayRecording(recording, { mode, policy, seed: 1 }, speak)
+    // A cast that a person read from the recording, for example from its loading screen. `AUTONOMY_REPLAY_CAST=off` runs without it.
+    const cast = process.env.AUTONOMY_REPLAY_CAST === 'off' ? undefined : loadCast(recording)
+    const result = await replayRecording(recording, { mode, policy, seed: 1, ...(cast ? { cast } : {}) }, speak)
 
     // The judge sees the frames before each line and the screen right after it. It has a session of its own.
     const judge = { baseURL, apiKey: connection.apiKey, model: judgeModel, headers: sessionHeaders(randomUUID()) }
@@ -73,7 +78,8 @@ describeTask('autonomy-replay', ({ casesFromInputs }) => {
     for (const line of result.lines) {
       const after = recording.frames.find(frame => frame.at > line.at + 2_000) ?? recording.frames.at(-1)
       const images = await Promise.all([...line.frames, ...(after ? [after] : [])].map(frame => frameImage(recording, frame)))
-      const answer = await complete(judge, judgeMessages({ line: line.text, images, timeline: result.timeline }), context.signal)
+      // The judge gets at most the last frames of a line, so a contact sheet of six tiles does not flood it.
+      const answer = await complete(judge, judgeMessages({ line: line.text, images: images.slice(-JUDGE_IMAGES), timeline: result.timeline, ...(cast ? { cast } : {}) }), context.signal)
       const judgment = parseJudgment(answer.text)
       if (judgment)
         judgments.push(judgment)
@@ -92,6 +98,7 @@ describeTask('autonomy-replay', ({ casesFromInputs }) => {
         policy,
         mode,
         maxOutputTokens: maxOutputTokens ?? null,
+        cast: cast ?? null,
         // Without the start of a request of the app, the request is far smaller than in the app.
         requestStart: requestStart ? { systemPromptChars: requestStart.systemPrompt.length, tools: requestStart.tools.length } : null,
         metrics,

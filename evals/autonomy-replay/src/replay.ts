@@ -16,10 +16,11 @@ import {
   nextFromMarker,
   observeInitiative,
   resolveInitiativeOptions,
+  setTimelineCast,
   setTimelineScene,
   timelineMarkerFrom,
 } from '@proj-airi/core-agent'
-import { pickContactSheet, pickFreshKeyframes, sceneAnchorAt, ScreenDetector } from '@proj-airi/stage-shared/perception'
+import { pickContactSheet, pickFreshKeyframes, pickRecentSheet, sceneAnchorAt, ScreenDetector } from '@proj-airi/stage-shared/perception'
 
 /** Settings of one replay. */
 export interface ReplayOptions {
@@ -29,6 +30,11 @@ export interface ReplayOptions {
   readonly seed: number
   /** The most frames for one turn. The app sends three, or two in commentary. */
   readonly maxImagesPerTurn?: number
+  /**
+   * The cast of the scene from the start of the replay: who the owner plays, the allies, and the opponents.
+   * A recording can start after the screen that shows the names, so a replay can give them. See `loadCast`.
+   */
+  readonly cast?: string
 }
 
 /** The tokens of one model call, as the provider reported them. */
@@ -143,7 +149,7 @@ function optionsFor(mode: InitiativeMode, activity: number): InitiativeOptions {
  * - The frame policy picks the frames as the app does. A contact sheet and the scene anchor each count as one image.
  * - The owner messages of the recording reach the policy at their times. Their text was never recorded.
  * - A spoken line holds further turns for its estimated playback time.
- * - The timeline takes the NOTE and SCENE markers of the replies, and each later notice gives it to the model.
+ * - The timeline takes the NOTE, SCENE, and CAST markers of the replies, and each later notice gives it to the model.
  */
 export async function replayRecording(recording: Recording, options: ReplayOptions, speak: (turn: ReplayTurn) => Promise<SpokenReply>): Promise<ReplayResult> {
   const random = seededRandom(options.seed)
@@ -151,7 +157,7 @@ export async function replayRecording(recording: Recording, options: ReplayOptio
   const maxImages = options.maxImagesPerTurn ?? (options.mode === 'commentary' ? 2 : 3)
   const firstAt = recording.frames[0]?.at ?? recording.startedAt
   let state = createInitiativeState(initiativeTimeFrom(new Date(firstAt)), options.mode)
-  let timeline: Timeline = EMPTY_TIMELINE
+  let timeline: Timeline = options.cast ? setTimelineCast(EMPTY_TIMELINE, options.cast, firstAt) : EMPTY_TIMELINE
   const events: ScreenEvent[] = []
   const lines: ReplayLine[] = []
   const usage = { input: 0, output: 0, cached: 0 }
@@ -171,6 +177,7 @@ export async function replayRecording(recording: Recording, options: ReplayOptio
   let anchorFrame: RecordedFrame | undefined
   const withSheet = options.policy === 'contact-sheet' || options.policy === 'scene-anchor+contact-sheet'
   const withAnchor = (options.policy === 'scene-anchor' || options.policy === 'scene-anchor+contact-sheet') && maxImages >= 2
+  const withRecentSheet = options.policy === 'recent-sheet' && maxImages >= 2
 
   for (const [index, frame] of recording.frames.entries()) {
     const time = initiativeTimeFrom(new Date(frame.at))
@@ -214,8 +221,13 @@ export async function replayRecording(recording: Recording, options: ReplayOptio
       anchorFrame = ring.find(candidate => candidate.at === anchorAt) ?? anchorFrame
     }
     const anchor = withAnchor ? anchorFrame : undefined
-    const sheet = withSheet ? pickContactSheet({ frames: ring, eventTimes, since }).map(pick => ring[pick.index]) : undefined
-    const picked = sheet ? [] : pickFreshKeyframes({ frames: ring, eventTimes, since, maxImages: anchor ? maxImages - 1 : maxImages }).map(pick => ring[pick.index])
+    const sheet = withSheet
+      ? pickContactSheet({ frames: ring, eventTimes, since }).map(pick => ring[pick.index])
+      : withRecentSheet ? pickRecentSheet(ring).map(position => ring[position]) : undefined
+    // The recent sheet goes with the newest frame at full size. The other sheet goes alone.
+    const picked = withRecentSheet
+      ? [frame]
+      : sheet ? [] : pickFreshKeyframes({ frames: ring, eventTimes, since, maxImages: anchor ? maxImages - 1 : maxImages }).map(pick => ring[pick.index])
     const screen: InitiativeScreenContext = {
       ...(frame.app ? { app: frame.app } : {}),
       frameAgesMs: picked.map(candidate => frame.at - candidate.at),
@@ -261,10 +273,10 @@ export async function replayRecording(recording: Recording, options: ReplayOptio
     for (const marker of markers) {
       timeline = marker.kind === 'note'
         ? addTimelineNotes(timeline, [{ at: frame.at, text: marker.text, source: 'model' }])
-        : setTimelineScene(timeline, marker.text, frame.at)
+        : marker.kind === 'scene' ? setTimelineScene(timeline, marker.text, frame.at) : setTimelineCast(timeline, marker.text, frame.at)
     }
     if (spoken) {
-      lines.push({ at: frame.at, text: spoken, trigger: decision.trigger, ...(decision.speechType ? { speechType: decision.speechType } : {}), frames: sheet?.length ? sheet : picked, ...(reply.firstTextMs !== undefined ? { firstTextMs: reply.firstTextMs } : {}) })
+      lines.push({ at: frame.at, text: spoken, trigger: decision.trigger, ...(decision.speechType ? { speechType: decision.speechType } : {}), frames: sheet?.length ? [...sheet, ...picked] : picked, ...(reply.firstTextMs !== undefined ? { firstTextMs: reply.firstTextMs } : {}) })
       speakingUntil = frame.at + spoken.length * SPEECH_MS_PER_CHARACTER
       speechEnd = speakingUntil
     }

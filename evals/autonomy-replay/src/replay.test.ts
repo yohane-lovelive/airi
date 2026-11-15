@@ -10,9 +10,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { complete, sessionHeaders } from './chat'
 import { renderContactSheet, scaleFrame } from './contact-sheet'
-import { parseJudgment } from './judge'
+import { judgeMessages, parseJudgment } from './judge'
 import { replayMetrics } from './metrics'
-import { frameImage, loadRecording, loadRecordings } from './recording'
+import { frameImage, loadCast, loadRecording, loadRecordings } from './recording'
 import { replayRecording, seededRandom, splitReply } from './replay'
 
 const START = Date.UTC(2026, 10, 2, 10, 0, 0)
@@ -97,6 +97,41 @@ describe('replayRecording', () => {
     expect(turns.every(turn => turn.endMarker === 'NEXT')).toBe(true)
     expect(result.cuts).toBe(1)
     expect(result.missingEnd).toBe(result.lines.length - 1)
+  })
+
+  it('sends a sheet of the seconds before a turn with its newest frame for the recent sheet, and keeps the cast of a reply', async () => {
+    const recording = loadRecording(await writeRecording(root, 4))
+    const turns: ReplayTurn[] = []
+    const result = await replayRecording(recording, { mode: 'commentary', policy: 'recent-sheet', seed: 1 }, async (turn) => {
+      turns.push(turn)
+      return { text: 'Look! <|CAST the owner plays Ambessa|><|NEXT wait|>' }
+    })
+
+    const late = turns.at(-1)!
+    expect(late.frames).toHaveLength(1)
+    expect(late.frames[0].at).toBe(late.at)
+    // Six tiles, 2 seconds apart, and the newest one is 2 seconds before the turn.
+    expect(late.sheet!.map(tile => late.at - tile.at)).toEqual([12_000, 10_000, 8_000, 6_000, 4_000, 2_000])
+    expect(late.notice).toContain('A contact sheet is attached: one image with 6 frames as tiles')
+    expect(result.timeline.cast?.text).toBe('the owner plays Ambessa')
+    expect(late.notice).toContain('Cast of the scene')
+  })
+
+  it('starts with the cast that a person wrote into the recording, and has none without the file', async () => {
+    const directory = await writeRecording(root, 4)
+    const recording = loadRecording(directory)
+    expect(loadCast(recording)).toBeUndefined()
+    await writeFile(join(directory, 'cast.txt'), 'The owner plays Ambessa.\nAllies: Karma.\n')
+    const turns: ReplayTurn[] = []
+
+    await replayRecording(recording, { mode: 'commentary', policy: 'recent-sheet', seed: 1, cast: loadCast(recording)! }, async (turn) => {
+      turns.push(turn)
+      return { text: 'Look! <|NEXT wait|>' }
+    })
+
+    expect(loadCast(recording)).toBe('The owner plays Ambessa. Allies: Karma.')
+    expect(turns[0].notice).toContain('Cast of the scene, written')
+    expect(turns[0].notice).toContain('The owner plays Ambessa. Allies: Karma.')
   })
 
   it('makes the same decisions again with the same seed and replies', async () => {
@@ -289,6 +324,42 @@ describe('replay helpers', () => {
 
     expect(metrics.cutShare).toBe(0.2)
     expect(metrics.missingEndShare).toBe(0.25)
+  })
+
+  it('measures the share of lines with a score, with a name, and with a wrong name', () => {
+    const texts = ['24対25の接戦だね。', 'スコアは３－２、まだ分からないよ。', 'アンベッサがレオナに飛び込んだ！', '試合時間は5:23、いい位置だね。']
+    const metrics = replayMetrics({
+      durationMs: MINUTE,
+      turns: texts.length,
+      silent: 0,
+      images: 0,
+      requests: texts.length,
+      toolCalls: 0,
+      cuts: 0,
+      missingEnd: 0,
+      usage: { input: 0, output: 0, cached: 0 },
+      lines: texts.map((text, index) => ({ at: index, text, trigger: 'event' as const, frames: [] })),
+      events: [],
+      timeline: { notes: [] },
+    }, [
+      { grounded: true, contradicts: false, names: 0, wrongNames: 0 },
+      { grounded: true, contradicts: false },
+      { grounded: true, contradicts: false, names: 2, wrongNames: 1 },
+      { grounded: true, contradicts: false, names: 0, wrongNames: 0 },
+    ])
+
+    // The clock of the last line is no score.
+    expect(metrics.scoreShare).toBe(0.5)
+    expect(metrics.namedShare).toBe(0.25)
+    expect(metrics.wrongNameShare).toBe(0.25)
+  })
+
+  it('gives the judge the cast of the scene, and reads the counts of names from its answer', () => {
+    const [, user] = judgeMessages({ line: 'アンベッサが飛び込んだ！', images: [], timeline: { notes: [], cast: { text: 'the owner plays Ambessa', at: 1 } } })
+
+    expect(JSON.stringify(user.content)).toContain('Cast of the scene: the owner plays Ambessa')
+    expect(parseJudgment('{"grounded": true, "contradicts": false, "names": 1, "wrongNames": 0}')).toEqual({ grounded: true, contradicts: false, names: 1, wrongNames: 0 })
+    expect(parseJudgment('{"grounded": true, "contradicts": false, "names": -1}')).toBeUndefined()
   })
 
   it('reads a judgment inside text or a code fence, and nothing from a broken answer', () => {
