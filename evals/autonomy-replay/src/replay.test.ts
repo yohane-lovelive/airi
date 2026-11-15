@@ -134,6 +134,81 @@ describe('replayRecording', () => {
     expect(turns[0].notice).toContain('The owner plays Ambessa. Allies: Karma.')
   })
 
+  it('gives the player names of the owner to a turn until a reply wrote the cast', async () => {
+    const recording = loadRecording(await writeRecording(root, 4))
+    const turns: ReplayTurn[] = []
+
+    await replayRecording(recording, { mode: 'commentary', policy: 'recent-sheet', seed: 1, ownerAccounts: ['Game: playername'] }, async (turn) => {
+      turns.push(turn)
+      return { text: turns.length === 1 ? 'Look! <|NEXT wait|>' : 'There! <|CAST The owner plays Ambessa.|><|NEXT wait|>' }
+    })
+
+    expect(turns.length).toBeGreaterThan(2)
+    expect(turns[0].notice).toContain('- The owner\'s player names in games: Game: playername.')
+    expect(turns[1].notice).toContain('player names in games')
+    expect(turns[2].notice).not.toContain('player names in games')
+    expect(turns[2].notice).toContain('Cast of the scene')
+  })
+
+  describe('cast reads', () => {
+    /** Looks one step apart from the start. The first ones show a roster screen. */
+    function looksOf(rosterLooks: number, count = 40) {
+      return Array.from({ length: count }, (_, index) => ({ at: START + (index + 1) * 2_000, roster: index < rosterLooks ? 0.9 : 0.1 }))
+    }
+
+    it('reads the cast from a roster screen in a turn of its own, and later notices hold that cast', async () => {
+      const recording = loadRecording(await writeRecording(root, 4))
+      const turns: ReplayTurn[] = []
+
+      const result = await replayRecording(recording, { mode: 'commentary', policy: 'recent-sheet', seed: 1, ownerAccounts: ['Game: playername'], looks: looksOf(10) }, async (turn) => {
+        turns.push(turn)
+        return { text: turn.castRead ? '<|CAST The owner plays Ambessa.|><|NEXT done|>' : 'Look! <|NEXT wait|>' }
+      })
+
+      const reads = turns.filter(turn => turn.castRead)
+      expect(reads).toHaveLength(1)
+      // The first look finds the roster screen, long before the first turn of the policy.
+      expect(turns[0]).toBe(reads[0])
+      expect(reads[0].at).toBe(START + 2_000)
+      expect(reads[0].frames.map(frame => frame.at)).toEqual([START + 2_000])
+      expect(reads[0].sheet).toBeUndefined()
+      expect(reads[0].endMarker).toBe('NEXT')
+      expect(reads[0].notice.split('\n')[0]).toContain('Silent turn')
+      expect(reads[0].notice).toContain('- The owner\'s player names in games: Game: playername.')
+      expect(turns[1].notice).toContain('Cast of the scene')
+      expect(turns[1].notice).toContain('The owner plays Ambessa.')
+      expect(result).toMatchObject({ castReads: 1, castWrites: 1, castReadsSpoken: 0, turns: turns.length - 1 })
+      expect(result.timeline.cast).toEqual({ text: 'The owner plays Ambessa.', at: START + 2_000 })
+    })
+
+    it('reads once more when the first read wrote no cast, and then leaves the roster screen alone', async () => {
+      const recording = loadRecording(await writeRecording(root, 2))
+      const reads: ReplayTurn[] = []
+
+      const result = await replayRecording(recording, { mode: 'commentary', policy: 'recent-sheet', seed: 1, looks: looksOf(30) }, async (turn) => {
+        if (turn.castRead)
+          reads.push(turn)
+        // A line of the policy stays silent here, so no speech holds a read.
+        return { text: '<|NEXT done|>' }
+      })
+
+      expect(reads.map(turn => turn.at)).toEqual([START + 2_000, START + 10_000])
+      expect(result).toMatchObject({ castReads: 2, castWrites: 0 })
+      expect(result.timeline.cast).toBeUndefined()
+    })
+
+    it('runs no cast read without looks, and none while the looks show the play', async () => {
+      const recording = loadRecording(await writeRecording(root, 2))
+      const speak = async (turn: ReplayTurn) => {
+        expect(turn.castRead).toBeUndefined()
+        return { text: 'Look! <|NEXT wait|>' }
+      }
+
+      expect((await replayRecording(recording, { mode: 'commentary', policy: 'recent-sheet', seed: 1 }, speak)).castReads).toBe(0)
+      expect((await replayRecording(recording, { mode: 'commentary', policy: 'recent-sheet', seed: 1, looks: looksOf(0) }, speak)).castReads).toBe(0)
+    })
+  })
+
   it('makes the same decisions again with the same seed and replies', async () => {
     const recording = loadRecording(await writeRecording(root, 3))
     const speak = async () => ({ text: '' })
@@ -224,6 +299,9 @@ describe('replay helpers', () => {
       toolCalls: 1,
       cuts: 0,
       missingEnd: 0,
+      castReads: 0,
+      castWrites: 0,
+      castReadsSpoken: 0,
       usage: { input: 1_000, output: 50, cached: 250 },
       lines: [
         { at: 0, text: 'ラーメン食べたい', trigger: 'boredom', speechType: 'ask', frames: [] },
@@ -252,6 +330,9 @@ describe('replay helpers', () => {
       toolCalls: 0,
       cuts: 0,
       missingEnd: 0,
+      castReads: 0,
+      castWrites: 0,
+      castReadsSpoken: 0,
       usage: { input: 0, output: 0, cached: 0 },
       // A line of a fake model has no time, and it does not count.
       lines: [900, 1_000, 1_100, 1_200, 1_300, 1_400, 1_500, 1_600, 1_700, 4_000, undefined].map(line),
@@ -274,6 +355,9 @@ describe('replay helpers', () => {
       toolCalls: 0,
       cuts: 0,
       missingEnd: 0,
+      castReads: 0,
+      castWrites: 0,
+      castReadsSpoken: 0,
       usage: { input: 0, output: 0, cached: 0 },
       lines: texts.map((text, index) => ({ at: index, text, trigger: 'event' as const, frames: [] })),
       events: [],
@@ -295,6 +379,9 @@ describe('replay helpers', () => {
       toolCalls: 0,
       cuts: 0,
       missingEnd: 0,
+      castReads: 0,
+      castWrites: 0,
+      castReadsSpoken: 0,
       usage: { input: 0, output: 3_000, cached: 0 },
       lines: texts.map((text, index) => ({ at: index, text, trigger: 'event' as const, frames: [] })),
       events: [],
@@ -316,6 +403,9 @@ describe('replay helpers', () => {
       toolCalls: 0,
       cuts: 2,
       missingEnd: 1,
+      castReads: 0,
+      castWrites: 0,
+      castReadsSpoken: 0,
       usage: { input: 0, output: 0, cached: 0 },
       lines: ['a', 'b', 'c', 'd'].map((text, index) => ({ at: index, text, trigger: 'event' as const, frames: [] })),
       events: [],
@@ -337,6 +427,9 @@ describe('replay helpers', () => {
       toolCalls: 0,
       cuts: 0,
       missingEnd: 0,
+      castReads: 0,
+      castWrites: 0,
+      castReadsSpoken: 0,
       usage: { input: 0, output: 0, cached: 0 },
       lines: texts.map((text, index) => ({ at: index, text, trigger: 'event' as const, frames: [] })),
       events: [],

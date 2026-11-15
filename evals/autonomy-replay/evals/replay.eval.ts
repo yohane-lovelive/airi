@@ -7,6 +7,7 @@ import process from 'node:process'
 
 import { randomUUID } from 'node:crypto'
 
+import { createGeminiDecisionClient } from '@proj-airi/core-agent'
 import { FRAME_POLICY_NAMES } from '@proj-airi/stage-shared/perception'
 import { integer, minValue, number, parse, picklist, pipe, record, string, unknown } from 'valibot'
 import { describeTask, expect } from 'vieval'
@@ -15,6 +16,7 @@ import { modelFromRun, openaiFromRunContext } from 'vieval/plugins/chat-models'
 import { createAppSpeaker } from '../src/app-speaker'
 import { complete, sessionHeaders } from '../src/chat'
 import { renderContactSheet, scaleFrame } from '../src/contact-sheet'
+import { screenLookAsk, traceGate } from '../src/gate'
 import { judgeMessages, parseJudgment } from '../src/judge'
 import { replayMetrics } from '../src/metrics'
 import { defaultRecordingsDirectory, frameImage, loadCast, loadRecordings } from '../src/recording'
@@ -38,6 +40,10 @@ const requestFields = parse(record(string(), record(string(), unknown())), JSON.
 const maxOutputTokens = process.env.AUTONOMY_REPLAY_MAX_OUTPUT_TOKENS
   ? parse(pipe(number(), integer(), minValue(1)), Number(process.env.AUTONOMY_REPLAY_MAX_OUTPUT_TOKENS))
   : undefined
+
+// The owner's player names in games, as "game: name" parts with a semicolon between them. The app takes them from the
+// memories of the character.
+const ownerAccounts = (process.env.AUTONOMY_REPLAY_OWNER_ACCOUNTS ?? '').split(';').map(account => account.trim()).filter(Boolean)
 
 describeTask('autonomy-replay', ({ casesFromInputs }) => {
   casesFromInputs('recording', recordings.map(recording => ({ name: recording.id, recording })), async (context) => {
@@ -70,7 +76,12 @@ describeTask('autonomy-replay', ({ casesFromInputs }) => {
     }
     // A cast that a person read from the recording, for example from its loading screen. `AUTONOMY_REPLAY_CAST=off` runs without it.
     const cast = process.env.AUTONOMY_REPLAY_CAST === 'off' ? undefined : loadCast(recording)
-    const result = await replayRecording(recording, { mode, policy, seed: 1, ...(cast ? { cast } : {}) }, speak)
+    // With the key of the decision model, a commentary looks at the screen as in the app, and a roster screen starts a
+    // cast read. The looks of a recording are saved in its folder, so a second replay asks nothing again.
+    const looks = mode === 'commentary' && process.env.GEMINI_API_KEY && process.env.AUTONOMY_REPLAY_LOOKS !== 'off'
+      ? await traceGate(recording, { signal: context.signal, ask: screenLookAsk(createGeminiDecisionClient({ apiKey: () => process.env.GEMINI_API_KEY })) })
+      : undefined
+    const result = await replayRecording(recording, { mode, policy, seed: 1, ...(cast ? { cast } : {}), ...(ownerAccounts.length ? { ownerAccounts } : {}), ...(looks ? { looks } : {}) }, speak)
 
     // The judge sees the frames before each line and the screen right after it. It has a session of its own.
     const judge = { baseURL, apiKey: connection.apiKey, model: judgeModel, headers: sessionHeaders(randomUUID()) }
@@ -99,6 +110,8 @@ describeTask('autonomy-replay', ({ casesFromInputs }) => {
         mode,
         maxOutputTokens: maxOutputTokens ?? null,
         cast: cast ?? null,
+        ownerAccounts,
+        looks: looks?.length ?? null,
         // Without the start of a request of the app, the request is far smaller than in the app.
         requestStart: requestStart ? { systemPromptChars: requestStart.systemPrompt.length, tools: requestStart.tools.length } : null,
         metrics,

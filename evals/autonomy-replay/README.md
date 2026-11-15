@@ -5,7 +5,7 @@ A [vieval](https://vieval.dev/) suite that replays screen recordings through the
 It has two tasks.
 
 - **The replay** (`eval:run`) runs the screen detectors, the initiative policy, and a frame policy on the clock of a recording. Each decision turn goes to the speaking model through the chat runtime of the app, so the request has the form that the app sends. A judge model then checks each line.
-- **The gate trace** (`eval:gate`) asks the screen gate of [the decision model ADR](../../docs/ai/adr/2026-11-14-autonomy-one-model-relay-decision.md) about a recording, one look each 2 seconds. It tells how often the gate passes, and how many labeled events it catches.
+- **The gate trace** (`eval:gate`) asks the questions of a screen look of [the decision model ADR](../../docs/ai/adr/2026-11-14-autonomy-one-model-relay-decision.md) about a recording, one look each 2 seconds. It tells how often the gate passes, how many labeled events it catches, and how many looks show a roster screen.
 
 ## How to use it
 
@@ -33,6 +33,8 @@ It has two tasks.
    ```
 
 `AUTONOMY_REPLAY_RECORDINGS` names the folder of the recordings. Without it, the suite reads the recordings folder of the desktop app. `AUTONOMY_REPLAY_MODE` is `idle` or `commentary`.
+
+With `GEMINI_API_KEY`, a replay in the commentary mode also traces the looks of the recording. A roster screen then starts a cast read, as in the app. `AUTONOMY_REPLAY_LOOKS=off` runs the replay without the looks. `AUTONOMY_REPLAY_OWNER_ACCOUNTS` gives the owner's player names, which the app reads from the memories of the character.
 
 Each recording runs once for each model and each frame policy. Without `AUTONOMY_REPLAY_POLICIES`, the replay runs `recent-sheet`, the frame policy of a commentary turn of the app. Name other policies of `@proj-airi/stage-shared/perception`, separated by commas, to compare them.
 
@@ -72,7 +74,7 @@ A recording with `labels.json` gets a score. A recording without it gets the pas
 
 `at` is the time in seconds from the start of the recording. `important` marks a moment that a friend beside the owner speaks about.
 
-The trace saves each look to `gate-trace.json` in the recording folder. A second run asks the model only for the missing looks. A change of the gate question starts the file again.
+The trace saves each look to `gate-trace.json` in the recording folder. A second run asks the model only for the missing looks. A change of a question of the look starts the file again.
 
 ## Metrics
 
@@ -90,9 +92,11 @@ The trace saves each look to `gate-trace.json` in the recording folder. A second
 | `missingEndShare` | The share of lines without an end marker. What the model writes after such a line reaches the speech. |
 | `scoreShare` | The share of lines that say a score. A high share means that the character reads the scoreboard aloud. |
 | `namedShare`, `wrongNameShare` | The share of judged lines that name a character, a skill, or an item, and the share with a wrong name. The judge is a model, so check the lines when a cast was wrong. |
+| `castReads`, `castWrites`, `castReadsSpoken` | The cast reads that a roster screen started, the ones that wrote a cast, and the ones with words to say. The last count must stay 0. |
 | `requestsPerTurn`, `toolCalls` | The model requests for each turn. A tool call adds a request before the line. |
 | `groundedShare`, `contradictionShare` | The share of lines that the judge found grounded in the screen, and the share that contradict the timeline. |
 | `passesPerMinute`, `linesPerMinute` (gate) | How often the gate passes, and the lines that a gap of 6 seconds between lines leaves. |
+| `rosterShare` (gate) | The share of the looks that show a roster screen. A match shows one for a short time only. |
 | `recall`, `precision`, `onAnyEvent` (gate) | The share of important events that a pass caught, the share of passes at an important event, and the share at any labeled event. |
 
 ## Layout

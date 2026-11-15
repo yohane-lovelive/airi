@@ -8,7 +8,7 @@ import { join } from 'node:path'
 import { DecisionRequestError } from '@proj-airi/core-agent'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { loadGateLabels, scoreGate, traceGate } from './gate'
+import { loadGateLabels, scoreGate, screenLookAsk, traceGate } from './gate'
 import { loadRecording } from './recording'
 
 const START = Date.UTC(2026, 10, 12, 13, 0, 0)
@@ -36,11 +36,11 @@ function frameOf(index: number) {
 
 /** The decision model is the boundary. The fake answers with a fixed chance. */
 function askOf(probability = 0.5) {
-  return vi.fn<GateAsk>(async () => ({ probability, inputTokens: 748 }))
+  return vi.fn<GateAsk>(async () => ({ probability, roster: 0.1, inputTokens: 748 }))
 }
 
 function looksOf(probabilities: number[]): GateLook[] {
-  return probabilities.map((probability, index) => ({ at: START + (index + 1) * 2_000, probability, inputTokens: 748 }))
+  return probabilities.map((probability, index) => ({ at: START + (index + 1) * 2_000, probability, roster: 0.1, inputTokens: 748 }))
 }
 
 describe('traceGate', () => {
@@ -61,15 +61,25 @@ describe('traceGate', () => {
     const looks = await traceGate(recording, { ask, minIntervalMs: 0 })
 
     expect(looks).toEqual([
-      { at: START + 2_000, probability: 0.8, inputTokens: 748 },
-      { at: START + 4_000, probability: 0.8, inputTokens: 748 },
-      { at: START + 6_000, probability: 0.8, inputTokens: 748 },
+      { at: START + 2_000, probability: 0.8, roster: 0.1, inputTokens: 748 },
+      { at: START + 4_000, probability: 0.8, roster: 0.1, inputTokens: 748 },
+      { at: START + 6_000, probability: 0.8, roster: 0.1, inputTokens: 748 },
     ])
     expect(ask.mock.calls.map(call => [call[0], call[1]])).toEqual([
       [frameOf(0), frameOf(4)],
       [frameOf(4), frameOf(8)],
       [frameOf(8), frameOf(12)],
     ])
+  })
+
+  it('asks the react question and the roster question in one request of the decision model', async () => {
+    const decide = vi.fn(async () => ({ answers: { react: { probability: 0.2 }, roster: { probability: 0.9 } }, inputTokens: 890 }))
+
+    const answer = await screenLookAsk({ decide: decide as never })('EARLIER', 'CURRENT')
+
+    expect(answer).toEqual({ probability: 0.2, roster: 0.9, inputTokens: 890 })
+    expect(decide).toHaveBeenCalledTimes(1)
+    expect(Object.keys(decide.mock.calls[0].at(1) ?? {})).toEqual(['react', 'roster'])
   })
 
   it('asks nothing again on a second run, because the looks are saved in the recording folder', async () => {
@@ -86,7 +96,7 @@ describe('traceGate', () => {
   it('keeps the looks before a failure, and the next run asks only for the rest', async () => {
     const recording = await writeRecording(root, 6)
     const failing = vi.fn<GateAsk>()
-      .mockResolvedValueOnce({ probability: 0.8, inputTokens: 748 })
+      .mockResolvedValueOnce({ probability: 0.8, roster: 0.1, inputTokens: 748 })
       .mockRejectedValue(new DecisionRequestError(400, 'The decision model answered HTTP 400'))
     await expect(traceGate(recording, { ask: failing, minIntervalMs: 0 })).rejects.toThrow('HTTP 400')
     const ask = askOf(0.2)
@@ -103,7 +113,7 @@ describe('traceGate', () => {
       const recording = await writeRecording(root, 2)
       const ask = vi.fn<GateAsk>()
         .mockRejectedValueOnce(new DecisionRequestError(503, 'The decision model answered HTTP 503'))
-        .mockResolvedValue({ probability: 0.6, inputTokens: 748 })
+        .mockResolvedValue({ probability: 0.6, roster: 0.1, inputTokens: 748 })
 
       const trace = traceGate(recording, { ask, minIntervalMs: 0 })
       await vi.advanceTimersByTimeAsync(3_000)

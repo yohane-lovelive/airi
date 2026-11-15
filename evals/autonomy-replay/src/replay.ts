@@ -5,19 +5,24 @@ import type { RecordedFrame, Recording } from './recording'
 
 import {
   addTimelineNotes,
+  CAST_READ_END_MARKER,
+  castReadNoticeText,
   commentaryIntervalFactor,
   createInitiativeState,
   decideInitiative,
   drawLineLength,
+  EMPTY_ROSTER_WATCH,
   EMPTY_TIMELINE,
   initiativeEndMarker,
   initiativeNoticeText,
   initiativeTimeFrom,
   nextFromMarker,
   observeInitiative,
+  observeRosterLook,
   resolveInitiativeOptions,
   setTimelineCast,
   setTimelineScene,
+  startRosterRead,
   timelineMarkerFrom,
 } from '@proj-airi/core-agent'
 import { pickContactSheet, pickFreshKeyframes, pickRecentSheet, sceneAnchorAt, ScreenDetector } from '@proj-airi/stage-shared/perception'
@@ -35,6 +40,16 @@ export interface ReplayOptions {
    * A recording can start after the screen that shows the names, so a replay can give them. See `loadCast`.
    */
   readonly cast?: string
+  /**
+   * The owner's player names in games, each as "game: name". The app reads them from the memories of the character.
+   * A replay has no memory, so a run can give them.
+   */
+  readonly ownerAccounts?: readonly string[]
+  /**
+   * The looks of the decision model at the recording, in time order. See `traceGate`. With them, a roster screen
+   * starts a cast read, as in the app. Without them, the replay runs no cast read.
+   */
+  readonly looks?: readonly { readonly at: number, readonly roster: number }[]
 }
 
 /** The tokens of one model call, as the provider reported them. */
@@ -45,10 +60,13 @@ export interface TokenUsage {
   readonly cached: number
 }
 
-/** One decision turn that the replay sends to the speaking model. */
+/** One turn that the replay sends to the speaking model: a decision turn of the policy, or a cast read. */
 export interface ReplayTurn {
   readonly at: number
-  readonly trigger: InitiativeTrigger
+  /** Why the policy started the turn. A cast read has none, because a roster screen starts it. */
+  readonly trigger?: InitiativeTrigger
+  /** The turn is a cast read: a turn without speech that reads who takes part from a roster screen. */
+  readonly castRead?: true
   readonly speechType?: SpeechType
   readonly notice: string
   /** The marker that ends the reply, as the notice asks for it. The chat runtime drops what the model writes after it. */
@@ -100,6 +118,12 @@ export interface ReplayResult {
   readonly cuts: number
   /** The lines without an end marker. Nothing can cut what the model writes after such a line. */
   readonly missingEnd: number
+  /** The cast reads. They are no turns of the policy, so `turns` and `silent` do not count them. */
+  readonly castReads: number
+  /** The cast reads that wrote a cast. */
+  readonly castWrites: number
+  /** The cast reads with words to say. The app speaks such words, although the notice asks for none. */
+  readonly castReadsSpoken: number
   readonly usage: TokenUsage
   readonly lines: readonly ReplayLine[]
   readonly events: readonly ScreenEvent[]
@@ -150,6 +174,7 @@ function optionsFor(mode: InitiativeMode, activity: number): InitiativeOptions {
  * - The owner messages of the recording reach the policy at their times. Their text was never recorded.
  * - A spoken line holds further turns for its estimated playback time.
  * - The timeline takes the NOTE, SCENE, and CAST markers of the replies, and each later notice gives it to the model.
+ * - With the looks of the decision model, a roster screen starts a cast read while no line plays, as in the app.
  */
 export async function replayRecording(recording: Recording, options: ReplayOptions, speak: (turn: ReplayTurn) => Promise<SpokenReply>): Promise<ReplayResult> {
   const random = seededRandom(options.seed)
@@ -175,6 +200,12 @@ export async function replayRecording(recording: Recording, options: ReplayOptio
   let lastOwnerAt: number | undefined
   let ownerIndex = 0
   let anchorFrame: RecordedFrame | undefined
+  let rosterWatch = EMPTY_ROSTER_WATCH
+  let lookIndex = 0
+  let castReads = 0
+  let castWrites = 0
+  let castReadsSpoken = 0
+  const looks = options.looks ?? []
   const withSheet = options.policy === 'contact-sheet' || options.policy === 'scene-anchor+contact-sheet'
   const withAnchor = (options.policy === 'scene-anchor' || options.policy === 'scene-anchor+contact-sheet') && maxImages >= 2
   const withRecentSheet = options.policy === 'recent-sheet' && maxImages >= 2
@@ -199,6 +230,36 @@ export async function replayRecording(recording: Recording, options: ReplayOptio
     if (speechEnd !== undefined && frame.at >= speechEnd) {
       state = observeInitiative(state, { type: 'speech-ended' }, initiativeTimeFrom(new Date(speechEnd)), policyOptions, random)
       speechEnd = undefined
+    }
+
+    // The looks up to this frame. A roster screen without a new cast starts a cast read, when no line plays.
+    for (; lookIndex < looks.length && looks[lookIndex].at <= frame.at; lookIndex++) {
+      const look = looks[lookIndex]
+      const observed = observeRosterLook(rosterWatch, { at: look.at, probability: look.roster, ...(timeline.cast ? { castAt: timeline.cast.at } : {}) })
+      rosterWatch = observed.watch
+      if (!observed.wanted || frame.at < speakingUntil)
+        continue
+      rosterWatch = startRosterRead(rosterWatch, frame.at)
+      castReads += 1
+      images += 1
+      const reply = await speak({
+        at: frame.at,
+        castRead: true,
+        notice: castReadNoticeText({ now: frame.at, timeline, ...(options.ownerAccounts?.length ? { ownerAccounts: options.ownerAccounts } : {}) }),
+        endMarker: CAST_READ_END_MARKER,
+        frames: [frame],
+      })
+      usage.input += reply.usage?.input ?? 0
+      usage.output += reply.usage?.output ?? 0
+      usage.cached += reply.usage?.cached ?? 0
+      requests += reply.requests ?? 1
+      const read = splitReply(reply.text)
+      const cast = read.markers.findLast(marker => marker.kind === 'cast')
+      if (cast) {
+        timeline = setTimelineCast(timeline, cast.text, frame.at)
+        castWrites += 1
+      }
+      castReadsSpoken += read.spoken ? 1 : 0
     }
 
     const host = { ownerActive: false, speechPlaying: frame.at < speakingUntil, turnRunning: false, intentions: 0 }
@@ -247,6 +308,7 @@ export async function replayRecording(recording: Recording, options: ReplayOptio
       recentLines: lines.slice(-3).map(line => line.text),
       screen,
       timeline,
+      ...(options.ownerAccounts?.length ? { ownerAccounts: options.ownerAccounts } : {}),
     })
 
     turns += 1
@@ -297,6 +359,9 @@ export async function replayRecording(recording: Recording, options: ReplayOptio
     toolCalls,
     cuts,
     missingEnd,
+    castReads,
+    castWrites,
+    castReadsSpoken,
     usage,
     lines,
     events,

@@ -62,6 +62,11 @@ export interface ReplayMetrics {
   readonly cutShare: number
   /** The share of lines without an end marker. What the model writes after such a line reaches the speech. */
   readonly missingEndShare?: number
+  /** The cast reads, and the ones that wrote a cast. A roster screen starts a read. */
+  readonly castReads: number
+  readonly castWrites: number
+  /** The cast reads with words to say. The notice asks for none, so this must stay 0. */
+  readonly castReadsSpoken: number
   /** The median time from the start of a request to the first text of a line, in milliseconds. */
   readonly firstTextMsMedian?: number
   /** The time that 9 of 10 lines stay under. The slow lines are what the owner notices. */
@@ -121,6 +126,9 @@ export function replayMetrics(result: ReplayResult, judgments: readonly LineJudg
     requestsPerTurn: result.turns ? result.requests / result.turns : 0,
     toolCalls: result.toolCalls,
     cutShare: result.turns ? result.cuts / result.turns : 0,
+    castReads: result.castReads,
+    castWrites: result.castWrites,
+    castReadsSpoken: result.castReadsSpoken,
     ...(firstTexts.length ? { firstTextMsMedian: percentile(firstTexts, 0.5), firstTextMsSlow: percentile(firstTexts, 0.9) } : {}),
     ...(pairs.length ? { topicSimilarity: pairs.reduce((sum, value) => sum + value, 0) / pairs.length } : {}),
     ...(judgments.length

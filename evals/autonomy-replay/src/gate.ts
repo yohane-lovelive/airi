@@ -1,3 +1,5 @@
+import type { GeminiDecisionClient } from '@proj-airi/core-agent'
+
 import type { RecordedFrame, Recording } from './recording'
 
 import { createHash } from 'node:crypto'
@@ -6,17 +8,19 @@ import { rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 
-import { DecisionRequestError, SCREEN_GATE, SCREEN_GATE_QUESTION, screenGateInput } from '@proj-airi/core-agent'
+import { DecisionRequestError, SCREEN_GATE, SCREEN_LOOK_QUESTIONS, screenGateInput } from '@proj-airi/core-agent'
 import { array, boolean, number, object, optional, parse, record, string } from 'valibot'
 
 import { frameImage } from './recording'
 
-/** One look of the screen gate: the chance that the frame at `at` shows a moment to react to. */
+/** One look of the screen: what the decision model answered about the frame at `at`. The chances are from 0 to 1. */
 export interface GateLook {
   /** The time of the current frame, as epoch milliseconds. */
   readonly at: number
-  /** The chance of yes, from 0 to 1. */
+  /** The chance that the frame shows a moment to react to. The screen gate reads it. */
   readonly probability: number
+  /** The chance that the frame shows a roster screen. The roster watch reads it. */
+  readonly roster: number
   readonly inputTokens: number
 }
 
@@ -30,7 +34,19 @@ export interface GateLabel {
 }
 
 /** The answer of the decision model for one look. */
-export type GateAsk = (previous: string, current: string, signal?: AbortSignal) => Promise<{ probability: number, inputTokens: number }>
+export type GateAsk = (previous: string, current: string, signal?: AbortSignal) => Promise<{ probability: number, roster: number, inputTokens: number }>
+
+/**
+ * Asks the decision model the questions of one look in one request, as the app asks them.
+ *
+ * @param client The client of the decision model.
+ */
+export function screenLookAsk(client: Pick<GeminiDecisionClient, 'decide'>): GateAsk {
+  return async (previous, current, signal) => {
+    const result = await client.decide(screenGateInput(previous, current), SCREEN_LOOK_QUESTIONS, signal)
+    return { probability: result.answers.react.probability, roster: result.answers.roster.probability, inputTokens: result.inputTokens }
+  }
+}
 
 /**
  * How the trace calls the decision model.
@@ -57,7 +73,7 @@ const labelsSchema = object({
 
 const savedSchema = object({
   question: string(),
-  looks: record(string(), object({ probability: number(), inputTokens: number() })),
+  looks: record(string(), object({ probability: number(), roster: number(), inputTokens: number() })),
 })
 
 /** The file name of the labels in a recording folder. */
@@ -77,9 +93,9 @@ export function loadGateLabels(recording: Recording): GateLabel[] | undefined {
   return parse(labelsSchema, JSON.parse(readFileSync(path, 'utf8'))).events.map(event => ({ at: event.at, type: event.type, important: event.important ?? false }))
 }
 
-/** Names the question and the settings of the gate. Saved looks of another question are not answers to this one. */
+/** Names the questions and the settings of a look. Saved looks of other questions are not answers to these. */
 function questionKey() {
-  return createHash('sha256').update(JSON.stringify([SCREEN_GATE_QUESTION, screenGateInput('', ''), SCREEN_GATE.stepMs])).digest('hex').slice(0, 16)
+  return createHash('sha256').update(JSON.stringify([SCREEN_LOOK_QUESTIONS, screenGateInput('', ''), SCREEN_GATE.stepMs])).digest('hex').slice(0, 16)
 }
 
 /**
@@ -121,7 +137,8 @@ async function askWithRetry(ask: GateAsk, previous: string, current: string, sig
 }
 
 /**
- * Asks the screen gate about a recording, one look each {@link SCREEN_GATE.stepMs}, as the app will ask it live.
+ * Asks the questions of a screen look about a recording, one look each {@link SCREEN_GATE.stepMs}, as the app asks
+ * them live.
  *
  * - Each look compares the frame of one step ago with the current frame.
  * - The looks are saved to `gate-trace.json` in the recording folder. A later run asks only for the missing looks, so
@@ -133,7 +150,7 @@ async function askWithRetry(ask: GateAsk, previous: string, current: string, sig
 export async function traceGate(recording: Recording, options: { ask: GateAsk, signal?: AbortSignal, minIntervalMs?: number }): Promise<GateLook[]> {
   const path = join(recording.directory, TRACE_FILE)
   const question = questionKey()
-  const looks = new Map<number, { probability: number, inputTokens: number }>()
+  const looks = new Map<number, { probability: number, roster: number, inputTokens: number }>()
   if (existsSync(path)) {
     const saved = parse(savedSchema, JSON.parse(readFileSync(path, 'utf8')))
     if (saved.question === question) {

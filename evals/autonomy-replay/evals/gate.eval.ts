@@ -1,9 +1,9 @@
 import process from 'node:process'
 
-import { createGeminiDecisionClient, SCREEN_GATE, SCREEN_GATE_QUESTION, screenGateInput } from '@proj-airi/core-agent'
+import { createGeminiDecisionClient, SCREEN_GATE, SCREEN_ROSTER } from '@proj-airi/core-agent'
 import { describeTask, expect } from 'vieval'
 
-import { loadGateLabels, scoreGate, traceGate } from '../src/gate'
+import { loadGateLabels, scoreGate, screenLookAsk, traceGate } from '../src/gate'
 import { defaultRecordingsDirectory, loadRecordings } from '../src/recording'
 
 /** The thresholds of the table in the artifact, so a run shows what another threshold would do. */
@@ -16,13 +16,7 @@ describeTask('screen-gate', ({ casesFromInputs }) => {
     const { recording } = context.matrix.inputs
     const client = createGeminiDecisionClient({ apiKey: () => process.env.GEMINI_API_KEY })
 
-    const looks = await traceGate(recording, {
-      signal: context.signal,
-      ask: async (previous, current, signal) => {
-        const result = await client.decide(screenGateInput(previous, current), { react: SCREEN_GATE_QUESTION }, signal)
-        return { probability: result.answers.react.probability, inputTokens: result.inputTokens }
-      },
-    })
+    const looks = await traceGate(recording, { signal: context.signal, ask: screenLookAsk(client) })
 
     // A recording with `labels.json` gets the shares of the events. Another one gets the pass rates only.
     const labels = loadGateLabels(recording)
@@ -33,6 +27,8 @@ describeTask('screen-gate', ({ casesFromInputs }) => {
         context.recordMetric(name, value)
     }
     context.recordMetric('inputTokensPerLook', looks.length ? looks.reduce((sum, look) => sum + look.inputTokens, 0) / looks.length : 0)
+    // The share of the looks that the roster watch takes for a roster screen. A match shows one for a short time only.
+    context.recordMetric('rosterShare', looks.length ? looks.filter(look => look.roster >= SCREEN_ROSTER.threshold).length / looks.length : 0)
     await context.recordArtifact('gate.json', {
       body: `${JSON.stringify({
         recording: recording.id,
@@ -40,7 +36,7 @@ describeTask('screen-gate', ({ casesFromInputs }) => {
         labels: labels ? { events: labels.length, important: labels.filter(label => label.important).length } : null,
         score,
         thresholds: THRESHOLDS.map(threshold => scoreGate(looks, labels, { startedAt, threshold })),
-        probabilities: looks.map(look => ({ second: Math.round((look.at - startedAt) / 1000), probability: Number(look.probability.toFixed(3)) })),
+        probabilities: looks.map(look => ({ second: Math.round((look.at - startedAt) / 1000), probability: Number(look.probability.toFixed(3)), roster: Number(look.roster.toFixed(3)) })),
       }, null, 2)}\n`,
       contentType: 'application/json',
       purpose: 'autonomy_replay.gate',
