@@ -10,6 +10,7 @@ import {
   decideInitiative,
   drawLineLength,
   EMPTY_TIMELINE,
+  initiativeEndMarker,
   initiativeNoticeText,
   initiativeTimeFrom,
   nextFromMarker,
@@ -44,6 +45,8 @@ export interface ReplayTurn {
   readonly trigger: InitiativeTrigger
   readonly speechType?: SpeechType
   readonly notice: string
+  /** The marker that ends the reply, as the notice asks for it. The chat runtime drops what the model writes after it. */
+  readonly endMarker: 'NEXT' | 'TOPIC'
   /** The frames that go one by one, oldest first. The last one goes at full size. */
   readonly frames: readonly RecordedFrame[]
   /** The frames that go as the tiles of one contact sheet, oldest first. */
@@ -63,6 +66,8 @@ export interface SpokenReply {
   /** The model requests of the turn. A turn with a tool call has more than one. */
   readonly requests?: number
   readonly toolCalls?: number
+  /** The model wrote on after the end marker of its reply, and the chat runtime dropped that text. */
+  readonly cut?: boolean
 }
 
 /** One line that the character spoke in the replay. */
@@ -85,6 +90,10 @@ export interface ReplayResult {
   /** The model requests of all turns. More requests than turns means tool calls. */
   readonly requests: number
   readonly toolCalls: number
+  /** The turns where the model wrote on after the end marker of its reply. The chat runtime dropped that text. */
+  readonly cuts: number
+  /** The lines without an end marker. Nothing can cut what the model writes after such a line. */
+  readonly missingEnd: number
   readonly usage: TokenUsage
   readonly lines: readonly ReplayLine[]
   readonly events: readonly ScreenEvent[]
@@ -151,6 +160,8 @@ export async function replayRecording(recording: Recording, options: ReplayOptio
   let images = 0
   let requests = 0
   let toolCalls = 0
+  let cuts = 0
+  let missingEnd = 0
   let speakingUntil = 0
   /** The end of the last spoken line, until the policy hears of it. */
   let speechEnd: number | undefined
@@ -234,6 +245,7 @@ export async function replayRecording(recording: Recording, options: ReplayOptio
       trigger: decision.trigger,
       ...(decision.speechType ? { speechType: decision.speechType } : {}),
       notice,
+      endMarker: initiativeEndMarker({}),
       frames: picked,
       ...(sheet?.length ? { sheet } : {}),
       ...(anchor ? { anchor } : {}),
@@ -243,6 +255,7 @@ export async function replayRecording(recording: Recording, options: ReplayOptio
     usage.cached += reply.usage?.cached ?? 0
     requests += reply.requests ?? 1
     toolCalls += reply.toolCalls ?? 0
+    cuts += reply.cut ? 1 : 0
 
     const { spoken, markers } = splitReply(reply.text)
     for (const marker of markers) {
@@ -259,6 +272,7 @@ export async function replayRecording(recording: Recording, options: ReplayOptio
       silent += 1
     }
     const turnNext = [...reply.text.matchAll(MARKER)].map(match => nextFromMarker(match[0])).filter(value => value !== undefined).at(-1)
+    missingEnd += spoken && !turnNext ? 1 : 0
     state = observeInitiative(state, { type: 'turn-finished', outcome: spoken ? 'spoke' : 'silent', ...(spoken && turnNext ? { next: turnNext } : {}) }, time, policyOptions, random)
   }
 
@@ -269,6 +283,8 @@ export async function replayRecording(recording: Recording, options: ReplayOptio
     images,
     requests,
     toolCalls,
+    cuts,
+    missingEnd,
     usage,
     lines,
     events,

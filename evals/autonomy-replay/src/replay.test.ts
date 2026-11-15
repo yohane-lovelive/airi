@@ -77,12 +77,26 @@ describe('replayRecording', () => {
     expect(result.events.some(event => event.type === 'scene-change')).toBe(true)
     expect(result.turns).toBeGreaterThan(0)
     expect(turns.every(turn => turn.frames.length >= 1 && turn.frames.length <= 2)).toBe(true)
-    expect(turns[0].notice).toContain('Mode: commentary')
+    expect(turns[0].notice).toContain('Mode: you talk about the owner\'s screen.')
     expect(result.lines[0].text).toBe('Look at that!')
     expect(result.timeline.scene?.text).toBe('a match')
     expect(result.timeline.notes[0]?.text).toBe('the scene changed')
     // A later notice gives the timeline back to the model.
     expect(turns.at(-1)!.notice).toContain('Current scene')
+  })
+
+  it('names NEXT as the end marker of each reply, and counts the cut replies and the lines without the marker', async () => {
+    const recording = loadRecording(await writeRecording(root, 4))
+    const turns: ReplayTurn[] = []
+    const result = await replayRecording(recording, { mode: 'commentary', policy: 'fresh-keyframes', seed: 1 }, async (turn) => {
+      turns.push(turn)
+      // The first reply was cut after its marker. The second has no marker.
+      return turns.length === 1 ? { text: 'Look! <|NEXT wait|>', cut: true } : { text: 'And again.' }
+    })
+
+    expect(turns.every(turn => turn.endMarker === 'NEXT')).toBe(true)
+    expect(result.cuts).toBe(1)
+    expect(result.missingEnd).toBe(result.lines.length - 1)
   })
 
   it('makes the same decisions again with the same seed and replies', async () => {
@@ -173,6 +187,8 @@ describe('replay helpers', () => {
       images: 6,
       requests: 5,
       toolCalls: 1,
+      cuts: 0,
+      missingEnd: 0,
       usage: { input: 1_000, output: 50, cached: 250 },
       lines: [
         { at: 0, text: 'ラーメン食べたい', trigger: 'boredom', speechType: 'ask', frames: [] },
@@ -199,6 +215,8 @@ describe('replay helpers', () => {
       images: 0,
       requests: 10,
       toolCalls: 0,
+      cuts: 0,
+      missingEnd: 0,
       usage: { input: 0, output: 0, cached: 0 },
       // A line of a fake model has no time, and it does not count.
       lines: [900, 1_000, 1_100, 1_200, 1_300, 1_400, 1_500, 1_600, 1_700, 4_000, undefined].map(line),
@@ -219,6 +237,8 @@ describe('replay helpers', () => {
       images: 0,
       requests: texts.length,
       toolCalls: 0,
+      cuts: 0,
+      missingEnd: 0,
       usage: { input: 0, output: 0, cached: 0 },
       lines: texts.map((text, index) => ({ at: index, text, trigger: 'event' as const, frames: [] })),
       events: [],
@@ -238,6 +258,8 @@ describe('replay helpers', () => {
       images: 0,
       requests: texts.length,
       toolCalls: 0,
+      cuts: 0,
+      missingEnd: 0,
       usage: { input: 0, output: 3_000, cached: 0 },
       lines: texts.map((text, index) => ({ at: index, text, trigger: 'event' as const, frames: [] })),
       events: [],
@@ -247,6 +269,26 @@ describe('replay helpers', () => {
     expect(metrics.lineCharsMedian).toBe(7)
     expect(metrics.lineCharsMax).toBe(3_500)
     expect(metrics.outputTokensPerLine).toBe(1_000)
+  })
+
+  it('measures the share of cut turns and the share of lines without an end marker', () => {
+    const metrics = replayMetrics({
+      durationMs: MINUTE,
+      turns: 10,
+      silent: 6,
+      images: 0,
+      requests: 10,
+      toolCalls: 0,
+      cuts: 2,
+      missingEnd: 1,
+      usage: { input: 0, output: 0, cached: 0 },
+      lines: ['a', 'b', 'c', 'd'].map((text, index) => ({ at: index, text, trigger: 'event' as const, frames: [] })),
+      events: [],
+      timeline: { notes: [] },
+    })
+
+    expect(metrics.cutShare).toBe(0.2)
+    expect(metrics.missingEndShare).toBe(0.25)
   })
 
   it('reads a judgment inside text or a code fence, and nothing from a broken answer', () => {

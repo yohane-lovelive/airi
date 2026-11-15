@@ -1,5 +1,6 @@
 import type { ChatConnection } from './chat'
 
+import { FINAL_ANSWER_RULE } from '@proj-airi/core-agent'
 import { describe, expect, it } from 'vitest'
 
 import { createAppSpeaker } from './app-speaker'
@@ -54,6 +55,8 @@ describe('createAppSpeaker', () => {
     expect(request.body.stream).toBe(true)
     expect(request.body.messages[0].role).toBe('system')
     expect(textOf(request.body.messages[0])).toContain('You are AIRI.')
+    // The chat runtime ends each system prompt with its final answer rule.
+    expect(textOf(request.body.messages[0]).endsWith(FINAL_ANSWER_RULE)).toBe(true)
     expect(textOf(request.body.messages.at(-1)!)).toContain('Mode: commentary')
     expect(imagesOf(request.body.messages.at(-1)!)).toEqual(['data:image/jpeg;base64,AAAA', 'data:image/jpeg;base64,BBBB'])
   })
@@ -109,7 +112,7 @@ describe('createAppSpeaker', () => {
 
   it('sends the system prompt and the tools of the app when it has the start of a request', async () => {
     const requestStart = {
-      systemPrompt: 'The whole prompt of the app.',
+      systemPrompt: `The whole prompt of the app.\n\n${FINAL_ANSWER_RULE}`,
       tools: [{ type: 'function' as const, function: { name: 'memory_search', description: 'Searches memories.', parameters: { type: 'object', properties: {} } } }],
     }
     const { speaker, requests } = setup([() => textReply('Nice!')], { requestStart })
@@ -118,6 +121,8 @@ describe('createAppSpeaker', () => {
 
     expect(textOf(requests[0].body.messages[0])).toContain('The whole prompt of the app.')
     expect(textOf(requests[0].body.messages[0])).not.toContain('You are AIRI.')
+    // A request start of the app holds the rule already, and the request holds it once.
+    expect(textOf(requests[0].body.messages[0]).split(FINAL_ANSWER_RULE)).toHaveLength(2)
     expect(requests[0].body.tools?.map(tool => tool.function.name)).toEqual(['memory_search'])
   })
 
@@ -155,6 +160,29 @@ describe('createAppSpeaker', () => {
 
     expect(free.requests[0].body.max_tokens).toBeUndefined()
     expect(limited.requests[0].body.max_tokens).toBe(400)
+  })
+
+  it('drops what the model writes after the end marker, and tells that the reply was cut', async () => {
+    const tailed = () => textReply('Nice!<|TOPIC the fight|><|NEXT wait|> tulip Nice again!<|TOPIC other|><|NEXT done|>')
+    const { speaker, requests } = setup([tailed, () => textReply('Second line.<|NEXT wait|>')])
+
+    const cut = await speaker.speak({ at: AT, notice: 'NOTICE-ONE', images: [], endMarker: 'NEXT' })
+    const whole = await speaker.speak({ at: AT + 10_000, notice: 'NOTICE-TWO', images: [], endMarker: 'NEXT' })
+
+    expect(cut.text).toBe('Nice!<|TOPIC the fight|><|NEXT wait|>')
+    expect(cut.cut).toBe(true)
+    expect(whole.cut).toBeUndefined()
+    // The next request holds the kept text only.
+    expect(textOf(requests[1].body.messages[1])).toBe('Nice!<|TOPIC the fight|><|NEXT wait|>')
+  })
+
+  it('keeps the whole reply without an end marker of the turn', async () => {
+    const { speaker } = setup([() => textReply('Nice!<|NEXT wait|> tulip')])
+
+    const reply = await speaker.speak({ at: AT, notice: 'NOTICE-ONE', images: [] })
+
+    expect(reply.text).toBe('Nice!<|NEXT wait|> tulip')
+    expect(reply.cut).toBeUndefined()
   })
 
   it('rejects when the provider refuses the request', async () => {

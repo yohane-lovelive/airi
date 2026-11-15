@@ -4,7 +4,7 @@ import type { ChatConnection } from './chat'
 import type { SpokenReply, TokenUsage } from './replay'
 import type { RequestStart } from './request-start'
 
-import { createChatOrchestratorRuntime, SCENE_ANCHOR_TEXT, streamFrom } from '@proj-airi/core-agent'
+import { createChatOrchestratorRuntime, FINAL_ANSWER_RULE, SCENE_ANCHOR_TEXT, streamFrom } from '@proj-airi/core-agent'
 
 import { speakingProvider } from './chat'
 
@@ -22,6 +22,8 @@ export interface SpeakerTurn {
   /** The time of the turn on the clock of the recording. Stored messages and the time notes of the request use it. */
   readonly at: number
   readonly notice: string
+  /** The marker that ends the reply, as the notice asks for it. Without it, the runtime keeps everything that the model writes. */
+  readonly endMarker?: 'NEXT' | 'TOPIC'
   /** The images that go with the notice as JPEG base64, oldest first. */
   readonly images: readonly string[]
   /** The anchor frame of the scene as JPEG base64. It goes right after the system prompt. */
@@ -35,6 +37,8 @@ interface TurnReadout {
   text: string
   toolCalls: number
   firstTextMs?: number
+  /** The runtime dropped text that the model wrote after the end marker of its reply. */
+  cut?: boolean
 }
 
 /**
@@ -45,6 +49,8 @@ interface TurnReadout {
  * - The notice is transient, as in the app. So the conversation keeps only the lines, and a silent turn leaves nothing.
  * - The conversation lives in memory for one replay. Create one speaker for each replay.
  * - Without `requestStart`, the system prompt is `persona` and the request has no tools.
+ * - The runtime ends each system prompt with its final answer rule. A request start of the app holds the rule already,
+ *   so the speaker takes it off there.
  *
  * Not in the request, although the app sends them: the summary of a long history, runtime contexts, and stickers.
  * They belong to stores of the app that a replay cannot load.
@@ -76,7 +82,8 @@ export function createAppSpeaker(options: {
     ...(options.fetch ? { fetch: options.fetch } : {}),
     onRequest: request => current?.usages.push(request.usage),
   })
-  const systemPrompt = options.requestStart?.systemPrompt ?? options.persona
+  // The runtime adds the rule to each request. A request start of the app was read after that step.
+  const systemPrompt = options.requestStart?.systemPrompt.replace(`\n\n${FINAL_ANSWER_RULE}`, '') ?? options.persona
   const tools = options.requestStart?.tools.map(tool => ({
     ...tool,
     execute: async () => {
@@ -112,6 +119,10 @@ export function createAppSpeaker(options: {
     onLlmFirstToken: (event) => {
       if (current)
         current.firstTextMs ??= event.ttfbMs
+    },
+    onReplyCut: () => {
+      if (current)
+        current.cut = true
     },
   })
   // The whole text of the reply, with its markers. The replay reads the timeline and `NEXT` markers from it.
@@ -154,6 +165,7 @@ export function createAppSpeaker(options: {
           notice: {
             source: NOTICE_SOURCE,
             transient: true,
+            ...(turn.endMarker ? { endMarker: turn.endMarker } : {}),
             ...(turn.anchor ? { anchor: { text: SCENE_ANCHOR_TEXT, image: `data:image/jpeg;base64,${turn.anchor}` } } : {}),
           },
         }, SESSION_ID)
@@ -173,6 +185,7 @@ export function createAppSpeaker(options: {
         durationMs,
         requests: readout.usages.length,
         toolCalls: readout.toolCalls,
+        ...(readout.cut ? { cut: true } : {}),
         // An empty reply can still send an empty text chunk, and that is not the start of a line.
         ...(readout.firstTextMs !== undefined && readout.text.trim() ? { firstTextMs: readout.firstTextMs } : {}),
       }

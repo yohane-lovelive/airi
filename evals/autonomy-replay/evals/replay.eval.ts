@@ -63,7 +63,7 @@ describeTask('autonomy-replay', ({ casesFromInputs }) => {
       if (turn.sheet)
         images.push(await renderContactSheet(await Promise.all(turn.sheet.map(frame => frameImage(recording, frame)))))
       const anchor = turn.anchor ? await frameImage(recording, turn.anchor) : undefined
-      return speaker.speak({ at: turn.at, notice: turn.notice, images, ...(anchor ? { anchor } : {}) }, context.signal)
+      return speaker.speak({ at: turn.at, notice: turn.notice, endMarker: turn.endMarker, images, ...(anchor ? { anchor } : {}) }, context.signal)
     }
     const result = await replayRecording(recording, { mode, policy, seed: 1 }, speak)
 

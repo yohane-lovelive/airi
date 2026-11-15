@@ -48,6 +48,10 @@ export interface ReplayMetrics {
   /** The model requests for each turn. Above 1 means tool calls, and each one adds a request before the line. */
   readonly requestsPerTurn: number
   readonly toolCalls: number
+  /** The share of turns where the model wrote on after the end marker of its reply. The chat runtime dropped that text. */
+  readonly cutShare: number
+  /** The share of lines without an end marker. What the model writes after such a line reaches the speech. */
+  readonly missingEndShare?: number
   /** The median time from the start of a request to the first text of a line, in milliseconds. */
   readonly firstTextMsMedian?: number
   /** The time that 9 of 10 lines stay under. The slow lines are what the owner notices. */
@@ -94,10 +98,12 @@ export function replayMetrics(result: ReplayResult, judgments: readonly LineJudg
           repeatShare: repeats.length / texts.length,
           lineCharsMedian: percentile(texts.map(text => text.length), 0.5),
           lineCharsMax: Math.max(...texts.map(text => text.length)),
+          missingEndShare: result.missingEnd / texts.length,
         }
       : {}),
     requestsPerTurn: result.turns ? result.requests / result.turns : 0,
     toolCalls: result.toolCalls,
+    cutShare: result.turns ? result.cuts / result.turns : 0,
     ...(firstTexts.length ? { firstTextMsMedian: percentile(firstTexts, 0.5), firstTextMsSlow: percentile(firstTexts, 0.9) } : {}),
     ...(pairs.length ? { topicSimilarity: pairs.reduce((sum, value) => sum + value, 0) / pairs.length } : {}),
     ...(judgments.length

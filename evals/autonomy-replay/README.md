@@ -43,6 +43,7 @@ A replay measures speed and cache only when its requests have the size of the re
 - The screen recorder of the app writes `request-start.json` into a recording at each chat request: the system prompt and the tool definitions. The replay of that recording sends them again.
 - `AUTONOMY_REPLAY_REQUEST_START` names one such file for every recording. Use it for an imported video, which has no file of its own.
 - Without a request start, the system prompt is a short persona and the request has no tools. The time to the first text is then shorter than in the app.
+- The chat runtime ends each system prompt with its final answer rule, and it cuts a reply at its end marker. The replay gets both, as the app does.
 - `AUTONOMY_REPLAY_REQUEST_FIELDS` adds body fields for each model, as JSON. The provider of the app turns reasoning off for autonomous speech, for example `{"gpt-6-luna":{"reasoningEffort":"none"}}`.
 - The replay answers each tool call with a fixed text. No tool runs, so a replay changes no memory and no mission.
 - `AUTONOMY_REPLAY_MAX_OUTPUT_TOKENS` limits the output of one model request. The app sets no limit, so leave it empty to measure the app. Set it when a model does not stop: one such line cost 129,000 output tokens and about 10 minutes on 2026-11-15.
@@ -75,6 +76,8 @@ The trace saves each look to `gate-trace.json` in the recording folder. A second
 | `imagesPerHour`, `inputTokens`, `outputTokens`, `cachedTokens`, `cacheShare` | What the frames cost in images and tokens. Prices are left out. |
 | `inputTokensPerLine`, `outputTokensPerLine` | The tokens of all turns for each spoken line. Silent turns count as cost of the lines. |
 | `lineCharsMedian`, `lineCharsMax` | The length of a line in characters. A longest line of thousands means that the model did not stop. Its speech holds every later turn of the replay. |
+| `cutShare` | The share of turns where the model wrote on after the end marker of its reply. The chat runtime dropped that text. |
+| `missingEndShare` | The share of lines without an end marker. What the model writes after such a line reaches the speech. |
 | `requestsPerTurn`, `toolCalls` | The model requests for each turn. A tool call adds a request before the line. |
 | `groundedShare`, `contradictionShare` | The share of lines that the judge found grounded in the screen, and the share that contradict the timeline. |
 | `passesPerMinute`, `linesPerMinute` (gate) | How often the gate passes, and the lines that a gap of 6 seconds between lines leaves. |
