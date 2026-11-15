@@ -2,7 +2,8 @@ import type { InitiativeNoticeContext } from './initiative-notice'
 
 import { describe, expect, it } from 'vitest'
 
-import { initiativeEndMarker, initiativeNoticeText } from './initiative-notice'
+import { CAST_READ_END_MARKER, castReadNoticeText, initiativeEndMarker, initiativeNoticeText } from './initiative-notice'
+import { TIMELINE_LIMITS } from './timeline'
 
 const NOW = Date.UTC(2026, 10, 1, 12, 0)
 
@@ -199,6 +200,43 @@ describe('initiativeNoticeText', () => {
     const old = initiativeNoticeText(context({ mode: 'commentary', screen, timeline: castAt(2 * 60 * 60_000) }))
     expect(old).not.toContain('Cast of the scene')
     expect(old).toContain('- The cast of this scene is not known yet.')
+  })
+
+  it('names the player names of the owner while the cast is not known, in a turn about the screen only', () => {
+    const screen = { frameAgesMs: [0], events: [] }
+    const ownerAccounts = ['League of Legends: moonrabbit', 'Apex Legends: moon_rabbit']
+    const line = '- The owner\'s player names in games: League of Legends: moonrabbit; Apex Legends: moon_rabbit.'
+
+    expect(initiativeNoticeText(context({ mode: 'commentary', screen, ownerAccounts }))).toContain(line)
+    // A known cast already names the character of the owner.
+    const known = { notes: [], cast: { text: 'The owner plays Ambessa.', at: NOW - 60_000 } }
+    expect(initiativeNoticeText(context({ mode: 'commentary', screen, timeline: known, ownerAccounts }))).not.toContain('player names in games')
+    expect(initiativeNoticeText(context({ mode: 'commentary', ownerAccounts }))).not.toContain('player names in games')
+    expect(initiativeNoticeText(context({ screen, ownerAccounts }))).not.toContain('player names in games')
+    expect(initiativeNoticeText(context({ mode: 'commentary', screen, ownerAccounts: [] }))).not.toContain('player names in games')
+  })
+
+  it('builds the notice of a cast read: no speech, the cast marker, and the end marker', () => {
+    const text = castReadNoticeText({ now: NOW, ownerAccounts: ['League of Legends: moonrabbit'] })
+
+    expect(text.split('\n')[0]).toBe('Silent turn: nobody hears this reply. Write no words to say, only the markers below.')
+    expect(text).toContain('<|CAST The owner plays ... Allies: ... Opponents: ...|>')
+    expect(text).toContain('do not guess a character from its look')
+    expect(text).toContain('- The owner\'s player names in games: League of Legends: moonrabbit.')
+    expect(text).not.toContain('Cast so far')
+    expect(text.split('\n').at(-1)).toBe(`End with <|${CAST_READ_END_MARKER} done|>.`)
+    // The word makes gpt-6-luna write on after its reply. See `FINAL_ANSWER_RULE`.
+    expect(text).not.toMatch(/commentary/i)
+  })
+
+  it('gives a cast read the fresh cast, so the read keeps its names', () => {
+    const fresh = { notes: [], cast: { text: 'The owner plays Ambessa.', at: NOW - 60_000 } }
+    const old = { notes: [], cast: { text: 'The owner plays Ambessa.', at: NOW - TIMELINE_LIMITS.maxCastAgeMs - 1 } }
+
+    expect(castReadNoticeText({ now: NOW, timeline: fresh })).toContain('- Cast so far, written 1 minute ago: The owner plays Ambessa.')
+    expect(castReadNoticeText({ now: NOW, timeline: fresh })).toContain('keep the names that it holds')
+    expect(castReadNoticeText({ now: NOW, timeline: old })).not.toContain('Cast so far')
+    expect(castReadNoticeText({ now: NOW })).not.toContain('player names in games')
   })
 
   it('names the last marker that the notice asks for as the end of the reply', () => {

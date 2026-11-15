@@ -6,6 +6,8 @@ import { rawTool } from '@xsai/tool'
 import { array, description, maxLength, minLength, nullable, pipe, safeParse, strictObject, string } from 'valibot'
 import { toJsonSchema } from 'xsschema'
 
+import { GAME_ACCOUNT_PREFIX } from '../libs/memory-index'
+
 export const READ_MEMORY_TOOL_NAME = 'builtIn_readMemory'
 export const WRITE_MEMORY_TOOL_NAME = 'builtIn_writeMemory'
 export const FORGET_MEMORY_TOOL_NAME = 'builtIn_forgetMemory'
@@ -43,6 +45,8 @@ export function composeMemoryPrompt(index: string) {
     `The index lists the newest entries only. Memories that fit the owner message can come with it. When neither shows what you need, search older entries with ${SEARCH_MEMORY_TOOL_NAME}.`,
     `Save with ${WRITE_MEMORY_TOOL_NAME} only when someone asks you to remember something, or states a lasting fact. Most turns save nothing.`,
     'One fact per entry. To update an entry, write it with its id instead of adding a near copy. Never save what a recipe already holds, your own rules, codes, passwords, or secrets.',
+    // A turn about the screen reads these entries by their description, so it can tell which character the owner plays.
+    `When the owner tells the player name or the account name that the owner uses in a game, save it as one entry for that game. Its description is "${GAME_ACCOUNT_PREFIX} " and the full name of the game, and its body is the name.`,
     `Forget an entry by its id with ${FORGET_MEMORY_TOOL_NAME} when it turns out wrong or someone asks. General entries belong to the owner, so you cannot change or forget them.`,
     index ? `Memory index:\n${index}` : 'The memory index is empty.',
   ].join('\n')

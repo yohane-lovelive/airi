@@ -54,4 +54,10 @@ describe('memory tools', () => {
     expect(composeMemoryPrompt('')).toContain('Never save what a recipe already holds')
     expect(composeMemoryPrompt('')).toContain('The memory index is empty.')
   })
+
+  // A turn about the screen finds these entries by their description. With the name, the model can tell which
+  // character on a loading screen is the owner's. Without it, a live check got no line with that character.
+  it('asks for one entry of a fixed form for the player name of each game', () => {
+    expect(composeMemoryPrompt('')).toContain('save it as one entry for that game. Its description is "Game account: " and the full name of the game, and its body is the name.')
+  })
 })

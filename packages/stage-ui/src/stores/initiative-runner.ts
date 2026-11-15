@@ -1,25 +1,32 @@
-import type { ChatAttachment, InitiativeDecision, InitiativeEvent, InitiativeHost, InitiativeRhythm, InitiativeScreenContext, InitiativeState, InitiativeTime, InitiativeWaitReason, MissionInstance, SpeechType, TimelineNote, TopicSeed } from '@proj-airi/core-agent'
+import type { ChatAttachment, InitiativeDecision, InitiativeEvent, InitiativeHost, InitiativeRhythm, InitiativeScreenContext, InitiativeState, InitiativeTime, InitiativeWaitReason, MissionInstance, RosterWatch, SpeechType, TimelineNote, TopicSeed } from '@proj-airi/core-agent'
 import type { SyncedPiniaRuntime } from 'pinia-plugin-synced'
 
 import type { OwnerPresence, OwnerPresenceSource } from '../libs/initiative/presence'
 import type { CapturedFrame } from '../libs/perception/frame-ring'
+import type { ScreenLookResult } from '../libs/perception/screen-look'
 
 import { errorMessageFrom } from '@moeru/std'
 import {
   calendarTopicSeeds,
+  CAST_READ_END_MARKER,
+  castReadNoticeText,
   createInitiativeState,
   currentTopicThread,
   decideInitiative,
   decideInterruption,
   drawLineLength,
+  EMPTY_ROSTER_WATCH,
   initiativeEndMarker,
   initiativeNoticeText,
   initiativeReadout,
   initiativeTimeFrom,
   observeInitiative,
+  observeRosterLook,
   pickTopicSeeds,
   requestRhythmTurn,
   resolveInitiativeOptions,
+  SCREEN_GATE,
+  startRosterRead,
   TOPIC_LIMITS,
   topicOf,
   topicVariety,
@@ -35,14 +42,16 @@ import { markAway, observePresence, OWNER_PRESENCE_LIMITS, shouldGreet } from '.
 import { TopicVectors } from '../libs/initiative/topic-vectors'
 import { initiativeTopicLines, memoryTopicSeeds } from '../libs/initiative/topics'
 import { isOwnerTyping } from '../libs/initiative/typing'
-import { MEMORY_INDEX_LIMIT, MEMORY_INDEX_LIMIT_WITH_RECALL } from '../libs/memory-index'
+import { gameAccounts, MEMORY_INDEX_LIMIT, MEMORY_INDEX_LIMIT_WITH_RECALL } from '../libs/memory-index'
 import { eventPressureFactor, IMAGE_BUDGET_LIMITS } from '../libs/perception/image-budget'
-import { buildScreenTurn } from '../libs/perception/screen-turn'
+import { ScreenLook } from '../libs/perception/screen-look'
+import { buildScreenTurn, imageAttachment } from '../libs/perception/screen-turn'
 import { Ticker } from '../workers/ticker'
 import { useLLM } from './ai/chat-llm/llm'
 import { useSpeakingStore } from './audio'
 import { useChatStore } from './chat'
 import { useChatSessionStore } from './chat/session-store'
+import { useDecisionModelStore } from './decision-model'
 import { useDeviceFloorStore } from './device-floor'
 import { useInitiativeStore } from './initiative'
 import { useInitiativeInspectorStore } from './initiative-inspector'
@@ -114,6 +123,9 @@ const LASTING_WAIT_REASONS: readonly InitiativeWaitReason[] = ['quiet-hours', 'o
  *   When no window of the app is open for 5 minutes, the commentary ends.
  *   A very large screen event interrupts the commentary line that plays: the sentence ends first, or the largest events
  *   cut it at once. The timeline notes the cut line.
+ * - While a commentary watches its window and the owner set up the decision model, the runner looks at the screen each
+ *   2 seconds. A look that finds a roster screen starts a cast read: a turn without speech that writes who takes part
+ *   to the timeline. The look also asks whether to react. That answer starts no turn yet.
  * - The open intentions add drive, and the situation block lists them. The owner's temporary changes, for example a
  *   quiet time, change the options at each tick.
  * - While a window watches the inspector, each tick publishes a readout of the policy to it.
@@ -149,6 +161,12 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
   const perceptionRunner = usePerceptionRunnerStore()
   const timeline = useTimelineStore()
   const speechControl = useSpeechOutputControlStore()
+  const decisionModel = useDecisionModelStore()
+  const screenLook = new ScreenLook((input, questions, signal) => decisionModel.decide(input, questions, signal))
+  /** What the looks know about a roster screen. See `observeRosterLook`. */
+  let rosterWatch: RosterWatch = EMPTY_ROSTER_WATCH
+  /** The last look of the screen, for an inspector. */
+  const lastLook = shallowRef<ScreenLookResult>()
   /** The newest autonomous turns, so an interruption stops only speech that this runner started. */
   const recentTurnIds: string[] = []
   /** The largest screen salience since the last turn started, and the one that the current line answers. */
@@ -161,7 +179,10 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
   const state = shallowRef<InitiativeState>()
   /** The autonomous turn in flight. The policy holds one turn at most. */
   let running: { sessionId: string, turnId: string, dropped: boolean } | undefined
+  /** Whether a turn that the policy started still prepares its notice. A cast read waits for it. */
+  let preparingTurn = false
   const ticker = new Ticker(TICK_INTERVAL_MS, tick)
+  const lookTicker = new Ticker(SCREEN_GATE.stepMs, () => void lookAtScreen())
   let leadership: SyncedPiniaRuntime | undefined
   let stopLeadershipListener: (() => void) | undefined
   let presenceSource: OwnerPresenceSource | undefined
@@ -220,7 +241,8 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
     return {
       ownerActive: ownerSpeaking.value || isOwnerTyping(ownerTyping.typingUntil, now),
       speechPlaying: speaking.nowSpeaking,
-      turnRunning: chat.sending || chat.activeTurns.length > 0,
+      // A cast read counts from its start, before the chat store knows its request.
+      turnRunning: chat.sending || chat.activeTurns.length > 0 || Boolean(running),
       intentions: intentions.openAt(now).length,
       commentaryBlind: Boolean(commentaryAt(now)) && !perceptionRunner.targetInView(),
     }
@@ -379,6 +401,8 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
       ...(!rhythm && !screen && webSearch.configured && webSearch.autonomousSearchesLeft(time.now) > 0 ? { canSearch: true } : {}),
       ...(screen ? { screen: screen.context } : {}),
       ...(screenTimeline ? { timeline: screenTimeline } : {}),
+      // The owner's player names come from the memories, so the model can tell which character on the screen is the owner's.
+      ...(mode === 'commentary' && screen && memory.enabled ? { ownerAccounts: gameAccounts(memory.entries, chat.personaOf(sessionId)) } : {}),
       ...(topics?.thread ? { thread: topics.thread } : {}),
       ...(topics?.seeds.length ? { seeds: topics.seeds } : {}),
       ...(recallMemory ? { recallMemory: recallMemory.body } : {}),
@@ -415,6 +439,71 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
     observe({ type: 'turn-finished', outcome, ...(next ? { next } : {}) })
   }
 
+  /**
+   * One look of the screen while a commentary sees its window. The decision model answers whether the screen shows a
+   * roster, and a roster screen without a new cast starts a cast read.
+   */
+  async function lookAtScreen() {
+    const now = Date.now()
+    // The cast serves the lines of a commentary, so no other mode pays for looks.
+    const watching = Boolean(leadership?.isLeader()) && initiative.enabled && deviceFloor.holdsFloor && decisionModel.configured
+      && perception.enabled && Boolean(commentaryAt(now)) && perceptionRunner.targetInView()
+    if (!watching) {
+      screenLook.reset()
+      rosterWatch = EMPTY_ROSTER_WATCH
+      return
+    }
+    const look = await screenLook.look(perceptionRunner.frames().at(-1), now)
+    if (!look)
+      return
+    lastLook.value = look
+    const sessionId = activeSessionId.value
+    const castAt = timeline.timelineOf(sessionId).cast?.at
+    const observed = observeRosterLook(rosterWatch, { at: look.at, probability: look.roster, ...(castAt !== undefined ? { castAt } : {}) })
+    rosterWatch = observed.watch
+    if (observed.wanted)
+      void readCast(sessionId)
+  }
+
+  /**
+   * Reads the cast of the scene from the roster screen that shows now, in a turn without speech. The reply holds only
+   * markers, so nothing is spoken or stored, and the chat store writes the cast to the timeline.
+   *
+   * The owner comes first, and one turn runs at a time. A read that cannot start now starts at a later look, while the
+   * roster screen still shows.
+   */
+  async function readCast(sessionId: string) {
+    const now = Date.now()
+    const frame = perceptionRunner.frames().at(-1)
+    const free = !running && !preparingTurn && !host(now).ownerActive && !speaking.nowSpeaking && !chat.sending && chat.activeTurns.length === 0
+    if (!frame || !free || !activeMessages.value || sessionId !== activeSessionId.value || perception.budgetAt(now, true).remaining <= 0)
+      return
+    const turn = { sessionId, turnId: nanoid(), dropped: false }
+    running = turn
+    rosterWatch = startRosterRead(rosterWatch, now)
+    try {
+      const known = await timeline.load(sessionId).catch(() => timeline.timelineOf(sessionId))
+      const text = castReadNoticeText({
+        now,
+        timeline: known,
+        ...(memory.enabled ? { ownerAccounts: gameAccounts(memory.entries, chat.personaOf(sessionId)) } : {}),
+      })
+      const attachments = [await imageAttachment(frame.image)]
+      // The owner started to type or to speak while the frame was read.
+      if (turn.dropped)
+        return
+      perception.recordImages(attachments.length, now)
+      await chat.notifyConversation(sessionId, { source: INITIATIVE_SOURCE, text, transient: true, endMarker: CAST_READ_END_MARKER, attachments }, turn.turnId)
+    }
+    catch (error) {
+      console.warn('[initiative] Failed to read the cast of the scene:', errorMessageFrom(error))
+    }
+    finally {
+      if (running === turn)
+        running = undefined
+    }
+  }
+
   function tick() {
     // Another device of the account holds the floor, so it speaks and this one stays quiet.
     if (!leadership?.isLeader() || !initiative.enabled || !deviceFloor.holdsFloor) {
@@ -449,8 +538,12 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
 
     if (inspector.isWatched(time.now))
       inspector.publish(initiativeReadout(next, currentHost, time, options), time.now, { awaySince: presence.value.awaySince, lastRhythm: lastRhythm.value }, topicReadout(sessionId, time))
-    if (decision.kind === 'turn')
-      void runTurn(decision, sessionId, rhythm?.awayMs)
+    if (decision.kind === 'turn') {
+      preparingTurn = true
+      void runTurn(decision, sessionId, rhythm?.awayMs).finally(() => {
+        preparingTurn = false
+      })
+    }
   }
 
   /** The current thread, the last seeds, and the variety of today's lines, for the inspector. */
@@ -641,14 +734,18 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
     stopLeadershipListener = syncedPinia.onLeadershipChange((isLeader) => {
       if (isLeader) {
         ticker.start()
+        lookTicker.start()
       }
       else {
         ticker.stop()
+        lookTicker.stop()
         state.value = undefined
       }
     })
-    if (syncedPinia.isLeader())
+    if (syncedPinia.isLeader()) {
       ticker.start()
+      lookTicker.start()
+    }
   }
 
   function dispose() {
@@ -660,6 +757,7 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
     stopAwayListener = undefined
     presenceSource = undefined
     ticker.stop()
+    lookTicker.stop()
     leadership = undefined
     state.value = undefined
   }
@@ -669,6 +767,8 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
   return {
     /** The policy state, for an inspector. It is read only. */
     state: readonly(state),
+    /** The last look of the screen: the chances that it shows a moment to react to, and a roster. It is read only. */
+    lastLook: readonly(lastLook),
     initialize,
     dispose,
   }

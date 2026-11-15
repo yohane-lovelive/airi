@@ -47,7 +47,8 @@ async function base64Of(image: Blob) {
   return encodeBase64(new Uint8Array(await image.arrayBuffer()))
 }
 
-async function attachmentOf(image: Blob): Promise<ChatAttachment> {
+/** Turns the JPEG of a frame into an attachment of a notice. */
+export async function imageAttachment(image: Blob): Promise<ChatAttachment> {
   return { type: 'image', mimeType: 'image/jpeg', data: await base64Of(image) }
 }
 
@@ -82,7 +83,7 @@ export async function buildScreenTurn(input: ScreenTurnInput): Promise<ScreenTur
   if (withSheet) {
     const tiles = pickContactSheet({ frames: input.frames, eventTimes, since: input.since }).map(pick => input.frames[pick.index])
     if (tiles.length) {
-      attachments.push(await attachmentOf(await renderContactSheet(tiles.map(tile => tile.image))))
+      attachments.push(await imageAttachment(await renderContactSheet(tiles.map(tile => tile.image))))
       contactSheetAgesMs = tiles.map(ageOf)
     }
   }
@@ -90,11 +91,11 @@ export async function buildScreenTurn(input: ScreenTurnInput): Promise<ScreenTur
     const newest = input.frames.at(-1)
     const tiles = pickRecentSheet(input.frames).map(index => input.frames[index])
     if (tiles.length) {
-      attachments.push(await attachmentOf(await renderContactSheet(tiles.map(tile => tile.image))))
+      attachments.push(await imageAttachment(await renderContactSheet(tiles.map(tile => tile.image))))
       contactSheetAgesMs = tiles.map(ageOf)
     }
     if (newest) {
-      attachments.push(await attachmentOf(newest.image))
+      attachments.push(await imageAttachment(newest.image))
       frameAgesMs = [ageOf(newest)]
     }
   }
@@ -102,7 +103,7 @@ export async function buildScreenTurn(input: ScreenTurnInput): Promise<ScreenTur
     const picks = pickFreshKeyframes({ frames: input.frames, eventTimes, since: input.since, maxImages: withAnchor ? count - 1 : count })
     for (const { index, role } of picks) {
       const frame = input.frames[index]
-      attachments.push(await attachmentOf(role === 'newest' ? frame.image : await scaleImage(frame.image, FRAME_LIMITS.smallLongSide)))
+      attachments.push(await imageAttachment(role === 'newest' ? frame.image : await scaleImage(frame.image, FRAME_LIMITS.smallLongSide)))
     }
     frameAgesMs = picks.map(({ index }) => ageOf(input.frames[index]))
   }
