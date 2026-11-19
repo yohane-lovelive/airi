@@ -21,7 +21,7 @@ const timers: ReturnType<typeof setInterval>[] = []
  * A screen that is a canvas. Its stream is live, so the runner takes real frames from it. A capture of an app takes the
  * window that the runner names, or else the window in front, as the desktop does.
  */
-function canvasSource(options: { foreground?: () => ForegroundWindow, needsGesture?: boolean, steady?: boolean, windowOpen?: () => boolean } = {}) {
+function canvasSource(options: { foreground?: () => ForegroundWindow, needsGesture?: boolean, steady?: boolean, windowOpen?: () => boolean, canCaptureApp?: () => boolean } = {}) {
   const canvas = document.createElement('canvas')
   canvas.width = 320
   canvas.height = 180
@@ -34,6 +34,8 @@ function canvasSource(options: { foreground?: () => ForegroundWindow, needsGestu
     supported: true,
     needsGesture: options.needsGesture ?? false,
     start: vi.fn(async (start?: { app?: string, windowId?: number }) => {
+      if (start?.app && options.canCaptureApp && !options.canCaptureApp())
+        throw new Error(`No open window of ${start.app}.`)
       const stream = canvas.captureStream(10)
       streams.push(stream)
       const windowId = start?.app ? start.windowId ?? options.foreground?.().id : undefined
@@ -268,6 +270,28 @@ describe('usePerceptionRunnerStore', { timeout: 60_000 }, () => {
     expect(runner.targetInView()).toBe(true)
     expect(screen.source.start).toHaveBeenLastCalledWith({ app: 'Game' })
     expect(screen.source.start).toHaveLastResolvedWith({ stream: screen.streams.at(-1), windowId: 2 })
+    expect(closed).toEqual([])
+  })
+
+  // The launcher of a game can be minimized when the owner asks for a commentary. The capture stopped for good then.
+  it('looks for the window of the target when the capture cannot start, and captures it when it shows', async () => {
+    let shown = false
+    const screen = canvasSource({ foreground: () => ({ id: 1, title: 'Lobby', app: 'Game' }), windowOpen: () => shown, canCaptureApp: () => shown })
+    const { runner, perception, status } = await createLeader(screen.source)
+    const closed: string[] = []
+    runner.onTargetClosed(app => closed.push(app))
+    perception.enabled = true
+    await expect.poll(() => status.status.state, { timeout: 15_000 }).toBe('running')
+
+    runner.setTarget('Game')
+    await expect.poll(() => screen.source.start).toHaveBeenLastCalledWith({ app: 'Game' })
+    await new Promise(resolve => setTimeout(resolve, 1_000))
+    expect(runner.running()).toBe(false)
+    expect(status.status.error).toBeUndefined()
+
+    shown = true
+    await expect.poll(() => runner.targetInView(), { timeout: 15_000 }).toBe(true)
+    await expect.poll(() => runner.frames().length, { timeout: 15_000 }).toBeGreaterThan(0)
     expect(closed).toEqual([])
   })
 

@@ -299,8 +299,18 @@ export const usePerceptionRunnerStore = defineStore('perception-runner', () => {
       syncRecording()
     }
     catch (error) {
-      failure = errorMessageFrom(error) ?? 'The capture did not start.'
-      console.warn('[perception] Failed to start the capture:', failure)
+      const message = errorMessageFrom(error) ?? 'The capture did not start.'
+      // The window of a target can be closed or minimized when its commentary starts, or between two matches of a
+      // game. So the runner looks for it, as after a close. A live check of 2026-11-19 stopped here for good.
+      if (target && source.windowOpen) {
+        console.info(`[perception] The capture of ${target} did not start: ${message} The capture looks for a window of it.`)
+        lostSince ??= Date.now()
+        searchTicker.start()
+      }
+      else {
+        failure = message
+        console.warn('[perception] Failed to start the capture:', failure)
+      }
     }
     finally {
       starting = false
@@ -327,7 +337,7 @@ export const usePerceptionRunnerStore = defineStore('perception-runner', () => {
 
   /**
    * The window of the target closed. The capture stops, and the runner looks for another window of the app until the
-   * grace time ends. A source that cannot list the windows, for example the web, ends the target at once.
+   * grace time ends. A capture of a target that cannot start does the same. A source that cannot list the windows, for example the web, ends the target at once.
    */
   function loseTarget() {
     const lost = target
@@ -355,7 +365,8 @@ export const usePerceptionRunnerStore = defineStore('perception-runner', () => {
       if (target !== lost || lostSince === undefined)
         return
       if (open) {
-        console.info(`[perception] Another window of ${lost} is open after ${Math.round((Date.now() - lostSince) / 1_000)} s, so the capture takes it.`)
+        console.info(`[perception] A window of ${lost} is open after ${Math.round((Date.now() - lostSince) / 1_000)} s, so the capture takes it.`)
+        // A window that is open and cannot be captured, for example a minimized one, starts the search again.
         stopSearch()
         await start()
         return
