@@ -44,7 +44,7 @@ export const electronOpenEditor = defineInvokeEventa<void>('eventa:invoke:electr
 export const electronOpenSettings = defineInvokeEventa<void, { route?: string }>('eventa:invoke:electron:windows:settings:open')
 /** Seconds since the last keyboard or mouse input on the whole system, from `powerMonitor.getSystemIdleTime()`. */
 export const electronSystemIdleSeconds = defineInvokeEventa<number>('eventa:invoke:electron:power-monitor:system-idle-seconds')
-/** One window on the whole system: its handle, its title, and the name and path of its app. */
+/** One window on the whole system: its handle, its title, and the name and path of its app, where the system tells them. */
 export interface DesktopWindowInfo {
   /** On Windows, the window handle. The window sources of `desktopCapturer` name the same number. */
   id: number
@@ -57,7 +57,10 @@ export interface DesktopWindowInfo {
  * Screen perception skips excluded windows with it, and a commentary follows the window of its app with it.
  */
 export const electronForegroundWindow = defineInvokeEventa<DesktopWindowInfo | undefined>('eventa:invoke:electron:foreground-window')
-/** The open windows, front to back, from `get-windows`. Commentary finds its target window with it. */
+/**
+ * The open windows, front to back, from `get-windows`. Commentary finds its target window with it.
+ * On Windows, the windows that only `desktopCapturer` lists come after them, with a title and an empty app.
+ */
 export const electronOpenWindows = defineInvokeEventa<DesktopWindowInfo[]>('eventa:invoke:electron:open-windows')
 /** One frame of a screen recording: the JPEG bytes, the base64 grayscale thumbnail, and the app in front. */
 export interface PerceptionRecordedFrame {
