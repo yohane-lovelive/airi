@@ -6,6 +6,7 @@ import type { RecordedFrame, Recording } from './recording'
 import {
   addTimelineNotes,
   CAST_READ_END_MARKER,
+  castFromRoster,
   castReadNoticeText,
   commentaryIntervalFactor,
   createInitiativeState,
@@ -13,6 +14,7 @@ import {
   drawLineLength,
   EMPTY_ROSTER_WATCH,
   EMPTY_TIMELINE,
+  freshTimelineCast,
   initiativeEndMarker,
   initiativeNoticeText,
   initiativeTimeFrom,
@@ -49,7 +51,7 @@ export interface ReplayOptions {
    * The looks of the decision model at the recording, in time order. See `traceGate`. With them, a roster screen
    * starts a cast read, as in the app. Without them, the replay runs no cast read.
    */
-  readonly looks?: readonly { readonly at: number, readonly roster: number }[]
+  readonly looks?: readonly { readonly at: number, readonly roster: number, readonly iconList?: number }[]
 }
 
 /** The tokens of one model call, as the provider reported them. */
@@ -206,6 +208,8 @@ export async function replayRecording(recording: Recording, options: ReplayOptio
   let castWrites = 0
   let castReadsSpoken = 0
   const looks = options.looks ?? []
+  /** The cast that a reply wrote, as the chat store of the app keeps it. Undefined leaves the cast as it is. */
+  const castOf = (text: string, at: number) => castFromRoster(text, options.ownerAccounts ?? [], freshTimelineCast(timeline, at)?.text)
   const withSheet = options.policy === 'contact-sheet' || options.policy === 'scene-anchor+contact-sheet'
   const withAnchor = (options.policy === 'scene-anchor' || options.policy === 'scene-anchor+contact-sheet') && maxImages >= 2
   const withRecentSheet = options.policy === 'recent-sheet' && maxImages >= 2
@@ -235,7 +239,7 @@ export async function replayRecording(recording: Recording, options: ReplayOptio
     // The looks up to this frame. A roster screen without a new cast starts a cast read, when no line plays.
     for (; lookIndex < looks.length && looks[lookIndex].at <= frame.at; lookIndex++) {
       const look = looks[lookIndex]
-      const observed = observeRosterLook(rosterWatch, { at: look.at, probability: look.roster, ...(timeline.cast ? { castAt: timeline.cast.at } : {}) })
+      const observed = observeRosterLook(rosterWatch, { at: look.at, probability: look.roster, ...(look.iconList !== undefined ? { iconList: look.iconList } : {}), ...(timeline.cast ? { castAt: timeline.cast.at } : {}) })
       rosterWatch = observed.watch
       if (!observed.wanted || frame.at < speakingUntil)
         continue
@@ -245,7 +249,7 @@ export async function replayRecording(recording: Recording, options: ReplayOptio
       const reply = await speak({
         at: frame.at,
         castRead: true,
-        notice: castReadNoticeText({ now: frame.at, timeline, ...(options.ownerAccounts?.length ? { ownerAccounts: options.ownerAccounts } : {}) }),
+        notice: castReadNoticeText(),
         endMarker: CAST_READ_END_MARKER,
         frames: [frame],
       })
@@ -254,9 +258,10 @@ export async function replayRecording(recording: Recording, options: ReplayOptio
       usage.cached += reply.usage?.cached ?? 0
       requests += reply.requests ?? 1
       const read = splitReply(reply.text)
-      const cast = read.markers.findLast(marker => marker.kind === 'cast')
-      if (cast) {
-        timeline = setTimelineCast(timeline, cast.text, frame.at)
+      const roster = read.markers.findLast(marker => marker.kind === 'cast')
+      const cast = roster ? castOf(roster.text, frame.at) : undefined
+      if (cast !== undefined) {
+        timeline = setTimelineCast(timeline, cast, frame.at)
         castWrites += 1
       }
       castReadsSpoken += read.spoken ? 1 : 0
@@ -333,9 +338,14 @@ export async function replayRecording(recording: Recording, options: ReplayOptio
 
     const { spoken, markers } = splitReply(reply.text)
     for (const marker of markers) {
+      if (marker.kind === 'cast') {
+        const cast = castOf(marker.text, frame.at)
+        timeline = cast === undefined ? timeline : setTimelineCast(timeline, cast, frame.at)
+        continue
+      }
       timeline = marker.kind === 'note'
         ? addTimelineNotes(timeline, [{ at: frame.at, text: marker.text, source: 'model' }])
-        : marker.kind === 'scene' ? setTimelineScene(timeline, marker.text, frame.at) : setTimelineCast(timeline, marker.text, frame.at)
+        : setTimelineScene(timeline, marker.text, frame.at)
     }
     if (spoken) {
       lines.push({ at: frame.at, text: spoken, trigger: decision.trigger, ...(decision.speechType ? { speechType: decision.speechType } : {}), frames: sheet?.length ? [...sheet, ...picked] : picked, ...(reply.firstTextMs !== undefined ? { firstTextMs: reply.firstTextMs } : {}) })

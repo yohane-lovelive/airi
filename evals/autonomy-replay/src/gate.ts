@@ -21,6 +21,8 @@ export interface GateLook {
   readonly probability: number
   /** The chance that the frame shows a roster screen. The roster watch reads it. */
   readonly roster: number
+  /** The chance that the list of the frame is a table of icons. The roster watch reads such a look as no roster. */
+  readonly iconList: number
   readonly inputTokens: number
 }
 
@@ -34,7 +36,7 @@ export interface GateLabel {
 }
 
 /** The answer of the decision model for one look. */
-export type GateAsk = (previous: string, current: string, signal?: AbortSignal) => Promise<{ probability: number, roster: number, inputTokens: number }>
+export type GateAsk = (previous: string, current: string, signal?: AbortSignal) => Promise<{ probability: number, roster: number, iconList: number, inputTokens: number }>
 
 /**
  * Asks the decision model the questions of one look in one request, as the app asks them.
@@ -44,7 +46,7 @@ export type GateAsk = (previous: string, current: string, signal?: AbortSignal) 
 export function screenLookAsk(client: Pick<GeminiDecisionClient, 'decide'>): GateAsk {
   return async (previous, current, signal) => {
     const result = await client.decide(screenGateInput(previous, current), SCREEN_LOOK_QUESTIONS, signal)
-    return { probability: result.answers.react.probability, roster: result.answers.roster.probability, inputTokens: result.inputTokens }
+    return { probability: result.answers.react.probability, roster: result.answers.roster.probability, iconList: result.answers.iconList.probability, inputTokens: result.inputTokens }
   }
 }
 
@@ -71,9 +73,11 @@ const labelsSchema = object({
   events: array(object({ at: number(), type: string(), important: optional(boolean()) })),
 })
 
+const savedKeySchema = object({ question: string() })
+
 const savedSchema = object({
   question: string(),
-  looks: record(string(), object({ probability: number(), roster: number(), inputTokens: number() })),
+  looks: record(string(), object({ probability: number(), roster: number(), iconList: number(), inputTokens: number() })),
 })
 
 /** The file name of the labels in a recording folder. */
@@ -150,11 +154,12 @@ async function askWithRetry(ask: GateAsk, previous: string, current: string, sig
 export async function traceGate(recording: Recording, options: { ask: GateAsk, signal?: AbortSignal, minIntervalMs?: number }): Promise<GateLook[]> {
   const path = join(recording.directory, TRACE_FILE)
   const question = questionKey()
-  const looks = new Map<number, { probability: number, roster: number, inputTokens: number }>()
+  const looks = new Map<number, { probability: number, roster: number, iconList: number, inputTokens: number }>()
   if (existsSync(path)) {
-    const saved = parse(savedSchema, JSON.parse(readFileSync(path, 'utf8')))
-    if (saved.question === question) {
-      for (const [at, look] of Object.entries(saved.looks))
+    const saved: unknown = JSON.parse(readFileSync(path, 'utf8'))
+    // The looks of other questions can have another form, so only the looks of these questions are read.
+    if (parse(savedKeySchema, saved).question === question) {
+      for (const [at, look] of Object.entries(parse(savedSchema, saved).looks))
         looks.set(Number(at), look)
     }
   }

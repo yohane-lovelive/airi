@@ -5,7 +5,7 @@ A [vieval](https://vieval.dev/) suite that replays screen recordings through the
 It has two tasks.
 
 - **The replay** (`eval:run`) runs the screen detectors, the initiative policy, and a frame policy on the clock of a recording. Each decision turn goes to the speaking model through the chat runtime of the app, so the request has the form that the app sends. A judge model then checks each line.
-- **The gate trace** (`eval:gate`) asks the questions of a screen look of [the decision model ADR](../../docs/ai/adr/2026-11-14-autonomy-one-model-relay-decision.md) about a recording, one look each 2 seconds. It tells how often the gate passes, how many labeled events it catches, and how many looks show a roster screen.
+- **The gate trace** (`eval:gate`) asks the questions of a screen look of [the decision model ADR](../../docs/ai/adr/2026-11-14-autonomy-one-model-relay-decision.md) about a recording, one look each 2 seconds. It tells how often the gate passes, how many labeled events it catches, and how many looks show a roster screen that is no table of icons.
 
 ## How to use it
 
@@ -96,7 +96,7 @@ The trace saves each look to `gate-trace.json` in the recording folder. A second
 | `requestsPerTurn`, `toolCalls` | The model requests for each turn. A tool call adds a request before the line. |
 | `groundedShare`, `contradictionShare` | The share of lines that the judge found grounded in the screen, and the share that contradict the timeline. |
 | `passesPerMinute`, `linesPerMinute` (gate) | How often the gate passes, and the lines that a gap of 6 seconds between lines leaves. |
-| `rosterShare` (gate) | The share of the looks that show a roster screen. A match shows one for a short time only. |
+| `rosterShare` (gate) | The share of the looks that show a roster screen that a cast read can copy. A match shows one for a short time only. |
 | `recall`, `precision`, `onAnyEvent` (gate) | The share of important events that a pass caught, the share of passes at an important event, and the share at any labeled event. |
 
 ## Layout

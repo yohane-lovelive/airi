@@ -28,7 +28,7 @@ describeTask('screen-gate', ({ casesFromInputs }) => {
     }
     context.recordMetric('inputTokensPerLook', looks.length ? looks.reduce((sum, look) => sum + look.inputTokens, 0) / looks.length : 0)
     // The share of the looks that the roster watch takes for a roster screen. A match shows one for a short time only.
-    context.recordMetric('rosterShare', looks.length ? looks.filter(look => look.roster >= SCREEN_ROSTER.threshold).length / looks.length : 0)
+    context.recordMetric('rosterShare', looks.length ? looks.filter(look => look.roster >= SCREEN_ROSTER.threshold && look.iconList < SCREEN_ROSTER.iconListLimit).length / looks.length : 0)
     await context.recordArtifact('gate.json', {
       body: `${JSON.stringify({
         recording: recording.id,
@@ -36,7 +36,7 @@ describeTask('screen-gate', ({ casesFromInputs }) => {
         labels: labels ? { events: labels.length, important: labels.filter(label => label.important).length } : null,
         score,
         thresholds: THRESHOLDS.map(threshold => scoreGate(looks, labels, { startedAt, threshold })),
-        probabilities: looks.map(look => ({ second: Math.round((look.at - startedAt) / 1000), probability: Number(look.probability.toFixed(3)), roster: Number(look.roster.toFixed(3)) })),
+        probabilities: looks.map(look => ({ second: Math.round((look.at - startedAt) / 1000), probability: Number(look.probability.toFixed(3)), roster: Number(look.roster.toFixed(3)), iconList: Number(look.iconList.toFixed(3)) })),
       }, null, 2)}\n`,
       contentType: 'application/json',
       purpose: 'autonomy_replay.gate',

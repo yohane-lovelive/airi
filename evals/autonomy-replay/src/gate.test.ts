@@ -36,11 +36,11 @@ function frameOf(index: number) {
 
 /** The decision model is the boundary. The fake answers with a fixed chance. */
 function askOf(probability = 0.5) {
-  return vi.fn<GateAsk>(async () => ({ probability, roster: 0.1, inputTokens: 748 }))
+  return vi.fn<GateAsk>(async () => ({ probability, roster: 0.1, iconList: 0.2, inputTokens: 748 }))
 }
 
 function looksOf(probabilities: number[]): GateLook[] {
-  return probabilities.map((probability, index) => ({ at: START + (index + 1) * 2_000, probability, roster: 0.1, inputTokens: 748 }))
+  return probabilities.map((probability, index) => ({ at: START + (index + 1) * 2_000, probability, roster: 0.1, iconList: 0.2, inputTokens: 748 }))
 }
 
 describe('traceGate', () => {
@@ -61,9 +61,9 @@ describe('traceGate', () => {
     const looks = await traceGate(recording, { ask, minIntervalMs: 0 })
 
     expect(looks).toEqual([
-      { at: START + 2_000, probability: 0.8, roster: 0.1, inputTokens: 748 },
-      { at: START + 4_000, probability: 0.8, roster: 0.1, inputTokens: 748 },
-      { at: START + 6_000, probability: 0.8, roster: 0.1, inputTokens: 748 },
+      { at: START + 2_000, probability: 0.8, roster: 0.1, iconList: 0.2, inputTokens: 748 },
+      { at: START + 4_000, probability: 0.8, roster: 0.1, iconList: 0.2, inputTokens: 748 },
+      { at: START + 6_000, probability: 0.8, roster: 0.1, iconList: 0.2, inputTokens: 748 },
     ])
     expect(ask.mock.calls.map(call => [call[0], call[1]])).toEqual([
       [frameOf(0), frameOf(4)],
@@ -72,14 +72,14 @@ describe('traceGate', () => {
     ])
   })
 
-  it('asks the react question and the roster question in one request of the decision model', async () => {
-    const decide = vi.fn(async () => ({ answers: { react: { probability: 0.2 }, roster: { probability: 0.9 } }, inputTokens: 890 }))
+  it('asks the questions of a look in one request of the decision model', async () => {
+    const decide = vi.fn(async () => ({ answers: { react: { probability: 0.2 }, roster: { probability: 0.9 }, iconList: { probability: 0.1 } }, inputTokens: 996 }))
 
     const answer = await screenLookAsk({ decide: decide as never })('EARLIER', 'CURRENT')
 
-    expect(answer).toEqual({ probability: 0.2, roster: 0.9, inputTokens: 890 })
+    expect(answer).toEqual({ probability: 0.2, roster: 0.9, iconList: 0.1, inputTokens: 996 })
     expect(decide).toHaveBeenCalledTimes(1)
-    expect(Object.keys(decide.mock.calls[0].at(1) ?? {})).toEqual(['react', 'roster'])
+    expect(Object.keys(decide.mock.calls[0].at(1) ?? {})).toEqual(['react', 'roster', 'iconList'])
   })
 
   it('asks nothing again on a second run, because the looks are saved in the recording folder', async () => {
@@ -96,7 +96,7 @@ describe('traceGate', () => {
   it('keeps the looks before a failure, and the next run asks only for the rest', async () => {
     const recording = await writeRecording(root, 6)
     const failing = vi.fn<GateAsk>()
-      .mockResolvedValueOnce({ probability: 0.8, roster: 0.1, inputTokens: 748 })
+      .mockResolvedValueOnce({ probability: 0.8, roster: 0.1, iconList: 0.2, inputTokens: 748 })
       .mockRejectedValue(new DecisionRequestError(400, 'The decision model answered HTTP 400'))
     await expect(traceGate(recording, { ask: failing, minIntervalMs: 0 })).rejects.toThrow('HTTP 400')
     const ask = askOf(0.2)
@@ -113,7 +113,7 @@ describe('traceGate', () => {
       const recording = await writeRecording(root, 2)
       const ask = vi.fn<GateAsk>()
         .mockRejectedValueOnce(new DecisionRequestError(503, 'The decision model answered HTTP 503'))
-        .mockResolvedValue({ probability: 0.6, roster: 0.1, inputTokens: 748 })
+        .mockResolvedValue({ probability: 0.6, roster: 0.1, iconList: 0.2, inputTokens: 748 })
 
       const trace = traceGate(recording, { ask, minIntervalMs: 0 })
       await vi.advanceTimersByTimeAsync(3_000)
@@ -137,6 +137,18 @@ describe('traceGate', () => {
 
     expect(ask).toHaveBeenCalledTimes(2)
     expect(looks.map(look => look.probability)).toEqual([0.3, 0.3])
+  })
+
+  // The looks of an older question had fewer answers. A trace stopped on such a file before it compared the question.
+  it('starts again from saved looks of an older form', async () => {
+    const recording = await writeRecording(root, 4)
+    await writeFile(join(recording.directory, 'gate-trace.json'), JSON.stringify({ question: 'an older question', looks: { [START + 2_000]: { probability: 0.9, inputTokens: 748 } } }))
+    const ask = askOf(0.3)
+
+    const looks = await traceGate(recording, { ask, minIntervalMs: 0 })
+
+    expect(ask).toHaveBeenCalledTimes(2)
+    expect(looks.map(look => look.iconList)).toEqual([0.2, 0.2])
   })
 })
 

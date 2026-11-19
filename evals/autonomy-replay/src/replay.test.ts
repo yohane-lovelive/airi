@@ -174,11 +174,26 @@ describe('replayRecording', () => {
       expect(reads[0].sheet).toBeUndefined()
       expect(reads[0].endMarker).toBe('NEXT')
       expect(reads[0].notice.split('\n')[0]).toContain('Silent turn')
-      expect(reads[0].notice).toContain('- The owner\'s player names in games: Game: playername.')
+      // Code finds the owner in the roster, so the read gets no player name of the owner.
+      expect(reads[0].notice).not.toContain('playername')
       expect(turns[1].notice).toContain('Cast of the scene')
       expect(turns[1].notice).toContain('The owner plays Ambessa.')
       expect(result).toMatchObject({ castReads: 1, castWrites: 1, castReadsSpoken: 0, turns: turns.length - 1 })
       expect(result.timeline.cast).toEqual({ text: 'The owner plays Ambessa.', at: START + 2_000 })
+    })
+
+    it('finds the owner and the two sides in the roster of a read, and keeps the cast at a later roster of the same people', async () => {
+      const recording = loadRecording(await writeRecording(root, 2))
+      const roster = '<|CAST\nGroup 1: Karma (kiki), Leona (taro)\nGroup 2: Ambessa (playername), Jinx (nana)\n|><|NEXT done|>'
+      // The roster screen shows, goes away, and comes back: two reads.
+      const looks = Array.from({ length: 40 }, (_, index) => ({ at: START + (index + 1) * 2_000, roster: index < 3 || (index >= 10 && index < 13) ? 0.9 : 0.1 }))
+
+      const result = await replayRecording(recording, { mode: 'commentary', policy: 'recent-sheet', seed: 1, ownerAccounts: ['Game: playername'], looks }, async turn => ({
+        text: turn.castRead ? roster : '<|NEXT done|>',
+      }))
+
+      expect(result).toMatchObject({ castReads: 2, castWrites: 1 })
+      expect(result.timeline.cast).toEqual({ text: 'The owner plays Ambessa (playername). Allies: Jinx (nana). Opponents: Karma (kiki), Leona (taro).', at: START + 2_000 })
     })
 
     it('reads once more when the first read wrote no cast, and then leaves the roster screen alone', async () => {
