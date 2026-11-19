@@ -178,6 +178,8 @@ describe('replayRecording', () => {
       expect(reads[0].notice).not.toContain('playername')
       expect(turns[1].notice).toContain('Cast of the scene')
       expect(turns[1].notice).toContain('The owner plays Ambessa.')
+      // With the looks, a turn of the policy writes no cast. The cast reads keep it.
+      expect(turns[1].notice).not.toContain('<|CAST')
       expect(result).toMatchObject({ castReads: 1, castWrites: 1, castReadsSpoken: 0, turns: turns.length - 1 })
       expect(result.timeline.cast).toEqual({ text: 'The owner plays Ambessa.', at: START + 2_000 })
     })

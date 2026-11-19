@@ -314,6 +314,8 @@ export async function replayRecording(recording: Recording, options: ReplayOptio
       screen,
       timeline,
       ...(options.ownerAccounts?.length ? { ownerAccounts: options.ownerAccounts } : {}),
+      // With the looks, the cast reads keep the cast, as in the app with the decision model.
+      ...(options.looks ? { castFromReads: true } : {}),
     })
 
     turns += 1
