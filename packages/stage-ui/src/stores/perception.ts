@@ -50,7 +50,8 @@ export const usePerceptionStore = defineStore('perception', () => {
   /** The image budget at `now`. A running commentary uses its own limit. Both count the same sent frames. */
   function budgetAt(now: number, commentary = false) {
     const wanted = commentary ? commentaryImagesPerHour.value : imagesPerHour.value
-    const limit = Math.round(Math.min(IMAGE_BUDGET_LIMITS.maxImagesPerHour, Math.max(IMAGE_BUDGET_LIMITS.minImagesPerHour, wanted)))
+    const most = commentary ? IMAGE_BUDGET_LIMITS.maxCommentaryImagesPerHour : IMAGE_BUDGET_LIMITS.maxImagesPerHour
+    const limit = Math.round(Math.min(most, Math.max(IMAGE_BUDGET_LIMITS.minImagesPerHour, wanted)))
     return imageBudgetState(sentImageTimes.value, limit, now)
   }
 

@@ -249,6 +249,19 @@ describe('initiativeNoticeText', () => {
     expect(initiativeNoticeText(context({ screen }))).not.toContain('player name of another person')
   })
 
+  // A cast read copies the roster with its player names. A cast of a turn about the screen came first in a live check.
+  it('asks a turn about the screen for no cast while cast reads keep it, and still gives the cast', () => {
+    const screen = { frameAgesMs: [0], events: [] }
+    const known = { notes: [], cast: { text: 'The owner plays Ambessa (moonrabbit).', at: NOW - 60_000 } }
+    const unknown = initiativeNoticeText(context({ mode: 'commentary', screen, castFromReads: true, ownerAccounts: ['Game: moonrabbit'] }))
+
+    expect(unknown).not.toContain('<|CAST')
+    expect(unknown).not.toContain('player names in games')
+    expect(initiativeNoticeText(context({ mode: 'commentary', screen, timeline: known, castFromReads: true }))).not.toContain('<|CAST')
+    expect(initiativeNoticeText(context({ mode: 'commentary', screen, timeline: known, castFromReads: true }))).toContain('- Cast of the scene, written 1 minute ago: The owner plays Ambessa (moonrabbit).')
+    expect(initiativeNoticeText(context({ mode: 'commentary', screen }))).toContain('<|CAST')
+  })
+
   it('names the last marker that the notice asks for as the end of the reply', () => {
     // Solo talk asks for no NEXT marker, so its topic label is last.
     expect(initiativeNoticeText(context({ smallTalkEndsAt: NOW + 25 * 60_000, solo: true }))).not.toContain('<|NEXT')

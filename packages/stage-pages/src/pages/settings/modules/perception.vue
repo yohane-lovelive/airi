@@ -54,7 +54,7 @@ const budget = computed(() => perception.budgetAt(now.value.getTime()))
         :label="t(`${KEY}.commentary-images-per-hour`)"
         :description="t(`${KEY}.commentary-images-per-hour-description`)"
         :min="IMAGE_BUDGET_LIMITS.minImagesPerHour"
-        :max="IMAGE_BUDGET_LIMITS.maxImagesPerHour"
+        :max="IMAGE_BUDGET_LIMITS.maxCommentaryImagesPerHour"
         :step="1"
       />
       <p :class="['text-xs', 'text-neutral-500 dark:text-neutral-400', 'tabular-nums']">

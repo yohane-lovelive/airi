@@ -147,6 +147,10 @@ On 2026-11-19 the owner put handling that fits one game on hold. On hold are a w
 - **The window list adds what Electron can capture.** On Windows, `get-windows` 9.3.0 lists only a window with a caption or the popup style. The lobby client of League of Legends has neither. So a commentary found no window of its app after a match, and it ended after 5 minutes. The main process now adds the window sources of `desktopCapturer` that the list does not hold, with a title and no app name.
 - **Other systems keep the plain list.** A read of the window sources can open a permission prompt on macOS.
 - **The rest of the target window stays.** A window of the app that stays in front for 2 seconds takes the capture, and a closed window starts the search for another one.
+- **A capture that cannot start looks for its window.** The window of a target can be minimized when its commentary starts. In a live check the capture then stopped for good. It now looks for the window, as after a close.
+- **A turn about the screen writes no cast while cast reads run.** With the decision model, its notice asks for no cast. In a live check such a turn wrote the cast first. That cast had no player names, and the cast read then did not run.
+- **A commentary without frames stays quiet.** An empty image budget counts like a window that is not in front. In a live check the turns went on without frames. The app name of the game window ends with "Client", and the lines said that the owner was back in the client.
+- **The image budget of a commentary is 360 images each hour by default.** The owner chose this on 2026-11-19, and the owner can set up to 600. A turn each 22 seconds with two images sends about 330 images each hour, and the budget of 120 was empty after 41 minutes.
 
 ## Rejected options
 
@@ -211,7 +215,9 @@ On 2026-11-19 the owner put handling that fits one game on hold. On hold are a w
 - A window that only the window sources list has no app name. A commentary finds it by its title only, so a short app name can also find a browser tab.
 - The notice of a turn about the screen is about 30 tokens longer, and about 40 more while the cast is not known.
 - Without the key of the decision model, the cast comes only from a turn that sees a roster screen by chance.
-- A commentary turn sends two images. With the default of 120 images each hour and a line each 20 seconds, the budget runs low after about 10 minutes and is empty after about 30.
+- A commentary turn sends two images. With the default of 360 images each hour and a line each 22 seconds, the budget does not run out. It falls below its half after about 30 minutes, and a turn then sends one image.
+- A profile that holds the old limit of 120 images keeps it. The owner sets the new limit in Settings > Modules > Screen perception.
+- While the image budget is empty, a commentary says nothing, and the stage does not tell why.
 
 ## Verification of step 1
 
@@ -300,4 +306,9 @@ On 2026-11-19 the owner put handling that fits one game on hold. On hold are a w
 - That replay gave 23 lines. No line said the score, 22 lines held a name, the judge found no wrong name, and no line said a player name.
 - Before the question about icons, the same replay ran a cast read at a scoreboard. That read named the characters from the icons, and its cast took the place of the good one.
 - On 2026-11-19 the lobby client of League of Legends was open. `get-windows` listed 9 windows without it. Its window had no caption and no popup style. Electron listed 12 window sources with it, under the same handle.
-- Not checked: the app with a live game. This covers the move of the capture to the lobby after a match, the move back at the next match, and the cast read of that match.
+- The desktop dev app ran with a live game on 2026-11-19, for 45 minutes over three matches. The commentary gave 92 lines.
+- After two matches, the capture moved to the lobby window 4 seconds after the game window closed. At the next match it moved back: once after the lobby closed, and once because the game window stayed in front for 2 seconds.
+- The answer about icons was 0.76 to 0.92 for an open scoreboard and for the table after a match. No cast read ran for them.
+- That check found three faults, and this change holds their fixes: the capture that did not start, the cast of a turn about the screen, and the lines without frames after the image budget ran out.
+- A browser test covers the capture that cannot start. Unit tests cover the notice without the cast lines.
+- Not checked: the app with a live game after these fixes. This covers a cast read at the loading screen of a live match, and a commentary that stays quiet with an empty budget.

@@ -244,7 +244,8 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
       // A cast read counts from its start, before the chat store knows its request.
       turnRunning: chat.sending || chat.activeTurns.length > 0 || Boolean(running),
       intentions: intentions.openAt(now).length,
-      commentaryBlind: Boolean(commentaryAt(now)) && !perceptionRunner.targetInView(),
+      // Without a frame, a commentary makes up what it cannot see. So an empty image budget counts like a hidden window.
+      commentaryBlind: Boolean(commentaryAt(now)) && (!perceptionRunner.targetInView() || perception.budgetAt(now, true).remaining <= 0),
     }
   }
 
@@ -403,6 +404,8 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
       ...(screenTimeline ? { timeline: screenTimeline } : {}),
       // The owner's player names come from the memories, so the model can tell which character on the screen is the owner's.
       ...(mode === 'commentary' && screen && memory.enabled ? { ownerAccounts: gameAccounts(memory.entries, chat.personaOf(sessionId)) } : {}),
+      // With the decision model, the cast reads keep the cast. Without it, a turn about the screen writes the cast.
+      ...(mode === 'commentary' && screen && decisionModel.configured ? { castFromReads: true } : {}),
       ...(topics?.thread ? { thread: topics.thread } : {}),
       ...(topics?.seeds.length ? { seeds: topics.seeds } : {}),
       ...(recallMemory ? { recallMemory: recallMemory.body } : {}),

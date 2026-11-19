@@ -1120,7 +1120,7 @@ pages:
         scene-anchor+contact-sheet: シーンのアンカーとコンタクトシート
         recent-sheet: 直近 12 秒のコンタクトシートと、最新のフレーム
       commentary-images-per-hour: 実況中の 1 時間あたりの画像
-      commentary-images-per-hour-description: 実況はよく話すので、別の予算を持ちます。実況の間は、上の上限の代わりにこの上限を使います。実況の 1 ターンで送るフレームは最大 2 枚です。
+      commentary-images-per-hour-description: 実況はよく話すので、別の予算を持ちます。実況の間は、上の上限の代わりにこの上限を使います。実況の 1 ターンで送るフレームは最大 2 枚です。予算を使い切ると、画像を送れるようになるまで実況は黙ります。
       states:
         off: 知覚はオフです。
         paused: 知覚は一時停止中です。

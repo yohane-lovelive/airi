@@ -5,8 +5,13 @@ export const IMAGE_BUDGET_LIMITS = {
   minImagesPerHour: 0,
   maxImagesPerHour: 120,
   defaultImagesPerHour: 20,
-  /** A running commentary raises the budget to its own setting, because its turns come often. */
-  defaultCommentaryImagesPerHour: 120,
+  /**
+   * A running commentary raises the budget to its own setting, because its turns come often. A live check of
+   * 2026-11-19 sent two images each 22 seconds, about 330 each hour. A budget of 120 was empty after 41 minutes.
+   */
+  defaultCommentaryImagesPerHour: 360,
+  /** The most that the owner can set for a commentary. */
+  maxCommentaryImagesPerHour: 600,
   /** One decision turn sends at most this many frames. */
   maxImagesPerTurn: 3,
   /** One commentary turn sends at most this many frames, so its frequent turns stay fast and cheap. */

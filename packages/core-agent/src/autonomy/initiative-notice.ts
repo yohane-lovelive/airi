@@ -88,6 +88,11 @@ export interface InitiativeNoticeContext {
    * of the owner beside that name.
    */
   readonly ownerAccounts?: readonly string[]
+  /**
+   * Cast reads keep the cast of the scene, so this turn writes none. A live check of 2026-11-19 got the cast of a turn
+   * about the screen first. It had no player names, and the cast read then did not run.
+   */
+  readonly castFromReads?: boolean
   /** Topics that the character can take up. The host draws them with `pickTopicSeeds`. */
   readonly seeds?: readonly TopicSeed[]
   /** A memory that fits the current topic, for the `recall` speech type. The host recalls it. */
@@ -185,7 +190,7 @@ export function initiativeNoticeText(context: InitiativeNoticeContext): string {
       lines.push(...timelineLines(context.timeline, context.now))
     lines.push(...screenLines(context.screen))
     lines.push('- If the screen shows something worth remembering later, add <|NOTE a short fact|>, at most two. If the scene changed, write <|SCENE the current scene: the app or game, the place, the goal, the state|>. Nobody sees or hears them, and you can write them also when you stay quiet.')
-    if (context.mode === 'commentary') {
+    if (context.mode === 'commentary' && !context.castFromReads) {
       const castKnown = Boolean(freshTimelineCast(context.timeline, context.now))
       lines.push(castKnown ? COMMENTARY_CAST.known : COMMENTARY_CAST.unknown)
       // A known cast already names the character of the owner, or says that it is not known.
