@@ -25,7 +25,15 @@ function run(probabilities: readonly number[], castAt?: (at: number, reads: numb
 
 describe('roster watch', () => {
   it('asks the react question and the roster question in one request', () => {
-    expect(Object.keys(SCREEN_LOOK_QUESTIONS)).toEqual(['react', 'roster'])
+    expect(Object.keys(SCREEN_LOOK_QUESTIONS)).toEqual(['react', 'roster', 'iconList'])
+  })
+
+  // A scoreboard shows each character by an icon. A read of it has no name to copy.
+  it('wants no read for a list that shows the characters by icons', () => {
+    const scoreboard = { at: STEP, probability: 0.9, iconList: SCREEN_ROSTER.iconListLimit }
+
+    expect(observeRosterLook(EMPTY_ROSTER_WATCH, scoreboard)).toEqual({ watch: EMPTY_ROSTER_WATCH, wanted: false })
+    expect(observeRosterLook(EMPTY_ROSTER_WATCH, { ...scoreboard, iconList: 0.1 }).wanted).toBe(true)
   })
 
   it('wants no read while the screen shows the play', () => {

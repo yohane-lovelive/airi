@@ -24,6 +24,8 @@ export interface ScreenLookResult {
   readonly react: number
   /** The chance that the frame shows a roster screen. */
   readonly roster: number
+  /** The chance that the list of the frame is a table of icons, which a cast read cannot copy. */
+  readonly iconList: number
   readonly inputTokens: number
 }
 
@@ -67,7 +69,7 @@ export class ScreenLook {
     this.busy = true
     try {
       const result = await this.decide(screenGateInput(await base64Of(previous.image), await base64Of(newest.image)), SCREEN_LOOK_QUESTIONS)
-      return { at: newest.at, react: result.answers.react.probability, roster: result.answers.roster.probability, inputTokens: result.inputTokens }
+      return { at: newest.at, react: result.answers.react.probability, roster: result.answers.roster.probability, iconList: result.answers.iconList.probability, inputTokens: result.inputTokens }
     }
     catch (error) {
       const rateLimited = error instanceof DecisionRequestError && error.status === 429

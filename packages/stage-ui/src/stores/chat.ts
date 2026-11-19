@@ -14,7 +14,7 @@ import type { ToolCallRerunPayload } from './tool-call-rerun'
 import { errorMessageFrom } from '@moeru/std'
 import { decodeBase64 } from '@moeru/std/base64'
 import { fileSource } from '@proj-airi/audio/encoding'
-import { createChatOrchestratorRuntime, isBackgroundRecipe, matchKeywordRecipes, renderConversationPreview } from '@proj-airi/core-agent'
+import { castFromRoster, createChatOrchestratorRuntime, freshTimelineCast, isBackgroundRecipe, matchKeywordRecipes, renderConversationPreview } from '@proj-airi/core-agent'
 import { supportsResponsesAudioInputEndpoint } from '@proj-airi/provider-inference'
 import { ATTR_GEN_AI_AGENT_ID, ATTR_GEN_AI_CONVERSATION_ID, ATTR_GEN_AI_OPERATION_NAME, ATTR_GEN_AI_PROVIDER_NAME, ATTR_GEN_AI_REQUEST_MODEL, ATTR_GEN_AI_TOOL_CALL_ARGUMENTS, ATTR_GEN_AI_TOOL_CALL_ID, ATTR_GEN_AI_TOOL_CALL_RESULT, ATTR_GEN_AI_TOOL_NAME, beginSpan, TraceLinkRelations, trackPath } from '@proj-airi/trace-kit'
 import { AgentAttributes, AgentIdKeys, AgentNames, AgentTracks } from '@proj-airi/trace-kit/agent'
@@ -33,7 +33,7 @@ import { useVisionInference } from '../composables/vision/use-vision-inference'
 import { chatAssetIdFrom, inlineConversationAssets, storeChatAttachments } from '../libs/chat-assets'
 import { extractMessageText, isCloudSyncableMessage } from '../libs/chat-sync'
 import { INITIATIVE_SOURCE } from '../libs/initiative/conversation'
-import { MEMORY_INDEX_LIMIT, MEMORY_INDEX_LIMIT_WITH_RECALL } from '../libs/memory-index'
+import { gameAccounts, MEMORY_INDEX_LIMIT, MEMORY_INDEX_LIMIT_WITH_RECALL } from '../libs/memory-index'
 import { composeRecalledMemories, newestUserText, withRecalledMemories } from '../libs/memory-recall'
 import { composeOwnerProfilePrompt } from '../libs/memory-work'
 import { syncedRoles } from '../libs/pinia/synced-context'
@@ -652,6 +652,18 @@ export const useChatStore = defineStore('chat', () => {
         await chatSession.setSessionTask(meta.sessionId, { status: 'interrupted', endedAt: Date.now() }, ['running'])
     }
     await pruneFinishedTasks()
+  }
+
+  /**
+   * Keeps the cast that a reply wrote. A cast read writes the roster of the screen, and `castFromRoster` finds the
+   * owner by the player names of the memories. A roster that tells nothing new leaves the cast as it is.
+   */
+  async function keepCast(sessionId: string, text: string, at: number) {
+    const known = await timeline.load(sessionId).catch(() => timeline.timelineOf(sessionId))
+    const accounts = memory.enabled ? gameAccounts(memory.entries, personaOf(sessionId)) : []
+    const cast = castFromRoster(text, accounts, freshTimelineCast(known, at)?.text)
+    if (cast !== undefined)
+      await timeline.setCast(sessionId, cast, at)
   }
 
   /**
@@ -1311,7 +1323,7 @@ export const useChatStore = defineStore('chat', () => {
       const at = Date.now()
       const kept = kind === 'note'
         ? timeline.addNotes(sessionId, [{ at, text, source: 'model' }])
-        : kind === 'scene' ? timeline.setScene(sessionId, text, at) : timeline.setCast(sessionId, text, at)
+        : kind === 'scene' ? timeline.setScene(sessionId, text, at) : keepCast(sessionId, text, at)
       void kept
         .catch(error => console.warn('[chat] Failed to keep a timeline marker:', errorMessageFrom(error)))
     },

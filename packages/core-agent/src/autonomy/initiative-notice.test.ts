@@ -125,11 +125,11 @@ describe('initiativeNoticeText', () => {
     expect(text).not.toContain('"first"')
     expect(text).toContain('"second"')
     expect(text).toContain(`"${'a'.repeat(119)}…"`)
-    // About 450 tokens at most. English text has about 4 characters for each token.
-    // A line about the screen gets what to talk about and the rule for names. They are about 180 of these tokens.
-    expect(initiativeNoticeText(context({ mode: 'commentary', speechType: 'recall', recentLines: [long, long, long] })).length).toBeLessThan(1800)
-    // While the cast is not known, the notice with the screen also tells how to write it: about 150 tokens more.
-    expect(initiativeNoticeText(context({ mode: 'commentary', speechType: 'recall', recentLines: [long, long, long], screen: { frameAgesMs: [0], events: [] } })).length).toBeLessThan(3200)
+    // About 500 tokens at most. English text has about 4 characters for each token.
+    // A line about the screen gets what to talk about and the rules for names. They are about 210 of these tokens.
+    expect(initiativeNoticeText(context({ mode: 'commentary', speechType: 'recall', recentLines: [long, long, long] })).length).toBeLessThan(2000)
+    // While the cast is not known, the notice with the screen also tells how to write it: about 180 tokens more.
+    expect(initiativeNoticeText(context({ mode: 'commentary', speechType: 'recall', recentLines: [long, long, long], screen: { frameAgesMs: [0], events: [] } })).length).toBeLessThan(3400)
   })
 
   // ROOT CAUSE:
@@ -216,27 +216,37 @@ describe('initiativeNoticeText', () => {
     expect(initiativeNoticeText(context({ mode: 'commentary', screen, ownerAccounts: [] }))).not.toContain('player names in games')
   })
 
-  it('builds the notice of a cast read: no speech, the cast marker, and the end marker', () => {
-    const text = castReadNoticeText({ now: NOW, ownerAccounts: ['League of Legends: moonrabbit'] })
+  it('builds the notice of a cast read: no speech, the list in groups, and the end marker', () => {
+    const text = castReadNoticeText()
 
     expect(text.split('\n')[0]).toBe('Silent turn: nobody hears this reply. Write no words to say, only the markers below.')
-    expect(text).toContain('<|CAST The owner plays ... Allies: ... Opponents: ...|>')
-    expect(text).toContain('do not guess a character from its look')
-    expect(text).toContain('- The owner\'s player names in games: League of Legends: moonrabbit.')
+    // One line for each group. In one line, a model put two rows of a screen into one group in 3 of 8 probes.
+    expect(text).toContain('<|CAST\nGroup 1: Character (player name), Character (player name), ...\nGroup 2: Character (player name), ...\n|>')
+    expect(text).toContain('A list of two rows has two groups.')
+    expect(text).toContain('Copy each name as the screen writes it')
+    expect(text).toContain('Do not name a character from its picture')
+    // A scoreboard writes player names beside pictures. Such an entry has no character, and code drops it.
+    expect(text).toContain('Without a written character name, write the player name alone, in brackets: (player name).')
+    expect(text).toContain('put * before that entry')
+    // Code finds the owner and the two sides, and it compares with the cast so far. The read gets none of them.
+    expect(text).not.toContain('player names in games')
+    expect(text).not.toContain('Allies')
     expect(text).not.toContain('Cast so far')
     expect(text.split('\n').at(-1)).toBe(`End with <|${CAST_READ_END_MARKER} done|>.`)
     // The word makes gpt-6-luna write on after its reply. See `FINAL_ANSWER_RULE`.
     expect(text).not.toMatch(/commentary/i)
   })
 
-  it('gives a cast read the fresh cast, so the read keeps its names', () => {
-    const fresh = { notes: [], cast: { text: 'The owner plays Ambessa.', at: NOW - 60_000 } }
-    const old = { notes: [], cast: { text: 'The owner plays Ambessa.', at: NOW - TIMELINE_LIMITS.maxCastAgeMs - 1 } }
+  // The cast keeps who plays which character. A later step can then tell a character by a player name on the screen.
+  it('asks a turn about the screen for the player name of each character, and keeps the names of other people out of a line', () => {
+    const screen = { frameAgesMs: [0], events: [] }
 
-    expect(castReadNoticeText({ now: NOW, timeline: fresh })).toContain('- Cast so far, written 1 minute ago: The owner plays Ambessa.')
-    expect(castReadNoticeText({ now: NOW, timeline: fresh })).toContain('keep the names that it holds')
-    expect(castReadNoticeText({ now: NOW, timeline: old })).not.toContain('Cast so far')
-    expect(castReadNoticeText({ now: NOW })).not.toContain('player names in games')
+    expect(initiativeNoticeText(context({ mode: 'commentary', screen }))).toContain('add it in brackets after the character: "Character (player name)"')
+    // The cast of a turn about the screen lasts for 90 minutes. An older one is no longer given.
+    const old = { notes: [], cast: { text: 'The owner plays Ambessa.', at: NOW - TIMELINE_LIMITS.maxCastAgeMs - 1 } }
+    expect(initiativeNoticeText(context({ mode: 'commentary', screen, timeline: old }))).not.toContain('Cast of the scene')
+    expect(initiativeNoticeText(context({ mode: 'commentary', screen }))).toContain('Do not say the player name of another person.')
+    expect(initiativeNoticeText(context({ screen }))).not.toContain('player name of another person')
   })
 
   it('names the last marker that the notice asks for as the end of the reply', () => {

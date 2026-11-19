@@ -11,7 +11,7 @@ function frame(at: number, text: string): CapturedFrame {
 }
 
 function answer(react: number, roster: number): Awaited<ReturnType<ScreenLookDecide>> {
-  return { answers: { react: { probability: react }, roster: { probability: roster } }, inputTokens: 890 }
+  return { answers: { react: { probability: react }, roster: { probability: roster }, iconList: { probability: 0.05 } }, inputTokens: 890 }
 }
 
 describe('screen look', () => {
@@ -20,7 +20,7 @@ describe('screen look', () => {
     const screenLook = new ScreenLook(decide)
 
     expect(await screenLook.look(frame(1_000, 'first'), 1_000)).toBeUndefined()
-    expect(await screenLook.look(frame(3_000, 'second'), 3_000)).toEqual({ at: 3_000, react: 0.1, roster: 0.9, inputTokens: 890 })
+    expect(await screenLook.look(frame(3_000, 'second'), 3_000)).toEqual({ at: 3_000, react: 0.1, roster: 0.9, iconList: 0.05, inputTokens: 890 })
 
     expect(decide).toHaveBeenCalledTimes(1)
     const [input, questions] = decide.mock.calls[0]

@@ -1,3 +1,4 @@
+export { castFromRoster } from './cast-roster'
 export { COMMENTARY_LIMITS, commentaryIntervalFactor, decideInterruption } from './commentary'
 export type { InterruptionDecision } from './commentary'
 export {
@@ -35,7 +36,7 @@ export type {
   TurnNext,
 } from './initiative'
 export { CAST_READ_END_MARKER, castReadNoticeText, INITIATIVE_RECENT_LINE_COUNT, initiativeEndMarker, initiativeNoticeText, SCENE_ANCHOR_TEXT } from './initiative-notice'
-export type { CastReadNoticeContext, InitiativeNoticeContext, InitiativeScreenContext } from './initiative-notice'
+export type { InitiativeNoticeContext, InitiativeScreenContext } from './initiative-notice'
 export { createIntention, INTENTION_LIMITS, openIntentions } from './intentions'
 export type { Intention, IntentionRequest } from './intentions'
 export { drawLineLength, LINE_LENGTH_LIMITS, LINE_LENGTH_TEXT } from './line-length'
@@ -93,7 +94,7 @@ export type {
 } from './missions'
 export { nextFromMarker } from './next-marker'
 export { SCREEN_GATE, SCREEN_GATE_QUESTION, screenGateInput } from './screen-gate'
-export { EMPTY_ROSTER_WATCH, observeRosterLook, SCREEN_LOOK_QUESTIONS, SCREEN_ROSTER, SCREEN_ROSTER_QUESTION, startRosterRead } from './screen-roster'
+export { EMPTY_ROSTER_WATCH, observeRosterLook, SCREEN_ICON_LIST_QUESTION, SCREEN_LOOK_QUESTIONS, SCREEN_ROSTER, SCREEN_ROSTER_QUESTION, startRosterRead } from './screen-roster'
 export type { RosterWatch } from './screen-roster'
 export { SPEECH_TYPES } from './speech-types'
 export type { SpeechType } from './speech-types'
@@ -103,6 +104,7 @@ export {
   addTimelineNotes,
   applyTimelineSummary,
   EMPTY_TIMELINE,
+  freshTimelineCast,
   setTimelineCast,
   setTimelineScene,
   TIMELINE_LIMITS,

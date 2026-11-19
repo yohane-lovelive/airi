@@ -40,7 +40,8 @@ export const TIMELINE_LIMITS = {
   maxAgeMs: 12 * 60 * 60_000,
   maxNoteLength: 120,
   maxSceneLength: 300,
-  maxCastLength: 400,
+  /** A cast of ten characters with their player names needs about 450 characters. */
+  maxCastLength: 600,
   /** The situation block leaves out a cast older than this. A match of a game ends sooner, and its cast with it. */
   maxCastAgeMs: 90 * 60_000,
   maxSummaryLength: 600,
@@ -94,6 +95,14 @@ export function addTimelineNotes(timeline: Timeline, notes: readonly TimelineNot
   if (!added.length)
     return timeline
   return { ...timeline, notes: [...timeline.notes, ...added].sort((left, right) => left.at - right.at) }
+}
+
+/**
+ * The cast of the scene, while it is young enough to trust. A match of a game ends sooner than
+ * {@link TIMELINE_LIMITS.maxCastAgeMs}, and its cast with it.
+ */
+export function freshTimelineCast(timeline: Timeline | undefined, now: number) {
+  return timeline?.cast && now - timeline.cast.at <= TIMELINE_LIMITS.maxCastAgeMs ? timeline.cast : undefined
 }
 
 /** Replaces the current scene. */

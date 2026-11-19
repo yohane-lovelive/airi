@@ -7,7 +7,7 @@ import type { TopicSeed, TopicThread } from './topics'
 
 import { dayPartOf } from './initiative'
 import { LINE_LENGTH_TEXT } from './line-length'
-import { TIMELINE_LIMITS } from './timeline'
+import { freshTimelineCast, TIMELINE_LIMITS } from './timeline'
 import { TOPIC_LIMITS } from './topics'
 
 /** The count of recent lines in the notice. The model reads them to avoid the same opening and structure. */
@@ -103,7 +103,7 @@ export interface InitiativeNoticeContext {
 const COMMENTARY_FOCUS = '- What to talk about: what happens in the scene, not the numbers of a scoreboard. Pick one: what the character of the owner just did, a skill that someone used, how the two sides stand, or a choice of an item or an upgrade. React to it like a friend who watches, and do not give advice in every line. Say the score only when the lead changes.'
 
 /** With the focus alone, the model made up names of characters that were not in the match. */
-const COMMENTARY_NAMES = '- Name a character or an item only when its name is written on the screen or the cast of the scene names it. Do not guess a character from a look. Without a sure name, say "an ally" or "an opponent". For a character of the cast, name the skill that it uses when you know that skill.'
+const COMMENTARY_NAMES = '- Name a character or an item only when its name is written on the screen or the cast of the scene names it. Do not guess a character from a look. Without a sure name, say "an ally" or "an opponent". For a character of the cast, name the skill that it uses when you know that skill. A name in brackets in the cast is the player name of that person. Do not say the player name of another person.'
 
 /**
  * The cast stays in the timeline, so later lines can name the characters after the screen that showed them is gone.
@@ -114,7 +114,7 @@ const COMMENTARY_NAMES = '- Name a character or an item only when its name is wr
  * The model read it in 8 of 8 tries when it knew the owner's player name, and in none of 8 without the name.
  */
 /** Where the names of a cast come from. A notice about the screen and a cast read give the same rule. */
-const CAST_RULES = 'Take only names that are written on the screen or that the owner told you, and do not guess a character from its look. The character of the owner is the one beside the owner\'s player name, when you know that name. The screen can also mark the owner, for example with a player name in another color. When you cannot tell, write "The owner plays: not known".'
+const CAST_RULES = 'Take only names that are written on the screen or that the owner told you, and do not guess a character from its look. The character of the owner is the one beside the owner\'s player name, when you know that name. The screen can also mark the owner, for example with a player name in another color. When you cannot tell, write "The owner plays: not known". The allies are the ones in the same row or group as the owner, also when that group is not the first one. When the screen writes a player name beside a character, add it in brackets after the character: "Character (player name)".'
 
 const COMMENTARY_CAST = {
   unknown: `- The cast of this scene is not known yet. When the screen shows the names of who plays, for example a loading screen or a scoreboard with names, write <|CAST The owner plays ... Allies: ... Opponents: ...|>. ${CAST_RULES} Nobody sees or hears it.`,
@@ -186,7 +186,7 @@ export function initiativeNoticeText(context: InitiativeNoticeContext): string {
     lines.push(...screenLines(context.screen))
     lines.push('- If the screen shows something worth remembering later, add <|NOTE a short fact|>, at most two. If the scene changed, write <|SCENE the current scene: the app or game, the place, the goal, the state|>. Nobody sees or hears them, and you can write them also when you stay quiet.')
     if (context.mode === 'commentary') {
-      const castKnown = Boolean(freshCast(context.timeline, context.now))
+      const castKnown = Boolean(freshTimelineCast(context.timeline, context.now))
       lines.push(castKnown ? COMMENTARY_CAST.known : COMMENTARY_CAST.unknown)
       // A known cast already names the character of the owner, or says that it is not known.
       if (!castKnown)
@@ -238,44 +238,42 @@ export function initiativeEndMarker(context: Pick<InitiativeNoticeContext, 'solo
   return context.solo ? 'TOPIC' : 'NEXT'
 }
 
-/** What the notice of a cast read knows. */
-export interface CastReadNoticeContext {
-  readonly now: number
-  /** The screen history of the conversation. The read starts from a fresh cast, when one exists. */
-  readonly timeline?: Timeline
-  /** The owner's player names in games, each as "game: name". See `InitiativeNoticeContext.ownerAccounts`. */
-  readonly ownerAccounts?: readonly string[]
-}
-
 /** The marker that ends a reply to the notice of {@link castReadNoticeText}. */
 export const CAST_READ_END_MARKER = 'NEXT'
 
 /**
- * Builds the notice of a cast read: a turn without speech that reads who takes part from a roster screen. It is the
- * text of a transient notice, and the frame of the screen goes with it at full size.
+ * Builds the notice of a cast read: a turn without speech that copies who takes part from a roster screen. It is
+ * the text of a transient notice, and the frame of the screen goes with it at full size.
  *
  * The roster watch starts the read when the decision model finds such a screen. A turn about the screen comes at the
  * pace of the talk, so it can miss a screen that shows for a short time.
  *
+ * The model only copies what the screen writes. `castFromRoster` finds the owner and the two sides, and it keeps the
+ * cast so far when the roster tells nothing new. Probes that left these choices to the model got the wrong side for
+ * the allies in 3 of 8 tries, and they kept the cast of the match before in 6 of 16 tries.
+ *
  * @example
- * castReadNoticeText({ now, ownerAccounts: ['League of Legends: somename'] })
+ * castReadNoticeText()
  * // => 'Silent turn: nobody hears this reply. ...'
  */
-export function castReadNoticeText(context: CastReadNoticeContext): string {
-  const cast = freshCast(context.timeline, context.now)
+export function castReadNoticeText(): string {
   return [
     'Silent turn: nobody hears this reply. Write no words to say, only the markers below.',
     '- The attached image is the owner\'s screen now.',
-    // Without this way out, a probe got a made-up cast for a screen of the play, and it took the place of a good cast.
+    // Without this way out, a probe got a made-up cast for a screen of the play.
     `- First check it: does it show a written list of the names of who takes part in the scene? If it does not, write only <|${CAST_READ_END_MARKER} done|>.`,
-    `- If it does, write <|CAST The owner plays ... Allies: ... Opponents: ...|> from it. ${CAST_RULES} Write each name in the letters of the screen. Leave out a title or a costume name before it, and write each character once.`,
-    ...ownerAccountLines(context.ownerAccounts),
-    ...(cast
-      ? [
-          `- Cast so far, written ${ageLabel(context.now - cast.at)} ago: ${cast.text}`,
-          `- When the screen shows the same people, write the cast again with what the screen adds, and keep the names that it holds. When the screen adds nothing, write only <|${CAST_READ_END_MARKER} done|>. When the screen shows other people, write the new cast.`,
-        ]
-      : []),
+    // One line for each group. In one line, a model put two rows of a screen into one group in 3 of 8 probes.
+    '- If it does, copy the whole list into one marker, with one line for each group:',
+    '<|CAST',
+    'Group 1: Character (player name), Character (player name), ...',
+    'Group 2: Character (player name), ...',
+    '|>',
+    '- A group is one row, one column, or one side of the list, as the screen shows it. A list of two rows has two groups. Copy every group, in the order of the screen, and do not put two rows into one group.',
+    // A probe asked to leave out a costume name. The model then named the character from its picture, and took the
+    // owner's character for another one in 5 of 14 tries. A copy of the written name needs no guess.
+    '- Copy each name as the screen writes it, letter by letter, also when it holds a title or a costume name. Do not name a character from its picture.',
+    '- The player name is the one that the screen writes beside the character. Without a written player name, write the character alone. Without a written character name, write the player name alone, in brackets: (player name).',
+    '- When the screen marks one player, for example with a player name in another color, put * before that entry.',
     `End with <|${CAST_READ_END_MARKER} done|>.`,
   ].join('\n')
 }
@@ -312,16 +310,11 @@ function screenLines(screen: InitiativeScreenContext) {
   return lines
 }
 
-/** The cast of the scene, while it is young enough to trust. */
-function freshCast(timeline: Timeline | undefined, now: number) {
-  return timeline?.cast && now - timeline.cast.at <= TIMELINE_LIMITS.maxCastAgeMs ? timeline.cast : undefined
-}
-
 function timelineLines(timeline: Timeline, now: number) {
   const lines: string[] = []
   if (timeline.scene)
     lines.push(`- Current scene, written ${ageLabel(now - timeline.scene.at)} ago: ${timeline.scene.text}`)
-  const cast = freshCast(timeline, now)
+  const cast = freshTimelineCast(timeline, now)
   if (cast)
     lines.push(`- Cast of the scene, written ${ageLabel(now - cast.at)} ago: ${cast.text}`)
   if (timeline.summary)

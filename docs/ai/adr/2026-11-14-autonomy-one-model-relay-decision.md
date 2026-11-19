@@ -126,10 +126,27 @@ A turn about the screen comes at the pace of the talk. In a replay of a match, t
 - **The read can leave the cast alone.** The notice tells the model to write only the end marker when the screen lists no names or adds nothing. Without this way out, a probe got a made-up cast for a screen of the play.
 - **The owner comes first.** A read waits while the owner types or speaks, while a line plays, and while a turn runs. It counts one image of the image budget.
 - **The looks run only for a commentary.** They need the key of the provider `google-generative-ai`. Without the key, no look runs, and a turn about the screen can still write the cast.
-- **The answer of the gate question starts no turn yet.** The runner keeps the last look. Step 8 lets the answer start turns.
+- **The answer of the gate question starts no turn yet.** The runner keeps the last look. Step 9 lets the answer start turns.
 - **The replay does the same.** The gate trace asks both questions and saves both answers. A replay in the commentary mode reads them and starts the cast reads.
 
 This changes one decision of 2026-11-13: the decision model judged only whether to react. On 2026-11-15 the owner asked to use it for the cast too.
+
+### The cast holds player names, and a commentary follows the launcher
+
+On 2026-11-19 the owner put handling that fits one game on hold. On hold are a way to tell a character in the play by the player name above it, and a list of the skills of a character. This step only keeps who plays which character, and it keeps a commentary alive between two matches.
+
+- **The cast holds pairs.** Each entry is `Character (player name)`, with the player name that the screen writes beside the character.
+- **A cast read only copies the list.** The reply holds the list of the screen in groups, with one line for each row, column, or side. It copies each name as the screen writes it, so a name keeps its title or its costume name.
+- **Code finds the owner and the two sides.** `castFromRoster` takes the entry with the owner's player name for the owner. The other entries of that group are the allies, and the other groups are the opponents. When the model chose the sides, it took the first row for the allies in 3 of 8 tries, on a screen with the owner in the second row.
+- **Code keeps the cast when the roster tells nothing new.** A roster whose names are all in the cast so far changes nothing. A roster with few player names does not replace a cast with player names. When the model made this choice, it kept the cast of the match before in 6 of 16 tries.
+- **The read gets no player name of the owner and no cast.** Code needs them, and the model does not.
+- **Without a player name of the owner, a mark decides.** The model puts `*` before the entry that the screen marks, for example with another color.
+- **A table of icons gets no read.** A third question of the look finds a list that shows each character by an icon, for example a scoreboard. A read of it has no name to copy. In a replay it named the characters from the icons, and that cast took the place of a good one.
+- **A line does not say the player name of another person.** The notice of a turn about the screen tells this rule, because the cast now goes to each of these turns.
+- **The next match gets a new cast.** The roster screen of the next match counts as a new one for the roster watch, and its players are not in the cast so far.
+- **The window list adds what Electron can capture.** On Windows, `get-windows` 9.3.0 lists only a window with a caption or the popup style. The lobby client of League of Legends has neither. So a commentary found no window of its app after a match, and it ended after 5 minutes. The main process now adds the window sources of `desktopCapturer` that the list does not hold, with a title and no app name.
+- **Other systems keep the plain list.** A read of the window sources can open a permission prompt on macOS.
+- **The rest of the target window stays.** A window of the app that stays in front for 2 seconds takes the capture, and a closed window starts the search for another one.
 
 ## Rejected options
 
@@ -148,6 +165,10 @@ This changes one decision of 2026-11-13: the decision model judged only whether 
 - **A part of the cast from the look of the screen.** It gave a cast sooner, but one wrong guess of the owner's character stayed in every later line.
 - **A cast read at fixed moments of a commentary.** A read at the start of a commentary and at each scene change needs no decision model. But a moment of the app tells nothing about the screen, and a game without a roster screen gets requests for nothing. The owner rejected it on 2026-11-15.
 - **A question about every written fact worth keeping.** For one loading screen, the chances went from 0.28 to 0.81. The question about a list of names gave 0.76 to 0.93.
+- **The model finds the owner and the two sides.** It needs no code. But the model took the wrong side for the allies in 3 of 8 tries, and it wrote the owner as "not known" beside the owner's own player name.
+- **The model compares the screen with the cast so far.** It kept the cast of the match before in 6 of 16 tries on the roster screen of the next match.
+- **A question about written character names.** The decision model gave 0.48 for a loading screen and 0.33 for a scoreboard. The question about icons gave 0.16 and 0.72.
+- **A patch of `get-windows`.** It fixes the cause, but the app then carries a patch of a native module. The window sources of Electron are already the list that the capture uses.
 - **A JSON schema for the reply.** The server holds only the final answer to the schema. With the final answer rule, 20 of 20 replies were valid JSON. But the reply of the app is text with markers, and its speech starts while the text streams.
 
 ## Steps
@@ -160,8 +181,9 @@ This changes one decision of 2026-11-13: the decision model judged only whether 
 | 4 | The replay evaluation sends the requests of the app. It gets the video import, the gate trace, and the question of the screen gate. | `evals/autonomy-replay`, `packages/core-agent`, `packages/stage-ui`, `apps/stage-tamagotchi`, `packages/i18n` | Done |
 | 5 | The final answer rule, the notice without the word "commentary", and the end marker of a reply. | `packages/core-agent`, `packages/stage-ui`, `evals/autonomy-replay` | Done |
 | 6 | What a line about the screen talks about: the focus, the cast of the scene, and the recent sheet. | `packages/core-agent`, `packages/stage-shared`, `packages/stage-ui`, `packages/i18n`, `evals/autonomy-replay` | Done |
-| 7 | The screen look in the app. A roster screen starts a cast read, and the memory gives the owner's player names. | `packages/core-agent`, `packages/stage-ui`, `evals/autonomy-replay` | This change |
-| 8 | The gate answer starts turns, and the choice of four answers. | `packages/core-agent`, `packages/stage-ui` | To do, with its own section in this document |
+| 7 | The screen look in the app. A roster screen starts a cast read, and the memory gives the owner's player names. | `packages/core-agent`, `packages/stage-ui`, `evals/autonomy-replay` | Done |
+| 8 | The cast holds the player name of each character, and code finds the owner and the two sides. The window list finds a window without a caption, so a commentary follows the launcher of a game. | `packages/core-agent`, `packages/stage-ui`, `apps/stage-tamagotchi`, `evals/autonomy-replay` | This change |
+| 9 | The gate answer starts turns, and the choice of four answers. | `packages/core-agent`, `packages/stage-ui` | To do, with its own section in this document |
 
 ## Consequences
 
@@ -169,8 +191,8 @@ This changes one decision of 2026-11-13: the decision model judged only whether 
 - The screen model that an owner selected has no effect after step 2. Screen turns use the chat model of the character.
 - The web app reaches OpenCode Go only through `pnpm dev:web` or a preview server.
 - The reasoning table needs an update when OpenCode Go adds a model. Until then, a new model reasons as the server decides.
-- The looks of a commentary need a Gemini API key since step 7, and autonomous turns need it after step 8. Its free tier allows 10,000 requests each day. One look each 2 seconds is 1,800 requests each hour.
-- While a commentary sees its window, a frame of that window goes to the Gemini API with each look. One look costs about 890 input tokens.
+- The looks of a commentary need a Gemini API key since step 7, and autonomous turns need it after step 9. Its free tier allows 10,000 requests each day. One look each 2 seconds is 1,800 requests each hour.
+- While a commentary sees its window, a frame of that window goes to the Gemini API with each look. One look costs about 1,000 input tokens since step 8.
 - A recording holds the system prompt of the character, with the memory index. It stays on the device, like the frames.
 - The replay runs one frame policy by default, the policy of the app.
 - Every chat request ends its system prompt with the final answer rule: a reply to the owner and a task too. A request without a system prompt gets a system message with only the rule.
@@ -181,7 +203,13 @@ This changes one decision of 2026-11-13: the decision model judged only whether 
 - The notice of a commentary turn is about 180 tokens longer, and about 150 more while the cast is not known.
 - A line names the character of the owner only when the cast holds it. For that, the character must know the owner's player name, for example from a memory, or the owner must tell which character it is.
 - The cast is known only after a roster screen showed while the commentary ran. A match that a commentary joins later has no cast until its next roster screen, and its lines say "an ally" and "an opponent".
-- A wrong name of a cast read stays until the next roster screen. The read takes a costume name for a part of a name, and it misreads a name that the screen writes in a play on words.
+- A wrong name of a cast read stays until the next roster screen. The read misreads a name that the screen writes in a play on words.
+- The cast holds each name as the screen writes it, with a title or a costume name. A line can say that longer name.
+- The cast holds the player names of other people. It stays on the device, and it goes to the chat model as text.
+- A roster that the model copies as one group tells no sides. The cast then lists the others without a side.
+- A scoreboard that shows the characters by icons gives no cast, also in a game where it is the only roster screen.
+- A window that only the window sources list has no app name. A commentary finds it by its title only, so a short app name can also find a browser tab.
+- The notice of a turn about the screen is about 30 tokens longer, and about 40 more while the cast is not known.
 - Without the key of the decision model, the cast comes only from a turn that sees a roster screen by chance.
 - A commentary turn sends two images. With the default of 120 images each hour and a line each 20 seconds, the budget runs low after about 10 minutes and is empty after about 30.
 
@@ -259,3 +287,17 @@ This changes one decision of 2026-11-13: the decision model judged only whether 
 - The answer of the gate question was 0.7 or more in 71 of the 314 looks.
 - After the 11 minutes, 62 of the 120 images of the budget were used.
 - Not checked: the window of a live game, and a game other than League of Legends.
+
+## Verification of step 8
+
+- Unit tests cover the roster parser, the lines of the two notices, the longer cast, the roster watch with a table of icons, the cast of a replay, the merge of the window list with the window sources, and the three cases of the service: Windows, another system, and window sources that fail.
+- The notice of a cast read ran 20 times on the loading screens of two matches, without a cast. Each cast had the character of the owner, the two sides, and a player name for each character. In one of the matches the owner is in the second row.
+- 12 reads of the second match had the cast of the first match. Each one gave the new cast, with the right sides.
+- 24 reads of three scoreboards had a cast, and the cast stayed in all of them. 12 reads of the play wrote no cast.
+- The decision model answered the question about icons with 0.16 at most for three loading screens, and with 0.72 or more for three scoreboards.
+- The gate trace ran again on the video with the loading screen: 495 looks of about 1,015 input tokens each. The roster answer passed 29 looks. The answer about icons was 0.26 at most for the 26 looks at the loading screen, and 0.81 or more for the 3 looks at an open scoreboard.
+- The replay ran with these looks and the owner's player name. It ran one cast read, at the first look. The cast had the character of the owner, the right sides, and a player name for each character. It stayed until the end of the match.
+- That replay gave 23 lines. No line said the score, 22 lines held a name, the judge found no wrong name, and no line said a player name.
+- Before the question about icons, the same replay ran a cast read at a scoreboard. That read named the characters from the icons, and its cast took the place of the good one.
+- On 2026-11-19 the lobby client of League of Legends was open. `get-windows` listed 9 windows without it. Its window had no caption and no popup style. Electron listed 12 window sources with it, under the same handle.
+- Not checked: the app with a live game. This covers the move of the capture to the lobby after a match, the move back at the next match, and the cast read of that match.

@@ -21,6 +21,11 @@ export const SCREEN_ROSTER = {
   maxReadsPerScreen: 2,
   /** The least time between the starts of two reads, so the cast of the first read is stored before the next look. */
   minReadGapMs: 8_000,
+  /**
+   * The chance of yes from which a look shows a table of icons, which gets no read. The probe of 2026-11-19 gave 0.16
+   * at most for three loading screens, and 0.72 or more for three scoreboards.
+   */
+  iconListLimit: 0.5,
 } as const
 
 /**
@@ -39,12 +44,29 @@ export const SCREEN_ROSTER_QUESTION = {
 } as const satisfies DecisionQuestion
 
 /**
+ * The question that finds a list without written character names: a table that shows each character by an icon.
+ *
+ * A cast read of such a table had no name to copy. In a replay it named the characters from the icons, and that cast
+ * took the place of a good one. A question about written character names gave 0.48 for a loading screen and 0.33 for
+ * a scoreboard, so this question asks about the icons.
+ */
+export const SCREEN_ICON_LIST_QUESTION = {
+  type: 'noul',
+  instructions: '2 枚目（今）の画面の参加者の一覧は、キャラクターを小さなアイコンだけで示す表ですか。',
+  criteria: {
+    true: '成績や持ち物の表で、キャラクターは小さなアイコンで示され、横にプレイヤー名や数字が並ぶ。',
+    false: 'キャラクターの大きな絵と名前が並ぶ画面。または、参加者の一覧がない。',
+  },
+} as const satisfies DecisionQuestion
+
+/**
  * The questions of one screen look. One request of the decision model asks them all about the same two frames, so the
  * second question costs no request of its own. The questions cannot see each other.
  */
 export const SCREEN_LOOK_QUESTIONS = {
   react: SCREEN_GATE_QUESTION,
   roster: SCREEN_ROSTER_QUESTION,
+  iconList: SCREEN_ICON_LIST_QUESTION,
 } as const
 
 /** What the roster watch knows between two looks. */
@@ -75,10 +97,11 @@ export const EMPTY_ROSTER_WATCH: RosterWatch = { below: 0, reads: 0 }
  * @param look The look.
  * @param look.at The time of the current frame of the look.
  * @param look.probability The chance that the frame shows a roster screen.
+ * @param look.iconList The chance that the list is a table of icons. Such a look counts as no roster screen.
  * @param look.castAt The time when the cast of the scene was last written.
  */
-export function observeRosterLook(watch: RosterWatch, look: { at: number, probability: number, castAt?: number }): { watch: RosterWatch, wanted: boolean } {
-  if (look.probability < SCREEN_ROSTER.threshold) {
+export function observeRosterLook(watch: RosterWatch, look: { at: number, probability: number, iconList?: number, castAt?: number }): { watch: RosterWatch, wanted: boolean } {
+  if (look.probability < SCREEN_ROSTER.threshold || (look.iconList ?? 0) >= SCREEN_ROSTER.iconListLimit) {
     if (watch.since === undefined)
       return { watch, wanted: false }
     const below = watch.below + 1

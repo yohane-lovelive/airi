@@ -459,7 +459,7 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
     lastLook.value = look
     const sessionId = activeSessionId.value
     const castAt = timeline.timelineOf(sessionId).cast?.at
-    const observed = observeRosterLook(rosterWatch, { at: look.at, probability: look.roster, ...(castAt !== undefined ? { castAt } : {}) })
+    const observed = observeRosterLook(rosterWatch, { at: look.at, probability: look.roster, iconList: look.iconList, ...(castAt !== undefined ? { castAt } : {}) })
     rosterWatch = observed.watch
     if (observed.wanted)
       void readCast(sessionId)
@@ -467,7 +467,8 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
 
   /**
    * Reads the cast of the scene from the roster screen that shows now, in a turn without speech. The reply holds only
-   * markers, so nothing is spoken or stored, and the chat store writes the cast to the timeline.
+   * markers, so nothing is spoken or stored. The chat store finds the owner in the roster and writes the cast to the
+   * timeline.
    *
    * The owner comes first, and one turn runs at a time. A read that cannot start now starts at a later look, while the
    * roster screen still shows.
@@ -482,12 +483,7 @@ export const useInitiativeRunnerStore = defineStore('initiative-runner', () => {
     running = turn
     rosterWatch = startRosterRead(rosterWatch, now)
     try {
-      const known = await timeline.load(sessionId).catch(() => timeline.timelineOf(sessionId))
-      const text = castReadNoticeText({
-        now,
-        timeline: known,
-        ...(memory.enabled ? { ownerAccounts: gameAccounts(memory.entries, chat.personaOf(sessionId)) } : {}),
-      })
+      const text = castReadNoticeText()
       const attachments = [await imageAttachment(frame.image)]
       // The owner started to type or to speak while the frame was read.
       if (turn.dropped)
